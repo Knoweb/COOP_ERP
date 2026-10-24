@@ -22,6 +22,7 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.api.ActivateLocation;
 import lk.coopfed.knoweb.m1party.api.ActivateRelationship;
 import lk.coopfed.knoweb.m1party.api.OpenTradingRelationship;
 import lk.coopfed.knoweb.m1party.api.RegisterTillPosition;
@@ -110,6 +111,7 @@ public class DemoDataLoader {
     private final Handles<PublishPriceList, UUID> publishPriceList;
     private final Handles<OpenTradingRelationship, UUID> openRelationship;
     private final Handles<ActivateRelationship, UUID> activateRelationship;
+    private final Handles<ActivateLocation, UUID> activateLocation;
     private final Handles<PrepareOpeningBalance, UUID> prepareOpeningBalance;
     private final Handles<SignOpeningBalance, UUID> signOpeningBalance;
     private final Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance;
@@ -152,6 +154,7 @@ public class DemoDataLoader {
             Handles<PublishPriceList, UUID> publishPriceList,
             Handles<OpenTradingRelationship, UUID> openRelationship,
             Handles<ActivateRelationship, UUID> activateRelationship,
+            Handles<ActivateLocation, UUID> activateLocation,
             Handles<PrepareOpeningBalance, UUID> prepareOpeningBalance,
             Handles<SignOpeningBalance, UUID> signOpeningBalance,
             Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance,
@@ -183,6 +186,7 @@ public class DemoDataLoader {
         this.publishPriceList = publishPriceList;
         this.openRelationship = openRelationship;
         this.activateRelationship = activateRelationship;
+        this.activateLocation = activateLocation;
         this.prepareOpeningBalance = prepareOpeningBalance;
         this.signOpeningBalance = signOpeningBalance;
         this.countersignOpeningBalance = countersignOpeningBalance;
@@ -489,6 +493,7 @@ public class DemoDataLoader {
             Actor stores, Actor countersigner, List<Item> items, Map<String, UUID> skus, boolean federation) {
         ScopeContext scope = scopeOf(stores);
         if (!inventory.skusWithLots(stores.locationId(), scope).isEmpty()) {
+            activateAfterOpening(stores.locationId(), countersigner);
             return;
         }
         LocalDate today = today();
@@ -515,6 +520,7 @@ public class DemoDataLoader {
         count("SignOpeningBalance");
         countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(countersigner));
         count("CountersignOpeningBalance");
+        activateAfterOpening(stores.locationId(), countersigner);
     }
 
     // ---- M5, phase 3: the society's stores stock and the shops' first stock ----------------------
@@ -530,6 +536,7 @@ public class DemoDataLoader {
         Actor buyer = DemoCast.M101_BUYER;
         ScopeContext scope = scopeOf(buyer);
         if (!inventory.skusWithLots(DemoCast.M101_WAREHOUSE, scope).isEmpty()) {
+            activateAfterOpening(DemoCast.M101_WAREHOUSE, DemoCast.M101_MANAGER);
             return;
         }
         LocalDate today = today();
@@ -545,6 +552,7 @@ public class DemoDataLoader {
         count("SignOpeningBalance");
         countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.M101_MANAGER));
         count("CountersignOpeningBalance");
+        activateAfterOpening(DemoCast.M101_WAREHOUSE, DemoCast.M101_MANAGER);
     }
 
     /**
@@ -558,6 +566,7 @@ public class DemoDataLoader {
             Actor staff, Actor manager, List<DemoShopStock.Shelf> shelves, List<Item> items, Map<String, UUID> skus) {
         ScopeContext scope = scopeOf(staff);
         if (!inventory.skusWithLots(staff.locationId(), scope).isEmpty()) {
+            activateAfterOpening(staff.locationId(), manager);
             return;
         }
         LocalDate today = today();
@@ -577,6 +586,18 @@ public class DemoDataLoader {
         count("SignOpeningBalance");
         countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(manager));
         count("CountersignOpeningBalance");
+        activateAfterOpening(staff.locationId(), manager);
+    }
+
+    /** Complete the onboarding sequence after the posted OPB, including a partially completed rerun. */
+    private void activateAfterOpening(UUID locationId, Actor actor) {
+        ScopeContext scope = scopeOf(actor);
+        LocationView location = party.getLocation(locationId, scope)
+                .orElseThrow(() -> new IllegalStateException("Demo location not found: " + locationId));
+        if ("ONBOARDING".equals(location.status())) {
+            activateLocation.handle(new ActivateLocation(locationId), scope);
+            count("ActivateLocation");
+        }
     }
 
     /** A line of a society's opening stock: the demo batch of the item, at the distributor's price. */

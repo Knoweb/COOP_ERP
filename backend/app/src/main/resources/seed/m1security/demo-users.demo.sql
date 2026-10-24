@@ -96,7 +96,7 @@ WITH job (role_id, codes) AS (
         -- of the terms with bil.creditlimit.change), and the second signature on the opening balance
         ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.creditnote.issue', 'bil.debitnote.issue',
-            'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
+            'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'prt.relationship.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
@@ -130,13 +130,13 @@ WITH job (role_id, codes) AS (
         -- distributor accounts
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
-            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate', 'prt.relationship.view',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
-            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate', 'prt.relationship.view',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),

@@ -48,7 +48,8 @@ ON CONFLICT (entity_id) DO NOTHING;
 --            0190f0de-0000-7000-8000-000000000133  S02   M101 Hettipola shop
 --            0190f0de-0000-7000-8000-000000000142  S01   M102 Pannala shop
 --            0190f0de-0000-7000-8000-000000000152  S01   M103 Point Pedro shop
--- The shops are ACTIVE, so that the loader can give each its till positions and primary till.
+-- Locations that receive an opening balance start ONBOARDING; the loader posts the OPB and then
+-- activates them through M1. Transfer-funded shops are already ACTIVE and receive no OPB.
 
 INSERT INTO party.location (
     location_id, owner_entity_id, location_code, location_type, name_en, name_si, name_ta,
@@ -57,16 +58,16 @@ INSERT INTO party.location (
 VALUES
     ('0190f0de-0000-7000-8000-000000000101', '0190f000-0000-7000-8000-000000000001', 'FW01', 'WAREHOUSE',
      'Federation central warehouse, Peliyagoda', 'සම්මේලන මධ්‍යම ගබඩාව, පෑලියගොඩ', 'கூட்டமைப்பு மத்திய களஞ்சியம், பேலியகொடை',
-     'Gampaha', 'en', NULL, 'L', true, 'ACTIVE'),
+     'Gampaha', 'en', NULL, 'L', true, 'ONBOARDING'),
     ('0190f0de-0000-7000-8000-000000000111', '0190f0de-0000-7000-8000-0000000000e1', 'W01', 'WAREHOUSE',
      'Kurunegala warehouse', 'කුරුණෑගල ගබඩාව', 'குருநாகல் களஞ்சியம்',
-     'Kurunegala', 'si', NULL, 'L', true, 'ACTIVE'),
+     'Kurunegala', 'si', NULL, 'L', true, 'ONBOARDING'),
     ('0190f0de-0000-7000-8000-000000000121', '0190f0de-0000-7000-8000-0000000000e2', 'W01', 'WAREHOUSE',
      'Jaffna warehouse', 'යාපනය ගබඩාව', 'யாழ்ப்பாணம் களஞ்சியம்',
-     'Jaffna', 'ta', NULL, 'L', true, 'ACTIVE'),
+     'Jaffna', 'ta', NULL, 'L', true, 'ONBOARDING'),
     ('0190f0de-0000-7000-8000-000000000131', '0190f0de-0000-7000-8000-0000000000e3', 'W01', 'WAREHOUSE',
      'Kuliyapitiya stores', 'කුලියාපිටිය ගබඩාව', 'குளியாப்பிட்டி களஞ்சியம்',
-     'Kurunegala', 'si', NULL, 'M', true, 'ACTIVE'),
+     'Kurunegala', 'si', NULL, 'M', true, 'ONBOARDING'),
     ('0190f0de-0000-7000-8000-000000000132', '0190f0de-0000-7000-8000-0000000000e3', 'S01', 'SHOP',
      'Kuliyapitiya town shop', 'කුලියාපිටිය නගර සාප්පුව', 'குளியாப்பிட்டி நகரக் கடை',
      'Kurunegala', 'si',
@@ -81,12 +82,12 @@ VALUES
      'Pannala shop', 'පන්නල සාප්පුව', 'பன்னல கடை',
      'Kurunegala', 'si',
      '[{"day":"MON","opens":"08:00","closes":"19:00"},{"day":"TUE","opens":"08:00","closes":"19:00"},{"day":"WED","opens":"08:00","closes":"19:00"},{"day":"THU","opens":"08:00","closes":"19:00"},{"day":"FRI","opens":"08:00","closes":"19:00"},{"day":"SAT","opens":"08:00","closes":"13:00"}]',
-     'S', true, 'ACTIVE'),
+     'S', true, 'ONBOARDING'),
     ('0190f0de-0000-7000-8000-000000000152', '0190f0de-0000-7000-8000-0000000000e5', 'S01', 'SHOP',
      'Point Pedro shop', 'පේදුරුතුඩුව සාප්පුව', 'பருத்தித்துறை கடை',
      'Jaffna', 'ta',
      '[{"day":"MON","opens":"07:30","closes":"19:30"},{"day":"TUE","opens":"07:30","closes":"19:30"},{"day":"WED","opens":"07:30","closes":"19:30"},{"day":"THU","opens":"07:30","closes":"19:30"},{"day":"FRI","opens":"07:30","closes":"19:30"},{"day":"SAT","opens":"07:30","closes":"13:00"}]',
-     'S', true, 'ACTIVE')
+     'S', true, 'ONBOARDING')
 ON CONFLICT (location_id) DO NOTHING;
 
 -- M7, the privacy requests (29 September 2026, branch feat/m7-limits-privacy-snapshot): the

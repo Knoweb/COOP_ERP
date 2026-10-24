@@ -110,15 +110,33 @@ public final class InventoryFixture {
     }
 
     public UUID location(UUID owner, String type) {
+        return location(owner, type, null);
+    }
+
+    /** A location in an explicit lifecycle status; null keeps M1's PLANNED default. */
+    public UUID location(UUID owner, String type, String status) {
         UUID id = Ids.next();
-        admin.update(
-                "insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en)"
-                        + " values (?, ?, ?, ?, ?)",
-                id,
-                owner,
-                "L" + id.toString().replace("-", "").substring(22).toUpperCase(),
-                type,
-                "M5 test " + type);
+        if (status == null) {
+            admin.update(
+                    "insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en)"
+                            + " values (?, ?, ?, ?, ?)",
+                    id,
+                    owner,
+                    "L" + id.toString().replace("-", "").substring(22).toUpperCase(),
+                    type,
+                    "M5 test " + type);
+        } else {
+            admin.update(
+                    "insert into party.location"
+                            + " (location_id, owner_entity_id, location_code, location_type, name_en, status)"
+                            + " values (?, ?, ?, ?, ?, ?)",
+                    id,
+                    owner,
+                    "L" + id.toString().replace("-", "").substring(22).toUpperCase(),
+                    type,
+                    "M5 test " + type,
+                    status);
+        }
         locations.add(id);
         return id;
     }

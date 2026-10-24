@@ -11,8 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
+import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.m1party.api.ActivateLocation;
+import lk.coopfed.knoweb.m1party.api.LocationActivated;
 import lk.coopfed.knoweb.m5inventory.InventoryFixture;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
@@ -54,6 +57,9 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     InventoryQueries queries;
 
+    @Autowired
+    Handles<ActivateLocation, UUID> activateLocation;
+
     private InventoryFixture fixture;
     private UUID shop;
     private UUID sku;
@@ -64,7 +70,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         fixture = new InventoryFixture(superuserJdbc());
         fixture.clean();
         fixture.entity(MPCS, "M5OB", "MPCS");
-        shop = fixture.location(MPCS, "SHOP");
+        shop = fixture.location(MPCS, "WAREHOUSE", "ONBOARDING");
         sku = fixture.sku(MPCS, "DHAL1");
         batch = fixture.batch(sku, MPCS, "D1", LocalDate.of(2027, 5, 31));
         kernel.reset();
@@ -180,7 +186,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         // M2's own guard answers for the counted batch: this item needs an expiry date.
         fixture.clean();
         fixture.entity(MPCS, "M5OB", "MPCS");
-        shop = fixture.location(MPCS, "SHOP");
+        shop = fixture.location(MPCS, "WAREHOUSE", "ONBOARDING");
         sku = fixture.sku(MPCS, "DHAL2");
         OpeningBalanceLine noExpiry = new OpeningBalanceLine(
                 null, LotCondition.GOOD, BigDecimal.ONE, BigDecimal.ONE, sku, "NEW-8", null, new BigDecimal("120.00"));
@@ -220,6 +226,45 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
 
         prepare.handle(command(line("1", "1")), own(MPCS));
         assertProblem(() -> prepare.handle(command(line("1", "1")), own(MPCS)), "m5.opening.already_open");
+    }
+
+    @Test
+    void onlyAnOnboardingLocationCanPrepareAndItCannotActivateUntilTheBalanceIsPosted() {
+        superuserJdbc().update("update party.location set connectivity_spec_met = true where location_id = ?", shop);
+
+        kernel.reset();
+        assertProblem(
+                () -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)),
+                "m5.opening.required_before_activation");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        UUID id = prepare.handle(command(line("3", "10")), own(MPCS));
+        sign.handle(new SignOpeningBalance(id), own(MPCS, OFFICER));
+        assertProblem(
+                () -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)),
+                "m5.opening.required_before_activation");
+
+        countersign.handle(new CountersignOpeningBalance(id), own(MPCS, FEDERATION_OFFICER));
+        kernel.reset();
+        activateLocation.handle(new ActivateLocation(shop), own(MPCS));
+
+        assertThat(superuserJdbc()
+                        .queryForObject("select status from party.location where location_id = ?", String.class, shop))
+                .isEqualTo("ACTIVE");
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("LOCATION_ACTIVATED");
+        assertThat(events(LocationActivated.class))
+                .containsExactly(new LocationActivated(shop, MPCS, "WAREHOUSE", "ONBOARDING"));
+
+        for (String status : List.of("PLANNED", "ACTIVE", "DORMANT")) {
+            UUID outsideOnboarding = fixture.location(MPCS, "WAREHOUSE", status);
+            assertProblem(
+                    () -> prepare.handle(
+                            new PrepareOpeningBalance(outsideOnboarding, List.of(line("1", "1"))), own(MPCS)),
+                    "m5.opening.location_not_onboarding");
+        }
     }
 
     @Test
