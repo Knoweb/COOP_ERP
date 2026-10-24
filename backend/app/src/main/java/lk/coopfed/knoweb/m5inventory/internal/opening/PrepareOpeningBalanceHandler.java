@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.m5inventory.internal.opening;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -13,6 +14,7 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.api.BatchRegistration;
 import lk.coopfed.knoweb.m2catalogue.api.RegisterBatch;
@@ -30,16 +32,15 @@ import org.springframework.transaction.annotation.Transactional;
  * stock of a location, with batch data and cost, before anyone signs it.
  *
  * <p>Guards, in order: an OWN scope ({@code m5.scope.own_required}); the location one of the
- * scope entity's that the scope reads ({@code m5.location.not_in_scope}); no stock has moved at it
+ * scope entity's that the scope reads ({@code m5.location.not_in_scope}); the location is
+ * ONBOARDING ({@code m5.opening.location_not_onboarding}); no stock has moved at it
  * ({@code m5.opening.location_has_stock}: an opening balance is the first stock of a location,
  * R-02); none in preparation for it ({@code m5.opening.already_open}); at least one line
  * ({@code m5.opening.lines_required}); each line's batch known to M2 ({@code m5.batch.not_found}),
  * its quantity above zero with at most three decimals and its cost zero or more with at most four
  * ({@code m5.opening.line_invalid}).
  *
- * <p>25A's "location ONBOARDING" guard is not applied: the demo loads the opening stock of
- * locations that are active already (recorded in the README). Audit {@code OPB_PREPARED}; event
- * {@code opening_balance.changed.v1} with status DRAFT.
+ * <p>Audit {@code OPB_PREPARED}; event {@code opening_balance.changed.v1} with status DRAFT.
  */
 @Service
 @CommandHandler(permission = "inv.opening.prepare")
@@ -79,11 +80,18 @@ class PrepareOpeningBalanceHandler implements Handles<PrepareOpeningBalance, UUI
             throw new ProblemException("m5.scope.own_required");
         }
         UUID location = command.locationId();
-        if (location == null
-                || party.getLocation(location, scope)
-                        .filter(l -> scope.entityId().equals(l.ownerEntityId()))
-                        .isEmpty()) {
+        Optional<LocationView> locationView = location == null
+                ? Optional.empty()
+                : party.getLocation(location, scope)
+                        .filter(l -> scope.entityId().equals(l.ownerEntityId()));
+        if (locationView.isEmpty()) {
             throw new ProblemException("m5.location.not_in_scope", Map.of("locationId", String.valueOf(location)));
+        }
+        LocationView ownedLocation = locationView.orElseThrow();
+        if (!"ONBOARDING".equals(ownedLocation.status())) {
+            throw new ProblemException(
+                    "m5.opening.location_not_onboarding",
+                    Map.of("locationId", location, "status", ownedLocation.status()));
         }
         if (store.locationHasMovements(location)) {
             throw new ProblemException("m5.opening.location_has_stock", Map.of("locationId", location));

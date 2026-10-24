@@ -123,6 +123,8 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void threeEntitiesAndNothingElse() {
         JdbcTemplate admin = superuserJdbc();
+        admin.update(
+                "delete from inventory.opening_balance where owner_entity_id in (?, ?, ?)", MPCS, OTHER, SUSPENDED);
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?, ?)", MPCS, OTHER, SUSPENDED);
         admin.update("delete from security.user_role where user_id = ?", OPERATOR);
         admin.update("delete from security.app_user where user_id = ?", OPERATOR);
@@ -339,6 +341,10 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         insertOperator(shop, "PENDING");
         refused(() -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)), "m1.location.operator_required");
         superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", OPERATOR);
+        refused(
+                () -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)),
+                "m5.opening.required_before_activation");
+        insertPostedOpeningBalance(shop);
         kernel.reset();
         activateLocation.handle(new ActivateLocation(shop), own(MPCS));
         assertThat(status(shop)).isEqualTo("ACTIVE");
@@ -385,6 +391,10 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         startOnboarding.handle(new StartLocationOnboarding(warehouse), own(MPCS));
         confirmConnectivity.handle(new ConfirmLocationConnectivity(warehouse), own(MPCS));
 
+        refused(
+                () -> activateLocation.handle(new ActivateLocation(warehouse), own(MPCS)),
+                "m5.opening.required_before_activation");
+        insertPostedOpeningBalance(warehouse);
         activateLocation.handle(new ActivateLocation(warehouse), own(MPCS));
 
         assertThat(status(warehouse)).isEqualTo("ACTIVE");
@@ -938,6 +948,17 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
     private static String status(UUID location) {
         return superuserJdbc()
                 .queryForObject("select status from party.location where location_id = ?", String.class, location);
+    }
+
+    private static void insertPostedOpeningBalance(UUID location) {
+        superuserJdbc()
+                .update(
+                        "insert into inventory.opening_balance"
+                                + " (opening_balance_id, owner_entity_id, location_id, status)"
+                                + " values (?, ?, ?, 'POSTED')",
+                        lk.coopfed.knoweb.kernel.api.Ids.next(),
+                        MPCS,
+                        location);
     }
 
     private static void insertEntity(JdbcTemplate admin, UUID id, String code, String status) {

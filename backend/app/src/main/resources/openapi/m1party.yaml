@@ -47,6 +47,9 @@
 #
 # 1.5.0 (CAT-08, bulk network register): POST /v1/party/locations/bulk bulk registers a network
 # of shops, till positions, users and devices in one transaction. Additive.
+# CR-21A-8 (INV-08): the Java-only m1party::api contract gains
+# LocationActivationPrerequisite so another module can contribute an activation guard without M1
+# depending on that module. The REST slice is unchanged, so its version remains 1.5.0.
 openapi: 3.1.0
 
 info:
@@ -56,7 +59,7 @@ info:
   # 1.4.4 (wave 3 review) and 1.4.5 (wave 4 review) are described in the header above.
   # 1.5.0 (CAT-08) adds bulkRegisterNetwork for shops, positions, users, and devices.
   version: 1.5.0
-  x-change-request: CR-18-2
+  x-change-request: CR-21A-8
 
 paths:
 

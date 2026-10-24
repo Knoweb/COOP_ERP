@@ -152,7 +152,7 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void anOpeningBalanceLineCanCarryItsBatchAsCountedOverHttp() {
         fixture.entity(MPCS, "M5HT", "MPCS");
-        UUID store = fixture.location(MPCS, "WAREHOUSE");
+        UUID store = fixture.location(MPCS, "WAREHOUSE", "ONBOARDING");
 
         ResponseEntity<JsonNode> prepared = post(
                 "/v1/inventory/opening-balances",
@@ -186,7 +186,7 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void anOpeningBalanceIsPreparedSignedAndCountersignedOverHttp() {
         fixture.entity(MPCS, "M5HT", "MPCS");
-        UUID shop = fixture.location(MPCS, "SHOP");
+        UUID shop = fixture.location(MPCS, "SHOP", "ONBOARDING");
         UUID signer = UUID.fromString("0190e677-0000-7000-8000-000000000011");
         UUID countersigner = UUID.fromString("0190e677-0000-7000-8000-000000000012");
 

@@ -16,6 +16,8 @@
   "m5.delivery.line_invalid": "A delivery line needs an item and a quantity above zero",
   "m5.pick_list.not_found": "The delivery note has no pick list yet",
   "m5.opening.location_has_stock": "Stock has already moved at this location; an opening balance is only for a location without stock",
+  "m5.opening.location_not_onboarding": "An opening balance can only be prepared while the location is onboarding",
+  "m5.opening.required_before_activation": "Post the location’s opening balance before activating it",
   "m5.opening.already_open": "An opening balance for this location is already being prepared",
   "m5.opening.lines_required": "An opening balance needs at least one counted line",
   "m5.opening.line_invalid": "A counted line needs a batch, a quantity above zero and a cost of zero or more",
