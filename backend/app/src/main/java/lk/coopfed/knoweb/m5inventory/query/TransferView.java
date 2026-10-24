@@ -7,7 +7,8 @@ import java.util.UUID;
 
 /**
  * A transfer between two locations of one entity (doc 25 flow 6.6): ISSUED until the source
- * dispatches it, IN_TRANSIT until the destination receives it, then RECEIVED.
+ * dispatches it, IN_TRANSIT until the destination receives it, then RECEIVED; cancellation before
+ * receipt is CANCELLED.
  */
 public record TransferView(
         UUID transferId,
@@ -21,7 +22,18 @@ public record TransferView(
         Instant dispatchedAt,
         UUID receivedBy,
         Instant receivedAt,
+        UUID shortfallId,
+        String shortfallStatus,
+        String shortfallCategory,
         List<Line> lines) {
 
-    public record Line(int lineNo, UUID batchId, UUID skuId, BigDecimal qty, BigDecimal unitCost) {}
+    public record Line(
+            UUID transferLineId,
+            int lineNo,
+            UUID batchId,
+            UUID skuId,
+            BigDecimal qty,
+            BigDecimal unitCost,
+            BigDecimal receivedQty,
+            BigDecimal shortfallQty) {}
 }

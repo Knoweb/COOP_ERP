@@ -29,6 +29,11 @@ public class TransferOverdueStore {
                          from inventory.transfer_receipt r
                         where r.transfer_id = d.transfer_id
                    )
+               and not exists (
+                       select 1
+                         from inventory.transfer_cancellation c
+                        where c.transfer_id = d.transfer_id
+                   )
             """;
 
     private final JdbcTemplate jdbc;

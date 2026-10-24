@@ -11,6 +11,7 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
+import lk.coopfed.knoweb.m5inventory.api.CancelTransfer;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
@@ -26,6 +27,7 @@ import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.CancelTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.InventoryApi;
 import lk.coopfed.knoweb.m5inventory.web.generated.IssueTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.LotBalanceResponse;
@@ -35,6 +37,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
@@ -61,6 +64,7 @@ class InventoryController implements InventoryApi {
     private final Handles<IssueTransfer, UUID> issueTransfer;
     private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
+    private final Handles<CancelTransfer, UUID> cancelTransfer;
 
     InventoryController(
             InventoryQueries queries,
@@ -71,7 +75,8 @@ class InventoryController implements InventoryApi {
             Handles<CountersignOpeningBalance, UUID> countersign,
             Handles<IssueTransfer, UUID> issueTransfer,
             Handles<DispatchTransfer, UUID> dispatchTransfer,
-            Handles<ReceiveTransfer, UUID> receiveTransfer) {
+            Handles<ReceiveTransfer, UUID> receiveTransfer,
+            Handles<CancelTransfer, UUID> cancelTransfer) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
@@ -81,6 +86,7 @@ class InventoryController implements InventoryApi {
         this.issueTransfer = issueTransfer;
         this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
+        this.cancelTransfer = cancelTransfer;
     }
 
     // ---- transfers (M5-09) ----------------------------------------------------------------
@@ -123,9 +129,30 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
-    public ResponseEntity<TransferResponse> receiveTransfer(String idempotencyKey, UUID transferId) {
+    public ResponseEntity<TransferResponse> receiveTransfer(
+            String idempotencyKey, UUID transferId, ReceiveTransferRequest request) {
         ScopeContext scope = currentScope.get();
-        receiveTransfer.handle(new ReceiveTransfer(transferId), scope);
+        ReceiveTransfer command = request == null
+                ? new ReceiveTransfer(transferId)
+                : new ReceiveTransfer(
+                        transferId,
+                        request.getLines().stream()
+                                .map(line -> line == null
+                                        ? null
+                                        : new ReceiveTransfer.Line(line.getTransferLineId(), line.getReceivedQty()))
+                                .toList());
+        receiveTransfer.handle(command, scope);
+        return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<TransferResponse> cancelTransfer(
+            String idempotencyKey, UUID transferId, CancelTransferRequest request) {
+        ScopeContext scope = currentScope.get();
+        cancelTransfer.handle(
+                new CancelTransfer(
+                        transferId, request.getReason(), Boolean.TRUE.equals(request.getPhysicalReturnVerified())),
+                scope);
         return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
     }
 
@@ -136,7 +163,10 @@ class InventoryController implements InventoryApi {
                         t.toLocationId(),
                         TransferResponse.StatusEnum.fromValue(t.status()),
                         t.lines().stream()
-                                .map(l -> new TransferLineResponse(l.lineNo(), l.batchId(), l.skuId(), l.qty()))
+                                .map(l -> new TransferLineResponse(
+                                                l.transferLineId(), l.lineNo(), l.batchId(), l.skuId(), l.qty())
+                                        .receivedQty(l.receivedQty())
+                                        .shortfallQty(l.shortfallQty()))
                                 .toList())
                 .issuedBy(t.issuedBy())
                 .issuedAt(t.issuedAt())
@@ -144,7 +174,16 @@ class InventoryController implements InventoryApi {
                 .dispatchedBy(t.dispatchedBy())
                 .dispatchedAt(t.dispatchedAt())
                 .receivedBy(t.receivedBy())
-                .receivedAt(t.receivedAt());
+                .receivedAt(t.receivedAt())
+                .shortfallId(t.shortfallId())
+                .shortfallStatus(
+                        t.shortfallStatus() == null
+                                ? null
+                                : TransferResponse.ShortfallStatusEnum.fromValue(t.shortfallStatus()))
+                .shortfallCategory(
+                        t.shortfallCategory() == null
+                                ? null
+                                : TransferResponse.ShortfallCategoryEnum.fromValue(t.shortfallCategory()));
     }
 
     // ---- reads ----------------------------------------------------------------------------

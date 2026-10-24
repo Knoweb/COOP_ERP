@@ -372,11 +372,15 @@ class InventoryQueriesImpl implements InventoryQueries {
                 select t.transfer_id, t.location_id, t.to_location_id, t.issued_by, t.issued_at,
                        d.doc_number_display,
                        x.dispatched_by, x.dispatched_at, x.transfer_id is not null as dispatched,
-                       r.received_by, r.received_at, r.transfer_id is not null as received
+                       r.received_by, r.received_at, r.transfer_id is not null as received,
+                       c.transfer_id is not null as cancelled,
+                       s.shortfall_id, s.status as shortfall_status, s.category as shortfall_category
                   from inventory.transfer t
                   left join kernel.document d on d.document_id = t.transfer_id
                   left join inventory.transfer_dispatch x on x.transfer_id = t.transfer_id
                   left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                  left join inventory.transfer_cancellation c on c.transfer_id = t.transfer_id
+                  left join inventory.transfer_shortfall s on s.transfer_id = t.transfer_id
                  where """
                         + " " + condition
                         + " order by t.issued_at desc, t.transfer_id",
@@ -385,9 +389,11 @@ class InventoryQueriesImpl implements InventoryQueries {
                     OffsetDateTime issued = rs.getObject("issued_at", OffsetDateTime.class);
                     OffsetDateTime dispatched = rs.getObject("dispatched_at", OffsetDateTime.class);
                     OffsetDateTime received = rs.getObject("received_at", OffsetDateTime.class);
-                    String status = rs.getBoolean("received")
-                            ? "RECEIVED"
-                            : rs.getBoolean("dispatched") ? "IN_TRANSIT" : "ISSUED";
+                    String status = rs.getBoolean("cancelled")
+                            ? "CANCELLED"
+                            : rs.getBoolean("received")
+                                    ? "RECEIVED"
+                                    : rs.getBoolean("dispatched") ? "IN_TRANSIT" : "ISSUED";
                     return new TransferView(
                             id,
                             rs.getObject("location_id", UUID.class),
@@ -400,6 +406,9 @@ class InventoryQueriesImpl implements InventoryQueries {
                             dispatched == null ? null : dispatched.toInstant(),
                             rs.getObject("received_by", UUID.class),
                             received == null ? null : received.toInstant(),
+                            rs.getObject("shortfall_id", UUID.class),
+                            rs.getString("shortfall_status"),
+                            rs.getString("shortfall_category"),
                             transferLines(id));
                 },
                 args);
@@ -408,17 +417,25 @@ class InventoryQueriesImpl implements InventoryQueries {
     private List<TransferView.Line> transferLines(UUID transferId) {
         return jdbc.query(
                 """
-                select line_no, batch_id, sku_id, qty, unit_cost
-                  from inventory.transfer_line
-                 where transfer_id = ?
-                 order by line_no
+                select l.line_id, l.line_no, l.batch_id, l.sku_id, l.qty, l.unit_cost,
+                       r.received_qty, s.shortfall_qty
+                  from inventory.transfer_line l
+                  left join inventory.transfer_receipt_line r
+                    on r.transfer_id = l.transfer_id and r.transfer_line_id = l.line_id
+                  left join inventory.transfer_shortfall_line s
+                    on s.transfer_id = l.transfer_id and s.transfer_line_id = l.line_id
+                 where l.transfer_id = ?
+                 order by l.line_no
                 """,
                 (rs, n) -> new TransferView.Line(
+                        rs.getObject("line_id", UUID.class),
                         rs.getInt("line_no"),
                         rs.getObject("batch_id", UUID.class),
                         rs.getObject("sku_id", UUID.class),
                         rs.getBigDecimal("qty"),
-                        rs.getBigDecimal("unit_cost")),
+                        rs.getBigDecimal("unit_cost"),
+                        rs.getBigDecimal("received_qty"),
+                        rs.getBigDecimal("shortfall_qty")),
                 transferId);
     }
 
