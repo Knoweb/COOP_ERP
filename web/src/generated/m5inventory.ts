@@ -169,7 +169,7 @@ export interface paths {
         put?: never;
         /**
          * The Federation's officer countersigns; the OPB is issued and the stock posted
-         * @description Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.opening.user_required, m5.opening.federation_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown, m2.sku.not_found, m2.batch.sku_not_active, m2.batch.batch_no_too_long, m2.batch.mrp_required, m2.batch.mrp_invalid, m2.batch.expiry_required, m2.batch.dates_invalid; mfa.required when the second factor is not fresh.
          */
         post: operations["countersignOpeningBalance"];
         delete?: never;
@@ -804,7 +804,7 @@ export interface components {
             locationId: string;
             lines: components["schemas"]["OpeningBalanceLineRequest"][];
         };
-        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires), which the prepare registers in M2 (M5-12). */
+        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires). The counted attributes remain on the signed line and the Federation countersign registers the batch in M2 in the posting transaction. */
         OpeningBalanceLineRequest: {
             /** Format: uuid */
             batchId?: string;
@@ -842,9 +842,13 @@ export interface components {
         OpeningBalanceLineResponse: {
             lineNo: number;
             /** Format: uuid */
-            batchId: string;
+            batchId?: string;
             /** Format: uuid */
             skuId: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
             /** @enum {string} */
             condition: "GOOD" | "DAMAGED";
             qty: number;

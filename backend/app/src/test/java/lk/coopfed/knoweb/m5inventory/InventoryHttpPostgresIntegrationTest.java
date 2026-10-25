@@ -180,7 +180,17 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(HttpStatus.CREATED);
         JsonNode line = prepared.getBody().get("lines").get(0);
         assertThat(line.get("skuId").asText()).isEqualTo(sku.toString());
-        assertThat(line.get("batchId").asText()).isNotBlank();
+        assertThat(line.path("batchId").isMissingNode() || line.path("batchId").isNull())
+                .isTrue();
+        assertThat(line.get("batchNo").asText()).isEqualTo("HTTP-OB-1");
+        assertThat(line.get("expiryDate").asText()).isEqualTo("2027-12-31");
+        assertThat(line.get("printedMrp").decimalValue()).isEqualByComparingTo("250");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from catalogue.batch where sku_id = ? and batch_no = 'HTTP-OB-1'",
+                                Integer.class,
+                                sku))
+                .isZero();
     }
 
     @Test
@@ -206,10 +216,10 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
         ResponseEntity<JsonNode> refused = post("/v1/inventory/opening-balances/" + id + "/countersign", null, signer);
         assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(refused.getBody().get("code").asText()).isEqualTo("m5.opening.countersigner_is_signer");
+        assertThat(refused.getBody().get("code").asText()).isEqualTo("m5.opening.federation_required");
 
         ResponseEntity<JsonNode> posted =
-                post("/v1/inventory/opening-balances/" + id + "/countersign", null, countersigner);
+                postAs("/v1/inventory/opening-balances/" + id + "/countersign", null, countersigner, TEST_FEDERATION);
         assertThat(posted.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(posted.getBody().get("status").asText()).isEqualTo("POSTED");
         assertThat(posted.getBody().get("documentId").asText()).isNotBlank();
@@ -616,7 +626,15 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private ResponseEntity<JsonNode> post(String url, Object body, UUID user, UUID idempotencyKey) {
-        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(user, MPCS);
+        return postAs(url, body, user, MPCS, idempotencyKey);
+    }
+
+    private ResponseEntity<JsonNode> postAs(String url, Object body, UUID user, UUID entity) {
+        return postAs(url, body, user, entity, UUID.randomUUID());
+    }
+
+    private ResponseEntity<JsonNode> postAs(String url, Object body, UUID user, UUID entity, UUID idempotencyKey) {
+        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(user, entity);
         headers.set("Idempotency-Key", idempotencyKey.toString());
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
         return http.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), JsonNode.class);

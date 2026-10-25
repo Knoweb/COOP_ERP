@@ -311,7 +311,8 @@ class InventoryQueriesImpl implements InventoryQueries {
     public Optional<OpeningBalanceView> openingBalance(UUID openingBalanceId, ScopeContext scope) {
         List<OpeningBalanceView.Line> lines = jdbc.query(
                 """
-                select line_no, batch_id, sku_id, condition, qty, unit_cost
+                select line_no, batch_id, sku_id, condition, qty, unit_cost,
+                       batch_no, expiry_date, printed_mrp
                   from inventory.opening_balance_line
                  where opening_balance_id = ?
                  order by line_no
@@ -322,7 +323,10 @@ class InventoryQueriesImpl implements InventoryQueries {
                         rs.getObject("sku_id", UUID.class),
                         rs.getString("condition"),
                         rs.getBigDecimal("qty"),
-                        rs.getBigDecimal("unit_cost")),
+                        rs.getBigDecimal("unit_cost"),
+                        rs.getString("batch_no"),
+                        rs.getObject("expiry_date", java.time.LocalDate.class),
+                        rs.getBigDecimal("printed_mrp")),
                 openingBalanceId);
         return jdbc
                 .query(

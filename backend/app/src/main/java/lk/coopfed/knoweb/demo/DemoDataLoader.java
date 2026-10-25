@@ -487,13 +487,13 @@ public class DemoDataLoader {
         count("ActivateRelationship");
     }
 
-    // ---- M5: opening stock, prepared and signed by stores, countersigned by accounts ---------------
+    // ---- M5: opening stock, prepared and signed locally, countersigned by the Federation -----------
 
     private void openingStock(
-            Actor stores, Actor countersigner, List<Item> items, Map<String, UUID> skus, boolean federation) {
+            Actor stores, Actor activator, List<Item> items, Map<String, UUID> skus, boolean federation) {
         ScopeContext scope = scopeOf(stores);
         if (!inventory.skusWithLots(stores.locationId(), scope).isEmpty()) {
-            activateAfterOpening(stores.locationId(), countersigner);
+            activateAfterOpening(stores.locationId(), activator);
             return;
         }
         LocalDate today = today();
@@ -518,9 +518,9 @@ public class DemoDataLoader {
         count("PrepareOpeningBalance");
         signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
         count("SignOpeningBalance");
-        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(countersigner));
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.FED_ACCOUNTS));
         count("CountersignOpeningBalance");
-        activateAfterOpening(stores.locationId(), countersigner);
+        activateAfterOpening(stores.locationId(), activator);
     }
 
     // ---- M5, phase 3: the society's stores stock and the shops' first stock ----------------------
@@ -530,7 +530,7 @@ public class DemoDataLoader {
      * item, at the distributor's price (what the society paid), enough for both its shops' first
      * transfers (DemoShopStock) with stock left for the count, the write-off and the repack
      * (DemoStockOperations). Prepared and signed by the society buyer, countersigned by the society
-     * manager.
+     * by the Federation onboarding officer.
      */
     private void societyStock(List<Item> items, Map<String, UUID> skus) {
         Actor buyer = DemoCast.M101_BUYER;
@@ -550,7 +550,7 @@ public class DemoDataLoader {
         count("PrepareOpeningBalance");
         signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
         count("SignOpeningBalance");
-        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.M101_MANAGER));
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.FED_ACCOUNTS));
         count("CountersignOpeningBalance");
         activateAfterOpening(DemoCast.M101_WAREHOUSE, DemoCast.M101_MANAGER);
     }
@@ -558,7 +558,7 @@ public class DemoDataLoader {
     /**
      * The opening stock of a shop with no society stores behind it (Pannala, Point Pedro: the
      * distributor delivers to the shop), counted on the day the shop went live: prepared and signed
-     * by the shop's staff member, countersigned by the society manager, at the distributor's price.
+     * by the shop's staff member, countersigned by the Federation, at the distributor's price.
      * Skipped once the shop holds any lot (on a stack loaded before this the shop already has its
      * GRNs, and M5 refuses an opening balance at a location with movements).
      */
@@ -584,7 +584,7 @@ public class DemoDataLoader {
         count("PrepareOpeningBalance");
         signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
         count("SignOpeningBalance");
-        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(manager));
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.FED_ACCOUNTS));
         count("CountersignOpeningBalance");
         activateAfterOpening(staff.locationId(), manager);
     }
