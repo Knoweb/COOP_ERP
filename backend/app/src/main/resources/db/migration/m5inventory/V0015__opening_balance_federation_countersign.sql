@@ -47,10 +47,11 @@ FOR EACH ROW
 EXECUTE FUNCTION inventory.guard_opening_balance_batch_resolution();
 
 -- This is the RLS template's fed_admin exception: only the configured Federation, in an
--- entity-wide OWN scope, can discover and lock an MPCS balance awaiting countersignature.
--- PostgreSQL applies UPDATE policies to SELECT FOR UPDATE. WITH CHECK false makes this a
--- lock-only exception: the eventual state transition must run under the derived owner scope.
--- Business authorization and MFA remain handler responsibilities.
+-- entity-wide OWN scope, can discover and lock an MPCS balance before validating its lifecycle
+-- state. PostgreSQL applies UPDATE policies to SELECT FOR UPDATE. WITH CHECK retains ordinary
+-- ownership, so the policy permits the cross-owner lock but never a cross-owner mutation: the
+-- eventual state transition must run under the derived owner scope. Business authorization and
+-- MFA remain handler responsibilities.
 CREATE POLICY federation_countersign_read ON inventory.opening_balance FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND kernel.scope_location() IS NULL
@@ -59,9 +60,11 @@ CREATE POLICY federation_countersign_read ON inventory.opening_balance FOR SELEC
 CREATE POLICY federation_countersign_update ON inventory.opening_balance FOR UPDATE TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND kernel.scope_location() IS NULL
-           AND kernel.scope_entity() = (SELECT kernel.system_entity())
-           AND status = 'SIGNED_ENTITY')
-    WITH CHECK (false);
+           AND kernel.scope_entity() = (SELECT kernel.system_entity()))
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND kernel.scope_location() IS NULL
+                AND kernel.scope_entity() = (SELECT kernel.system_entity())
+                AND owner_entity_id = kernel.scope_entity());
 
 CREATE POLICY federation_countersign_read ON inventory.opening_balance_line FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'OWN'
