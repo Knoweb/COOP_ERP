@@ -349,12 +349,15 @@ class InventoryController implements InventoryApi {
                         OpeningBalanceResponse.StatusEnum.fromValue(balance.status()),
                         balance.lines().stream()
                                 .map(l -> new OpeningBalanceLineResponse(
-                                        l.lineNo(),
-                                        l.batchId(),
-                                        l.skuId(),
-                                        OpeningBalanceLineResponse.ConditionEnum.fromValue(l.condition()),
-                                        l.qty(),
-                                        l.unitCost()))
+                                                l.lineNo(),
+                                                l.skuId(),
+                                                OpeningBalanceLineResponse.ConditionEnum.fromValue(l.condition()),
+                                                l.qty(),
+                                                l.unitCost())
+                                        .batchId(l.batchId())
+                                        .batchNo(l.batchNo())
+                                        .expiryDate(l.expiryDate())
+                                        .printedMrp(l.printedMrp()))
                                 .toList())
                 .preparedBy(balance.preparedBy())
                 .signedEntityBy(balance.signedEntityBy())

@@ -27,6 +27,7 @@
   "m5.opening.countersigner_is_signer": "The person who signed for the entity cannot also countersign",
   "m5.opening.user_required": "An opening balance is signed by a person",
   "m5.opening.entity_unknown": "The entity of the opening balance was not found",
+  "m5.opening.federation_required": "A Federation officer in the Federation scope must countersign the opening balance",
   "m5.transfer.same_location": "A transfer must go to another location",
   "m5.transfer.destination_invalid": "The destination is not a location of your entity that you can see",
   "m5.transfer.lines_required": "A transfer needs at least one line",

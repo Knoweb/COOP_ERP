@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -26,12 +27,16 @@ import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
+import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The opening balance (doc 25 section 4.7 and flow 6.9; 25A M5-10 at demo scope): prepared,
@@ -60,6 +65,12 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     Handles<ActivateLocation, UUID> activateLocation;
 
+    @Autowired
+    JdbcTemplate appJdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
     private InventoryFixture fixture;
     private UUID shop;
     private UUID sku;
@@ -69,6 +80,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
     void arrange() {
         fixture = new InventoryFixture(superuserJdbc());
         fixture.clean();
+        fixture.entity(TEST_FEDERATION, "FED", "FEDERATION");
         fixture.entity(MPCS, "M5OB", "MPCS");
         shop = fixture.location(MPCS, "WAREHOUSE", "ONBOARDING");
         sku = fixture.sku(MPCS, "DHAL1");
@@ -103,7 +115,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
                 .containsExactly("OPB_SIGNED_ENTITY");
 
         kernel.reset();
-        UUID document = countersign.handle(new CountersignOpeningBalance(id), own(MPCS, FEDERATION_OFFICER));
+        UUID document = countersign.handle(new CountersignOpeningBalance(id), federationOfficer());
 
         assertThat(queries.openingBalance(id, own(MPCS))).hasValueSatisfying(b -> {
             assertThat(b.status()).isEqualTo("POSTED");
@@ -141,7 +153,16 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains("DOCUMENT_ISSUED", "STOCK_POSTED", "OPB_POSTED");
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("OPB_POSTED"))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.scope().userId()).isEqualTo(FEDERATION_OFFICER);
+                    assertThat(a.scope().homeEntityId()).isEqualTo(TEST_FEDERATION);
+                    assertThat(a.scope().entityId()).isEqualTo(MPCS);
+                });
         assertThat(events(OpeningBalancePosted.class)).singleElement().satisfies(e -> {
+            assertThat(e.ownerEntityId()).isEqualTo(MPCS);
             assertThat(e.documentId()).isEqualTo(document);
             assertThat(e.lines()).isEqualTo(2);
             assertThat(e.locationId()).isEqualTo(shop);
@@ -152,7 +173,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aLineWithItsBatchAsCountedRegistersTheBatchInM2() {
+    void aLineWithItsBatchAsCountedIsRetainedThenRegisteredAtFederationCountersign() {
         OpeningBalanceLine counted = new OpeningBalanceLine(
                 null,
                 LotCondition.GOOD,
@@ -164,6 +185,24 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
                 new BigDecimal("120.00"));
 
         UUID id = prepare.handle(command(counted), own(MPCS));
+
+        assertThat(queries.openingBalance(id, own(MPCS))).hasValueSatisfying(balance -> {
+            OpeningBalanceView.Line retained = balance.lines().get(0);
+            assertThat(retained.batchId()).isNull();
+            assertThat(retained.batchNo()).isEqualTo("NEW-7");
+            assertThat(retained.expiryDate()).isEqualTo(LocalDate.of(2027, 8, 31));
+            assertThat(retained.printedMrp()).isEqualByComparingTo("120.00");
+        });
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from catalogue.batch where sku_id = ? and batch_no = 'NEW-7'",
+                                Integer.class,
+                                sku))
+                .isZero();
+
+        sign.handle(new SignOpeningBalance(id), own(MPCS, OFFICER));
+        kernel.reset();
+        UUID document = countersign.handle(new CountersignOpeningBalance(id), federationOfficer());
 
         UUID registered = queries.openingBalance(id, own(MPCS))
                 .orElseThrow()
@@ -179,19 +218,138 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(batchRow.get("batch_no")).isEqualTo("NEW-7");
         assertThat(batchRow.get("owner_entity_id")).isEqualTo(MPCS);
         assertThat(batchRow.get("origin_document_id")).isEqualTo(id);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?",
+                                Integer.class,
+                                document))
+                .isEqualTo(1);
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
-                .contains("OPB_PREPARED");
+                .contains("BATCH_REGISTERED", "DOCUMENT_ISSUED", "STOCK_POSTED", "OPB_POSTED");
 
-        // M2's own guard answers for the counted batch: this item needs an expiry date.
+        // M2's own guard answers at countersign: this item needs an expiry date. The whole
+        // posting rolls back while the entity's signed balance and retained data remain.
         fixture.clean();
+        fixture.entity(TEST_FEDERATION, "FED", "FEDERATION");
         fixture.entity(MPCS, "M5OB", "MPCS");
         shop = fixture.location(MPCS, "WAREHOUSE", "ONBOARDING");
         sku = fixture.sku(MPCS, "DHAL2");
         OpeningBalanceLine noExpiry = new OpeningBalanceLine(
                 null, LotCondition.GOOD, BigDecimal.ONE, BigDecimal.ONE, sku, "NEW-8", null, new BigDecimal("120.00"));
-        assertThatThrownBy(() -> prepare.handle(command(noExpiry), own(MPCS))).isInstanceOf(ProblemException.class);
+        UUID invalid = prepare.handle(command(noExpiry), own(MPCS));
+        sign.handle(new SignOpeningBalance(invalid), own(MPCS, OFFICER));
+        kernel.reset();
+        assertProblem(
+                () -> countersign.handle(new CountersignOpeningBalance(invalid), federationOfficer()),
+                "m2.batch.expiry_required");
+        assertThat(queries.openingBalance(invalid, own(MPCS)).orElseThrow().status())
+                .isEqualTo("SIGNED_ENTITY");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from catalogue.batch where sku_id = ? and batch_no = 'NEW-8'",
+                                Integer.class,
+                                sku))
+                .isZero();
         assertThat(queries.balances(shop, null, true, own(MPCS))).isEmpty();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void v0015RestrictsFederationAccessAndMakesSignedBatchResolutionOneTimeAndNarrow() {
+        OpeningBalanceLine unresolved = new OpeningBalanceLine(
+                null,
+                LotCondition.GOOD,
+                new BigDecimal("12.000"),
+                new BigDecimal("95.0000"),
+                sku,
+                "RLS-NEW-7",
+                LocalDate.of(2027, 8, 31),
+                new BigDecimal("120.00"));
+        UUID openingBalanceId = prepare.handle(command(unresolved), own(MPCS));
+        UUID lineId = superuserJdbc()
+                .queryForObject(
+                        "select line_id from inventory.opening_balance_line where opening_balance_id = ?",
+                        UUID.class,
+                        openingBalanceId);
+
+        assertThat(visibleOpeningBalances(MPCS, null, openingBalanceId)).isOne();
+        assertThat(visibleOpeningBalanceLines(MPCS, null, openingBalanceId)).isOne();
+
+        UUID federationOffice = fixture.location(TEST_FEDERATION, "OFFICE");
+        assertThat(visibleOpeningBalances(TEST_FEDERATION, federationOffice, openingBalanceId))
+                .isZero();
+        assertThat(visibleOpeningBalanceLines(TEST_FEDERATION, federationOffice, openingBalanceId))
+                .isZero();
+        UUID unrelatedEntity = UUID.fromString("0190e679-0000-7000-8000-000000000099");
+        assertThat(visibleOpeningBalances(unrelatedEntity, null, openingBalanceId))
+                .isZero();
+        assertThat(visibleOpeningBalanceLines(unrelatedEntity, null, openingBalanceId))
+                .isZero();
+
+        assertThatThrownBy(() -> resolveBatch(MPCS, lineId, batch))
+                .rootCause()
+                .hasMessageContaining("opening balance batch can only be resolved after entity signature");
+
+        sign.handle(new SignOpeningBalance(openingBalanceId), own(MPCS, OFFICER));
+        assertThat(inDatabaseScope(
+                        TEST_FEDERATION,
+                        null,
+                        () -> appJdbc.queryForObject(
+                                "select opening_balance_id from inventory.opening_balance"
+                                        + " where opening_balance_id = ? for update",
+                                UUID.class,
+                                openingBalanceId)))
+                .isEqualTo(openingBalanceId);
+        assertThat(inDatabaseScope(
+                        TEST_FEDERATION,
+                        null,
+                        () -> appJdbc.queryForObject(
+                                "select count(*) from inventory.opening_balance_line" + " where opening_balance_id = ?",
+                                Integer.class,
+                                openingBalanceId)))
+                .isOne();
+        assertThatThrownBy(() -> inDatabaseScope(
+                        TEST_FEDERATION,
+                        null,
+                        () -> appJdbc.update(
+                                "update inventory.opening_balance set status = 'POSTED'"
+                                        + " where opening_balance_id = ?",
+                                openingBalanceId)))
+                .as("Federation scope may lock but never mutate the MPCS header")
+                .rootCause()
+                .hasMessageContaining("row-level security policy");
+        assertThat(resolveBatch(TEST_FEDERATION, lineId, batch)).isZero();
+        assertThat(resolveBatch(MPCS, lineId, batch)).isOne();
+
+        UUID replacement = fixture.batch(sku, MPCS, "RLS-OTHER-8", LocalDate.of(2027, 9, 30));
+        assertThatThrownBy(() -> resolveBatch(MPCS, lineId, replacement))
+                .rootCause()
+                .hasMessageContaining("opening balance batch can only be resolved once");
+
+        for (String column : List.of(
+                "opening_balance_id",
+                "owner_entity_id",
+                "location_id",
+                "sku_id",
+                "condition",
+                "qty",
+                "unit_cost",
+                "batch_no",
+                "expiry_date",
+                "printed_mrp")) {
+            assertThatThrownBy(() -> inDatabaseScope(
+                            MPCS,
+                            null,
+                            () -> appJdbc.update(
+                                    "update inventory.opening_balance_line set " + column + " = " + column
+                                            + " where line_id = ?",
+                                    lineId)))
+                    .as("%s remains immutable", column)
+                    .rootCause()
+                    .hasMessageContaining("permission denied");
+        }
     }
 
     // ---- guards ------------------------------------------------------------------------------
@@ -245,7 +403,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)),
                 "m5.opening.required_before_activation");
 
-        countersign.handle(new CountersignOpeningBalance(id), own(MPCS, FEDERATION_OFFICER));
+        countersign.handle(new CountersignOpeningBalance(id), federationOfficer());
         kernel.reset();
         activateLocation.handle(new ActivateLocation(shop), own(MPCS));
 
@@ -276,7 +434,7 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         assertProblem(
                 () -> sign.handle(new SignOpeningBalance(Ids.next()), own(MPCS, OFFICER)), "m5.opening.not_found");
         assertProblem(
-                () -> countersign.handle(new CountersignOpeningBalance(id), own(MPCS, FEDERATION_OFFICER)),
+                () -> countersign.handle(new CountersignOpeningBalance(id), federationOfficer()),
                 "m5.opening.not_signed");
 
         sign.handle(new SignOpeningBalance(id), own(MPCS, OFFICER));
@@ -284,7 +442,15 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         kernel.reset();
         assertProblem(
                 () -> countersign.handle(new CountersignOpeningBalance(id), own(MPCS, OFFICER)),
+                "m5.opening.federation_required");
+        assertProblem(
+                () -> countersign.handle(new CountersignOpeningBalance(id), own(TEST_FEDERATION, OFFICER)),
                 "m5.opening.countersigner_is_signer");
+        UUID federationLocation = fixture.location(TEST_FEDERATION, "OFFICE");
+        assertProblem(
+                () -> countersign.handle(
+                        new CountersignOpeningBalance(id), InventoryFixture.at(TEST_FEDERATION, federationLocation)),
+                "m5.opening.federation_required");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(queries.balances(shop, null, true, own(MPCS))).isEmpty();
     }
@@ -303,6 +469,10 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         return new OpeningBalanceLine(batch, LotCondition.DAMAGED, new BigDecimal(qty), new BigDecimal(cost));
     }
 
+    private static lk.coopfed.knoweb.kernel.api.ScopeContext federationOfficer() {
+        return own(TEST_FEDERATION, FEDERATION_OFFICER);
+    }
+
     /** A read-only class: it prepares nothing. */
     private static lk.coopfed.knoweb.kernel.api.ScopeContext viewOnly(UUID entity) {
         lk.coopfed.knoweb.kernel.api.Scope scope = new lk.coopfed.knoweb.kernel.api.Scope(entity, null);
@@ -317,6 +487,51 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
                 null,
                 java.util.Locale.ENGLISH,
                 null);
+    }
+
+    private int visibleOpeningBalances(UUID entityId, UUID locationId, UUID openingBalanceId) {
+        return inDatabaseScope(
+                entityId,
+                locationId,
+                () -> appJdbc.queryForObject(
+                        "select count(*) from inventory.opening_balance where opening_balance_id = ?",
+                        Integer.class,
+                        openingBalanceId));
+    }
+
+    private int visibleOpeningBalanceLines(UUID entityId, UUID locationId, UUID openingBalanceId) {
+        return inDatabaseScope(
+                entityId,
+                locationId,
+                () -> appJdbc.queryForObject(
+                        "select count(*) from inventory.opening_balance_line where opening_balance_id = ?",
+                        Integer.class,
+                        openingBalanceId));
+    }
+
+    private int resolveBatch(UUID entityId, UUID lineId, UUID batchId) {
+        return inDatabaseScope(
+                entityId,
+                null,
+                () -> appJdbc.update(
+                        "update inventory.opening_balance_line set batch_id = ? where line_id = ?", batchId, lineId));
+    }
+
+    private <T> T inDatabaseScope(UUID entityId, UUID locationId, Supplier<T> work) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        return transaction.execute(status -> {
+            appJdbc.queryForObject(
+                    "select set_config('app.scope_entity_id', ?, true)", String.class, setting(entityId));
+            appJdbc.queryForObject(
+                    "select set_config('app.scope_location_id', ?, true)", String.class, setting(locationId));
+            appJdbc.queryForObject("select set_config('app.scope_class', 'OWN', true)", String.class);
+            appJdbc.queryForObject("select set_config('app.granted_entities', '{}', true)", String.class);
+            return work.get();
+        });
+    }
+
+    private static String setting(UUID value) {
+        return value == null ? "" : value.toString();
     }
 
     private <T extends DomainEvent> List<T> events(Class<T> type) {

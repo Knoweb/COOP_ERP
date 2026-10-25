@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m5inventory.query;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,5 +16,14 @@ public record OpeningBalanceView(
         UUID documentId,
         List<Line> lines) {
 
-    public record Line(int lineNo, UUID batchId, UUID skuId, String condition, BigDecimal qty, BigDecimal unitCost) {}
+    public record Line(
+            int lineNo,
+            UUID batchId,
+            UUID skuId,
+            String condition,
+            BigDecimal qty,
+            BigDecimal unitCost,
+            String batchNo,
+            LocalDate expiryDate,
+            BigDecimal printedMrp) {}
 }

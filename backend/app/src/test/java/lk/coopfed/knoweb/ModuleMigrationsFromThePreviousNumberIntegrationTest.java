@@ -55,7 +55,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m3pricing", "9");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        // INV-07: m5inventory V0012-V0014 (receipt, shortfall and cancellation facts) from V0011.
+        // INV-07 and INV-09: m5inventory V0012-V0015 (receipt, shortfall, cancellation and
+        // Federation opening-balance countersign) from V0011.
         streams.put("m5inventory", "11");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
@@ -199,7 +200,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 11)
                 .containsEntry("m3pricing", 10)
-                .containsEntry("m5inventory", 14)
+                .containsEntry("m5inventory", 15)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
 
