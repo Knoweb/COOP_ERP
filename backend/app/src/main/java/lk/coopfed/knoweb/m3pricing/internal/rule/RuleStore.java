@@ -39,7 +39,8 @@ public class RuleStore {
     public record DueRule(UUID ruleId, UUID ownerEntityId, LocalDate validTo) {}
 
     private static final String COLUMNS = "rule_id, owner_entity_id, name, kind, predicate::text as predicate,"
-            + " benefit::text as benefit, priority, valid_from, valid_to, status, created_at";
+            + " benefit::text as benefit, priority, valid_from, valid_to, status, created_at,"
+            + " advisory, adopted_from_rule_id";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -135,7 +136,9 @@ public class RuleStore {
                 rs.getDate("valid_from").toLocalDate(),
                 validTo == null ? null : validTo.toLocalDate(),
                 rs.getString("status"),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getBoolean("advisory"),
+                rs.getObject("adopted_from_rule_id", UUID.class));
     }
 
     /** Decimals are kept as text in the JSON, as in the snapshot: nothing rounds them on the way. */

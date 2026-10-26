@@ -6,7 +6,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.m3pricing.api.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.api.RulePredicate;
 
-/** One discount rule (doc 23 section 3.3) as the reads show it. */
+/** One discount rule, including advisory adoption metadata. */
 public record RuleView(
         UUID ruleId,
         UUID ownerEntityId,
@@ -18,4 +18,6 @@ public record RuleView(
         LocalDate validFrom,
         LocalDate validTo,
         String status,
-        Instant createdAt) {}
+        Instant createdAt,
+        boolean advisory,
+        UUID adoptedFromRuleId) {}

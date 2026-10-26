@@ -14,6 +14,8 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
+import lk.coopfed.knoweb.m3pricing.api.AdoptAdvisoryRule;
+import lk.coopfed.knoweb.m3pricing.api.AmendDraftRule;
 import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.CreatePriceList;
 import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
@@ -34,6 +36,8 @@ import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
 import lk.coopfed.knoweb.m3pricing.internal.policy.SetMrpPolicyHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
+import lk.coopfed.knoweb.m3pricing.internal.rule.AdoptAdvisoryRuleHandler;
+import lk.coopfed.knoweb.m3pricing.internal.rule.AmendDraftRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
@@ -44,6 +48,7 @@ import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
+import lk.coopfed.knoweb.m3pricing.web.generated.AmendDraftRuleRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.AuthorRuleRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.BasketResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.BatchCandidate;
@@ -91,6 +96,7 @@ class PricingController implements PricingApi {
     private final SetLinesHandler setLines;
     private final PublishPriceListHandler publish;
     private final AuthorRuleHandler authorRule;
+    private final AmendDraftRuleHandler amendDraftRule;
     private final ActivateRuleHandler activateRule;
     private final WithdrawRuleHandler withdrawRule;
     private final EnterControlPriceHandler enterControlPrice;
@@ -100,6 +106,7 @@ class PricingController implements PricingApi {
     private final PricingQueries queries;
     private final CurrentScope currentScope;
     private final ObjectProvider<A4Renderer> renderer;
+    private final AdoptAdvisoryRuleHandler adoptAdvisoryRule;
 
     @SuppressWarnings("java:S107") // one handler per operation of the slice; a controller only translates
     PricingController(
@@ -108,6 +115,8 @@ class PricingController implements PricingApi {
             SetLinesHandler setLines,
             PublishPriceListHandler publish,
             AuthorRuleHandler authorRule,
+            AmendDraftRuleHandler amendDraftRule,
+            AdoptAdvisoryRuleHandler adoptAdvisoryRule,
             ActivateRuleHandler activateRule,
             WithdrawRuleHandler withdrawRule,
             EnterControlPriceHandler enterControlPrice,
@@ -126,11 +135,13 @@ class PricingController implements PricingApi {
         this.setLines = setLines;
         this.publish = publish;
         this.authorRule = authorRule;
+        this.amendDraftRule = amendDraftRule;
         this.activateRule = activateRule;
         this.withdrawRule = withdrawRule;
         this.queries = queries;
         this.currentScope = currentScope;
         this.renderer = renderer;
+        this.adoptAdvisoryRule = adoptAdvisoryRule;
     }
 
     // ---- shelf-label printing (M3-09) ----------------------------------------------------------
@@ -150,6 +161,16 @@ class PricingController implements PricingApi {
         return queries.labelJob(jobId, scope)
                 .map(job -> ResponseEntity.ok(toResponse(job, scope)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<RuleResponse> adoptAdvisoryRule(String idempotencyKey, UUID ruleId) {
+        ScopeContext scope = currentScope.get();
+
+        UUID newId = adoptAdvisoryRule.handle(new AdoptAdvisoryRule(ruleId), scope);
+
+        return ResponseEntity.created(URI.create("/v1/pricing/rules/" + newId))
+                .body(toResponse(queries.getRule(newId, scope).orElseThrow()));
     }
 
     private LabelJobResponse toResponse(LabelJobView job, ScopeContext scope) {
@@ -371,10 +392,41 @@ class PricingController implements PricingApi {
                                 request.getBenefit().getValue()),
                         request.getPriority(),
                         request.getValidFrom(),
-                        request.getValidTo()),
+                        request.getValidTo(),
+                        Boolean.TRUE.equals(request.getAdvisory())),
                 scope);
         return ResponseEntity.created(URI.create("/v1/pricing/rules/" + id))
                 .body(toResponse(queries.getRule(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<RuleResponse> amendDraftRule(
+            String idempotencyKey, UUID ruleId, AmendDraftRuleRequest request) {
+        ScopeContext scope = currentScope.get();
+        RulePredicate p = request.getPredicate();
+
+        UUID id = amendDraftRule.handle(
+                new AmendDraftRule(
+                        ruleId,
+                        request.getName(),
+                        request.getKind().getValue(),
+                        p == null
+                                ? null
+                                : new lk.coopfed.knoweb.m3pricing.api.RulePredicate(
+                                        p.getSkuId(),
+                                        p.getUomCode(),
+                                        p.getMinQty(),
+                                        p.getDaysToExpiry(),
+                                        p.getBillTotalFrom()),
+                        new lk.coopfed.knoweb.m3pricing.api.RuleBenefit(
+                                request.getBenefit().getKind().getValue(),
+                                request.getBenefit().getValue()),
+                        request.getPriority(),
+                        request.getValidFrom(),
+                        request.getValidTo()),
+                scope);
+
+        return ResponseEntity.ok(toResponse(queries.getRule(id, scope).orElseThrow()));
     }
 
     @Override
@@ -411,7 +463,9 @@ class PricingController implements PricingApi {
                         rule.validFrom(),
                         RuleResponse.StatusEnum.fromValue(rule.status()),
                         rule.createdAt())
-                .validTo(rule.validTo());
+                .validTo(rule.validTo())
+                .advisory(rule.advisory())
+                .adoptedFromRuleId(rule.adoptedFromRuleId());
     }
 
     // ---- price lists (M3-04) -------------------------------------------------------------------
