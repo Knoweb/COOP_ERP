@@ -138,8 +138,7 @@ public class CreateProfitCenterHandler implements Handles<CreateProfitCenter, UU
         audit.record(AUDIT_CREATED, Subject.of("profit_center", profitCenterId), null, snapshot, scope);
 
         // 4. Domain event
-        events.publish(
-                new ProfitCenterCreated(profitCenterId, scope.entityId(), code, category, command.locationId()));
+        events.publish(new ProfitCenterCreated(profitCenterId, scope.entityId(), code, category, command.locationId()));
 
         return profitCenterId;
     }
