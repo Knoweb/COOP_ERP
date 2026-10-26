@@ -1952,99 +1952,119 @@ select.pricing-select option:focus {
   box-sizing: border-box !important;
 }
 
-/* 1. Batch (First Column - 15%) */
+/* 1. Item (First Column - 20%) */
 .shell-page .pricing-markdown-table th:first-child,
-.shell-page .pricing-markdown-table th.pricing-th-batch,
+.shell-page .pricing-markdown-table th.pricing-th-item,
 .pricing-markdown-table th:first-child,
-.pricing-markdown-table th.pricing-th-batch,
-.pricing-col-batch {
-  width: 15% !important;
+.pricing-markdown-table th.pricing-th-item,
+.pricing-col-item {
+  width: 20% !important;
   min-width: 0 !important;
-  max-width: 15% !important;
-  text-align: center !important;
+  max-width: 20% !important;
+  text-align: left !important;
   vertical-align: middle !important;
 }
 
 .shell-page .pricing-markdown-table td:first-child,
-.shell-page .pricing-markdown-table td.pricing-cell-batch,
+.shell-page .pricing-markdown-table td.pricing-cell-item,
 .pricing-markdown-table td:first-child,
-.pricing-markdown-table td.pricing-cell-batch {
-  width: 15% !important;
+.pricing-markdown-table td.pricing-cell-item {
+  width: 20% !important;
   min-width: 0 !important;
-  max-width: 15% !important;
+  max-width: 20% !important;
+  text-align: left !important;
+  vertical-align: middle !important;
+}
+
+/* 2. Batch (14%) */
+.shell-page .pricing-markdown-table th.pricing-th-batch,
+.pricing-markdown-table th.pricing-th-batch,
+.pricing-col-batch {
+  width: 14% !important;
+  min-width: 0 !important;
+  max-width: 14% !important;
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-/* 2. Expiry Date (14%) */
+.shell-page .pricing-markdown-table td.pricing-cell-batch,
+.pricing-markdown-table td.pricing-cell-batch {
+  width: 14% !important;
+  min-width: 0 !important;
+  max-width: 14% !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* 3. Expiry Date (12%) */
 .shell-page .pricing-markdown-table th.pricing-th-expiry,
 .shell-page .pricing-markdown-table td.pricing-cell-expiry,
 .pricing-col-expiry,
 .pricing-th-expiry,
 .pricing-cell-expiry {
-  width: 14% !important;
+  width: 12% !important;
   min-width: 0 !important;
-  max-width: 14% !important;
+  max-width: 12% !important;
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-/* 3. Days Remaining (14%) */
+/* 4. Days Remaining (12%) */
 .shell-page .pricing-markdown-table th.pricing-th-days,
 .shell-page .pricing-markdown-table td.pricing-cell-days,
 .pricing-col-days,
 .pricing-th-days,
 .pricing-cell-days {
-  width: 14% !important;
+  width: 12% !important;
   min-width: 0 !important;
-  max-width: 14% !important;
+  max-width: 12% !important;
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-/* 4. Qty on Hand (11%) */
+/* 5. Qty on Hand (10%) */
 .shell-page .pricing-markdown-table th.pricing-th-qty,
 .shell-page .pricing-markdown-table td.pricing-cell-qty,
 .pricing-col-qty,
 .pricing-th-qty,
 .pricing-markdown-table .pricing-cell-qty {
-  width: 11% !important;
+  width: 10% !important;
   min-width: 0 !important;
-  max-width: 11% !important;
+  max-width: 10% !important;
   text-align: center !important;
   vertical-align: middle !important;
   font-variant-numeric: tabular-nums !important;
 }
 
-/* 5. Condition (13%) */
+/* 6. Condition (11%) */
 .shell-page .pricing-markdown-table th.pricing-th-condition,
 .shell-page .pricing-markdown-table td.pricing-cell-condition,
 .pricing-col-condition,
 .pricing-th-condition,
 .pricing-markdown-table .pricing-cell-condition {
-  width: 13% !important;
+  width: 11% !important;
   min-width: 0 !important;
-  max-width: 13% !important;
+  max-width: 11% !important;
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-/* 6. Applicable Markdown Rule (33%) */
+/* 7. Applicable Markdown Rule (21%) */
 .shell-page .pricing-markdown-table th.pricing-th-rule,
 .pricing-col-rule,
 .pricing-th-rule {
-  width: 33% !important;
+  width: 21% !important;
   min-width: 0 !important;
-  max-width: 33% !important;
+  max-width: 21% !important;
   text-align: center !important;
   vertical-align: middle !important;
 }
 
 .shell-page .pricing-markdown-table td.pricing-cell-rule,
 .pricing-cell-rule {
-  width: 33% !important;
+  width: 21% !important;
   min-width: 0 !important;
-  max-width: 33% !important;
+  max-width: 21% !important;
   text-align: left !important;
   vertical-align: middle !important;
 }

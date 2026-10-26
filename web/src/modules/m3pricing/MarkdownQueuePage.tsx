@@ -11,6 +11,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { Rule } from "./pricingApi";
+import { SkuName } from "./SkuPicker";
 import { errorText } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
 import { PricingSelect } from "./PricingSelect";
@@ -198,6 +199,7 @@ export function MarkdownQueuePage() {
             <div className="modern-table-scroll pricing-markdown-table-scroll">
               <table className="modern-table pricing-markdown-table">
                 <colgroup>
+                  <col className="pricing-col-item" />
                   <col className="pricing-col-batch" />
                   <col className="pricing-col-expiry" />
                   <col className="pricing-col-days" />
@@ -207,6 +209,7 @@ export function MarkdownQueuePage() {
                 </colgroup>
                 <thead>
                   <tr>
+                    <th className="pricing-th-item">{t("pricing.markdown.column.item").text}</th>
                     <th className="pricing-th-batch">{t("pricing.markdown.column.batch").text}</th>
                     <th className="pricing-th-expiry">{t("pricing.markdown.column.expiry").text}</th>
                     <th className="pricing-th-days">{t("pricing.markdown.column.days_remaining").text}</th>
@@ -218,6 +221,9 @@ export function MarkdownQueuePage() {
                 <tbody>
                   {filteredItems.map(({ lot, daysRemaining, matchedRule }) => (
                     <tr key={lot.stockLotId}>
+                      <td className="pricing-cell-item">
+                        <SkuName skuId={lot.skuId} />
+                      </td>
                       <td className="pricing-cell-batch">
                         <span className="pricing-markdown-batch">{lot.batchNo}</span>
                       </td>
