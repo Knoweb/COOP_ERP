@@ -56,7 +56,10 @@ class InventoryQueriesImpl implements InventoryQueries {
                    coalesce((select sum(p.qty)
                                from inventory.pick_list_line p
                                join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
-                              where pl.status = 'OPEN' and p.stock_lot_id = l.stock_lot_id), 0) as reserved,
+                               left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                              where pl.status = 'OPEN'
+                                and coalesce(o.replacement_stock_lot_id, p.stock_lot_id)
+                                    = l.stock_lot_id), 0) as reserved,
                    case when l.condition = 'GOOD' and l.qty_on_hand > 0
                              and (l.expiry_date is null or l.expiry_date >= d.today)
                         then row_number() over (
@@ -108,9 +111,14 @@ class InventoryQueriesImpl implements InventoryQueries {
                                    - coalesce((select sum(p.qty)
                                                  from inventory.pick_list_line p
                                                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
-                                                 join inventory.stock_lot r on r.stock_lot_id = p.stock_lot_id
+                                                  left join inventory.pick_override o
+                                                    on o.pick_line_id = p.pick_line_id
+                                                 join inventory.stock_lot r
+                                                   on r.stock_lot_id = coalesce(
+                                                       o.replacement_stock_lot_id, p.stock_lot_id)
                                                 where pl.status = 'OPEN'
-                                                  and p.location_id = loc.id and p.sku_id = sku.id
+                                                  and coalesce(o.location_id, p.location_id) = loc.id
+                                                  and p.sku_id = sku.id
                                                   and (r.expiry_date is null or r.expiry_date >= ?)), 0) as on_hand
                               from unnest(?::uuid[]) as loc (id)
                              cross join unnest(?::uuid[]) as sku (id)
@@ -290,12 +298,20 @@ class InventoryQueriesImpl implements InventoryQueries {
                         head.status(),
                         jdbc.query(
                                 """
-                                select delivery_line_id, sku_id, location_id, stock_lot_id, batch_id, qty
-                                  from inventory.pick_list_line
-                                 where pick_list_id = ?
-                                 order by delivery_line_id, stock_lot_id is null, location_id
+                                select p.pick_line_id, p.delivery_line_id, p.sku_id,
+                                       coalesce(o.location_id, p.location_id) as location_id,
+                                       coalesce(o.replacement_stock_lot_id, p.stock_lot_id) as stock_lot_id,
+                                       coalesce(o.replacement_batch_id, p.batch_id) as batch_id,
+                                       p.qty
+                                  from inventory.pick_list_line p
+                                  left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                                 where p.pick_list_id = ?
+                                 order by p.delivery_line_id,
+                                          coalesce(o.replacement_stock_lot_id, p.stock_lot_id) is null,
+                                          coalesce(o.location_id, p.location_id)
                                 """,
                                 (rs, n) -> new PickListView.Pick(
+                                        rs.getObject("pick_line_id", UUID.class),
                                         rs.getObject("delivery_line_id", UUID.class),
                                         rs.getObject("sku_id", UUID.class),
                                         rs.getObject("location_id", UUID.class),

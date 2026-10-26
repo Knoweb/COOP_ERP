@@ -102,5 +102,18 @@
   "m5.repack.yield_out_of_range": "More packs ({actual}) than the recipe allows from this quantity ({expected} expected); check the count of packs",
   "m5.repack.yield_reason_required": "Fewer packs ({actual}) than the recipe expects ({expected}); give the reason for the shortfall",
   "m5.till_fact.type_required": "The till’s fact names no type",
-  "m5.expiry_task.not_found": "The expiry task was not found"
+  "m5.expiry_task.not_found": "The expiry task was not found",
+  "m5.pick_list.not_found": "The pick list was not found",
+  "m5.pick_list.not_open": "This pick list was already dispatched",
+  "m5.pick.user_required": "A warehouse user must make the pick override",
+  "m5.pick.reason_invalid": "Give a reason of no more than 500 characters",
+  "m5.pick.line_not_found": "The pick-list line was not found",
+  "m5.pick.short_line_not_overridable": "A short line has no suggested lot to override",
+  "m5.pick.replacement_same_as_original": "Choose a lot other than the suggested lot",
+  "m5.pick.already_overridden": "This pick-list line was already overridden",
+  "m5.pick.replacement_lot_not_found": "The replacement stock lot was not found",
+  "m5.pick.sku_mismatch": "The replacement lot must contain the same item",
+  "m5.pick.location_mismatch": "The replacement lot must be at the same warehouse",
+  "m5.pick.lot_unavailable": "The replacement lot does not have enough unreserved stock",
+  "m5.pick.lot_expired": "The replacement lot is expired or too close to expiry"
 }

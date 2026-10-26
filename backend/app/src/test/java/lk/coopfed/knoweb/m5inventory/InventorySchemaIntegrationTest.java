@@ -63,6 +63,33 @@ class InventorySchemaIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void pickOverridesAreInsertOnlyForcedAndKeepBothLotIdentities() {
+        assertRefused("update inventory.pick_override set reason = reason");
+        assertRefused("delete from inventory.pick_override");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select relrowsecurity and relforcerowsecurity"
+                                        + " from pg_class where oid = 'inventory.pick_override'::regclass",
+                                Boolean.class))
+                .isTrue();
+
+        List<String> foreignKeys = superuserJdbc()
+                .queryForList(
+                        "select pg_get_constraintdef(oid) from pg_constraint"
+                                + " where conrelid = 'inventory.pick_override'::regclass and contype = 'f'",
+                        String.class);
+        assertThat(foreignKeys)
+                .anySatisfy(definition -> assertThat(definition)
+                        .contains(
+                                "(pick_line_id, pick_list_id, owner_entity_id, location_id, original_stock_lot_id, sku_id)",
+                                "inventory.pick_list_line"))
+                .anySatisfy(definition -> assertThat(definition)
+                        .contains(
+                                "(replacement_stock_lot_id, owner_entity_id, location_id, sku_id, replacement_batch_id, condition)",
+                                "inventory.stock_lot"));
+    }
+
+    @Test
     void transferLifecycleFactsKeepTheirCompositeParentIdentity() {
         List<String> receiptLineForeignKeys = superuserJdbc()
                 .queryForList(
