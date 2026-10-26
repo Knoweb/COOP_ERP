@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.RuleDrafted;
+import lk.coopfed.knoweb.m3pricing.internal.list.Federation;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListRules;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -40,12 +41,19 @@ public class AuthorRuleHandler implements Handles<AuthorRule, UUID> {
     private final RuleVocabulary vocabulary;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final Federation federation;
 
     AuthorRuleHandler(
-            JdbcTemplate jdbc, RuleStore store, RuleVocabulary vocabulary, AuditFacade audit, EventPublisher events) {
+            JdbcTemplate jdbc,
+            RuleStore store,
+            RuleVocabulary vocabulary,
+            Federation federation,
+            AuditFacade audit,
+            EventPublisher events) {
         this.jdbc = jdbc;
         this.store = store;
         this.vocabulary = vocabulary;
+        this.federation = federation;
         this.audit = audit;
         this.events = events;
     }
@@ -57,6 +65,10 @@ public class AuthorRuleHandler implements Handles<AuthorRule, UUID> {
             throw new ProblemException("request.invalid");
         }
         PriceListRules.requireOwnerScope(scope);
+
+        if (command.advisory() && !federation.isCaller(scope)) {
+            throw new ProblemException("m3.rule.advisory_federation_only");
+        }
         if (command.name() == null || command.name().isBlank()) {
             throw new ProblemException("request.field.required", Map.of("field", "name"));
         }
@@ -75,9 +87,10 @@ public class AuthorRuleHandler implements Handles<AuthorRule, UUID> {
         UUID ruleId = Ids.next();
         String name = command.name().strip();
         jdbc.update(
-                "insert into pricing.discount_rule (rule_id, owner_entity_id, name, kind, predicate, benefit,"
-                        + " priority, valid_from, valid_to, status) values (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?,"
-                        + " 'DRAFT')",
+                "insert into pricing.discount_rule "
+                        + "(rule_id, owner_entity_id, name, kind, predicate, benefit,"
+                        + " priority, advisory, valid_from, valid_to, status)"
+                        + " values (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?, 'DRAFT')",
                 ruleId,
                 scope.entityId(),
                 name,
@@ -85,6 +98,7 @@ public class AuthorRuleHandler implements Handles<AuthorRule, UUID> {
                 store.predicateJson(command.predicate()),
                 store.benefitJson(command.benefit()),
                 priority,
+                command.advisory(),
                 Date.valueOf(command.validFrom()),
                 command.validTo() == null ? null : Date.valueOf(command.validTo()));
 
@@ -99,6 +113,7 @@ public class AuthorRuleHandler implements Handles<AuthorRule, UUID> {
         after.put("validFrom", command.validFrom());
         after.put("validTo", command.validTo());
         after.put("status", RuleStore.DRAFT);
+        after.put("advisory", command.advisory());
         audit.record(AUDIT_AUTHORED, Subject.of("discount_rule", ruleId), null, after, scope);
 
         events.publish(new RuleDrafted(ruleId, scope.entityId(), command.kind()));

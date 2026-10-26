@@ -38,6 +38,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID DISTRIBUTOR = UUID.fromString("0190e740-0000-7000-8000-000000000003");
     private static final UUID TAX_CATEGORY = UUID.fromString("0190e740-0000-7000-8000-000000000100");
     private static final UUID RELATIONSHIP = UUID.fromString("0190e740-0000-7000-8000-000000000401");
+    private static final UUID ADOPTING_SOCIETY = UUID.fromString("0190e740-0000-7000-8000-000000000005");
 
     @Autowired
     TestRestTemplate http;
@@ -65,6 +66,12 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 rice,
                 FEDERATION,
                 TAX_CATEGORY);
+        admin.update(
+                "insert into party.entity "
+                        + "(entity_id, entity_code, entity_type, legal_name_en, status) "
+                        + "values (?, 'M3HTTPADOPT', 'MPCS', 'HTTP adoption society', 'ACTIVE')",
+                ADOPTING_SOCIETY);
+
         kernel.reset();
     }
 
@@ -76,6 +83,8 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.update("delete from party.entity_relationship where relationship_id = ?", RELATIONSHIP);
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from party.entity_party_directory where entity_id = ?", ADOPTING_SOCIETY);
+        admin.update("delete from party.entity where entity_id = ?", ADOPTING_SOCIETY);
     }
 
     @Test
@@ -239,6 +248,213 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         "validFrom", applyFrom.toString()));
         assertThat(freeItem.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(freeItem.getBody().get("code").asText()).isEqualTo("m3.rule.kind_not_available");
+    }
+
+    @Test
+    void aDraftRuleCanBeAmendedThroughHttp() {
+        ResponseEntity<JsonNode> authored = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules",
+                DISTRIBUTOR,
+                Map.of(
+                        "name", "Original rice promotion",
+                        "kind", "TIME_LIMITED_PRICE",
+                        "predicate", Map.of("skuId", rice),
+                        "benefit", Map.of("kind", "PERCENT_OFF", "value", 10),
+                        "validFrom", applyFrom.toString()));
+
+        assertThat(authored.getStatusCode())
+                .as(String.valueOf(authored.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+
+        String ruleId = authored.getBody().get("ruleId").asText();
+        String path = "/v1/pricing/rules/" + ruleId;
+
+        Map<String, Object> amendment = Map.of(
+                "name", "Updated rice promotion",
+                "kind", "TIME_LIMITED_PRICE",
+                "predicate", Map.of("skuId", rice),
+                "benefit", Map.of("kind", "PERCENT_OFF", "value", 20),
+                "priority", 25,
+                "validFrom", applyFrom.toString(),
+                "validTo", applyFrom.plusDays(7).toString());
+
+        ResponseEntity<JsonNode> amended = send(HttpMethod.PATCH, path, DISTRIBUTOR, amendment);
+
+        assertThat(amended.getStatusCode())
+                .as(String.valueOf(amended.getBody()))
+                .isEqualTo(HttpStatus.OK);
+
+        JsonNode updated = amended.getBody();
+
+        assertThat(updated.get("ruleId").asText()).isEqualTo(ruleId);
+        assertThat(updated.get("name").asText()).isEqualTo("Updated rice promotion");
+        assertThat(updated.get("status").asText()).isEqualTo("DRAFT");
+        assertThat(updated.get("priority").asInt()).isEqualTo(25);
+        assertThat(updated.get("benefit").get("value").decimalValue()).isEqualByComparingTo("20");
+        assertThat(updated.get("validTo").asText())
+                .isEqualTo(applyFrom.plusDays(7).toString());
+
+        // Another entity cannot amend this rule.
+        ResponseEntity<JsonNode> otherOwner = send(HttpMethod.PATCH, path, FEDERATION, amendment);
+
+        assertThat(otherOwner.getStatusCode())
+                .as(String.valueOf(otherOwner.getBody()))
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(otherOwner.getBody().get("code").asText()).isEqualTo("m3.rule.not_found");
+
+        // Activate the rule before testing draft-only protection.
+        ResponseEntity<JsonNode> activated = send(HttpMethod.POST, path + "/activate", DISTRIBUTOR, null);
+
+        assertThat(activated.getStatusCode())
+                .as(String.valueOf(activated.getBody()))
+                .isEqualTo(HttpStatus.OK);
+
+        // ACTIVE rules must not be amended.
+        ResponseEntity<JsonNode> activeAmendment = send(HttpMethod.PATCH, path, DISTRIBUTOR, amendment);
+
+        assertThat(activeAmendment.getStatusCode())
+                .as(String.valueOf(activeAmendment.getBody()))
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(activeAmendment.getBody().get("code").asText()).isEqualTo("m3.rule.not_draft");
+
+        ResponseEntity<JsonNode> finalRule = send(HttpMethod.GET, path, DISTRIBUTOR, null);
+
+        assertThat(finalRule.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(finalRule.getBody().get("status").asText()).isEqualTo("ACTIVE");
+        assertThat(finalRule.getBody().get("name").asText()).isEqualTo("Updated rice promotion");
+    }
+
+    @Test
+    void adoptionRefusesANonMpcsEntityThroughHttp() {
+        ResponseEntity<JsonNode> authored = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules",
+                FEDERATION,
+                Map.of(
+                        "name", "Ordinary Federation promotion",
+                        "kind", "TIME_LIMITED_PRICE",
+                        "predicate", Map.of("skuId", rice),
+                        "benefit", Map.of("kind", "PERCENT_OFF", "value", 10),
+                        "validFrom", applyFrom.toString()));
+
+        assertThat(authored.getStatusCode())
+                .as(String.valueOf(authored.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+
+        String sourceRuleId = authored.getBody().get("ruleId").asText();
+
+        ResponseEntity<JsonNode> adopted =
+                send(HttpMethod.POST, "/v1/pricing/rules/" + sourceRuleId + "/adopt", DISTRIBUTOR, null);
+
+        assertThat(adopted.getStatusCode())
+                .as(String.valueOf(adopted.getBody()))
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        assertThat(adopted.getBody().get("code").asText()).isEqualTo("m3.rule.adopt_mpcs_only");
+    }
+
+    @Test
+    void anActiveFederationAdvisoryCanBeAdoptedThroughHttp() {
+        ResponseEntity<JsonNode> authored = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules",
+                FEDERATION,
+                Map.of(
+                        "name",
+                        "Federation rice advisory",
+                        "kind",
+                        "TIME_LIMITED_PRICE",
+                        "predicate",
+                        Map.of("skuId", rice),
+                        "benefit",
+                        Map.of("kind", "PERCENT_OFF", "value", 10),
+                        "validFrom",
+                        applyFrom.toString(),
+                        "advisory",
+                        true));
+
+        assertThat(authored.getStatusCode())
+                .as(String.valueOf(authored.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+
+        UUID sourceId = UUID.fromString(authored.getBody().get("ruleId").asText());
+
+        ResponseEntity<JsonNode> activated =
+                send(HttpMethod.POST, "/v1/pricing/rules/" + sourceId + "/activate", FEDERATION, null);
+
+        assertThat(activated.getStatusCode())
+                .as(String.valueOf(activated.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select owner_entity_id, advisory, status "
+                                        + "from pricing.discount_rule where rule_id = ?",
+                                sourceId))
+                .containsEntry("owner_entity_id", FEDERATION)
+                .containsEntry("advisory", true)
+                .containsEntry("status", "ACTIVE");
+
+        ResponseEntity<JsonNode> adopted =
+                send(HttpMethod.POST, "/v1/pricing/rules/" + sourceId + "/adopt", ADOPTING_SOCIETY, null);
+
+        assertThat(adopted.getStatusCode())
+                .as(String.valueOf(adopted.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+
+        String newId = adopted.getBody().get("ruleId").asText();
+
+        assertThat(newId).isNotEqualTo(sourceId.toString());
+        assertThat(adopted.getBody().get("status").asText()).isEqualTo("DRAFT");
+        assertThat(adopted.getHeaders().getLocation()).hasToString("/v1/pricing/rules/" + newId);
+
+        Integer count = superuserJdbc()
+                .queryForObject(
+                        "select count(*) from pricing.discount_rule "
+                                + "where rule_id = ?::uuid "
+                                + "and owner_entity_id = ? "
+                                + "and adopted_from_rule_id = ?",
+                        Integer.class,
+                        newId,
+                        ADOPTING_SOCIETY,
+                        sourceId);
+
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void aNonFederationEntityCannotAuthorAnAdvisoryRule() {
+        ResponseEntity<JsonNode> response = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules",
+                DISTRIBUTOR,
+                Map.of(
+                        "name",
+                        "Unauthorized advisory",
+                        "kind",
+                        "TIME_LIMITED_PRICE",
+                        "predicate",
+                        Map.of("skuId", rice),
+                        "benefit",
+                        Map.of("kind", "PERCENT_OFF", "value", 10),
+                        "validFrom",
+                        applyFrom.toString(),
+                        "advisory",
+                        true));
+
+        assertThat(response.getStatusCode())
+                .as(String.valueOf(response.getBody()))
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        assertThat(response.getBody().get("code").asText()).isEqualTo("m3.rule.advisory_federation_only");
+
+        Integer count = superuserJdbc()
+                .queryForObject(
+                        "select count(*) from pricing.discount_rule " + "where owner_entity_id = ? and advisory = true",
+                        Integer.class,
+                        DISTRIBUTOR);
+
+        assertThat(count).isZero();
     }
 
     @Test

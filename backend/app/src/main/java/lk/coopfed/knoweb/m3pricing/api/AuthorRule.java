@@ -14,4 +14,18 @@ public record AuthorRule(
         RuleBenefit benefit,
         Integer priority,
         LocalDate validFrom,
-        LocalDate validTo) {}
+        LocalDate validTo,
+        boolean advisory) {
+
+    // Preserve existing seven-argument callers.
+    public AuthorRule(
+            String name,
+            String kind,
+            RulePredicate predicate,
+            RuleBenefit benefit,
+            Integer priority,
+            LocalDate validFrom,
+            LocalDate validTo) {
+        this(name, kind, predicate, benefit, priority, validFrom, validTo, false);
+    }
+}

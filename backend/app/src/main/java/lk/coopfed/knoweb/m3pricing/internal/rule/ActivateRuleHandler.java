@@ -12,8 +12,10 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
 import lk.coopfed.knoweb.m3pricing.api.RuleActivated;
+import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListRules;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +38,8 @@ public class ActivateRuleHandler implements Handles<ActivateRule, UUID> {
     private final JdbcTemplate jdbc;
     private final RuleStore store;
     private final RuleVocabulary vocabulary;
+    private final CatalogueQueries catalogue;
+    private final ControlPriceStore controlPrices;
     private final AuditFacade audit;
     private final EventPublisher events;
     private final Clock clock;
@@ -45,6 +49,8 @@ public class ActivateRuleHandler implements Handles<ActivateRule, UUID> {
             JdbcTemplate jdbc,
             RuleStore store,
             RuleVocabulary vocabulary,
+            CatalogueQueries catalogue,
+            ControlPriceStore controlPrices,
             AuditFacade audit,
             EventPublisher events,
             Clock clock,
@@ -52,6 +58,8 @@ public class ActivateRuleHandler implements Handles<ActivateRule, UUID> {
         this.jdbc = jdbc;
         this.store = store;
         this.vocabulary = vocabulary;
+        this.catalogue = catalogue;
+        this.controlPrices = controlPrices;
         this.audit = audit;
         this.events = events;
         this.clock = clock;
@@ -74,6 +82,24 @@ public class ActivateRuleHandler implements Handles<ActivateRule, UUID> {
             throw new ProblemException("m3.rule.valid_from_past");
         }
         vocabulary.check(rule.kind(), rule.predicate(), rule.benefit(), scope);
+
+        if (RuleVocabulary.FIXED_PRICE.equals(rule.benefit().kind())) {
+            UUID skuId = rule.predicate().skuId();
+
+            String uomCode = rule.predicate().uomCode();
+            if (uomCode == null) {
+                uomCode = catalogue
+                        .getSku(skuId, scope)
+                        .orElseThrow(() -> new ProblemException("m3.rule.sku_not_active"))
+                        .baseUomCode();
+            }
+
+            controlPrices.ceilingFor(skuId, uomCode, rule.validFrom()).ifPresent(ceiling -> {
+                if (rule.benefit().value().compareTo(ceiling.ceilingPrice()) > 0) {
+                    throw new ProblemException("m3.rule.above_control_price");
+                }
+            });
+        }
 
         jdbc.update("update pricing.discount_rule set status = 'ACTIVE' where rule_id = ?", rule.ruleId());
 

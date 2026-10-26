@@ -51,8 +51,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m1security", "20");
         // CAT-06: m2catalogue V0011 (location_assortment) from V0010.
         streams.put("m2catalogue", "10");
-        // M1-03: m3pricing V0010 (commercial_price_list) from V0009 (label_job).
-        streams.put("m3pricing", "9");
+        // PRC-04: m3pricing V0011 and V0012 upgrade an existing V0010 database.
+        streams.put("m3pricing", "10");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // INV-07 and INV-09: m5inventory V0012-V0015 (receipt, shortfall, cancellation and
@@ -199,7 +199,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 11)
-                .containsEntry("m3pricing", 10)
+                .containsEntry("m3pricing", 12)
                 .containsEntry("m5inventory", 15)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);

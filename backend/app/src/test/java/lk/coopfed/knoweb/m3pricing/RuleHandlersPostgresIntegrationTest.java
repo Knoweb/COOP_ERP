@@ -18,14 +18,17 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
+import lk.coopfed.knoweb.m3pricing.api.AmendDraftRule;
 import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.RuleActivated;
+import lk.coopfed.knoweb.m3pricing.api.RuleAmended;
 import lk.coopfed.knoweb.m3pricing.api.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.api.RuleDrafted;
 import lk.coopfed.knoweb.m3pricing.api.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.api.RuleWithdrawn;
 import lk.coopfed.knoweb.m3pricing.api.WithdrawRule;
 import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
+import lk.coopfed.knoweb.m3pricing.internal.rule.AmendDraftRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
@@ -56,6 +59,9 @@ class RuleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     AuthorRuleHandler author;
+
+    @Autowired
+    AmendDraftRuleHandler amend;
 
     @Autowired
     ActivateRuleHandler activate;
@@ -92,6 +98,7 @@ class RuleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     void clean() {
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table pricing.discount_rule");
+        admin.update("delete from pricing.control_price where sku_id in (?, ?, ?)", milk, biscuits, draftSku);
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
@@ -330,6 +337,183 @@ class RuleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         refused(() -> withdraw.handle(new WithdrawRule(rule, "why"), own(STRANGER)), "m3.rule.not_found");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    // ---- PRC-04: amend draft rules ---------------------------------------------------
+
+    @Test
+    void aDraftRuleCanBeAmendedWithAuditAndEvent() {
+        UUID ruleId = author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("PERCENT_OFF", "10")), own(SOCIETY));
+
+        kernel.reset();
+
+        UUID result = amend.handle(
+                new AmendDraftRule(
+                        ruleId,
+                        "Updated milk promotion",
+                        "TIME_LIMITED_PRICE",
+                        item(biscuits),
+                        benefit("FIXED_PRICE", "90"),
+                        25,
+                        today.plusDays(1),
+                        today.plusDays(7)),
+                own(SOCIETY));
+
+        assertThat(result).isEqualTo(ruleId);
+
+        assertThat(queries.getRule(ruleId, own(SOCIETY))).get().satisfies(view -> {
+            assertThat(view.name()).isEqualTo("Updated milk promotion");
+            assertThat(view.status()).isEqualTo("DRAFT");
+            assertThat(view.predicate().skuId()).isEqualTo(biscuits);
+            assertThat(view.benefit().kind()).isEqualTo("FIXED_PRICE");
+            assertThat(view.benefit().value()).isEqualByComparingTo("90");
+            assertThat(view.priority()).isEqualTo(25);
+            assertThat(view.validFrom()).isEqualTo(today.plusDays(1));
+            assertThat(view.validTo()).isEqualTo(today.plusDays(7));
+        });
+
+        assertThat(audit("RULE_AUTHORED"))
+                .singleElement()
+                .satisfies(record -> assertThat(record.subject().id()).isEqualTo(ruleId));
+
+        assertThat(events(RuleAmended.class)).containsExactly(new RuleAmended(ruleId, SOCIETY, "TIME_LIMITED_PRICE"));
+    }
+
+    @Test
+    void anActiveRuleCannotBeAmended() {
+        UUID ruleId = author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("PERCENT_OFF", "10")), own(SOCIETY));
+
+        activate.handle(new ActivateRule(ruleId), own(SOCIETY));
+        kernel.reset();
+
+        refused(
+                () -> amend.handle(
+                        new AmendDraftRule(
+                                ruleId,
+                                "Changed name",
+                                "TIME_LIMITED_PRICE",
+                                item(milk),
+                                benefit("PERCENT_OFF", "20"),
+                                50,
+                                today,
+                                null),
+                        own(SOCIETY)),
+                "m3.rule.not_draft");
+
+        assertThat(queries.getRule(ruleId, own(SOCIETY))).get().satisfies(view -> {
+            assertThat(view.status()).isEqualTo("ACTIVE");
+            assertThat(view.benefit().value()).isEqualByComparingTo("10");
+        });
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void amendmentRefusesAnotherOwnerAndInvalidValues() {
+        UUID ruleId = author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("PERCENT_OFF", "10")), own(SOCIETY));
+
+        kernel.reset();
+
+        AmendDraftRule valid = new AmendDraftRule(
+                ruleId,
+                "Updated promotion",
+                "TIME_LIMITED_PRICE",
+                item(milk),
+                benefit("PERCENT_OFF", "15"),
+                50,
+                today,
+                null);
+
+        refused(() -> amend.handle(valid, own(STRANGER)), "m3.rule.not_found");
+
+        refused(() -> amend.handle(valid, atShop(SOCIETY)), "scope.invalid");
+
+        refused(
+                () -> amend.handle(
+                        new AmendDraftRule(
+                                ruleId,
+                                "Updated promotion",
+                                "TIME_LIMITED_PRICE",
+                                item(milk),
+                                benefit("PERCENT_OFF", "15"),
+                                50,
+                                today,
+                                today.minusDays(1)),
+                        own(SOCIETY)),
+                "m3.rule.validity_invalid");
+
+        refused(
+                () -> amend.handle(
+                        new AmendDraftRule(
+                                ruleId,
+                                "Updated promotion",
+                                "TIME_LIMITED_PRICE",
+                                item(milk),
+                                benefit("PERCENT_OFF", "100"),
+                                50,
+                                today,
+                                null),
+                        own(SOCIETY)),
+                "m3.rule.benefit_value_invalid");
+
+        assertThat(queries.getRule(ruleId, own(SOCIETY))).get().satisfies(view -> {
+            assertThat(view.status()).isEqualTo("DRAFT");
+            assertThat(view.benefit().value()).isEqualByComparingTo("10");
+        });
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void fixedPriceActivationRespectsTheControlPriceCeiling() {
+        superuserJdbc()
+                .update(
+                        "insert into pricing.control_price "
+                                + "(control_price_id, sku_id, ceiling_price, ceiling_uom_code, "
+                                + "effective_from, effective_to, gazette_reference, entered_by, owner_entity_id) "
+                                + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        Ids.next(),
+                        milk,
+                        new BigDecimal("100.00"),
+                        "EA",
+                        today,
+                        null,
+                        "PRC-04-TEST",
+                        USER,
+                        FEDERATION);
+
+        UUID above =
+                author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("FIXED_PRICE", "100.01")), own(SOCIETY));
+
+        UUID equal =
+                author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("FIXED_PRICE", "100.00")), own(SOCIETY));
+
+        UUID below =
+                author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("FIXED_PRICE", "90.00")), own(SOCIETY));
+
+        UUID noCeiling = author.handle(
+                rule("TIME_LIMITED_PRICE", item(biscuits), benefit("FIXED_PRICE", "150.00")), own(SOCIETY));
+
+        kernel.reset();
+
+        refused(() -> activate.handle(new ActivateRule(above), own(SOCIETY)), "m3.rule.above_control_price");
+
+        assertThat(queries.getRule(above, own(SOCIETY))).get().satisfies(r -> assertThat(r.status())
+                .isEqualTo("DRAFT"));
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        activate.handle(new ActivateRule(equal), own(SOCIETY));
+        activate.handle(new ActivateRule(below), own(SOCIETY));
+        activate.handle(new ActivateRule(noCeiling), own(SOCIETY));
+
+        for (UUID id : List.of(equal, below, noCeiling)) {
+            assertThat(queries.getRule(id, own(SOCIETY))).get().satisfies(r -> assertThat(r.status())
+                    .isEqualTo("ACTIVE"));
+        }
     }
 
     // ---- helpers ------------------------------------------------------------------------------------

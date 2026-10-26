@@ -355,6 +355,32 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Amend an existing draft pricing rule
+         * @description Only the owning entity may amend a DRAFT rule. The rule vocabulary and validity dates are validated before the update.
+         */
+        patch: operations["amendDraftRule"];
+        trace?: never;
+    };
+    "/v1/pricing/rules/{ruleId}/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adopt an active Federation advisory rule as an MPCS-owned draft
+         * @description The source must be an active Federation advisory rule. Only an MPCS may adopt it. The original is unchanged.
+         */
+        post: operations["adoptAdvisoryRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -450,6 +476,23 @@ export interface components {
             validFrom: string;
             /** Format: date */
             validTo?: string | null;
+            /**
+             * @description Federation-only advisory pricing rule.
+             * @default false
+             */
+            advisory: boolean;
+        };
+        AmendDraftRuleRequest: {
+            name: string;
+            /** @enum {string} */
+            kind: "TIME_LIMITED_PRICE" | "QUANTITY_BREAK" | "BILL_THRESHOLD" | "FREE_ITEM" | "EXPIRY_MARKDOWN";
+            predicate: components["schemas"]["RulePredicate"];
+            benefit: components["schemas"]["RuleBenefit"];
+            priority?: number | null;
+            /** Format: date */
+            validFrom: string;
+            /** Format: date */
+            validTo?: string | null;
         };
         WithdrawRuleRequest: {
             reason: string;
@@ -473,6 +516,13 @@ export interface components {
             status: "DRAFT" | "ACTIVE" | "EXPIRED" | "WITHDRAWN";
             /** Format: date-time */
             createdAt: string;
+            /** @description Whether this is a Federation advisory rule. */
+            advisory?: boolean;
+            /**
+             * Format: uuid
+             * @description Original Federation advisory rule ID when adopted.
+             */
+            adoptedFromRuleId?: string | null;
         };
         CreatePriceListRequest: {
             /** @enum {string} */
@@ -1475,6 +1525,66 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    amendDraftRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendDraftRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description The amended draft rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    adoptAdvisoryRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The newly adopted draft rule */
+            201: {
+                headers: {
+                    /** @description Address of the new draft */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
     activateRule: {
