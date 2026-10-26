@@ -16,8 +16,6 @@ export function StockPage() {
   const formatDate = useFormatDate();
   const api = useInventoryApi();
   const canPrepare = useHasPermission("inv.opening.prepare");
-  const canPick = useHasPermission("whs.pick");
-  const canViewStock = useHasPermission("inv.stock.view");
   const [locationId, setLocationId] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -42,6 +40,25 @@ export function StockPage() {
 
   return (
     <main className="shell-page">
+      <Link className="back-link" to="/reporting">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M15 18l-6-6 6-6" />
+          <path d="M9 12h10" />
+        </svg>
+        <span>{t("inventory.back_dashboard").text}</span>
+      </Link>
+
       <PageHeader
         icon="stock"
         title={t("inventory.title").text}
@@ -135,11 +152,6 @@ export function StockPage() {
       <Link className="action-link" to="/inventory/transfer-requests">
         <span>{t("inventory.request.link").text}</span>
       </Link>
-
-      {canPick && <Link className="action-link" to="/inventory/pick-lists"><span>{t("inventory.pick.link").text}</span></Link>}
-      {canViewStock && <Link className="action-link" to="/inventory/expiry"><span>{t("inventory.expiry.link").text}</span></Link>}
-      {canViewStock && <Link className="action-link" to="/inventory/losses"><span>{t("inventory.loss.link").text}</span></Link>}
-      {canViewStock && <Link className="action-link" to="/inventory/policies"><span>{t("inventory.policy.link").text}</span></Link>}
     </div>
   </section>
 
@@ -154,14 +166,20 @@ export function StockPage() {
         </p>
       )}
 
-      {balances.data?.length === 0 && (
-        <p>{t("inventory.balances.empty").text}</p>
-      )}
-
-      {balances.data && balances.data.length > 0 && (
+      {balances.data && (
         <section className="modern-table-card">
           <div className="modern-table-scroll">
             <table className="modern-table stock-table stock-positions-table">
+              <colgroup>
+                <col className="col-item" />
+                <col className="col-batch" />
+                <col className="col-expiry" />
+                <col className="col-condition" />
+                <col className="col-on-hand" />
+                <col className="col-fefo" />
+                <col className="col-available" />
+                <col className="col-unit-cost" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>{t("inventory.column.item").text}</th>
@@ -171,64 +189,72 @@ export function StockPage() {
                   <th className="numeric-cell">{t("inventory.column.on_hand").text}</th>
                   <th className="numeric-cell">{t("inventory.column.fefo").text}</th>
                   <th className="numeric-cell">{t("inventory.column.available").text}</th>
-                  <th>{t("inventory.column.unit_cost").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.unit_cost").text}</th>
                 </tr>
               </thead>
 
               <tbody>
-                {balances.data.map((lot) => (
-                  <tr key={lot.stockLotId}>
-                    <td>
-                      <Link
-                        className="entity-link"
-                        to={`/inventory/locations/${locationId}/skus/${lot.skuId}`}
-                      >
-                        <span className="entity-link__icon" aria-hidden="true">
-                          <svg viewBox="0 0 24 24">
-                            <path d="M4 7 12 3l8 4-8 4-8-4Z" />
-                            <path d="M4 7v10l8 4 8-4V7" />
-                          </svg>
-                        </span>
-
-                        <SkuLabel skuId={lot.skuId} />
-                      </Link>
-                    </td>
-
-                    <td>
-                      {isSyntheticBatchNo(lot.batchNo)
-                        ? t("inventory.field.batch_not_tracked").text
-                        : (lot.batchNo ?? "")}
-                    </td>
-
-                    <td>{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
-
-                    <td>
-                      <span className="condition-chip">
-                        {t(`inventory.condition.${lot.condition}`).text}
-                      </span>
-                    </td>
-
-                    <td className="numeric-cell">
-                      {lot.qtyOnHand}
-                    </td>
-
-                    <td className="numeric-cell">
-                      {lot.expired ? (
-                        <span className="condition-chip">{t("inventory.lot.expired").text}</span>
-                      ) : (
-                        (lot.fefoRank ?? "")
-                      )}
-                    </td>
-
-                    <td className="numeric-cell numeric-cell--strong">
-                      {availableOf(lot.skuId) ?? ""}
-                    </td>
-
-                    <td className="numeric-cell">
-                      {lot.unitCost != null && <MoneyDisplay amount={lot.unitCost} />}
+                {balances.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="empty-table-cell">
+                      {t("inventory.balances.empty").text}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  balances.data.map((lot) => (
+                    <tr key={lot.stockLotId}>
+                      <td>
+                        <Link
+                          className="entity-link"
+                          to={`/inventory/locations/${locationId}/skus/${lot.skuId}`}
+                        >
+                          <span className="entity-link__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                              <path d="M4 7 12 3l8 4-8 4-8-4Z" />
+                              <path d="M4 7v10l8 4 8-4V7" />
+                            </svg>
+                          </span>
+
+                          <SkuLabel skuId={lot.skuId} />
+                        </Link>
+                      </td>
+
+                      <td>
+                        {isSyntheticBatchNo(lot.batchNo)
+                          ? t("inventory.field.batch_not_tracked").text
+                          : (lot.batchNo ?? "")}
+                      </td>
+
+                      <td>{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
+
+                      <td>
+                        <span className="condition-chip">
+                          {t(`inventory.condition.${lot.condition}`).text}
+                        </span>
+                      </td>
+
+                      <td className="numeric-cell">
+                        {lot.qtyOnHand}
+                      </td>
+
+                      <td className="numeric-cell">
+                        {lot.expired ? (
+                          <span className="condition-chip">{t("inventory.lot.expired").text}</span>
+                        ) : (
+                          (lot.fefoRank ?? "")
+                        )}
+                      </td>
+
+                      <td className="numeric-cell numeric-cell--strong">
+                        {availableOf(lot.skuId) ?? ""}
+                      </td>
+
+                      <td className="numeric-cell">
+                        {lot.unitCost != null && <MoneyDisplay amount={lot.unitCost} />}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

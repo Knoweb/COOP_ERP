@@ -36,48 +36,342 @@
   margin-bottom: var(--space-3);
 }
 
-.inventory-card-heading {
-  align-items: center;
+/* ---------- Stock Navigation & Filter Controls ----------------------------- */
+
+.shell-page > .back-link {
+  margin-bottom: var(--space-2);
+}
+
+.stock-positions-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.stock-positions-filters .modern-location-picker,
+.modern-filter-panel--stock .modern-location-picker {
+  width: 100%;
+  max-width: 320px;
+}
+
+.stock-positions-filters .modern-location-picker select {
+  max-width: 100%;
+}
+
+.stock-positions-filters .inventory-control-links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: space-between;
-  padding: var(--space-4);
+  align-items: center;
+  gap: var(--target-gap);
+  margin-bottom: 0;
 }
 
-.inventory-card-heading h2 {
+/* ---------- Stock Card Header ---------------------------------------------- */
+
+.stock-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.stock-card-header h1 {
   margin: 0;
+  font-size: var(--font-size-xl, 24px);
+  font-weight: 700;
+  color: var(--color-text);
 }
 
-.inventory-metric-grid,
-.inventory-policy-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--reporting-key-column-min)), 1fr));
+.stock-card-sku {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--color-surface-subtle, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius, 6px);
+  width: fit-content;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Table Container & Scrolling ------------------------------------ */
+
+.modern-table-card {
+  max-width: 100%;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  background: var(--color-surface, #fff);
+  overflow: hidden;
   margin-bottom: var(--space-4);
 }
 
-.inventory-metric,
-.inventory-policy-card {
-  padding: var(--space-4);
+.modern-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.inventory-metric {
-  display: grid;
+/* ---------- Common Table Styling (Main & Item Details) --------------------- */
+
+.stock-table.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.stock-table th,
+.stock-table td {
+  padding: 11px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stock-table th {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-polish-27, var(--color-surface-subtle));
+  white-space: nowrap;
+}
+
+.stock-table td {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.stock-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.stock-table tbody tr:nth-child(even) {
+  background: var(--color-polish-29, rgba(0, 0, 0, 0.01));
+}
+
+.stock-table tbody tr:hover {
+  background: var(--color-polish-14, rgba(0, 0, 0, 0.03));
+}
+
+.stock-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.stock-table th.numeric-cell,
+.stock-table td.numeric-cell {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-table td.numeric-cell--strong {
+  font-weight: var(--font-weight-strong, 600);
+}
+
+/* Chips & Badges */
+.stock-table .condition-chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.stock-table .movement-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill, 12px);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-surface-subtle, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.stock-table .qty--positive {
+  color: var(--color-success, #16a34a);
+  font-weight: 600;
+}
+
+.stock-table .qty--negative {
+  color: var(--color-danger, #dc2626);
+  font-weight: 600;
+}
+
+.stock-table td .entity-link {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1);
+  word-break: break-word;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.inventory-metric strong {
-  font-size: var(--font-size-lg);
+.stock-table td .entity-link:hover {
+  text-decoration: underline;
 }
 
-.inventory-policy-card h2 {
-  font-size: var(--font-size-md);
-  margin-top: 0;
+/* ---------- 1. Main Stock Positions Table ----------------------------------- */
+
+.stock-table.stock-positions-table {
+  min-width: 780px;
 }
 
-.inventory-policy-notice {
-  border-inline-start: var(--border-width-marker) solid var(--color-brand-accent1);
-  margin-block: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+.stock-positions-table col.col-item {
+  width: 24%;
+  min-width: 170px;
 }
+
+.stock-positions-table col.col-batch {
+  width: 15%;
+  min-width: 120px;
+}
+
+.stock-positions-table col.col-expiry {
+  width: 12%;
+  min-width: 100px;
+}
+
+.stock-positions-table col.col-condition {
+  width: 11%;
+  min-width: 90px;
+}
+
+.stock-positions-table col.col-on-hand {
+  width: 10%;
+  min-width: 80px;
+}
+
+.stock-positions-table col.col-fefo {
+  width: 9%;
+  min-width: 80px;
+}
+
+.stock-positions-table col.col-available {
+  width: 9%;
+  min-width: 80px;
+}
+
+.stock-positions-table col.col-unit-cost {
+  width: 10%;
+  min-width: 90px;
+}
+
+/* ---------- 2. Item Details (Stock Card) Table ------------------------------ */
+
+.stock-table.stock-card-table {
+  min-width: 700px;
+}
+
+.stock-card-table col.col-when {
+  width: 22%;
+  min-width: 140px;
+}
+
+.stock-card-table col.col-movement {
+  width: 20%;
+  min-width: 130px;
+}
+
+.stock-card-table col.col-condition {
+  width: 14%;
+  min-width: 95px;
+}
+
+.stock-card-table col.col-qty {
+  width: 14%;
+  min-width: 90px;
+}
+
+.stock-card-table col.col-balance {
+  width: 14%;
+  min-width: 90px;
+}
+
+.stock-card-table col.col-unit-cost {
+  width: 16%;
+  min-width: 100px;
+}
+
+.stock-card-table td.cell-when {
+  white-space: nowrap;
+}
+
+/* ---------- 3. Opening Balance Table (Adding & Viewing Items) --------------- */
+
+.stock-table.opening-balance-table {
+  min-width: 760px;
+}
+
+.stock-table td.empty-table-cell {
+  text-align: center !important;
+  color: var(--color-text-muted);
+  padding: var(--space-4) !important;
+  font-style: italic;
+}
+
+.opening-balance-table input,
+.opening-balance-table select {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius, 6px);
+  font-size: 13px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text);
+}
+
+.opening-balance-table td.numeric-cell input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.opening-balance-table .btn-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-danger, #dc2626);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--radius, 4px);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.opening-balance-table .btn-remove:hover {
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+}
+
+/* ---------- Responsive Adjustments across Devices -------------------------- */
+
+@media (max-width: 768px) {
+  .stock-positions-filters {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .stock-positions-filters .modern-location-picker,
+  .modern-filter-panel--stock .modern-location-picker {
+    max-width: 100%;
+  }
+
+  .stock-table th,
+  .stock-table td {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .stock-card-header h1 {
+    font-size: 20px;
+  }
+}
+
+

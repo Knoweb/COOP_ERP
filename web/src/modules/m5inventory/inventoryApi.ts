@@ -14,7 +14,6 @@ export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
-export type PickList = components["schemas"]["PickListResponse"];
 export type Transfer =components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
 export type ReceiveTransferRequest = components["schemas"]["ReceiveTransferRequest"];
@@ -30,7 +29,6 @@ export type Repack = components["schemas"]["RepackResponse"];
 export type ExecuteRepackRequest = components["schemas"]["ExecuteRepackRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
-export type Batch = catalogueComponents["schemas"]["BatchResponse"];
 export type TransferRequest = tradingComponents["schemas"]["TransferRequestResponse"];
 export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
 
@@ -74,13 +72,6 @@ export function useInventoryApi() {
         return data ?? null;
       },
 
-      async batch(batchId: string): Promise<Batch | null> {
-        const { data } = await catalogue.GET("/v1/catalogue/batches/{batchId}", {
-          params: { path: { batchId } }
-        });
-        return data ?? null;
-      },
-
       async openingBalance(id: string): Promise<OpeningBalance> {
         const { data } = await api.GET("/v1/inventory/opening-balances/{openingBalanceId}", {
           params: { path: { openingBalanceId: id } }
@@ -109,13 +100,6 @@ export function useInventoryApi() {
           params: { path: { locationId }, query: { skuId } }
         });
         return data ?? [];
-      },
-
-      async pickList(deliveryNoteId: string): Promise<PickList> {
-        const { data } = await api.GET("/v1/inventory/pick-lists/{deliveryNoteId}", {
-          params: { path: { deliveryNoteId } }
-        });
-        return data!;
       },
 
       async transfers(locationId: string): Promise<Transfer[]> {
