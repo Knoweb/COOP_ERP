@@ -79,30 +79,42 @@ export function OpeningBalancePage() {
         <StateChip state={chipOf(ob.status)} label={t(`inventory.opening.status.${ob.status}`).text} />
       </p>
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("inventory.column.item").text}</th>
-            <th>{t("inventory.column.condition").text}</th>
-            <th>{t("inventory.column.qty").text}</th>
-            <th>{t("inventory.column.unit_cost").text}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ob.lines.map((line) => (
-            <tr key={line.lineNo}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{t(`inventory.condition.${line.condition}`).text}</td>
-              <td>{line.qty}</td>
-              <td>
-                <MoneyDisplay amount={line.unitCost} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="modern-table-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table stock-table opening-balance-table">
+            <colgroup>
+              <col className="col-item" />
+              <col className="col-condition" />
+              <col className="col-qty" />
+              <col className="col-unit-cost" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>{t("inventory.column.item").text}</th>
+                <th>{t("inventory.column.condition").text}</th>
+                <th className="numeric-cell">{t("inventory.column.qty").text}</th>
+                <th className="numeric-cell">{t("inventory.column.unit_cost").text}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ob.lines.map((line) => (
+                <tr key={line.lineNo}>
+                  <td>
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>
+                    <span className="condition-chip">{t(`inventory.condition.${line.condition}`).text}</span>
+                  </td>
+                  <td className="numeric-cell">{line.qty}</td>
+                  <td className="numeric-cell">
+                    <MoneyDisplay amount={line.unitCost} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="inventory-action-bar">
         {ob.status === "DRAFT" && canSign && (
