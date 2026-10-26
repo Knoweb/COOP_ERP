@@ -19,6 +19,11 @@ export type ReasonRequest = components["schemas"]["EntityReasonRequest"];
 export type BulkValidationReport = components["schemas"]["BulkValidationReport"];
 export type Relationship = components["schemas"]["RelationshipResponse"];
 export type AmendTermsRequest = components["schemas"]["AmendTermsRequest"];
+export type BulkRegisterNetworkRequest = components["schemas"]["BulkRegisterNetworkRequest"];
+export type BulkNetworkReport = components["schemas"]["BulkNetworkReport"];
+export type BulkShopItem = components["schemas"]["BulkShopItem"];
+export type BulkUserItem = components["schemas"]["BulkUserItem"];
+export type BulkDeviceItem = components["schemas"]["BulkDeviceItem"];
 
 export type SocietyFilter = {
   status?: SocietyStatus;
@@ -124,6 +129,17 @@ export function usePartyApi() {
         const { data } = await api.POST("/v1/party/relationships/{relationshipId}/amend", {
           params: { header: { "Idempotency-Key": idempotencyKey }, path: { relationshipId } },
           body
+        });
+        return data!;
+      },
+
+      /**
+       * Bulk registers a network of shops, till positions, users and devices in one transaction (CAT-08).
+       */
+      async bulkRegisterNetwork(request: BulkRegisterNetworkRequest, idempotencyKey: string): Promise<BulkNetworkReport> {
+        const { data } = await api.POST("/v1/party/locations/bulk", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
         });
         return data!;
       }

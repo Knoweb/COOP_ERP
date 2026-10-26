@@ -12,6 +12,34 @@ import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
 
+const DISTRICTS = [
+  "Ampara",
+  "Anuradhapura",
+  "Badulla",
+  "Batticaloa",
+  "Colombo",
+  "Galle",
+  "Gampaha",
+  "Hambantota",
+  "Jaffna",
+  "Kalutara",
+  "Kandy",
+  "Kegalle",
+  "Kilinochchi",
+  "Kurunegala",
+  "Mannar",
+  "Matale",
+  "Matara",
+  "Monaragala",
+  "Mullaitivu",
+  "Nuwara Eliya",
+  "Polonnaruwa",
+  "Puttalam",
+  "Ratnapura",
+  "Trincomalee",
+  "Vavuniya"
+];
+
 /** Custom Status dropdown with styled selection, checkmark, custom hover and responsive layout */
 function StatusDropdown(props: {
   value: SocietyStatus | "";
@@ -139,8 +167,9 @@ export function SocietyRegisterPage() {
 
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
   const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const deferredSearch = useDeferredValue(search);
 
   const filter = {
@@ -183,8 +212,9 @@ export function SocietyRegisterPage() {
         <button
           type="button"
           className="society-filter-toggle-btn"
-          aria-expanded={showFilters}
-          onClick={() => setShowFilters((prev) => !prev)}
+          aria-expanded={filtersOpen}
+          aria-controls="society-filters"
+          onClick={() => setFiltersOpen((prev) => !prev)}
         >
           <svg
             viewBox="0 0 24 24"
@@ -203,7 +233,7 @@ export function SocietyRegisterPage() {
           </svg>
           <span>{t("party.filter.toggle").text}</span>
           <svg
-            className={`society-filter-arrow ${showFilters ? "society-filter-arrow--open" : ""}`}
+            className={`society-filter-arrow ${filtersOpen ? "society-filter-arrow--open" : ""}`}
             viewBox="0 0 24 24"
             width="14"
             height="14"
@@ -218,8 +248,8 @@ export function SocietyRegisterPage() {
           </svg>
         </button>
 
-        {showFilters && (
-          <form role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">
+        {filtersOpen && (
+          <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">
             <label className="modern-field">
               <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
               <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
@@ -233,8 +263,31 @@ export function SocietyRegisterPage() {
               />
             </div>
             <label className="modern-field">
-              <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
-              <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
+              <span className="modern-field__label party-filter-label">
+                {t("party.filter.district").text}
+              </span>
+              <input
+                type="text"
+                list="society-district-options"
+                value={districtSearch}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setDistrictSearch(value);
+
+                  const match = DISTRICTS.find(
+                    (name) => name.toLowerCase() === value.trim().toLowerCase()
+                  );
+
+                  setDistrict(match ?? "");
+                }}
+                className="party-filter-input"
+                autoComplete="off"
+              />
+              <datalist id="society-district-options">
+                {DISTRICTS.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
             </label>
           </form>
         )}

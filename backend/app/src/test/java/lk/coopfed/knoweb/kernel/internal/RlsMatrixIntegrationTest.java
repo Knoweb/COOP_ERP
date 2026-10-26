@@ -303,6 +303,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                             + " Federation's row for the item (EffectivePolicy)",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "pricing.adjustment_type",
+                    "everyone_reads (m3pricing V0008): adjustment types are read by all authenticated scopes",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
@@ -310,6 +314,19 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "catalogue.tax_rate",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
+                    "catalogue.sku_alias",
+                    "authenticated_read (22A section 3): alias history every class but NONE reads; only the"
+                            + " Federation updates aliases (fed_update), so an entity's own UPDATE and MOVE are hidden",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return everyClassButNoneReadsEverything(check);
+                        }
+                        if (check.op() == Op.UPDATE || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        return null;
+                    }),
             new Departure(
                     "security.app_user",
                     "no ext_view on purpose (m1security V0009): the row carries pin_hash and provider_subject,"
@@ -398,8 +415,28 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "dest_read (m5inventory V0004): the receiving shop reads the lines of a transfer sent to it",
                     RlsMatrixIntegrationTest::addressedToTheShop),
             new Departure(
+                    "inventory.transfer_dispatch",
+                    "dest_read (m5inventory V0011): the receiving shop reads the dispatch fact of a transfer sent to it",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
                     "inventory.transfer_receipt",
                     "source_read (m5inventory V0004): the sending shop reads the receipt of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_receipt_line",
+                    "source_read (m5inventory V0012): the sending shop reads the received quantities of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_shortfall",
+                    "source_read (m5inventory V0013): the sending shop reads the shortfall of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_shortfall_line",
+                    "source_read (m5inventory V0013): the sending shop reads shortfall lines of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_cancellation",
+                    "dest_read (m5inventory V0012): the receiving shop reads cancellation of a transfer addressed to it",
                     RlsMatrixIntegrationTest::addressedToTheShop),
             new Departure(
                     "trading.transfer_request",

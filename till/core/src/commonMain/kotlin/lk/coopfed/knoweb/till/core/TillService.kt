@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.till.core
 
 import kotlin.math.abs
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,11 +25,15 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import lk.coopfed.knoweb.till.core.id.IdGenerator
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.CashMovementKind
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
+import lk.coopfed.knoweb.till.core.model.ClockReading
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.port.Central
 import lk.coopfed.knoweb.till.core.port.CentralRefused
@@ -59,6 +64,15 @@ import lk.coopfed.knoweb.till.core.time.Times
 /** The till cannot do this now; [message] says why in words for the cashier. */
 class TillRefusal(message: String) : Exception(message)
 
+/** A tender specified by the operator at checkout (doc 26 section 3.3). */
+data class TenderInput(
+    val kind: String,
+    val amount: Money,
+    val reference: String? = null,
+    val tendered: Money = amount,
+    val customerAccountId: String? = null,
+)
+
 /** What the status bar shows: online or not, what waits for central, the snapshot in use, what the office must know. */
 data class TillStatus(
     val online: Boolean? = null,
@@ -72,6 +86,8 @@ data class TillStatus(
     val banners: List<String> = emptyList(),
     /** Central revoked this till: it is locked, its facts are kept (doc 32 section 9). */
     val revoked: Boolean = false,
+    /** The till is locked due to inactivity or lock command; operator PIN required to resume (T-09, FR-SEC-070). */
+    val locked: Boolean = false,
 )
 
 /**
@@ -115,6 +131,10 @@ class TillService(
         private set
     var operator: Operator? = null
         private set
+    var isLocked: Boolean = false
+        private set
+    private var lastActivityElapsed: Long = 0L
+    val idleLockDuration: Duration get() = policy.idleLock
     private var snapshotVersion = 0L
     private var operatorsSeen = false
     private var revoked = false
@@ -151,6 +171,7 @@ class TillService(
         revoked = store.setting(Settings.REVOKED) != null
         repairCounters()
         purgeAcknowledged()
+        lastActivityElapsed = currentUptimeMs()
         publishStatus()
     }
 
@@ -246,7 +267,12 @@ class TillService(
     suspend fun refreshSnapshot(): Long {
         val identity = requireDevice()
         val held = lock.withLock { snapshotVersion }
-        var delta = SnapshotDelta.fromJson(central.snapshot(held))
+        var delta = try {
+            SnapshotDelta.fromJson(central.snapshot(held))
+        } catch (e: CentralUnreachable) {
+            lock.withLock { publishStatus(online = false, message = "Offline: selling continues; ${e.message}") }
+            throw e
+        }
         var manifest = verifier.verify(delta, identity.locationId, identity.signingPublicKey, identity.signingKeyId)
         try {
             verifier.continuity(manifest, held)
@@ -262,7 +288,7 @@ class TillService(
             val confirmedAt = clock.now().toEpochMilliseconds().toString()
             if (delta.version == current.version && !delta.fullSnapshotRequired) {
                 store.transaction { store.putSetting(Settings.LAST_SNAPSHOT_AT, confirmedAt) }
-                publishStatus()
+                publishStatus(online = true, message = null)
                 return current.version
             }
             val next = current.apply(delta, businessDate())
@@ -274,7 +300,7 @@ class TillService(
             snapshotVersion = next.version
             catalogue = Catalogue(next, localPrices, businessDate())
             if (catalogue.operators.isNotEmpty()) operatorsSeen = true
-            publishStatus()
+            publishStatus(online = true, message = null)
             return next.version
         }
     }
@@ -298,20 +324,22 @@ class TillService(
         }
         if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         lock.withLock {
-            val at = now()
+            val reading = clockReading()
             val identity = device
             store.transaction {
                 store.removeSetting(Settings.pinFailures(candidate.userId))
                 if (previous != null && previous.userId != candidate.userId && identity != null) {
                     record(
                         Facts.OPERATOR_SWITCH_EVENT,
-                        at,
+                        reading,
                         candidate.userId,
                         Facts.operatorSwitched(identity, previous.userId, candidate.userId),
                     )
                 }
             }
             operator = candidate
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
             publishStatus()
         }
     }
@@ -334,17 +362,19 @@ class TillService(
         if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         return lock.withLock {
             val identity = requireDevice()
-            val at = now()
+            val reading = clockReading()
             store.transaction {
                 store.removeSetting(Settings.pinFailures(candidate.userId))
                 record(
                     Facts.OPERATOR_SWITCH_EVENT,
-                    at,
+                    reading,
                     candidate.userId,
                     Facts.operatorSwitched(identity, previous.userId, candidate.userId, reason),
                 )
             }
             operator = candidate
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
             publishStatus()
             candidate
         }
@@ -366,7 +396,8 @@ class TillService(
     }
 
     private fun countWrongPin(candidate: Operator) {
-        val at = now()
+        val reading = clockReading()
+        val at = reading.occurredAt
         val limit = policy.pinFailuresBeforeLock
         val key = Settings.pinFailures(candidate.userId)
         var lockedNow = false
@@ -378,7 +409,7 @@ class TillService(
                 store.putSetting(Settings.PIN_LOCK_REMAINING_MS, policy.pinLockFor.inWholeMilliseconds.toString())
                 store.removeSetting(key)
                 lockedNow = true
-                device?.let { record(Facts.PIN_LOCKOUT_EVENT, at, null, Facts.pinLockout(it, failures, until)) }
+                device?.let { record(Facts.PIN_LOCKOUT_EVENT, reading, null, Facts.pinLockout(it, failures, until)) }
             } else {
                 store.putSetting(key, failures.toString())
             }
@@ -453,11 +484,98 @@ class TillService(
         val id = store.setting(Settings.TRIAL_OPERATOR_ID) ?: ids.next().also { id ->
             store.transaction { store.putSetting(Settings.TRIAL_OPERATOR_ID, id) }
         }
-        Operator(id, "Trial cashier", shopLanguage, null, emptyList()).also { operator = it }
+        Operator(id, "Trial cashier", shopLanguage, null, emptyList()).also {
+            operator = it
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
+        }
     }
 
     fun signOut() {
+        isLocked = false
         operator = null
+        publishStatus()
+    }
+
+    /** Records user activity on the till, resetting the inactivity/idle timer. */
+    fun recordActivity() {
+        if (!isLocked) {
+            lastActivityElapsed = currentUptimeMs()
+        }
+    }
+
+    /** Locks the till session; the operator or a colleague must enter their PIN to unlock. */
+    fun lock() {
+        if (operator != null && !isLocked) {
+            isLocked = true
+            publishStatus()
+        }
+    }
+
+    /**
+     * Checks if the till has been idle longer than the configured [idleLockDuration].
+     * If so, locks the till and returns true; otherwise returns false.
+     */
+    fun checkIdleLock(): Boolean {
+        if (operator != null && !isLocked && policy.idleLock.isPositive()) {
+            val elapsed = currentUptimeMs() - lastActivityElapsed
+            if (elapsed >= policy.idleLock.inWholeMilliseconds) {
+                lock()
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Unlocks the currently signed-in operator with their PIN.
+     */
+    suspend fun unlock(pin: String): Operator {
+        val current = lock.withLock {
+            requireDevice()
+            requireNotRevoked()
+            requireNotLockedOut()
+            operator ?: throw TillRefusal("No operator signed in")
+        }
+        if (current.pinHash != null && !checkPin(current, pin)) {
+            throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
+        }
+        return lock.withLock {
+            store.transaction {
+                store.removeSetting(Settings.pinFailures(current.userId))
+            }
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
+            publishStatus()
+            current
+        }
+    }
+
+    /**
+     * Unlocks the till with [candidate] operator and their PIN.
+     * If [candidate] is the current operator, unlocks with PIN.
+     * If [candidate] is a colleague, switches operators and audits the switch fact.
+     */
+    suspend fun unlock(candidate: Operator, pin: String, reason: String? = null): Operator {
+        val current = operator
+        return if (current == null || current.userId == candidate.userId) {
+            unlock(pin)
+        } else {
+            val switched = switchOperator(candidate, pin, reason ?: "Unlocked by colleague")
+            lock.withLock {
+                isLocked = false
+                lastActivityElapsed = currentUptimeMs()
+                publishStatus()
+            }
+            switched
+        }
+    }
+
+    private fun requireNotLocked() {
+        if (isLocked) {
+            throw TillRefusal("The till is locked: enter PIN to unlock")
+        }
+        recordActivity()
     }
 
     // ================================================================= the session (doc 26 section 3.5)
@@ -465,6 +583,7 @@ class TillService(
     suspend fun openSession(floatAmount: Money): SessionRecord = lock.withLock {
         val identity = requireDevice()
         requireNotRevoked()
+        requireNotLocked()
         val cashier = operator ?: throw TillRefusal("Sign in first")
         if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
             TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
@@ -472,7 +591,8 @@ class TillService(
         }
         if (store.openSession() != null) throw TillRefusal("A session is already open at this till")
         if (floatAmount.cents < 0) throw TillRefusal("The float cannot be negative")
-        val now = now()
+        val reading = clockReading()
+        val now = reading.occurredAt
         val session = SessionRecord(
             sessionId = ids.next(),
             operatorUserId = cashier.userId,
@@ -482,7 +602,7 @@ class TillService(
             floatAmount = floatAmount,
         )
         val opened = store.transaction {
-            val fact = record("till_session.opened.v1", now, cashier.userId, Facts.sessionOpened(identity, session))
+            val fact = record("till_session.opened.v1", reading, cashier.userId, Facts.sessionOpened(identity, session))
             session.copy(openedSeq = fact.deviceSeq).also { store.saveSession(it) }
         }
         publishStatus()
@@ -511,6 +631,7 @@ class TillService(
         val actingSupervisor = lock.withLock {
             requireDevice()
             requireNotRevoked()
+            requireNotLocked()
             if (store.openSession() != null) throw TillRefusal("Close the session first: the business date changes only between sessions")
             val current = store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) }
             if (current == null || date >= current) {
@@ -538,24 +659,29 @@ class TillService(
             if (from == null || date >= from) {
                 throw TillRefusal("Only a move back needs a supervisor; the business date moves forward by itself when a session opens")
             }
+            val reading = clockReading()
             store.transaction {
                 if (actingSupervisor != null) store.removeSetting(Settings.pinFailures(actingSupervisor.userId))
                 store.putSetting(Settings.BUSINESS_DATE, date.toString())
                 // Central learns who moved the date, from what to what (TILLM6-05).
-                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, now(), actingSupervisor?.userId, Facts.businessDateCorrected(identity, from, date))
+                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, reading, actingSupervisor?.userId, Facts.businessDateCorrected(identity, from, date))
             }
             publishStatus()
         }
     }
 
     /**
-     * Sells the basket for cash: numbers the receipt from the till position's series, writes it and
-     * its bundle to the outbox in one transaction, and returns it for printing. The basket is
-     * emptied only when the receipt is safely written.
+     * Completes a sale with one or more tenders: numbers the receipt from the till position's
+     * series, writes it, its tender rows and its bundle to the outbox in one atomic transaction,
+     * and returns it for printing. The basket is emptied only when the receipt is safely written.
+     *
+     * Refuses digital tenders (CARD, WALLET, QR) when offline (FR-POS-040) or when the approval
+     * reference is missing.
      */
-    suspend fun sellForCash(basket: Basket, tendered: Money): IssuedReceipt = lock.withLock {
+    suspend fun sell(basket: Basket, tenders: List<TenderInput>): IssuedReceipt = lock.withLock {
         val identity = requireDevice()
         requireNotRevoked()
+        requireNotLocked()
         val cashier = operator ?: throw TillRefusal("Sign in first")
         if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
             TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
@@ -563,10 +689,68 @@ class TillService(
         }
         val session = store.openSession() ?: throw TillRefusal("Open a session first")
         if (basket.isEmpty) throw TillRefusal("The basket is empty")
+        if (tenders.isEmpty()) throw TillRefusal("At least one tender is required")
+
         val gross = basket.total
-        if (tendered < gross) throw TenderTooSmall(gross, tendered)
-        val now = now()
+        val isOnline = _status.value.online == true
+
+        for (tender in tenders) {
+            val upperKind = tender.kind.uppercase()
+            val isDigital = upperKind in setOf("CARD", "CARD_REF", "WALLET", "QR")
+            if (isDigital) {
+                val label = when (upperKind) {
+                    "CARD", "CARD_REF" -> "Card"
+                    "WALLET" -> "Wallet"
+                    "QR" -> "QR"
+                    else -> tender.kind
+                }
+                if (!isOnline) {
+                    throw TillRefusal("$label payment is refused while offline")
+                }
+                if (tender.reference.isNullOrBlank()) {
+                    throw TillRefusal("Payment reference is required for $label")
+                }
+            }
+            if (tender.amount <= Money.ZERO) {
+                throw TillRefusal("Tender amount must be positive")
+            }
+        }
+
+        val appliedTotal = tenders.fold(Money.ZERO) { acc, t -> acc + t.amount }
+        if (appliedTotal != gross) {
+            if (appliedTotal < gross) {
+                throw TillRefusal("Total tenders LKR ${appliedTotal.display()} is less than total LKR ${gross.display()}")
+            } else {
+                throw TillRefusal("Total tenders LKR ${appliedTotal.display()} exceeds total LKR ${gross.display()}")
+            }
+        }
+
+        val totalTendered = tenders.fold(Money.ZERO) { acc, t -> acc + t.tendered }
+        if (totalTendered < gross) {
+            throw TenderTooSmall(gross, totalTendered)
+        }
+
+        val reading = clockReading()
+        val now = reading.occurredAt
         val language = shopLanguage
+
+        val tenderRecords = tenders.mapIndexed { index, t ->
+            val changeGiven = if (t.kind.uppercase() == "CASH" && t.tendered > t.amount) {
+                t.tendered - t.amount
+            } else {
+                Money.ZERO
+            }
+            TenderRecord(
+                seq = index + 1,
+                kind = t.kind.uppercase(),
+                amount = t.amount,
+                reference = t.reference?.trim(),
+                customerAccountId = t.customerAccountId,
+                changeGiven = changeGiven,
+                offline = !isOnline,
+            )
+        }
+
         val receipt = store.transaction {
             val number = next(Settings.NEXT_RECEIPT_NUMBER)
             val seq = next(Settings.NEXT_DEVICE_SEQ)
@@ -600,18 +784,28 @@ class TillService(
                 operatorName = cashier.displayName,
                 lines = lines,
                 gross = gross,
-                tendered = tendered,
-                change = tendered - gross,
+                tendered = totalTendered,
+                change = totalTendered - gross,
                 contentHash = hash,
                 deviceSeq = seq,
+                tenders = tenderRecords,
             )
             store.saveReceipt(receipt)
             store.appendOutbox(
                 Facts.event(
-                    eventId = ids.next(), eventType = "receipt.issued.v1", deviceSeq = seq, occurredAt = now,
-                    zone = clock.zone, actorUserId = cashier.userId,
+                    eventId = ids.next(),
+                    eventType = "receipt.issued.v1",
+                    deviceSeq = seq,
+                    occurredAt = reading.occurredAt,
+                    zone = clock.zone,
+                    actorUserId = cashier.userId,
                     payload = Facts.receiptPayload(document, lineJson, receipt),
-                    aggregateType = "receipt", aggregateId = documentId, contentHash = hash,
+                    aggregateType = "receipt",
+                    aggregateId = documentId,
+                    contentHash = hash,
+                    rawInstant = reading.rawInstant,
+                    offlineTimed = reading.offlineTimed,
+                    clockOffsetMs = reading.clockOffsetMs,
                 ),
             )
             receipt
@@ -621,33 +815,157 @@ class TillService(
         receipt
     }
 
+    /**
+     * Sells the basket for cash: numbers the receipt from the till position's series, writes it and
+     * its bundle to the outbox in one transaction, and returns it for printing. The basket is
+     * emptied only when the receipt is safely written.
+     */
+    suspend fun sellForCash(basket: Basket, tendered: Money): IssuedReceipt {
+        val gross = basket.total
+        if (tendered < gross) throw TenderTooSmall(gross, tendered)
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "CASH", amount = gross, reference = null, tendered = tendered)),
+        )
+    }
+
+    /** Sells the basket using an external standalone card terminal, recording its approval reference. */
+    suspend fun sellForCard(basket: Basket, reference: String): IssuedReceipt {
+        val gross = basket.total
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "CARD", amount = gross, reference = reference)),
+        )
+    }
+
+    /** Sells the basket using an external mobile wallet, recording its approval reference. */
+    suspend fun sellForWallet(basket: Basket, reference: String): IssuedReceipt {
+        val gross = basket.total
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "WALLET", amount = gross, reference = reference)),
+        )
+    }
+
+    /** Sells the basket using a dynamic/merchant QR payment, recording its transaction reference. */
+    suspend fun sellForQr(basket: Basket, reference: String): IssuedReceipt {
+        val gross = basket.total
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "QR", amount = gross, reference = reference)),
+        )
+    }
+
+    /**
+     * Records a cash movement (drop or pay-out) at the drawer (doc 26 section 3.5).
+     * Validates that a session is open, amount is positive, reason is non-blank,
+     * and atomically writes the movement and the outbox event in the device sequence.
+     */
+    suspend fun recordCashMovement(
+        kind: String,
+        amount: Money,
+        reason: String,
+    ): CashMovementRecord = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val cashier = operator ?: throw TillRefusal("Sign in first")
+        val session = store.openSession() ?: throw TillRefusal("No session is open")
+        if (amount <= Money.ZERO) {
+            throw TillRefusal("Cash movement amount must be positive")
+        }
+        val trimmedReason = reason.trim()
+        if (trimmedReason.isEmpty()) {
+            throw TillRefusal("Reason is mandatory for cash movement")
+        }
+        val upperKind = kind.uppercase()
+        if (upperKind != CashMovementKind.DROP && upperKind != CashMovementKind.PAYOUT) {
+            throw TillRefusal("Unknown cash movement kind: $kind")
+        }
+
+        val reading = clockReading()
+        val now = reading.occurredAt
+        val movementId = ids.next()
+        val occurredAtSec = Times.wholeSecond(now).epochSeconds
+
+        val movement = CashMovementRecord(
+            movementId = movementId,
+            sessionId = session.sessionId,
+            kind = upperKind,
+            amount = amount,
+            occurredAt = occurredAtSec,
+            operatorUserId = cashier.userId,
+            reason = trimmedReason,
+        )
+
+        val recorded = store.transaction {
+            val fact = record(
+                "cash_movement.recorded.v1",
+                reading,
+                cashier.userId,
+                Facts.cashMovement(identity, movement, now),
+                aggregateType = "cash_movement",
+                aggregateId = movementId,
+            )
+            val withSeq = movement.copy(deviceSeq = fact.deviceSeq)
+            store.saveCashMovement(withSeq)
+            withSeq
+        }
+        recorded
+    }
+
+    suspend fun recordCashDrop(amount: Money, reason: String): CashMovementRecord =
+        recordCashMovement(CashMovementKind.DROP, amount, reason)
+
+    suspend fun recordPayout(amount: Money, reason: String): CashMovementRecord =
+        recordCashMovement(CashMovementKind.PAYOUT, amount, reason)
+
     /** The cashier's blind count closes the session; the till works out expected cash and the variance. */
     suspend fun closeSession(counted: Money): ZReport = lock.withLock {
         val identity = requireDevice()
+        requireNotLocked()
         val session = store.openSession() ?: throw TillRefusal("No session is open")
         if (counted.cents < 0) throw TillRefusal("The count cannot be negative")
         val receipts = store.receiptsOfSession(session.sessionId)
-        val open = ZReport.of(session, receipts)
-        val now = now()
+        val movements = store.cashMovementsOfSession(session.sessionId)
+        val open = ZReport.of(session, receipts, cashMovements = movements)
+        val reading = clockReading()
+        val now = reading.occurredAt
         val closing = session.copy(
             closedAt = Times.wholeSecond(now).epochSeconds,
             countedCash = counted,
-            expectedCash = SessionRules.expectedCash(session, open.cashSales),
+            expectedCash = SessionRules.expectedCash(session, open.cashSales, open.drops, open.payouts),
         )
         val closed = store.transaction {
-            val fact = record("till_session.closed.v1", now, operator?.userId ?: session.operatorUserId, Facts.sessionClosed(identity, closing))
+            val fact = record(
+                "till_session.closed.v1",
+                reading,
+                operator?.userId ?: session.operatorUserId,
+                Facts.sessionClosed(identity, closing, openSessionsRemaining = 0),
+            )
             closing.copy(closedSeq = fact.deviceSeq).also { store.saveSession(it) }
         }
         publishStatus()
-        zReportOf(closed, receipts)
+        zReportOf(closed, receipts, movements)
     }
 
     suspend fun zReport(sessionId: String): ZReport? = lock.withLock {
-        store.session(sessionId)?.let { zReportOf(it, store.receiptsOfSession(it.sessionId)) }
+        store.session(sessionId)?.let {
+            zReportOf(it, store.receiptsOfSession(it.sessionId), store.cashMovementsOfSession(it.sessionId))
+        }
     }
 
-    private fun zReportOf(session: SessionRecord, receipts: List<IssuedReceipt>): ZReport =
-        ZReport.of(session, receipts, store.quarantinedAmong(ZReport.factsOf(session, receipts)))
+    private fun zReportOf(
+        session: SessionRecord,
+        receipts: List<IssuedReceipt>,
+        cashMovements: List<CashMovementRecord> = emptyList(),
+    ): ZReport =
+        ZReport.of(
+            session,
+            receipts,
+            store.quarantinedAmong(ZReport.factsOf(session, receipts, cashMovements)),
+            cashMovements,
+        )
 
     // ================================================================= problems for the office
 
@@ -974,15 +1292,17 @@ class TillService(
     }
 
     /**
-     * The till's clock corrected by the offset central last measured (TillEvent.occurred_at). The
-     * offset is dropped, with a problem recorded, when the PC's clock was moved since it was measured:
+     * Captures a consistent snapshot of the device wall clock and active offset metadata.
+     * The offset is dropped, with a problem recorded, when the PC's clock was moved since it was measured:
      * it reads earlier than at the measurement, or it moved more than the policy's tolerance beside
      * the monotonic clock. The next heartbeat measures again.
      */
-    private fun now(): Instant {
+    private fun clockReading(): ClockReading {
         val raw = clock.now()
-        val offset = store.setting(Settings.CLOCK_OFFSET_MS)?.toLongOrNull() ?: return raw
-        val at = store.setting(Settings.CLOCK_OFFSET_AT)?.toLongOrNull() ?: return raw + offset.milliseconds
+        val offset = store.setting(Settings.CLOCK_OFFSET_MS)?.toLongOrNull()
+            ?: return ClockReading(occurredAt = raw, rawInstant = raw, clockOffsetMs = null, offlineTimed = true)
+        val at = store.setting(Settings.CLOCK_OFFSET_AT)?.toLongOrNull()
+            ?: return ClockReading(occurredAt = raw + offset.milliseconds, rawInstant = raw, clockOffsetMs = offset, offlineTimed = false)
         val rawMs = raw.toEpochMilliseconds()
         val elapsed = clock.elapsedMillis()
         val elapsedAt = offsetElapsedAt
@@ -1003,12 +1323,19 @@ class TillService(
                 )
             }
             offsetElapsedAt = null
-            return raw
+            return ClockReading(occurredAt = raw, rawInstant = raw, clockOffsetMs = null, offlineTimed = true)
         }
-        return raw + offset.milliseconds
+        return ClockReading(occurredAt = raw + offset.milliseconds, rawInstant = raw, clockOffsetMs = offset, offlineTimed = false)
     }
 
+    /**
+     * The till's clock corrected by the offset central last measured (TillEvent.occurred_at).
+     */
+    private fun now(): Instant = clockReading().occurredAt
+
     private fun rawMillis(): Long = clock.now().toEpochMilliseconds()
+
+    private fun currentUptimeMs(): Long = clock.elapsedMillis() ?: rawMillis()
 
     /**
      * The business date a new session opens on: today's date at the shop, never earlier than the
@@ -1100,8 +1427,28 @@ class TillService(
         store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) } ?: Times.date(clock.now(), clock.zone)
 
     /** Appends a fact with the next device sequence number. Call inside a transaction. */
-    private fun record(eventType: String, at: Instant, actor: String?, payload: JsonObject): OutboxEntry {
-        val entry = Facts.event(ids.next(), eventType, next(Settings.NEXT_DEVICE_SEQ), at, clock.zone, actor, payload)
+    private fun record(
+        eventType: String,
+        reading: ClockReading,
+        actor: String?,
+        payload: JsonObject,
+        aggregateType: String? = null,
+        aggregateId: String? = null,
+    ): OutboxEntry {
+        val entry = Facts.event(
+            eventId = ids.next(),
+            eventType = eventType,
+            deviceSeq = next(Settings.NEXT_DEVICE_SEQ),
+            occurredAt = reading.occurredAt,
+            zone = clock.zone,
+            actorUserId = actor,
+            payload = payload,
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
+            rawInstant = reading.rawInstant,
+            offlineTimed = reading.offlineTimed,
+            clockOffsetMs = reading.clockOffsetMs,
+        )
         store.appendOutbox(entry)
         return entry
     }
@@ -1127,6 +1474,7 @@ class TillService(
             problems = store.unseenAnomalyCount(),
             banners = banners(),
             revoked = revoked,
+            locked = isLocked,
         )
     }
 

@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.till.core.model
 
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 import lk.coopfed.knoweb.till.core.money.Money
@@ -63,6 +64,18 @@ data class ReceiptLine(
     val lineTotal: Money,
 )
 
+/** A tender applied to a receipt (doc 26 section 3.3). */
+@Serializable
+data class TenderRecord(
+    val seq: Int,
+    val kind: String,
+    val amount: Money,
+    val reference: String? = null,
+    val customerAccountId: String? = null,
+    val changeGiven: Money = Money.ZERO,
+    val offline: Boolean = false,
+)
+
 /** A receipt the till issued: a fact, never changed afterwards (doc 26; AGENTS.md rule 3). */
 @Serializable
 data class IssuedReceipt(
@@ -80,6 +93,7 @@ data class IssuedReceipt(
     val change: Money,
     val contentHash: String,
     val deviceSeq: Long,
+    val tenders: List<TenderRecord> = emptyList(),
 )
 
 /** A fact waiting in the outbox for central (doc 32 section 3). */
@@ -118,3 +132,35 @@ data class Anomaly(
     }
 }
 
+/**
+ * A clock snapshot captured consistently at event creation time.
+ */
+data class ClockReading(
+    /** The till's clock with active central offset applied, if any. */
+    val occurredAt: Instant,
+    /** The raw device wall-clock reading at capture time. */
+    val rawInstant: Instant,
+    /** The offset (server - device) in ms actually applied to occurredAt, or null if no offset was active. */
+    val clockOffsetMs: Long?,
+    /** True when recorded without an active clock sync offset. */
+    val offlineTimed: Boolean,
+)
+
+/** The kind of cash movement at a till drawer (doc 26 section 3.5). */
+object CashMovementKind {
+    const val DROP = "DROP"
+    const val PAYOUT = "PAYOUT"
+}
+
+/** A cash drop or pay-out recorded at a till (doc 26 section 3.5). */
+@Serializable
+data class CashMovementRecord(
+    val movementId: String,
+    val sessionId: String,
+    val kind: String,
+    val amount: Money,
+    val occurredAt: Long,
+    val operatorUserId: String,
+    val reason: String,
+    val deviceSeq: Long? = null,
+)

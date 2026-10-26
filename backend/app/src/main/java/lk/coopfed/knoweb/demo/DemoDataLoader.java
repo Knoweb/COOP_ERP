@@ -22,6 +22,7 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.api.ActivateLocation;
 import lk.coopfed.knoweb.m1party.api.ActivateRelationship;
 import lk.coopfed.knoweb.m1party.api.OpenTradingRelationship;
 import lk.coopfed.knoweb.m1party.api.RegisterTillPosition;
@@ -49,6 +50,7 @@ import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
@@ -109,10 +111,12 @@ public class DemoDataLoader {
     private final Handles<PublishPriceList, UUID> publishPriceList;
     private final Handles<OpenTradingRelationship, UUID> openRelationship;
     private final Handles<ActivateRelationship, UUID> activateRelationship;
+    private final Handles<ActivateLocation, UUID> activateLocation;
     private final Handles<PrepareOpeningBalance, UUID> prepareOpeningBalance;
     private final Handles<SignOpeningBalance, UUID> signOpeningBalance;
     private final Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance;
     private final Handles<IssueTransfer, UUID> issueTransfer;
+    private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
     private final PartyQueries party;
     private final RelationshipQueries relationships;
@@ -150,10 +154,12 @@ public class DemoDataLoader {
             Handles<PublishPriceList, UUID> publishPriceList,
             Handles<OpenTradingRelationship, UUID> openRelationship,
             Handles<ActivateRelationship, UUID> activateRelationship,
+            Handles<ActivateLocation, UUID> activateLocation,
             Handles<PrepareOpeningBalance, UUID> prepareOpeningBalance,
             Handles<SignOpeningBalance, UUID> signOpeningBalance,
             Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance,
             Handles<IssueTransfer, UUID> issueTransfer,
+            Handles<DispatchTransfer, UUID> dispatchTransfer,
             Handles<ReceiveTransfer, UUID> receiveTransfer,
             PartyQueries party,
             RelationshipQueries relationships,
@@ -180,10 +186,12 @@ public class DemoDataLoader {
         this.publishPriceList = publishPriceList;
         this.openRelationship = openRelationship;
         this.activateRelationship = activateRelationship;
+        this.activateLocation = activateLocation;
         this.prepareOpeningBalance = prepareOpeningBalance;
         this.signOpeningBalance = signOpeningBalance;
         this.countersignOpeningBalance = countersignOpeningBalance;
         this.issueTransfer = issueTransfer;
+        this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
         this.party = party;
         this.relationships = relationships;
@@ -479,12 +487,13 @@ public class DemoDataLoader {
         count("ActivateRelationship");
     }
 
-    // ---- M5: opening stock, prepared and signed by stores, countersigned by accounts ---------------
+    // ---- M5: opening stock, prepared and signed locally, countersigned by the Federation -----------
 
     private void openingStock(
-            Actor stores, Actor countersigner, List<Item> items, Map<String, UUID> skus, boolean federation) {
+            Actor stores, Actor activator, List<Item> items, Map<String, UUID> skus, boolean federation) {
         ScopeContext scope = scopeOf(stores);
         if (!inventory.skusWithLots(stores.locationId(), scope).isEmpty()) {
+            activateAfterOpening(stores.locationId(), activator);
             return;
         }
         LocalDate today = today();
@@ -509,8 +518,9 @@ public class DemoDataLoader {
         count("PrepareOpeningBalance");
         signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
         count("SignOpeningBalance");
-        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(countersigner));
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.FED_ACCOUNTS));
         count("CountersignOpeningBalance");
+        activateAfterOpening(stores.locationId(), activator);
     }
 
     // ---- M5, phase 3: the society's stores stock and the shops' first stock ----------------------
@@ -520,12 +530,13 @@ public class DemoDataLoader {
      * item, at the distributor's price (what the society paid), enough for both its shops' first
      * transfers (DemoShopStock) with stock left for the count, the write-off and the repack
      * (DemoStockOperations). Prepared and signed by the society buyer, countersigned by the society
-     * manager.
+     * by the Federation onboarding officer.
      */
     private void societyStock(List<Item> items, Map<String, UUID> skus) {
         Actor buyer = DemoCast.M101_BUYER;
         ScopeContext scope = scopeOf(buyer);
         if (!inventory.skusWithLots(DemoCast.M101_WAREHOUSE, scope).isEmpty()) {
+            activateAfterOpening(DemoCast.M101_WAREHOUSE, DemoCast.M101_MANAGER);
             return;
         }
         LocalDate today = today();
@@ -539,14 +550,15 @@ public class DemoDataLoader {
         count("PrepareOpeningBalance");
         signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
         count("SignOpeningBalance");
-        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.M101_MANAGER));
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.FED_ACCOUNTS));
         count("CountersignOpeningBalance");
+        activateAfterOpening(DemoCast.M101_WAREHOUSE, DemoCast.M101_MANAGER);
     }
 
     /**
      * The opening stock of a shop with no society stores behind it (Pannala, Point Pedro: the
      * distributor delivers to the shop), counted on the day the shop went live: prepared and signed
-     * by the shop's staff member, countersigned by the society manager, at the distributor's price.
+     * by the shop's staff member, countersigned by the Federation, at the distributor's price.
      * Skipped once the shop holds any lot (on a stack loaded before this the shop already has its
      * GRNs, and M5 refuses an opening balance at a location with movements).
      */
@@ -554,6 +566,7 @@ public class DemoDataLoader {
             Actor staff, Actor manager, List<DemoShopStock.Shelf> shelves, List<Item> items, Map<String, UUID> skus) {
         ScopeContext scope = scopeOf(staff);
         if (!inventory.skusWithLots(staff.locationId(), scope).isEmpty()) {
+            activateAfterOpening(staff.locationId(), manager);
             return;
         }
         LocalDate today = today();
@@ -571,8 +584,20 @@ public class DemoDataLoader {
         count("PrepareOpeningBalance");
         signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
         count("SignOpeningBalance");
-        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(manager));
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.FED_ACCOUNTS));
         count("CountersignOpeningBalance");
+        activateAfterOpening(staff.locationId(), manager);
+    }
+
+    /** Complete the onboarding sequence after the posted OPB, including a partially completed rerun. */
+    private void activateAfterOpening(UUID locationId, Actor actor) {
+        ScopeContext scope = scopeOf(actor);
+        LocationView location = party.getLocation(locationId, scope)
+                .orElseThrow(() -> new IllegalStateException("Demo location not found: " + locationId));
+        if ("ONBOARDING".equals(location.status())) {
+            activateLocation.handle(new ActivateLocation(locationId), scope);
+            count("ActivateLocation");
+        }
     }
 
     /** A line of a society's opening stock: the demo batch of the item, at the distributor's price. */
@@ -618,8 +643,8 @@ public class DemoDataLoader {
     /**
      * The society manager sends the town shop its first stock from the stores (M5-09,
      * DemoShopStock#TOWN_SHOP), and the shop's own staff member receives it at the shop: each
-     * writes only its own location's rows. Skipped when a transfer to the shop exists; one left in
-     * transit is received.
+     * writes only its own location's rows. Skipped when a transfer to the shop exists; one left
+     * issued is dispatched and one left in transit is received.
      */
     private void shopStockByTransfer(Map<String, UUID> skus) {
         ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
@@ -634,6 +659,8 @@ public class DemoDataLoader {
             count("IssueTransfer");
             existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
         }
+        dispatchIssued(existing, DemoCast.M101_TOWN_SHOP, manager);
+        existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
         for (TransferView transfer : existing) {
             if ("IN_TRANSIT".equals(transfer.status()) && DemoCast.M101_TOWN_SHOP.equals(transfer.toLocationId())) {
                 receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), shop);
@@ -646,7 +673,7 @@ public class DemoDataLoader {
      * The society manager sends the Hettipola shop its first stock a month later
      * (DemoShopStock#HETTIPOLA_SHOP) and receives it there himself: the shop has no staff user of
      * its own in the demo, and the manager works entity-wide. Skipped when a transfer to the shop
-     * exists; one left in transit is received.
+     * exists; one left issued is dispatched and one left in transit is received.
      */
     private void hettipolaStockByTransfer(Map<String, UUID> skus) {
         ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
@@ -661,11 +688,22 @@ public class DemoDataLoader {
             count("IssueTransfer");
             existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
         }
+        dispatchIssued(existing, DemoCast.M101_HETTIPOLA_SHOP, manager);
+        existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
         for (TransferView transfer : existing) {
             if ("IN_TRANSIT".equals(transfer.status())
                     && DemoCast.M101_HETTIPOLA_SHOP.equals(transfer.toLocationId())) {
                 receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), manager);
                 count("ReceiveTransfer");
+            }
+        }
+    }
+
+    private void dispatchIssued(List<TransferView> transfers, UUID destination, ScopeContext source) {
+        for (TransferView transfer : transfers) {
+            if ("ISSUED".equals(transfer.status()) && destination.equals(transfer.toLocationId())) {
+                dispatchTransfer.handle(new DispatchTransfer(transfer.transferId()), source);
+                count("DispatchTransfer");
             }
         }
     }

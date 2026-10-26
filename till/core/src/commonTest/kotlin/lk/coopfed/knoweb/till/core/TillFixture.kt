@@ -12,6 +12,7 @@ class TillFixture(
     operators: List<SnapshotRow> = listOf(Samples.operator("pin:1234")),
     private val trialCashier: Boolean = false,
     private val tokenEndpointSetLocally: Boolean = false,
+    extraRows: List<SnapshotRow> = emptyList(),
 ) {
     val store = InMemoryStore()
     val clock = FixedClock()
@@ -21,7 +22,7 @@ class TillFixture(
         Samples.sku(Samples.SKU_DHAL, "Dhal 1kg", "පරිප්පු 1kg", "4790000000028"),
         Samples.price(Samples.SKU_RICE, "1250.00"),
         Samples.price(Samples.SKU_DHAL, "385.50"),
-    ) + operators
+    ) + operators + extraRows
     val central = FakeCentral(Samples.snapshotAnswer(7, rows))
 
     /**

@@ -65,9 +65,12 @@ export function CataloguePage() {
   const intl = useIntl();
   const api = useCatalogueApi();
   const canCreate = useHasPermission("cat.sku.create_local");
+  const canImport = useHasPermission("cat.import.run");
+  const canSupplier = useHasPermission("cat.supplier.manage");
   const language = languageOf(intl.locale);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<SkuStatus | "">("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const skus = useQuery({
     queryKey: ["catalogue", "skus", q.trim(), language, status],
@@ -80,16 +83,48 @@ export function CataloguePage() {
         icon="catalogue"
         title={t("catalogue.title").text}
         actions={
-          canCreate ? (
-            <Link className="action-link action-link--primary" to="/catalogue/skus/new">
-              <span className="action-link__symbol" aria-hidden="true">+</span>
-              <span>{t("catalogue.new").text}</span>
-            </Link>
-          ) : undefined
+          <div className="catalogue-actions">
+            {canSupplier && (
+              <Link className="action-link" to="/catalogue/suppliers">
+                <span>{t("catalogue.suppliers.nav").text}</span>
+              </Link>
+            )}
+            {canCreate && (
+              <Link className="action-link" to="/catalogue/suspects">
+                <span>{t("catalogue.suspects.nav").text}</span>
+              </Link>
+            )}
+            {canImport && (
+              <Link className="action-link" to="/catalogue/import">
+                <span>{t("catalogue.import.nav").text}</span>
+              </Link>
+            )}
+            {canCreate && (
+              <Link className="action-link action-link--primary" to="/catalogue/skus/new">
+                <span className="action-link__symbol" aria-hidden="true">+</span>
+                <span>{t("catalogue.new").text}</span>
+              </Link>
+            )}
+          </div>
         }
       />
 
-      <section className="modern-filter-panel">
+      <button
+  type="button"
+  className="filter-toggle"
+  onClick={() => setFiltersOpen(!filtersOpen)}
+  aria-expanded={filtersOpen}
+  aria-controls="catalogue-filters"
+>
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16M7 12h10M10 17h4" />
+  </svg>
+  {t("catalogue.filter.toggle").text}
+  <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+</button>
+
+{filtersOpen && (
+  <section id="catalogue-filters" className="modern-filter-panel">
         <label className="modern-field modern-field--search">
           <span className="modern-field__label">
             {t("catalogue.filter.search").text}
@@ -149,6 +184,7 @@ export function CataloguePage() {
           </span>
         </label>
       </section>
+      )}
 
       {skus.isLoading && <p>{t("catalogue.loading").text}</p>}
 

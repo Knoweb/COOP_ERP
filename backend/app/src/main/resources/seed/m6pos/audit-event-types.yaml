@@ -40,3 +40,24 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: A till session's close arrived again with other amounts; the first close is kept
+
+  - code: CASH_MOVEMENT_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A cash movement (drop or pay-out) recorded at a till was ingested at central
+
+  - code: CASH_MOVEMENT_FLAGGED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A cash movement recorded at a till was ingested with anomalies found at central
+
+  - code: CASH_MOVEMENT_REPLAY_DIFFERS
+    severity: ALERT
+    offline_capturable: false
+    description_en: A cash movement arrived again under the same id with other details; the first copy is kept
+
+  # TILL-SELL-11 (C-02c, doc 26 section 3.5, 26A section 10): shortage exceeds threshold -> REVIEW
+  - code: TILL_SESSION_SHORTAGE_REVIEW
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till session closed with a cash shortage exceeding the configured threshold

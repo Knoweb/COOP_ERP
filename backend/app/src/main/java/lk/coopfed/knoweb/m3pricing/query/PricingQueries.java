@@ -88,6 +88,14 @@ public interface PricingQueries {
             UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
 
     /**
+     * ResolveCommercialPrice: commercial/institutional selling price of a SKU at a shop on a date,
+     * prioritizing the society's published COMMERCIAL list in force, falling back to RETAIL, bounded
+     * by in-stock batch MRP and the control price.
+     */
+    Optional<RetailPrice> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
+
+    /**
      * ResolveBasket(location, date, tenderKind, lines) of doc 23 section 5.2.
      */
     Optional<lk.coopfed.knoweb.engine.BasketResult> resolveBasket(
@@ -104,4 +112,15 @@ public interface PricingQueries {
      * listReviews(kind, status) of doc 23 section 5.2.
      */
     List<ReviewItem> listReviews(String kind, String status, ScopeContext scope);
+
+    /** One shelf-label print job, empty when RLS does not expose it to the caller. */
+    Optional<LabelJobView> labelJob(UUID jobId, ScopeContext scope);
+
+    // ---- M3-07 / PRC-10: adjustment types ----------------------------------------------------
+
+    /** GetAdjustmentType: one adjustment type by code; empty when it does not exist. */
+    Optional<AdjustmentTypeView> getAdjustmentType(String code, ScopeContext scope);
+
+    /** ListAdjustmentTypes: all registered adjustment types. */
+    List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope);
 }

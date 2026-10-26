@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <title>Shelf labels</title>
+  <style>
+    @page { margin: 8mm; }
+    .labels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+    .label { border: 0.4mm solid #111; min-height: 55mm; padding: 4mm; break-inside: avoid; display: flex; flex-direction: column; }
+    .code { font-size: 9pt; font-weight: 700; letter-spacing: 0.04em; }
+    .name { margin-top: 1.5mm; line-height: 1.25; }
+    .name-en { font-weight: 700; }
+    .price { margin-top: auto; padding-top: 3mm; font-size: 19pt; font-weight: 700; }
+    .unit { margin-top: 1mm; font-size: 9pt; }
+    .mrp { margin-top: 2mm; padding-top: 2mm; border-top: 0.2mm solid #777; font-size: 8pt; }
+    .empty { margin-top: 20mm; text-align: center; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="labels" th:unless="${#lists.isEmpty(data.labels)}">
+    <article class="label" th:each="label : ${data.labels}">
+      <div class="code" th:text="${label.code}">SKU-001</div>
+      <div class="name" lang="si" th:text="${label.nameSi}">සිංහල නම</div>
+      <div class="name" lang="ta" th:text="${label.nameTa}">தமிழ் பெயர்</div>
+      <div class="name name-en" lang="en" th:text="${label.nameEn}">English name</div>
+      <div class="price"><span th:text="${data.priceLabel}">Price</span>: <span th:text="${label.price}">Rs 0.00</span></div>
+      <div class="unit"><span th:text="${data.unitLabel}">Unit</span>: <span th:text="${label.unit}">EA</span></div>
+      <div class="mrp" th:text="${label.mrpNote}">Check the printed MRP on the pack</div>
+    </article>
+  </div>
+  <div class="empty" th:if="${#lists.isEmpty(data.labels)}" th:text="${data.empty}">No eligible labels to print</div>
+</body>
+</html>

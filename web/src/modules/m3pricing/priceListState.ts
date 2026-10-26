@@ -1,6 +1,6 @@
 import { ApiProblem } from "../../shell/api/client";
 import type { ChipState } from "../../shell/components/StateChip";
-import type { ControlPrice, LineOutcome, PriceList } from "./pricingApi";
+import type { ControlPrice, LineOutcome, PriceList, Rule } from "./pricingApi";
 
 /** The look of a price list's state (doc 30 section 2.2): a draft is being written, a published version is in force. */
 export function chipOf(status: PriceList["status"]): ChipState {
@@ -9,6 +9,20 @@ export function chipOf(status: PriceList["status"]): ChipState {
       return "draft";
     case "PUBLISHED":
       return "issued";
+    default:
+      return "void";
+  }
+}
+
+/** The look of a discount rule's status. */
+export function ruleStatusChip(status: Rule["status"]): ChipState {
+  switch (status) {
+    case "DRAFT":
+      return "draft";
+    case "ACTIVE":
+      return "issued";
+    case "EXPIRED":
+    case "WITHDRAWN":
     default:
       return "void";
   }

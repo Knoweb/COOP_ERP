@@ -16,7 +16,10 @@ export function StockPage() {
   const formatDate = useFormatDate();
   const api = useInventoryApi();
   const canPrepare = useHasPermission("inv.opening.prepare");
+  const canPick = useHasPermission("whs.pick");
+  const canViewStock = useHasPermission("inv.stock.view");
   const [locationId, setLocationId] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const balances = useQuery({
     queryKey: ["inventory", "balances", locationId],
@@ -79,29 +82,66 @@ export function StockPage() {
 
       {/* Stock control, below the header: five links in the header's action column squeezed the
           title to nothing in Sinhala and Tamil. */}
-      <div className="inventory-control-links">
-        <Link className="action-link" to="/inventory/counts">
-          <span>{t("inventory.counts.link").text}</span>
-        </Link>
-        <Link className="action-link" to="/inventory/write-offs">
-          <span>{t("inventory.writeoffs.link").text}</span>
-        </Link>
-        <Link className="action-link" to="/inventory/repacks">
-          <span>{t("inventory.repacks.link").text}</span>
-        </Link>
-        <Link className="action-link" to="/inventory/transfer-requests">
-          <span>{t("inventory.request.link").text}</span>
-        </Link>
-      </div>
 
-      <section className="modern-filter-panel modern-filter-panel--stock">
-        <div className="modern-location-picker">
-          <LocationPicker
-            value={locationId}
-            onChange={setLocationId}
-          />
-        </div>
-      </section>
+<button
+  type="button"
+  className="filter-toggle"
+  onClick={() => setFiltersOpen(!filtersOpen)}
+  aria-expanded={filtersOpen}
+  aria-controls="stock-filters"
+>
+  <svg
+    viewBox="0 0 24 24"
+    width="18"
+    height="18"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M4 7h16M7 12h10M10 17h4" />
+  </svg>
+  {t("inventory.filter.toggle").text}
+  <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+</button>
+
+  <section
+    id="stock-filters"
+    hidden={!filtersOpen}
+    className="modern-filter-panel modern-filter-panel--stock stock-positions-filters"
+  >
+    <div className="modern-location-picker">
+      <LocationPicker
+        value={locationId}
+        onChange={setLocationId}
+      />
+    </div>
+
+    <div className="inventory-control-links">
+      <Link className="action-link" to="/inventory/counts">
+        <span>{t("inventory.counts.link").text}</span>
+      </Link>
+
+      <Link className="action-link" to="/inventory/write-offs">
+        <span>{t("inventory.writeoffs.link").text}</span>
+      </Link>
+
+      <Link className="action-link" to="/inventory/repacks">
+        <span>{t("inventory.repacks.link").text}</span>
+      </Link>
+
+      <Link className="action-link" to="/inventory/transfer-requests">
+        <span>{t("inventory.request.link").text}</span>
+      </Link>
+
+      {canPick && <Link className="action-link" to="/inventory/pick-lists"><span>{t("inventory.pick.link").text}</span></Link>}
+      {canViewStock && <Link className="action-link" to="/inventory/expiry"><span>{t("inventory.expiry.link").text}</span></Link>}
+      {canViewStock && <Link className="action-link" to="/inventory/losses"><span>{t("inventory.loss.link").text}</span></Link>}
+      {canViewStock && <Link className="action-link" to="/inventory/policies"><span>{t("inventory.policy.link").text}</span></Link>}
+    </div>
+  </section>
 
       {balances.isLoading && <p>{t("inventory.loading").text}</p>}
 
@@ -121,7 +161,7 @@ export function StockPage() {
       {balances.data && balances.data.length > 0 && (
         <section className="modern-table-card">
           <div className="modern-table-scroll">
-            <table className="modern-table stock-table">
+            <table className="modern-table stock-table stock-positions-table">
               <thead>
                 <tr>
                   <th>{t("inventory.column.item").text}</th>

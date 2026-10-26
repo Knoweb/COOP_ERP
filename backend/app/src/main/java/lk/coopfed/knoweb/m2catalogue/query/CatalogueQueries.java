@@ -35,6 +35,12 @@ public interface CatalogueQueries {
      */
     Optional<TaxRateView> taxRateInForce(UUID skuId, LocalDate onDate, ScopeContext scope);
 
+    /**
+     * Lists tax rates, optionally filtered by tax category and/or effective date.
+     * Accessible by every authenticated scope (catalogue.tax_rate authenticated_read policy).
+     */
+    List<TaxRateHistoryView> taxRates(UUID taxCategoryId, LocalDate onDate, ScopeContext scope);
+
     /** The conversions of a SKU visible in the scope (catalogue RLS); empty otherwise. */
     List<ConversionView> conversions(UUID skuId, ScopeContext scope);
 
@@ -43,4 +49,13 @@ public interface CatalogueQueries {
 
     /** The images of a SKU visible in the scope. */
     List<ImageView> images(UUID skuId, ScopeContext scope);
+
+    /** The duplicate suspects visible in the scope (catalogue RLS) (CAT-01, 22A section 6.1). */
+    List<DuplicateSuspectView> listDuplicateSuspects(String status, int limit, ScopeContext scope);
+
+    /**
+     * Resolves the canonical SKU id of a SKU by following the alias chain in catalogue.sku_alias
+     * (max depth 3, 22A section 7; doc 22 section 6.3). Returns the SKU itself if not aliased.
+     */
+    UUID resolveAlias(UUID skuId, ScopeContext scope);
 }

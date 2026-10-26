@@ -64,7 +64,13 @@ import lk.coopfed.knoweb.till.core.time.Times
 fun TillApp(controller: TillController, defaults: EnrolDefaults = EnrolDefaults()) {
     LaunchedEffect(Unit) { controller.start() }
     TillTheme {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            Modifier.fillMaxSize().onPreviewKeyEvent {
+                controller.recordActivity()
+                false
+            },
+            color = MaterialTheme.colorScheme.background,
+        ) {
             Column(Modifier.fillMaxSize()) {
                 TopBar(controller)
                 Banners(controller)
@@ -79,6 +85,7 @@ fun TillApp(controller: TillController, defaults: EnrolDefaults = EnrolDefaults(
                         Screen.SELL -> SellScreen(controller)
                         Screen.CLOSE_SESSION -> CloseSessionScreen(controller)
                         Screen.Z_REPORT -> ZReportScreen(controller)
+                        Screen.LOCKED -> LockScreen(controller)
                     }
                 }
             }
@@ -121,10 +128,11 @@ private fun TopBar(c: TillController) {
                 Text("${s.problems} problem${if (s.problems == 1L) "" else "s"} for the office", color = TillColors.onAccent)
             }
         }
-        if (c.screen != Screen.ENROL && c.screen != Screen.STARTING) {
+        if (c.screen != Screen.ENROL && c.screen != Screen.STARTING && c.screen != Screen.LOCKED) {
             OutlinedButton(onClick = { c.syncNow() }) { Text("Sync now", color = TillColors.onAccent) }
         }
-        if (c.operatorName != null && c.screen != Screen.SIGN_IN) {
+        if (c.operatorName != null && c.screen != Screen.SIGN_IN && c.screen != Screen.LOCKED) {
+            OutlinedButton(onClick = { c.lock() }) { Text("Lock", color = TillColors.onAccent) }
             OutlinedButton(onClick = { c.signOut() }) { Text("Sign out", color = TillColors.onAccent) }
         }
     }
@@ -245,6 +253,80 @@ private fun SignInScreen(c: TillController) {
 }
 
 @Composable
+private fun LockScreen(c: TillController) {
+    val currentOp = c.operator
+    val trial = currentOp?.pinHash == null && c.trialCashierOffered
+    var switching by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf<Operator?>(null) }
+    var pin by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    Panel("Till locked") {
+        if (!switching) {
+            if (trial) {
+                Text(
+                    "The till locked due to inactivity. Continue as trial cashier to resume.",
+                    color = TillColors.textMuted,
+                )
+            } else {
+                Text(
+                    "The till locked due to inactivity. Enter PIN for ${currentOp?.displayName ?: "operator"} to resume.",
+                    color = TillColors.textMuted,
+                )
+                OutlinedTextField(
+                    pin, { pin = it.filter(Char::isDigit).take(8) },
+                    label = { Text("PIN for ${currentOp?.displayName ?: "operator"}") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (pin.length >= 4) c.unlock(pin) }),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { c.unlock(pin) }, enabled = !c.busy && (trial || pin.length >= 4)) {
+                    Text(if (c.busy) "Checking…" else "Unlock")
+                }
+                if (c.operators.isNotEmpty()) {
+                    OutlinedButton(onClick = { switching = true; pin = "" }) {
+                        Text("Switch operator")
+                    }
+                }
+            }
+        } else {
+            Text("Select colleague and enter PIN to switch operator and unlock:", color = TillColors.textMuted)
+            c.operators.forEach { op ->
+                Text(
+                    op.displayName,
+                    modifier = Modifier.fillMaxWidth().clickable { chosen = op; pin = "" }
+                        .background(if (chosen == op) TillColors.issuedBg else TillColors.surface).padding(10.dp),
+                )
+            }
+            chosen?.let { op ->
+                OutlinedTextField(
+                    pin, { pin = it.filter(Char::isDigit).take(8) },
+                    label = { Text("PIN for ${op.displayName}") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (pin.length >= 4) c.unlockWithOperator(op, pin) }),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { c.unlockWithOperator(op, pin) }, enabled = !c.busy && pin.length >= 4) {
+                        Text(if (c.busy) "Checking…" else "Unlock as ${op.displayName}")
+                    }
+                    OutlinedButton(onClick = { switching = false; pin = "" }) {
+                        Text("Back")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun OpenSessionScreen(c: TillController) {
     var float by remember { mutableStateOf("2000.00") }
     var correcting by remember { mutableStateOf(false) }
@@ -317,15 +399,23 @@ private fun BusinessDateDialog(c: TillController, close: () -> Unit) {
 private fun SellScreen(c: TillController) {
     var scan by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Item>>(emptyList()) }
-    var paying by remember { mutableStateOf(false) }
+    var payingMode by remember { mutableStateOf<String?>(null) }
+    var cashMovementMode by remember { mutableStateOf<String?>(null) }
     val scanFocus = remember { FocusRequester() }
-    LaunchedEffect(paying, c.needsPrice) { if (!paying && c.needsPrice == null) scanFocus.requestFocus() }
+    LaunchedEffect(payingMode, cashMovementMode, c.needsPrice) {
+        if (payingMode == null && cashMovementMode == null && c.needsPrice == null) scanFocus.requestFocus()
+    }
 
     Row(
         Modifier.fillMaxSize().onPreviewKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when (e.key) {
-                Key.F2 -> { if (c.lines.isNotEmpty()) paying = true; true }
+                Key.F2 -> { if (c.lines.isNotEmpty()) payingMode = "CASH"; true }
+                Key.F3 -> { if (c.lines.isNotEmpty()) payingMode = "CARD"; true }
+                Key.F4 -> { if (c.lines.isNotEmpty()) payingMode = "WALLET"; true }
+                Key.F5 -> { if (c.lines.isNotEmpty()) payingMode = "QR"; true }
+                Key.F7 -> { cashMovementMode = "DROP"; true }
+                Key.F8 -> { cashMovementMode = "PAYOUT"; true }
                 Key.F10 -> { c.toCloseSession(); true }
                 else -> false
             }
@@ -369,8 +459,27 @@ private fun SellScreen(c: TillController) {
                     Text("${c.lines.size} lines", color = TillColors.textMuted)
                 }
             }
-            Button(onClick = { paying = true }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                Text("Cash  (F2)", fontSize = 20.sp)
+            Button(onClick = { payingMode = "CASH" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Text("Cash  (F2)", fontSize = 18.sp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { payingMode = "CARD" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.weight(1f).height(46.dp)) {
+                    Text("Card (F3)", fontSize = 13.sp)
+                }
+                Button(onClick = { payingMode = "WALLET" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.weight(1f).height(46.dp)) {
+                    Text("Wallet (F4)", fontSize = 13.sp)
+                }
+                Button(onClick = { payingMode = "QR" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.weight(1f).height(46.dp)) {
+                    Text("QR (F5)", fontSize = 13.sp)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { cashMovementMode = "DROP" }, enabled = !c.busy, modifier = Modifier.weight(1f)) {
+                    Text("Drop (F7)", fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = { cashMovementMode = "PAYOUT" }, enabled = !c.busy, modifier = Modifier.weight(1f)) {
+                    Text("Pay-out (F8)", fontSize = 12.sp)
+                }
             }
             OutlinedButton(onClick = { c.clearSale() }, enabled = c.lines.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Clear the sale") }
             OutlinedButton(onClick = { c.reprintLast() }, enabled = c.lastReceipt != null, modifier = Modifier.fillMaxWidth()) {
@@ -383,8 +492,62 @@ private fun SellScreen(c: TillController) {
             Text("Printer: ${c.printerDescription}", color = TillColors.textMuted, fontSize = 12.sp)
         }
     }
-    if (paying) CashDialog(c) { paying = false }
+    when (payingMode) {
+        "CASH" -> CashDialog(c) { payingMode = null }
+        "CARD", "WALLET", "QR" -> DigitalPayDialog(c, payingMode!!) { payingMode = null }
+    }
+    cashMovementMode?.let { mode ->
+        CashMovementDialog(c, mode) { cashMovementMode = null }
+    }
     c.needsPrice?.let { PriceDialog(c, it) }
+}
+
+@Composable
+private fun CashMovementDialog(c: TillController, mode: String, close: () -> Unit) {
+    var amount by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    val isDrop = mode == "DROP"
+    val title = if (isDrop) "Cash Drop (Safe)" else "Cash Pay-out"
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (isDrop) "Record cash dropped from drawer into safe. Drawer will open and slip will print."
+                    else "Record pay-out from drawer. Drawer will open and slip will print.",
+                    color = TillColors.textMuted,
+                )
+                OutlinedTextField(
+                    amount,
+                    { amount = it },
+                    label = { Text("Amount (LKR)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                OutlinedTextField(
+                    reason,
+                    { reason = it },
+                    label = { Text("Reason (mandatory)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isDrop) c.recordCashDrop(amount, reason, close)
+                    else c.recordPayout(amount, reason, close)
+                },
+                enabled = !c.busy && amount.isNotBlank() && reason.isNotBlank(),
+            ) { Text("Confirm & Print") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -434,6 +597,72 @@ private fun CashDialog(c: TillController, close: () -> Unit) {
             }
         },
         confirmButton = { Button(onClick = { c.payCash(given, close) }, enabled = !c.busy) { Text("Complete (Enter)") } },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel (Esc)") } },
+    )
+}
+
+@Composable
+private fun DigitalPayDialog(c: TillController, kind: String, close: () -> Unit) {
+    var reference by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    val isOnline = c.status.online == true
+    val titleKind = when (kind.uppercase()) {
+        "CARD" -> "Card"
+        "WALLET" -> "Wallet"
+        "QR" -> "QR"
+        else -> kind
+    }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    val onComplete = {
+        if (reference.isNotBlank() && isOnline) {
+            when (kind.uppercase()) {
+                "CARD" -> c.payCard(reference.trim(), close)
+                "WALLET" -> c.payWallet(reference.trim(), close)
+                "QR" -> c.payQr(reference.trim(), close)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("$titleKind Payment: LKR ${c.total.display()}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!isOnline) {
+                    Text(
+                        "Offline: $titleKind payments are refused while offline (Cash only per FR-POS-040)",
+                        color = TillColors.disputedText,
+                        modifier = Modifier.background(TillColors.disputedBg).padding(8.dp),
+                    )
+                } else {
+                    Text(
+                        "Authorize $titleKind on standalone terminal/app, then key the approval reference. Never enter card numbers, PINs or CVV.",
+                        color = TillColors.textMuted,
+                        fontSize = 13.sp,
+                    )
+                }
+                OutlinedTextField(
+                    reference, { reference = it },
+                    label = { Text("Terminal Approval Reference") },
+                    singleLine = true,
+                    enabled = isOnline,
+                    modifier = Modifier.focusRequester(focus).onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) { close(); true } else false
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onComplete() }),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onComplete,
+                enabled = !c.busy && isOnline && reference.isNotBlank(),
+            ) {
+                Text("Complete (Enter)")
+            }
+        },
         dismissButton = { TextButton(onClick = close) { Text("Cancel (Esc)") } },
     )
 }

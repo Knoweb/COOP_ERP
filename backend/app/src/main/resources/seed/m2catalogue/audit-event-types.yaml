@@ -90,6 +90,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Tag defined
 
+  - code: TAX_CATEGORY_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Tax category defined
+
   - code: TAX_RATE_PUBLISHED
     severity: INFO
     offline_capturable: false
@@ -114,3 +119,19 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Duplicate suspect resolved
+
+  - code: SKUS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Batch of catalogue SKUs imported by data steward
+
+  - code: DUPLICATE_SUSPECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Duplicate SKU suspect detected
+
+  - code: ASSORTMENT_DRIFT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Assortment maintainer reconcile detected and repaired drift
+

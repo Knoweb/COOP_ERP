@@ -9,7 +9,7 @@
 openapi: 3.1.0
 info:
   title: COOP ERP Pricing API
-  version: 0.4.0
+  version: 0.5.0
 paths:
   /v1/pricing/lists:
     get:
@@ -24,7 +24,7 @@ paths:
         - in: query
           name: kind
           required: false
-          schema: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+          schema: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         - in: query
           name: status
           required: false
@@ -284,6 +284,44 @@ paths:
               schema: { $ref: '#/components/schemas/RetailPriceResponse' }
         '404':
           description: The location or the SKU is not visible in the caller's scope
+  /v1/pricing/resolve/commercial:
+    get:
+      tags: [Pricing]
+      operationId: resolveCommercialPrice
+      summary: The commercial selling price of a SKU at a shop on a date (tax-inclusive, per unit), under MRP and control ceilings
+      description: >
+        Prioritizes the society's published COMMERCIAL list in force on the date, falling back to
+        RETAIL list when no commercial line exists, bounded by in-stock MRP and the control price.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uom
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: qty
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The commercial price, or why the item is not sellable there
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetailPriceResponse' }
+        '404':
+          description: The location or the SKU is not visible in the caller's scope
   /v1/pricing/advisory-lines:
     get:
       tags: [Pricing]
@@ -505,6 +543,53 @@ paths:
               schema: { $ref: '#/components/schemas/RuleResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/labels:
+    post:
+      tags: [Pricing]
+      operationId: printShelfLabels
+      summary: Queue shelf labels for the published retail list in force today
+      description: >
+        The shop belongs to the caller and every requested SKU has a line on the caller's
+        published RETAIL list in force on the print date. The configured pricing.label_template
+        is recorded with the QUEUED job. Ask for the job until it is RENDERED or FAILED. Codes
+        this operation can answer with 422: m3.label.location_not_owned,
+        m3.label.retail_list_not_found, m3.label.sku_not_on_list,
+        m3.label.template_invalid.
+      x-permission: prc.label.print
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrintShelfLabelsRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelJobResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/labels/{jobId}:
+    get:
+      tags: [Pricing]
+      operationId: getLabelJob
+      summary: A shelf-label print job with a fresh PDF link when rendered
+      x-permission: prc.label.print
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The label job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelJobResponse' }
+        '404':
+          description: No such label job in the caller's scope
   /v1/pricing/rules/{ruleId}:
     parameters:
       - in: path
@@ -656,7 +741,7 @@ components:
       type: object
       required: [kind, name]
       properties:
-        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        kind: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         name: { type: string, minLength: 1, maxLength: 120 }
     PublishPriceListRequest:
       type: object
@@ -776,6 +861,40 @@ components:
         ownerEntityId: { type: [string, 'null'], format: uuid }
         source: { type: string, enum: [OWN, FEDERATION, DEFAULT], description: 'Whose row applies: the caller''s, the Federation''s, or none (the configured default)' }
         setAt: { type: [string, 'null'], format: date-time }
+    PrintShelfLabelsRequest:
+      type: object
+      required: [locationId, skuIds]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, format: uuid }
+    LabelRefusal:
+      type: object
+      required: [skuId, skuCode, reason, listPrice, ceilingPrice]
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        reason: { type: string, enum: [ABOVE_CONTROL_PRICE] }
+        listPrice: { type: number }
+        ceilingPrice: { type: number }
+        ceilingReference: { type: [string, 'null'] }
+    LabelJobResponse:
+      type: object
+      required: [jobId, locationId, status, requestedCount, renderedCount, refused, createdAt]
+      properties:
+        jobId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        status: { type: string, enum: [QUEUED, RENDERED, FAILED] }
+        requestedCount: { type: integer, minimum: 1 }
+        renderedCount: { type: integer, minimum: 0 }
+        refused:
+          type: array
+          items: { $ref: '#/components/schemas/LabelRefusal' }
+        downloadUrl: { type: string, format: uri, description: A fresh pre-signed PDF link when RENDERED }
+        createdAt: { type: string, format: date-time }
     PriceListResponse:
       type: object
       required: [priceListId, rootPriceListId, kind, name, version, status, createdAt]
@@ -783,7 +902,7 @@ components:
         priceListId: { type: string, format: uuid }
         rootPriceListId: { type: string, format: uuid, description: The id of version 1 that a relationship binds }
         ownerEntityId: { type: string, format: uuid }
-        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        kind: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         name: { type: string }
         version: { type: integer }
         sourceVersionId: { type: [string, 'null'], format: uuid }

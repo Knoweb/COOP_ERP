@@ -169,3 +169,11 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: User deactivated, login disabled and sessions ended
+  - code: NETWORK_BULK_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Network shops, till positions, users and devices bulk registered
+  - code: USERS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Users bulk imported with identity-provider provisioning

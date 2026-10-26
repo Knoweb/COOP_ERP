@@ -199,6 +199,27 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         return new TemporaryPassword(value);
     }
 
+    @Override
+    public void setPassword(ScopeContext ctx, String subjectId, String password, boolean temporary) {
+        assertInScope(ctx, homeEntityOf(subjectId));
+        call(() -> rest.put()
+                .uri(realmPath + "/users/{id}/reset-password", subjectId)
+                .headers(this::bearer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("type", "password", "value", password, "temporary", temporary))
+                .retrieve()
+                .toBodilessEntity());
+        if (!temporary) {
+            call(() -> rest.put()
+                    .uri(realmPath + "/users/{id}", subjectId)
+                    .headers(this::bearer)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("requiredActions", List.of()))
+                    .retrieve()
+                    .toBodilessEntity());
+        }
+    }
+
     /**
      * Removes the user's OTP credentials and asks for a new one at the next sign-in. The
      * required actions are read and then written back whole, so a {@link #setTemporaryPassword}
@@ -309,7 +330,28 @@ public class KeycloakAdminClient implements IdentityProviderClient {
                         "select home_entity_id from security.app_user where provider_subject = ?",
                         (rs, n) -> rs.getObject(1, UUID.class),
                         subjectId)));
-        return found == null || found.isEmpty() ? null : found.getFirst();
+        if (found != null && !found.isEmpty() && found.getFirst() != null) {
+            return found.getFirst();
+        }
+        // When a user is being provisioned in an in-flight transaction (e.g. bulk user import),
+        // the app_user row is not yet committed to the database. Retrieve home_entity_id from
+        // the provider's user attributes ('ent').
+        try {
+            JsonNode user = call(() -> rest.get()
+                    .uri(realmPath + "/users/{id}", subjectId)
+                    .headers(this::bearer)
+                    .retrieve()
+                    .body(JsonNode.class));
+            if (user != null && user.has("attributes") && user.get("attributes").has("ent")) {
+                JsonNode ent = user.get("attributes").get("ent");
+                if (ent.isArray() && !ent.isEmpty()) {
+                    return UUID.fromString(ent.get(0).asText());
+                }
+            }
+        } catch (Exception ignored) {
+            // Not found at provider either
+        }
+        return null;
     }
 
     // ---- the provider ----

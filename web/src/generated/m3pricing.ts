@@ -157,6 +157,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/resolve/commercial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The commercial selling price of a SKU at a shop on a date (tax-inclusive, per unit), under MRP and control ceilings
+         * @description Prioritizes the society's published COMMERCIAL list in force on the date, falling back to RETAIL list when no commercial line exists, bounded by in-stock MRP and the control price.
+         */
+        get: operations["resolveCommercialPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/advisory-lines": {
         parameters: {
             query?: never;
@@ -276,6 +296,43 @@ export interface paths {
          * @description The predicate and benefit follow the closed vocabulary of doc 23 section 3.3, per kind. Codes this operation can answer with 422: m3.rule.kind_not_available (FREE_ITEM, not yet), m3.rule.kind_invalid, m3.rule.sku_required, m3.rule.sku_not_active, m3.rule.uom_invalid, m3.rule.field_not_allowed, m3.rule.min_qty_required, m3.rule.days_to_expiry_required, m3.rule.not_expiry_tracked, m3.rule.bill_total_required, m3.rule.benefit_not_allowed, m3.rule.benefit_value_invalid, m3.rule.validity_invalid, m3.rule.priority_invalid, scope.invalid, request.field.required.
          */
         post: operations["authorRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue shelf labels for the published retail list in force today
+         * @description The shop belongs to the caller and every requested SKU has a line on the caller's published RETAIL list in force on the print date. The configured pricing.label_template is recorded with the QUEUED job. Ask for the job until it is RENDERED or FAILED. Codes this operation can answer with 422: m3.label.location_not_owned, m3.label.retail_list_not_found, m3.label.sku_not_on_list, m3.label.template_invalid.
+         */
+        post: operations["printShelfLabels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/labels/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A shelf-label print job with a fresh PDF link when rendered */
+        get: operations["getLabelJob"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -419,7 +476,7 @@ export interface components {
         };
         CreatePriceListRequest: {
             /** @enum {string} */
-            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            kind: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
             name: string;
         };
         PublishPriceListRequest: {
@@ -558,6 +615,39 @@ export interface components {
             /** Format: date-time */
             setAt?: string | null;
         };
+        PrintShelfLabelsRequest: {
+            /** Format: uuid */
+            locationId: string;
+            skuIds: string[];
+        };
+        LabelRefusal: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            /** @enum {string} */
+            reason: "ABOVE_CONTROL_PRICE";
+            listPrice: number;
+            ceilingPrice: number;
+            ceilingReference?: string | null;
+        };
+        LabelJobResponse: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            status: "QUEUED" | "RENDERED" | "FAILED";
+            requestedCount: number;
+            renderedCount: number;
+            refused: components["schemas"]["LabelRefusal"][];
+            /**
+             * Format: uri
+             * @description A fresh pre-signed PDF link when RENDERED
+             */
+            downloadUrl?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         PriceListResponse: {
             /** Format: uuid */
             priceListId: string;
@@ -569,7 +659,7 @@ export interface components {
             /** Format: uuid */
             ownerEntityId?: string;
             /** @enum {string} */
-            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            kind: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
             name: string;
             version: number;
             /** Format: uuid */
@@ -763,7 +853,7 @@ export interface operations {
     listPriceLists: {
         parameters: {
             query?: {
-                kind?: "TRADE" | "RETAIL" | "ADVISORY";
+                kind?: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
                 status?: "DRAFT" | "PUBLISHED" | "SUPERSEDED" | "WITHDRAWN";
             };
             header?: never;
@@ -1035,6 +1125,39 @@ export interface operations {
             };
         };
     };
+    resolveCommercialPrice: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId: string;
+                uom: string;
+                qty: number;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The commercial price, or why the item is not sellable there */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetailPriceResponse"];
+                };
+            };
+            /** @description The location or the SKU is not visible in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listAdvisoryLines: {
         parameters: {
             query: {
@@ -1265,6 +1388,64 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    printShelfLabels: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrintShelfLabelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelJobResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getLabelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The label job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelJobResponse"];
+                };
+            };
+            /** @description No such label job in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getRule: {

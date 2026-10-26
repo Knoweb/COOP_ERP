@@ -9,11 +9,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.time.Times
 
@@ -35,7 +37,7 @@ object Facts {
     }
 
     /** till_session.closed.v1: the blind count and the till's expected figure. */
-    fun sessionClosed(device: DeviceIdentity, s: SessionRecord): JsonObject = buildJsonObject {
+    fun sessionClosed(device: DeviceIdentity, s: SessionRecord, openSessionsRemaining: Int = 0): JsonObject = buildJsonObject {
         put("session_id", s.sessionId)
         put("till_position_id", device.tillPositionId)
         put("operator_user_id", s.operatorUserId)
@@ -44,6 +46,20 @@ object Facts {
         put("counted_cash", s.countedCash!!.plain())
         put("expected_cash", s.expectedCash!!.plain())
         put("variance", s.variance!!.plain())
+        put("open_sessions_remaining", openSessionsRemaining)
+    }
+
+    /** cash_movement.recorded.v1: cash drop or pay-out at the till drawer. */
+    fun cashMovement(device: DeviceIdentity, m: CashMovementRecord, occurredAt: Instant): JsonObject = buildJsonObject {
+        put("movement_id", m.movementId)
+        put("session_id", m.sessionId)
+        put("till_position_id", device.tillPositionId)
+        put("kind", m.kind)
+        put("amount", m.amount.plain())
+        put("occurred_at", Times.iso(occurredAt))
+        put("operator_user_id", m.operatorUserId)
+        put("reason", m.reason)
+        m.deviceSeq?.let { put("device_seq", it) }
     }
 
     /** The document and lines of a receipt bundle (receipt.issued.v1), with doc 18's column names. */
@@ -92,16 +108,29 @@ object Facts {
         }
     }
 
-    /** The whole receipt.issued.v1 payload: document, lines, the cash tender, the session and the hash. */
+    /** The whole receipt.issued.v1 payload: document, lines, the tenders, the session and the hash. */
     fun receiptPayload(document: JsonObject, lines: JsonArray, receipt: IssuedReceipt): JsonObject = buildJsonObject {
         put("document", document)
         put("lines", lines)
         put("tenders", buildJsonArray {
-            add(buildJsonObject {
-                put("seq", 1)
-                put("kind", "CASH")
-                put("amount", receipt.gross.plain())
-            })
+            val list = receipt.tenders.ifEmpty {
+                listOf(TenderRecord(seq = 1, kind = "CASH", amount = receipt.gross))
+            }
+            for (tender in list) {
+                add(buildJsonObject {
+                    put("seq", tender.seq)
+                    put("kind", tender.kind)
+                    put("amount", tender.amount.plain())
+                    tender.reference?.let { put("reference", it) }
+                    tender.customerAccountId?.let { put("customer_account_id", it) }
+                    if (tender.changeGiven > Money.ZERO) {
+                        put("change_given", tender.changeGiven.plain())
+                    }
+                    if (tender.offline) {
+                        put("offline", true)
+                    }
+                })
+            }
         })
         put("session_id", receipt.sessionId)
         put("content_hash", receipt.contentHash)
@@ -177,13 +206,18 @@ object Facts {
         aggregateType: String? = null,
         aggregateId: String? = null,
         contentHash: String? = null,
+        rawInstant: Instant = occurredAt,
+        offlineTimed: Boolean = false,
+        clockOffsetMs: Long? = null,
     ): OutboxEntry {
         val json = buildJsonObject {
             put("event_id", eventId)
             put("event_type", eventType)
             put("device_seq", deviceSeq)
             put("occurred_at", Times.iso(occurredAt))
-            put("occurred_local", Times.local(occurredAt, zone))
+            put("occurred_local", Times.local(rawInstant, zone))
+            if (offlineTimed) put("offline_timed", true)
+            if (clockOffsetMs != null) put("clock_offset_ms", clockOffsetMs)
             put("actor_user_id", actorUserId?.let { JsonPrimitive(it) } ?: JsonPrimitive(null as String?))
             if (aggregateType != null) put("aggregate_type", aggregateType)
             if (aggregateId != null) put("aggregate_id", aggregateId)

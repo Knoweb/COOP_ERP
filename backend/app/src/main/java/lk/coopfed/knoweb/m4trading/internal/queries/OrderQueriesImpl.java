@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
+import lk.coopfed.knoweb.m4trading.query.OrderAdjustmentView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.OrderView;
 import lk.coopfed.knoweb.m4trading.query.OrderView.OrderLineView;
@@ -196,5 +197,35 @@ class OrderQueriesImpl implements OrderQueries {
 
     private static LocalDate date(Object value) {
         return value instanceof java.sql.Date d ? d.toLocalDate() : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderAdjustmentView> listAdjustments(UUID orderId, ScopeContext scope) {
+        if (orderId == null) {
+            return List.of();
+        }
+        return jdbc.query(
+                """
+                select adjustment_id, order_id, owner_entity_id, counterparty_entity_id,
+                       adjustment_type, kind, amount, description, recorded_by, recorded_at,
+                       invoice_document_id
+                  from trading.doc_order_adjustment
+                 where order_id = ?
+                 order by recorded_at
+                """,
+                (rs, rowNum) -> new OrderAdjustmentView(
+                        rs.getObject("adjustment_id", UUID.class),
+                        rs.getObject("order_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getObject("counterparty_entity_id", UUID.class),
+                        rs.getString("adjustment_type"),
+                        rs.getString("kind"),
+                        rs.getBigDecimal("amount"),
+                        rs.getString("description"),
+                        rs.getObject("recorded_by", UUID.class),
+                        rs.getTimestamp("recorded_at").toInstant(),
+                        rs.getObject("invoice_document_id", UUID.class)),
+                orderId);
     }
 }

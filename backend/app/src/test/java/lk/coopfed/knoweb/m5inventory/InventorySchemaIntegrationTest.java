@@ -46,6 +46,84 @@ class InventorySchemaIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void transferLifecycleFactsAreInsertOnlyAndForceRowLevelSecurity() {
+        for (String table : List.of(
+                "transfer_receipt_line", "transfer_cancellation", "transfer_shortfall", "transfer_shortfall_line")) {
+            assertRefused("update inventory." + table + " set owner_entity_id = owner_entity_id");
+            assertRefused("delete from inventory." + table);
+            assertThat(superuserJdbc()
+                            .queryForObject(
+                                    "select relrowsecurity and relforcerowsecurity"
+                                            + " from pg_class where oid = ('inventory.' || ?)::regclass",
+                                    Boolean.class,
+                                    table))
+                    .as("inventory.%s enables and forces RLS", table)
+                    .isTrue();
+        }
+    }
+
+    @Test
+    void transferLifecycleFactsKeepTheirCompositeParentIdentity() {
+        List<String> receiptLineForeignKeys = superuserJdbc()
+                .queryForList(
+                        "select pg_get_constraintdef(oid) from pg_constraint"
+                                + " where conrelid = 'inventory.transfer_receipt_line'::regclass"
+                                + " and contype = 'f' order by pg_get_constraintdef(oid)",
+                        String.class);
+        assertThat(receiptLineForeignKeys)
+                .anySatisfy(
+                        definition -> assertThat(definition)
+                                .contains(
+                                        "(transfer_id, owner_entity_id, location_id, from_location_id)",
+                                        "inventory.transfer_receipt(transfer_id, owner_entity_id, location_id, from_location_id)"))
+                .anySatisfy(
+                        definition -> assertThat(definition)
+                                .contains(
+                                        "(transfer_id, transfer_line_id, owner_entity_id, from_location_id, location_id)",
+                                        "inventory.transfer_line(transfer_id, line_id, owner_entity_id, location_id, to_location_id)"));
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select pg_get_constraintdef(oid) from pg_constraint"
+                                        + " where conrelid = 'inventory.transfer_cancellation'::regclass"
+                                        + " and contype = 'f'",
+                                String.class))
+                .contains(
+                        "(transfer_id, owner_entity_id, location_id, to_location_id)",
+                        "inventory.transfer(transfer_id, owner_entity_id, location_id, to_location_id)");
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select pg_get_constraintdef(oid) from pg_constraint"
+                                        + " where conrelid = 'inventory.transfer_cancellation'::regclass"
+                                        + " and conname = 'transfer_cancellation_return_verification'",
+                                String.class))
+                .contains(
+                        "cancelled_from_status = 'ISSUED'",
+                        "physical_return_verified_by IS NULL",
+                        "cancelled_from_status = 'IN_TRANSIT'",
+                        "physical_return_verified_at IS NOT NULL");
+
+        List<String> shortfallLineForeignKeys = superuserJdbc()
+                .queryForList(
+                        "select pg_get_constraintdef(oid) from pg_constraint"
+                                + " where conrelid = 'inventory.transfer_shortfall_line'::regclass"
+                                + " and contype = 'f'",
+                        String.class);
+        assertThat(shortfallLineForeignKeys)
+                .anySatisfy(
+                        definition -> assertThat(definition)
+                                .contains(
+                                        "(shortfall_id, transfer_id, owner_entity_id, location_id, from_location_id)",
+                                        "inventory.transfer_shortfall(shortfall_id, transfer_id, owner_entity_id, location_id, from_location_id)"))
+                .anySatisfy(
+                        definition -> assertThat(definition)
+                                .contains(
+                                        "(transfer_id, transfer_line_id, owner_entity_id, location_id, from_location_id)",
+                                        "inventory.transfer_receipt_line(transfer_id, transfer_line_id, owner_entity_id, location_id, from_location_id)"));
+    }
+
+    @Test
     void theMovementPartitionsExistAheadWithRowLevelSecurityForced() {
         List<Map<String, Object>> partitions = superuserJdbc()
                 .queryForList(

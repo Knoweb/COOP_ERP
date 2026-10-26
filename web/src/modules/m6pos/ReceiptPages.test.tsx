@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiProblem } from "../../shell/api/client";
 import { messages, type Locale } from "../../shell/i18n/messages";
-import type { Location, Receipt, ReceiptFilter, TillPosition, TillSession } from "./posApi";
+import type { Location, Receipt, ReceiptFilter, ReceiptProfit, TillPosition, TillSession } from "./posApi";
 import { ReceiptPage } from "./ReceiptPage";
 import { ReceiptsPage } from "./ReceiptsPage";
 import { SessionsPage } from "./SessionsPage";
@@ -94,7 +94,8 @@ const api = {
   }),
   sessions: vi.fn(async () => ({ items: [orphan, session] })),
   session: vi.fn(async () => session),
-  getSku: vi.fn(async () => ({ skuId: "s1", skuCode: "SKU-1", nameEn: "Samba rice 5 kg" }))
+  getSku: vi.fn(async () => ({ skuId: "s1", skuCode: "SKU-1", nameEn: "Samba rice 5 kg" })),
+  receiptProfit: vi.fn(async (): Promise<ReceiptProfit | null> => null)
 };
 
 vi.mock("./posApi", () => ({ usePosApi: () => api }));
@@ -200,5 +201,114 @@ describe("the shop's receipts", () => {
     const orphanRow = screen.getByText(text("pos.session.open_missing")).closest("tr")!;
     expect(within(orphanRow).getByText("Rs 4,100.00")).toBeTruthy();
     expect(within(orphanRow).getByText("Rs 100.00")).toBeTruthy();
+  }, 15000);
+
+  it("shows authoritative profit and margin breakdown to authorized users", async () => {
+    api.receiptProfit.mockResolvedValueOnce({
+      documentId: RECEIPT,
+      locationId: SHOP,
+      netSales: 1250,
+      totalCost: 1000,
+      grossProfit: 250,
+      marginPercent: 20,
+      costPending: false,
+      currency: "LKR",
+      lines: [
+        {
+          lineNo: 1,
+          skuId: "s1",
+          qty: 2,
+          unitPrice: 625,
+          lineTotal: 1250,
+          lineNet: 1250,
+          unitCost: 500,
+          lineCost: 1000,
+          lineProfit: 250,
+          marginPercent: 20,
+          costPending: false
+        }
+      ]
+    });
+
+    renderAt(`/pos/receipts/${RECEIPT}?location=${SHOP}`);
+
+    // Summary Profit Card with exact domain labels
+    const profitHeading = await screen.findByRole("heading", { name: text("pos.profit.title") }, { timeout: 10000 });
+    expect(profitHeading).toBeTruthy();
+    const profitSection = profitHeading.closest("section")!;
+    expect(within(profitSection).getByText(text("pos.profit.total_cost"))).toBeTruthy();
+    expect(within(profitSection).getByText("Rs 1,000.00")).toBeTruthy();
+    expect(within(profitSection).getByText(text("pos.profit.gross_profit"))).toBeTruthy();
+    expect(within(profitSection).getByText("Rs 250.00")).toBeTruthy();
+    expect(within(profitSection).getByText(text("pos.profit.margin_pct"))).toBeTruthy();
+    expect(within(profitSection).getByText("20%")).toBeTruthy();
+
+    // Line columns
+    expect(screen.getByText(text("pos.column.unit_cost"))).toBeTruthy();
+    expect(screen.getByText(text("pos.column.line_cost"))).toBeTruthy();
+    expect(screen.getByText(text("pos.column.line_profit"))).toBeTruthy();
+    expect(screen.getByText(text("pos.column.margin"))).toBeTruthy();
+    expect(screen.getByText("Rs 500.00")).toBeTruthy();
+    expect(screen.getAllByText("Rs 1,000.00")).toHaveLength(2);
+    expect(screen.getAllByText("Rs 250.00")).toHaveLength(2);
+  }, 15000);
+
+  it("does not display or leak profit when user is unauthorized (403)", async () => {
+    // Return null simulating 403 or lack of pos.receipt.margin permission
+    api.receiptProfit.mockResolvedValueOnce(null);
+
+    renderAt(`/pos/receipts/${RECEIPT}?location=${SHOP}`);
+
+    // Receipt details render normally
+    expect(await screen.findByText("M101-S01-T1-RCT-0000007", undefined, { timeout: 10000 })).toBeTruthy();
+
+    // Sensitive profit data and columns are hidden
+    expect(screen.queryByRole("heading", { name: text("pos.profit.title") })).toBeNull();
+    expect(screen.queryByText(text("pos.profit.total_cost"))).toBeNull();
+    expect(screen.queryByText(text("pos.column.unit_cost"))).toBeNull();
+    expect(screen.queryByText(text("pos.column.margin"))).toBeNull();
+  }, 15000);
+
+  it("displays localized cost pending state when central inventory cost is pending/oversold", async () => {
+    api.receiptProfit.mockResolvedValueOnce({
+      documentId: RECEIPT,
+      locationId: SHOP,
+      netSales: 1250,
+      totalCost: null,
+      grossProfit: null,
+      marginPercent: null,
+      costPending: true,
+      currency: "LKR",
+      lines: [
+        {
+          lineNo: 1,
+          skuId: "s1",
+          qty: 2,
+          unitPrice: 625,
+          lineTotal: 1250,
+          lineNet: 1250,
+          unitCost: null,
+          lineCost: null,
+          lineProfit: null,
+          marginPercent: null,
+          costPending: true
+        }
+      ]
+    });
+
+    renderAt(`/pos/receipts/${RECEIPT}?location=${SHOP}`);
+
+    const profitHeading = await screen.findByRole("heading", { name: text("pos.profit.title") }, { timeout: 10000 });
+    expect(profitHeading).toBeTruthy();
+    const profitSection = profitHeading.closest("section")!;
+    expect(screen.getByText(text("pos.profit.pending_notice"))).toBeTruthy();
+
+    // Cost pending badge appears instead of fake 0
+    const pendingBadges = screen.getAllByText(text("pos.profit.cost_pending"));
+    expect(pendingBadges.length).toBeGreaterThanOrEqual(2);
+
+    // No fake zero profit rendered in profit section
+    expect(within(profitSection).queryByText("Rs 0.00")).toBeNull();
+    expect(within(profitSection).queryByText("0%")).toBeNull();
   }, 15000);
 });

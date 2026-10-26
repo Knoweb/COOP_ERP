@@ -5,9 +5,11 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.port.TillStore
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRow
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
@@ -85,8 +87,46 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
     override fun session(sessionId: String): SessionRecord? =
         q.selectSession(sessionId).executeAsOneOrNull()?.let { json.decodeFromString(SessionRecord.serializer(), it) }
 
+    override fun saveCashMovement(movement: CashMovementRecord) {
+        q.insertCashMovement(
+            id = movement.movementId,
+            session_id = movement.sessionId,
+            kind = movement.kind,
+            amount = movement.amount.plain(),
+            at = movement.occurredAt,
+            operator_user_id = movement.operatorUserId,
+            reason = movement.reason,
+        )
+    }
+
+    override fun cashMovementsOfSession(sessionId: String): List<CashMovementRecord> =
+        q.selectCashMovementsBySession(sessionId).executeAsList().map {
+            CashMovementRecord(
+                movementId = it.id,
+                sessionId = it.session_id,
+                kind = it.kind,
+                amount = Money.parse(it.amount),
+                occurredAt = it.at,
+                operatorUserId = it.operator_user_id,
+                reason = it.reason ?: "",
+            )
+        }
+
     override fun saveReceipt(receipt: IssuedReceipt) {
         q.insertReceipt(receipt.documentId, receipt.sessionId, receipt.number, json.encodeToString(IssuedReceipt.serializer(), receipt))
+        for (t in receipt.tenders) {
+            q.insertTender(
+                tender_id = "${receipt.documentId}-${t.seq}",
+                document_id = receipt.documentId,
+                seq = t.seq.toLong(),
+                kind = t.kind,
+                amount = t.amount.plain(),
+                reference = t.reference,
+                customer_account_id = t.customerAccountId,
+                change_given = if (t.changeGiven > Money.ZERO) t.changeGiven.plain() else null,
+                offline = if (t.offline) 1L else 0L,
+            )
+        }
     }
 
     override fun receiptsOfSession(sessionId: String): List<IssuedReceipt> =

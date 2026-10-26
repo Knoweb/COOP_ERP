@@ -73,6 +73,18 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
                         + " values (?, (select tag_id from catalogue.tag where tag_code = 'rice' and governed), ?)",
                 LOCAL,
                 ENTITY);
+        db.update(
+                """
+                insert into catalogue.location_assortment (location_id, sku_id, reasons, sell_through, owner_entity_id)
+                values (?, ?, ARRAY['LOCAL'], false, ?),
+                       (?, ?, ARRAY['CORE_RANGE'], false, ?)
+                """,
+                SHOP,
+                LOCAL,
+                ENTITY,
+                SHOP,
+                SHARED,
+                ENTITY);
     }
 
     @AfterEach
@@ -200,8 +212,10 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
     }
 
     private static void forget(JdbcTemplate db) {
+        db.update("delete from catalogue.location_assortment where location_id = ?", SHOP);
         List<UUID> skus = List.of(LOCAL, DRAFT, OTHERS, SHARED);
         for (UUID sku : skus) {
+            db.update("delete from catalogue.location_assortment where sku_id = ?", sku);
             db.update("delete from catalogue.batch_key where sku_id = ?", sku);
             db.update("delete from catalogue.batch where sku_id = ?", sku);
             db.update("delete from catalogue.sku_image where sku_id = ?", sku);

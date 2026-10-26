@@ -120,6 +120,15 @@ class Sku implements Persistable<UUID> {
 
     void activateLocal() {
         requireStatus(DRAFT);
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
+        }
         status = LOCAL;
         priorStatus = null;
     }
@@ -129,6 +138,16 @@ class Sku implements Persistable<UUID> {
 
         if (shortNameSi == null || shortNameTa == null) {
             throw new ProblemException("m2.sku.shared_translations_required");
+        }
+
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
         }
 
         status = SHARED;
@@ -153,6 +172,35 @@ class Sku implements Persistable<UUID> {
 
         status = priorStatus;
         priorStatus = null;
+    }
+
+    void promoteToShared(UUID federationEntityId) {
+        if (!LOCAL.equals(status)) {
+            throw new ProblemException("m2.sku.not_local");
+        }
+        if (shortNameSi == null || shortNameTa == null || shortNameSi.isBlank() || shortNameTa.isBlank()) {
+            throw new ProblemException("m2.sku.shared_translations_required");
+        }
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        this.ownerEntityId = federationEntityId;
+        this.status = SHARED;
+        this.priorStatus = null;
+    }
+
+    void mergeIntoShared() {
+        if (!LOCAL.equals(status)) {
+            throw new ProblemException("m2.sku.not_local");
+        }
+        this.priorStatus = LOCAL;
+        this.status = INACTIVE;
     }
 
     private void apply(SkuDetails details) {
@@ -252,6 +300,30 @@ class Sku implements Persistable<UUID> {
 
     UUID taxCategoryId() {
         return taxCategoryId;
+    }
+
+    String shortNameEn() {
+        return shortNameEn;
+    }
+
+    String shortNameSi() {
+        return shortNameSi;
+    }
+
+    String shortNameTa() {
+        return shortNameTa;
+    }
+
+    String multiMrpPolicy() {
+        return multiMrpPolicy;
+    }
+
+    String originKind() {
+        return originKind;
+    }
+
+    Map<String, Object> attributes() {
+        return attributes;
     }
 
     Map<String, Object> auditState() {

@@ -76,3 +76,28 @@
 .pricing-muted {
   color: var(--color-text-muted);
 }
+
+.pricing-withdraw-form {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.pricing-review-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.pricing-detail-pill {
+  font-size: var(--font-size-sm);
+  background: var(--color-surface-subtle);
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius);
+}
+
+.pricing-markdown-rule-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

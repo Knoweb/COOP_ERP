@@ -221,7 +221,7 @@ export function ReportPage() {
           ) : (
             <div className="modern-table-card">
               <div className="modern-table-scroll">
-                <table className="modern-table">
+                <table className="modern-table reporting-data-table">
                   <thead>
                     <tr>
                       {data.data.columns.map((column) => (

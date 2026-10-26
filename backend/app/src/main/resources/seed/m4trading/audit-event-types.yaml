@@ -55,6 +55,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Every allocated quantity of the order is on an issued delivery note
 
+  - code: ORDER_ADJUSTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Adjustment recorded on an accepted order by the seller
+
   - code: DN_CREATED
     severity: INFO
     offline_capturable: false

@@ -17,7 +17,8 @@ import lk.coopfed.knoweb.m5inventory.api.CountScheduled;
 import lk.coopfed.knoweb.m5inventory.api.CountStarted;
 import lk.coopfed.knoweb.m5inventory.api.CountSubmitted;
 import lk.coopfed.knoweb.m5inventory.api.StockMoved;
-import lk.coopfed.knoweb.m5inventory.api.TransferIssued;
+import lk.coopfed.knoweb.m5inventory.api.TransferCancelled;
+import lk.coopfed.knoweb.m5inventory.api.TransferDispatched;
 import lk.coopfed.knoweb.m5inventory.api.TransferReceived;
 import org.springframework.stereotype.Component;
 
@@ -30,8 +31,8 @@ import org.springframework.stereotype.Component;
  *   <li>Stock movement appends UPSERT on {@code lot}; a lot depleted to zero appends DELETE.
  *   <li>Count scheduled and started append UPSERT on {@code count_task}.
  *   <li>Count submitted, approved, or rejected appends DELETE on {@code count_task}.
- *   <li>Transfer issued appends UPSERT on {@code expected_transfer} for the destination shop.
- *   <li>Transfer received appends DELETE on {@code expected_transfer} for the destination shop.
+ *   <li>Transfer dispatched appends UPSERT on {@code expected_transfer} for the destination shop.
+ *   <li>Transfer received or cancelled appends DELETE on {@code expected_transfer} for the destination shop.
  *   <li>Inventory configuration changes append UPSERT on {@code inventory_policy}.
  * </ul>
  *
@@ -142,9 +143,9 @@ public class M5ChangeLogFanOut {
     // ---- Transfers ----------------------------------------------------------------------------
 
     @EventConsumer(
-            types = {TransferIssued.TYPE},
+            types = {TransferDispatched.TYPE},
             consumer = CONSUMER)
-    public void onTransferIssued(JsonNode payload, ScopeContext scope) {
+    public void onTransferDispatched(JsonNode payload, ScopeContext scope) {
         UUID toLocationId = uuid(payload, "toLocationId");
         UUID ownerEntityId = uuid(payload, "ownerEntityId");
         UUID transferId = uuid(payload, "transferId");
@@ -168,6 +169,17 @@ public class M5ChangeLogFanOut {
             types = {TransferReceived.TYPE},
             consumer = CONSUMER)
     public void onTransferReceived(JsonNode payload, ScopeContext scope) {
+        deleteExpectedTransfer(payload, scope);
+    }
+
+    @EventConsumer(
+            types = {TransferCancelled.TYPE},
+            consumer = CONSUMER)
+    public void onTransferCancelled(JsonNode payload, ScopeContext scope) {
+        deleteExpectedTransfer(payload, scope);
+    }
+
+    private void deleteExpectedTransfer(JsonNode payload, ScopeContext scope) {
         UUID toLocationId = uuid(payload, "toLocationId");
         UUID ownerEntityId = uuid(payload, "ownerEntityId");
         UUID transferId = uuid(payload, "transferId");

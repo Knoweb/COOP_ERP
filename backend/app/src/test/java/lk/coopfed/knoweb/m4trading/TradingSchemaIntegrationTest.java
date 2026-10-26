@@ -34,6 +34,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
 
     private static final Map<String, Set<String>> POLICIES = Map.ofEntries(
             Map.entry("doc_order", FOLLOWS_HEADER),
+            Map.entry("doc_order_adjustment", with(TEMPLATE_WITH_PARTY, "own_update")),
             Map.entry("doc_order_line", FOLLOWS_HEADER_UPDATED),
             Map.entry("allocation_run", TEMPLATE),
             Map.entry("order_allocation", TEMPLATE_WITH_PARTY),
@@ -67,10 +68,14 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("posting_map", Set.of("reference_read", "seed_reference")));
 
     /** The columns app_rw may update, per table; a table not named here grants no UPDATE. */
-    private static final Map<String, Set<String>> UPDATABLE = Map.of(
-            "doc_order_line", Set.of("cancelled_qty"),
-            "doc_delivery", Set.of("vehicle_ref", "driver_user_id", "driver_name", "dispatched_at", "route_ref"),
-            "doc_delivery_drop",
+    private static final Map<String, Set<String>> UPDATABLE = Map.ofEntries(
+            Map.entry("doc_order_adjustment", Set.of("invoice_document_id")),
+            Map.entry("doc_order_line", Set.of("cancelled_qty")),
+            Map.entry(
+                    "doc_delivery",
+                    Set.of("vehicle_ref", "driver_user_id", "driver_name", "dispatched_at", "route_ref")),
+            Map.entry(
+                    "doc_delivery_drop",
                     Set.of(
                             "status",
                             "arrived_at",
@@ -78,14 +83,14 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
                             "pod_signature_key",
                             "pod_photo_key",
                             "delivered_by",
-                            "undelivered_reason"),
-            "doc_grn", Set.of("confirmed_by", "confirmed_at"),
-            "doc_grn_line", Set.of("batch_id", "unit_cost"),
-            "order_allocation_line", Set.of("fulfilled_qty"),
-            "doc_invoice", Set.of("print_object_key", "credited_amount", "settled_amount", "debited_amount"),
-            "doc_credit_note", Set.of("print_object_key"),
-            "doc_debit_note", Set.of("print_object_key"),
-            "doc_payment_receipt", Set.of("print_object_key"));
+                            "undelivered_reason")),
+            Map.entry("doc_grn", Set.of("confirmed_by", "confirmed_at")),
+            Map.entry("doc_grn_line", Set.of("batch_id", "unit_cost")),
+            Map.entry("order_allocation_line", Set.of("fulfilled_qty")),
+            Map.entry("doc_invoice", Set.of("print_object_key", "credited_amount", "settled_amount", "debited_amount")),
+            Map.entry("doc_credit_note", Set.of("print_object_key")),
+            Map.entry("doc_debit_note", Set.of("print_object_key")),
+            Map.entry("doc_payment_receipt", Set.of("print_object_key")));
 
     @Test
     void theTradingSchemaHoldsTheTablesOfM401() {

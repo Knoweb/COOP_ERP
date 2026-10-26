@@ -52,6 +52,15 @@
 
   /* ---- Space: the 8 px grid -------------------------------------------------------------- */
 
+  /* Data table column widths */
+  --reporting-cell-min: 110px;
+  --reporting-key-column-min: 200px;
+  --reporting-key-column-max: 260px;
+  --integration-log-table-min: 950px;
+  --integration-log-date-min: 145px;
+  --integration-log-detail-min: 120px;
+  --integration-log-detail-max: 240px;
+
   --space-half: 0.25rem; /* 4 px: the half step, inside a component only (icon to its label) */
   --space-1: 0.5rem; /* 8 px */
   --space-2: 1rem; /* 16 px */

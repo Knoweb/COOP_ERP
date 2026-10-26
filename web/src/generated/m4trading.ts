@@ -174,6 +174,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/orders/{orderId}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        /** The adjustments recorded on this order */
+        get: operations["listOrderAdjustments"];
+        put?: never;
+        /**
+         * The seller records a manual adjustment (special discount or delivery fee) on an order
+         * @description Problems: m4.order.not_found, m4.order.not_seller, m4.order.not_adjustable, m4.adjustment.type_unknown, m4.adjustment.amount_invalid, m4.adjustment.exceeds_max_amount, m4.adjustment.exceeds_max_percent, m4.adjustment.already_recorded, m4.adjustment.permission_denied.
+         */
+        post: operations["recordOrderAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/delivery-notes": {
         parameters: {
             query?: never;
@@ -1084,6 +1107,32 @@ export interface components {
             allocatedQty: number;
             reason: string;
         };
+        RecordOrderAdjustmentRequest: {
+            adjustmentType: string;
+            amount: number;
+            description?: string;
+        };
+        OrderAdjustmentResponse: {
+            /** Format: uuid */
+            adjustmentId: string;
+            /** Format: uuid */
+            orderId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            counterpartyEntityId: string;
+            adjustmentType: string;
+            /** @enum {string} */
+            kind: "SPECIAL_DISCOUNT" | "DELIVERY_FEE";
+            amount: number;
+            description?: string;
+            /** Format: uuid */
+            recordedBy: string;
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: uuid */
+            invoiceDocumentId?: string;
+        };
         CreateDeliveryNoteRequest: {
             /**
              * Format: uuid
@@ -1785,7 +1834,7 @@ export interface components {
              */
             transferId?: string;
             /** @enum {string} */
-            transferStatus?: "IN_TRANSIT" | "RECEIVED";
+            transferStatus?: "ISSUED" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
             lines: components["schemas"]["TransferRequestLineResponse"][];
         };
         TransferRequestLineResponse: {
@@ -2115,6 +2164,77 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listOrderAdjustments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The adjustments of the order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderAdjustmentResponse"][];
+                };
+            };
+            /** @description m4.order.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    recordOrderAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordOrderAdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The adjustment recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderAdjustmentResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m4.order.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             422: components["responses"]["RuleBroken"];
         };
     };

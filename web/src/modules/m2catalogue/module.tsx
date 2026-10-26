@@ -8,14 +8,51 @@
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { CataloguePage } from "./CataloguePage";
+import { CatalogueImportPage } from "./CatalogueImportPage";
 import { NewSkuPage } from "./NewSkuPage";
 import { SkuPage } from "./SkuPage";
+import { TaxRatesPage } from "./TaxRatesPage";
+import { BatchPage } from "./BatchPage";
+import { SuppliersPage } from "./SuppliersPage";
+import { DuplicateSuspectsPage } from "./DuplicateSuspectsPage";
 
 export const catalogueModule: ModuleDefinition = {
   id: "catalogue",
 
   routes: [
     { path: "catalogue", element: <CataloguePage /> },
+    {
+      path: "catalogue/tax-rates",
+      element: (
+        <RequirePermission anyOf={["cat.tax.publish", "cat.sku.view"]}>
+          <TaxRatesPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "catalogue/import",
+      element: (
+        <RequirePermission anyOf={["cat.import.run"]}>
+          <CatalogueImportPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "catalogue/suppliers",
+      element: (
+        <RequirePermission anyOf={["cat.supplier.manage", "cat.sku.view"]}>
+          <SuppliersPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "catalogue/suspects",
+      element: (
+        <RequirePermission anyOf={["cat.sku.create_local", "cat.sku.view"]}>
+          <DuplicateSuspectsPage />
+        </RequirePermission>
+      )
+    },
     {
       path: "catalogue/skus/new",
       element: (
@@ -24,12 +61,29 @@ export const catalogueModule: ModuleDefinition = {
         </RequirePermission>
       )
     },
-    { path: "catalogue/skus/:skuId", element: <SkuPage /> }
+    { path: "catalogue/skus/:skuId", element: <SkuPage /> },
+    { path: "catalogue/batches/:batchId", element: <BatchPage /> }
   ],
 
   // The label is a message id of catalogue.messages.json, never literal text.
-  navItems: [{ labelId: "catalogue.nav", to: "/catalogue" }],
+  navItems: [
+    { labelId: "catalogue.nav", to: "/catalogue" },
+    { labelId: "catalogue.tax.nav", to: "/catalogue/tax-rates" },
+    { labelId: "catalogue.suppliers.nav", to: "/catalogue/suppliers" },
+    { labelId: "catalogue.suspects.nav", to: "/catalogue/suspects" }
+  ],
 
   // x-permissions of openapi/m2catalogue.yaml, read from the session's resolved set (PR #144).
-  requiredPermissions: ["cat.sku.view", "cat.sku.create_local", "cat.sku.create", "cat.barcode.manage"]
+  requiredPermissions: [
+    "cat.sku.view",
+    "cat.sku.create_local",
+    "cat.sku.create",
+    "cat.sku.deactivate",
+    "cat.barcode.manage",
+    "cat.batch.correct",
+    "cat.supplier.manage",
+    "cat.image.manage",
+    "cat.import.run",
+    "cat.tax.publish"
+  ]
 };

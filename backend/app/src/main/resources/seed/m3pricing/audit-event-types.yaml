@@ -36,6 +36,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Discount rule withdrawn
 
+  - code: RULE_EXPIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Discount rule expired by the clock
+
   # M3-06 and M3-07 (23A section 7): control prices and the multi-MRP policy.
   - code: CONTROL_PRICE_ENTERED
     severity: INFO
@@ -80,3 +85,20 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A batch MRP or control price checked against the price lists in force
+
+  # PRC-03 shelf-label job lifecycle. LABEL_JOB_CREATED is specified by 23A; completion and
+  # failure are separate handler facts because every database mutation is audited.
+  - code: LABEL_JOB_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job created
+
+  - code: LABEL_JOB_RENDERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job rendered
+
+  - code: LABEL_JOB_FAILED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job failed

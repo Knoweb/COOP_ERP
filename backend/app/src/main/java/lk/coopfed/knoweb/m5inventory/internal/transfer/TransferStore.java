@@ -21,11 +21,7 @@ class TransferStore {
         this.jdbc = jdbc;
     }
 
-    /**
-     * The transfer as the scope sees it: its source (own_read) or its destination (dest_read).
-     * Not locked (the table grants no UPDATE, which FOR SHARE needs): two receipts at once meet
-     * at the receipt's primary key, and the second rolls back whole.
-     */
+    /** The transfer as the scope sees it: its source (own_read) or its destination (dest_read). */
     Optional<Header> find(UUID transferId) {
         return jdbc
                 .query(
@@ -67,6 +63,22 @@ class TransferStore {
     boolean received(UUID transferId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "select exists (select 1 from inventory.transfer_receipt where transfer_id = ?)",
+                Boolean.class,
+                transferId));
+    }
+
+    /** The source has dispatched the transfer; its primary key permits this fact only once. */
+    boolean dispatched(UUID transferId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from inventory.transfer_dispatch where transfer_id = ?)",
+                Boolean.class,
+                transferId));
+    }
+
+    /** The source cancelled this transfer; its primary key permits this terminal fact only once. */
+    boolean cancelled(UUID transferId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from inventory.transfer_cancellation where transfer_id = ?)",
                 Boolean.class,
                 transferId));
     }

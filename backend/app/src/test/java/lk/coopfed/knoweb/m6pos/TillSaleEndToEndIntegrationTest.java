@@ -239,6 +239,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents())
                 .filteredOn(TillSessionRecorded.class::isInstance)
                 .hasSize(2);
+        assertThat(kernel.committedEvents())
+                .filteredOn(lk.coopfed.knoweb.kernel.api.LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
 
         // Over HTTP, the office reads the receipt on its business day, and on its own; the shop's
         // own session too. The day is the one the receipt was issued on in the business time zone,
@@ -291,6 +294,71 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         deliverTheTillsEvents();
         assertThat(onHand(rice)).isEqualByComparingTo("8");
         assertThat(receiptsAt(office)).hasSize(1);
+    }
+
+    @Test
+    void theTillPerformsCashDropAndPayoutAndAfterSyncMovementsAndExpectedCashReconcile() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        UUID session = till.openSession(new BigDecimal("1000.00"));
+        UUID receipt = till.sell(List.of(new Sale("4790001000011", new BigDecimal("1"), new BigDecimal("1450.00"))));
+
+        UUID drop = till.cashDrop(new BigDecimal("500.00"), "Midday safe sweep");
+        UUID payout = till.cashPayout(new BigDecimal("150.00"), "Cleaning supplies");
+
+        // Expected cash: 1000 + 1450 - 500 - 150 = 1800.00
+        till.closeSession(new BigDecimal("1800.00"));
+
+        till.drain(50, Instant.now().plusSeconds(30));
+        assertThat(till.pending()).isZero();
+        deliverTheTillsEvents();
+
+        ScopeContext office = own(MPCS);
+        List<PosQueries.CashMovementView> movements = pos.cashMovements(session, office);
+        assertThat(movements).hasSize(2);
+        assertThat(movements)
+                .extracting(PosQueries.CashMovementView::movementId)
+                .containsExactlyInAnyOrder(drop, payout);
+
+        assertThat(movements)
+                .filteredOn(m -> m.kind().equals("DROP"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.amount()).isEqualByComparingTo("500.00");
+                    assertThat(m.reason()).isEqualTo("Midday safe sweep");
+                    assertThat(m.flags()).isEmpty();
+                });
+
+        assertThat(movements)
+                .filteredOn(m -> m.kind().equals("PAYOUT"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.amount()).isEqualByComparingTo("150.00");
+                    assertThat(m.reason()).isEqualTo("Cleaning supplies");
+                    assertThat(m.flags()).isEmpty();
+                });
+
+        // The session's blind close worked out zero variance
+        assertThat(sessionsAt(office)).singleElement().satisfies(s -> {
+            assertThat(s.sessionId()).isEqualTo(session);
+            assertThat(s.countedCash()).isEqualByComparingTo("1800.00");
+            assertThat(s.expectedCash()).isEqualByComparingTo("1800.00");
+            assertThat(s.variance()).isEqualByComparingTo("0.00");
+        });
+
+        // Query over HTTP
+        JsonNode cashMovementsJson = http.exchange(
+                        "/v1/pos/sessions/" + session + "/cash-movements",
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(cashMovementsJson).hasSize(2);
+
+        // Committed audit contains movement recorded events
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("CASH_MOVEMENT_RECORDED", "TILL_SESSION_OPENED", "TILL_SESSION_CLOSED");
     }
 
     @Test
@@ -534,6 +602,50 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TOTAL_MISMATCH"));
     }
 
+    @Test
+    void endToEndTillCardSaleSyncsAndPosReceiptQueryReturnsReference() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID cardSaleId =
+                till.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))), payload -> {
+                    payload.put(
+                            "tenders",
+                            List.of(Map.of(
+                                    "seq", 1,
+                                    "kind", "CARD",
+                                    "amount", "1450.00",
+                                    "reference", "AUTH-E2E-CARD-8899")));
+                });
+        till.closeSession(BigDecimal.ZERO);
+        till.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents();
+
+        // Check PosQueries returns reference
+        assertThat(pos.receipt(cardSaleId, own(MPCS))).hasValueSatisfying(r -> {
+            assertThat(r.grossAmount()).isEqualByComparingTo("1450.00");
+            assertThat(r.flags()).isEmpty();
+            assertThat(r.tenders()).singleElement().satisfies(t -> {
+                assertThat(t.kind()).isEqualTo("CARD");
+                assertThat(t.amount()).isEqualByComparingTo("1450.00");
+                assertThat(t.reference()).isEqualTo("AUTH-E2E-CARD-8899");
+            });
+        });
+
+        // Check HTTP endpoint returns reference
+        JsonNode response = http.exchange(
+                        "/v1/pos/receipts/" + cardSaleId,
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(response.get("tenders")).singleElement().satisfies(t -> {
+            assertThat(t.get("kind").asText()).isEqualTo("CARD");
+            assertThat(t.get("amount").asDouble()).isEqualTo(1450.00);
+            assertThat(t.get("reference").asText()).isEqualTo("AUTH-E2E-CARD-8899");
+        });
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {
@@ -713,6 +825,15 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 barcode,
                 sku,
                 MPCS);
+        db.update(
+                """
+                insert into catalogue.location_assortment (location_id, sku_id, reasons, sell_through, since, owner_entity_id)
+                values (?, ?, ARRAY['LOCAL']::text[], false, now(), ?)
+                on conflict (location_id, sku_id) do nothing
+                """,
+                SHOP,
+                sku,
+                MPCS);
         outer.run(
                 own(MPCS),
                 () -> ledger.post(
@@ -739,8 +860,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static void forget(JdbcTemplate db) {
-        db.execute("truncate table pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
-                + " pos.till_session");
+        db.execute(
+                "truncate table pos.cash_movement, pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
+                        + " pos.till_session");
         db.update("delete from kernel.event_outbox where owner_entity_id = ?", MPCS);
         for (String table : List.of(
                 "kernel.sync_event",
@@ -751,6 +873,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 "kernel.location_snapshot_version")) {
             db.update("delete from " + table + " where owner_entity_id = ?", MPCS);
         }
+        db.update("delete from catalogue.location_assortment where owner_entity_id = ?", MPCS);
         db.update("delete from catalogue.sku_barcode where owner_entity_id = ?", MPCS);
         db.update("delete from kernel.numbering_series where series_id = ?", SERIES);
         db.update("delete from party.device where owner_entity_id = ?", MPCS);

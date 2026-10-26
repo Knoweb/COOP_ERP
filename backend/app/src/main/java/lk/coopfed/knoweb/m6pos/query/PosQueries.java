@@ -33,6 +33,12 @@ public interface PosQueries {
     Optional<ReceiptView> receipt(UUID documentId, ScopeContext scope);
 
     /**
+     * Authoritative cost, gross profit and margin breakdown of one receipt, or empty when there is
+     * none or the caller's scope may not see it.
+     */
+    Optional<ReceiptProfitView> receiptProfit(UUID documentId, ScopeContext scope);
+
+    /**
      * One page of a location's till sessions, newest first, with their close when it arrived; a
      * close whose open never arrived is listed with the open's fields empty.
      */
@@ -40,6 +46,9 @@ public interface PosQueries {
 
     /** One session, or empty when there is none or the caller's scope may not see it. */
     Optional<SessionView> session(UUID sessionId, ScopeContext scope);
+
+    /** All cash drops and pay-outs recorded during one till session, oldest first. */
+    List<CashMovementView> cashMovements(UUID sessionId, ScopeContext scope);
 
     /**
      * @param locationId   the shop; required
@@ -78,7 +87,11 @@ public interface PosQueries {
                 int lineNo, UUID skuId, UUID batchId, BigDecimal qty, BigDecimal unitPrice, BigDecimal lineTotal) {}
 
         /** How the customer paid: CASH, CARD ... as the till reported it, in the till's order. */
-        public record Tender(int seq, String kind, BigDecimal amount) {}
+        public record Tender(int seq, String kind, BigDecimal amount, String reference) {
+            public Tender(int seq, String kind, BigDecimal amount) {
+                this(seq, kind, amount, null);
+            }
+        }
     }
 
     /** A session; the open's fields (position, business date, opened at, float) are null for an orphan close. */
@@ -93,4 +106,43 @@ public interface PosQueries {
             BigDecimal countedCash,
             BigDecimal expectedCash,
             BigDecimal variance) {}
+
+    record CashMovementView(
+            UUID movementId,
+            UUID sessionId,
+            UUID locationId,
+            UUID tillPositionId,
+            UUID deviceId,
+            String kind,
+            BigDecimal amount,
+            Instant occurredAt,
+            UUID operatorUserId,
+            String reason,
+            Long deviceSeq,
+            List<String> flags) {}
+
+    record ReceiptProfitView(
+            UUID documentId,
+            UUID locationId,
+            BigDecimal netSales,
+            BigDecimal totalCost,
+            BigDecimal grossProfit,
+            BigDecimal marginPercent,
+            boolean costPending,
+            String currency,
+            List<LineProfitView> lines) {
+
+        public record LineProfitView(
+                int lineNo,
+                UUID skuId,
+                BigDecimal qty,
+                BigDecimal unitPrice,
+                BigDecimal lineTotal,
+                BigDecimal lineNet,
+                BigDecimal unitCost,
+                BigDecimal lineCost,
+                BigDecimal lineProfit,
+                BigDecimal marginPercent,
+                boolean costPending) {}
+    }
 }

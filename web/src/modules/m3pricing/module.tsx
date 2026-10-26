@@ -3,9 +3,13 @@
 // shell builds the router and the navigation from there, so a module never edits the shell.
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
+import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { GazettePage } from "./GazettePage";
+import { MarkdownQueuePage } from "./MarkdownQueuePage";
 import { MrpPolicyPage } from "./MrpPolicyPage";
 import { PricingPage } from "./PricingPage";
+import { PricingReviewsPage } from "./PricingReviewsPage";
+import { RulesPage } from "./RulesPage";
 import { ShelfListPage } from "./ShelfListPage";
 import { ShelfPricesPage } from "./ShelfPricesPage";
 import { TradePriceListPage } from "./TradePriceListPage";
@@ -14,14 +18,25 @@ export const pricingModule: ModuleDefinition = {
   id: "pricing",
 
   // doc 30 section 5.3, "Trade price list": the lists, then one version with its lines. 23A
-  // section 8 (M3-06, M3-07): the shelf price list, the gazette and the MRP policy.
+  // section 8 (M3-06, M3-07, M3-10): the shelf price list, the gazette, the MRP policy,
+  // promotion rules, pricing exception reviews, and the markdown queue.
   routes: [
     { path: "pricing", element: <PricingPage /> },
     { path: "pricing/lists/:listId", element: <TradePriceListPage /> },
     { path: "pricing/shelf", element: <ShelfPricesPage /> },
     { path: "pricing/shelf/:listId", element: <ShelfListPage /> },
     { path: "pricing/gazette", element: <GazettePage /> },
-    { path: "pricing/mrp-policy", element: <MrpPolicyPage /> }
+    { path: "pricing/mrp-policy", element: <MrpPolicyPage /> },
+    { path: "pricing/rules", element: <RulesPage /> },
+    {
+      path: "pricing/reviews",
+      element: (
+        <RequirePermission anyOf={["prc.review.view"]}>
+          <PricingReviewsPage />
+        </RequirePermission>
+      )
+    },
+    { path: "pricing/markdown", element: <MarkdownQueuePage /> }
   ],
 
   // The label is a message id of pricing.messages.json, never literal text. The pricing screens
@@ -30,5 +45,14 @@ export const pricingModule: ModuleDefinition = {
 
   // x-permissions of openapi/m3pricing.yaml, read from the session's resolved set (PR #144). A
   // user with one of them sees the module; the pages hide what the user may not do.
-  requiredPermissions: ["prc.pricelist.view", "prc.pricelist.author", "prc.controlprice.enter", "prc.mrp_policy.set"]
+  requiredPermissions: [
+    "prc.pricelist.view",
+    "prc.pricelist.author",
+    "prc.controlprice.enter",
+    "prc.mrp_policy.set",
+    "prc.rule.author",
+    "prc.rule.activate",
+    "prc.review.view",
+    "prc.label.print"
+  ]
 };

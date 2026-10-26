@@ -6,6 +6,7 @@
 import type { ReactElement } from "react";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
+import { BulkNetworkRegisterPage } from "./BulkNetworkRegisterPage";
 import { BulkRegisterPage } from "./BulkRegisterPage";
 import { GrantsPage } from "./GrantsPage";
 import { NewUserPage } from "./NewUserPage";
@@ -29,6 +30,7 @@ export const ROLE_PERMISSIONS = ["gov.role.manage"];
 export const GRANT_PERMISSIONS = ["gov.external.grant"];
 // The seller's people who change terms (21A): pricing amends them, accounts change the credit limit.
 export const RELATIONSHIP_PERMISSIONS = ["prt.relationship.amend"];
+export const LOCATION_PERMISSIONS = ["prt.location.register"];
 
 const guard = (anyOf: string[], page: ReactElement) => <RequirePermission anyOf={anyOf}>{page}</RequirePermission>;
 
@@ -42,6 +44,7 @@ export const partyModule: ModuleDefinition = {
     { path: "party/societies", element: guard(SOCIETY_PERMISSIONS, <SocietyRegisterPage />) },
     { path: "party/societies/new", element: guard(["gov.entity.register"], <RegisterSocietyPage />) },
     { path: "party/societies/bulk", element: guard(["gov.entity.register"], <BulkRegisterPage />) },
+    { path: "party/locations/bulk", element: guard(LOCATION_PERMISSIONS, <BulkNetworkRegisterPage />) },
     { path: "party/societies/:entityId", element: guard(SOCIETY_PERMISSIONS, <SocietyCardPage />) },
     { path: "party/users", element: guard(USER_PERMISSIONS, <UsersPage />) },
     { path: "party/users/new", element: guard(["gov.user.manage"], <NewUserPage />) },
@@ -68,6 +71,7 @@ export const partyModule: ModuleDefinition = {
     ...USER_PERMISSIONS,
     ...ROLE_PERMISSIONS,
     ...GRANT_PERMISSIONS,
-    ...RELATIONSHIP_PERMISSIONS
+    ...RELATIONSHIP_PERMISSIONS,
+    ...LOCATION_PERMISSIONS
   ]
 };

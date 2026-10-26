@@ -232,6 +232,23 @@ public class IngestTransactions {
             List<JsonNode> chunk,
             int chunkIndex,
             int maxEventBytes) {
+        return applyChunk(device, record, batchId, firstSeq, chunk, chunkIndex, maxEventBytes, null);
+    }
+
+    /**
+     * Step 4 to 7 for one chunk: the events in order, then the cursor, in one transaction. A crash
+     * before the commit leaves the cursor at the last committed chunk (doc 32 section 3.3 step 7).
+     */
+    @Transactional
+    public ChunkResult applyChunk(
+            ScopeContext device,
+            DeviceRecord record,
+            UUID batchId,
+            long firstSeq,
+            List<JsonNode> chunk,
+            int chunkIndex,
+            int maxEventBytes,
+            Long currentOffsetMs) {
         Map<String, Object> cursor = jdbc.queryForMap(
                 "select last_applied_seq, in_flight_batch_id from kernel.device_sync_cursor where device_id = ? for update",
                 device.deviceId());
@@ -246,7 +263,7 @@ public class IngestTransactions {
         List<Ack.Outcome> outcomes = new ArrayList<>(chunk.size());
         long seq = firstSeq;
         for (JsonNode event : chunk) {
-            outcomes.add(applier.apply(device, record, batchId, seq, event, maxEventBytes));
+            outcomes.add(applier.apply(device, record, batchId, seq, event, maxEventBytes, currentOffsetMs));
             seq++;
         }
         long last = seq - 1;

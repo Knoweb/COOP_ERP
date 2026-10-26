@@ -3,16 +3,22 @@ package lk.coopfed.knoweb.m6pos.web;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
+import lk.coopfed.knoweb.m6pos.query.PosQueries.CashMovementView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptFilter;
+import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptProfitView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.SessionFilter;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.SessionView;
+import lk.coopfed.knoweb.m6pos.web.generated.CashMovementResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.PosApi;
+import lk.coopfed.knoweb.m6pos.web.generated.ReceiptLineProfitResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptLineResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptPage;
+import lk.coopfed.knoweb.m6pos.web.generated.ReceiptProfitResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptTenderResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.SessionPage;
@@ -64,6 +70,13 @@ class PosController implements PosApi {
     }
 
     @Override
+    public ResponseEntity<ReceiptProfitResponse> getReceiptProfit(UUID documentId) {
+        return queries.receiptProfit(documentId, currentScope.get())
+                .map(p -> ResponseEntity.ok(toResponse(p)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
     public ResponseEntity<SessionPage> listSessions(
             UUID locationId, LocalDate businessDate, String cursor, Integer limit) {
         PosQueries.Page<SessionView> page = queries.sessions(
@@ -77,6 +90,17 @@ class PosController implements PosApi {
     public ResponseEntity<SessionResponse> getTillSession(UUID sessionId) {
         return queries.session(sessionId, currentScope.get())
                 .map(s -> ResponseEntity.ok(toResponse(s)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<List<CashMovementResponse>> listSessionCashMovements(UUID sessionId) {
+        return queries.session(sessionId, currentScope.get())
+                .map(s -> {
+                    List<CashMovementView> movements = queries.cashMovements(sessionId, currentScope.get());
+                    return ResponseEntity.ok(
+                            movements.stream().map(PosController::toResponse).toList());
+                })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -98,7 +122,8 @@ class PosController implements PosApi {
                                         .lineTotal(l.lineTotal()))
                                 .toList(),
                         r.tenders().stream()
-                                .map(x -> new ReceiptTenderResponse(x.seq(), x.kind(), x.amount()))
+                                .map(x -> new ReceiptTenderResponse(x.seq(), x.kind(), x.amount())
+                                        .reference(x.reference()))
                                 .toList())
                 .tillPositionId(r.tillPositionId())
                 .netAmount(r.netAmount())
@@ -123,5 +148,44 @@ class PosController implements PosApi {
                 .countedCash(s.countedCash())
                 .expectedCash(s.expectedCash())
                 .variance(s.variance());
+    }
+
+    private static CashMovementResponse toResponse(CashMovementView m) {
+        return new CashMovementResponse(
+                        m.movementId(),
+                        m.sessionId(),
+                        m.locationId(),
+                        CashMovementResponse.KindEnum.fromValue(m.kind()),
+                        m.amount(),
+                        m.occurredAt(),
+                        m.reason())
+                .tillPositionId(m.tillPositionId())
+                .deviceId(m.deviceId())
+                .operatorUserId(m.operatorUserId())
+                .deviceSeq(m.deviceSeq())
+                .flags(m.flags());
+    }
+
+    private static ReceiptProfitResponse toResponse(ReceiptProfitView p) {
+        List<ReceiptLineProfitResponse> lines = p.lines().stream()
+                .map(l -> new ReceiptLineProfitResponse(
+                                l.lineNo(),
+                                l.skuId(),
+                                l.qty(),
+                                l.unitPrice(),
+                                l.lineTotal(),
+                                l.lineNet(),
+                                l.costPending())
+                        .unitCost(l.unitCost())
+                        .lineCost(l.lineCost())
+                        .lineProfit(l.lineProfit())
+                        .marginPercent(l.marginPercent()))
+                .toList();
+
+        return new ReceiptProfitResponse(
+                        p.documentId(), p.locationId(), p.netSales(), p.costPending(), p.currency(), lines)
+                .totalCost(p.totalCost())
+                .grossProfit(p.grossProfit())
+                .marginPercent(p.marginPercent());
     }
 }

@@ -51,12 +51,27 @@ audit_event_types:
   - code: TRANSFER_ISSUED
     severity: INFO
     offline_capturable: false
-    description_en: Stock left a location for another location of the entity and is in transit
+    description_en: A transfer was issued and its stock left the source location awaiting dispatch
+
+  - code: TRANSFER_DISPATCHED
+    severity: INFO
+    offline_capturable: false
+    description_en: An issued inventory transfer was dispatched to its destination
 
   - code: TRANSFER_RECEIVED
     severity: INFO
     offline_capturable: false
-    description_en: A transfer was received in full at its destination
+    description_en: A transfer was received at its destination using the quantities recorded by the receiver
+
+  - code: TRANSFER_CANCELLED
+    severity: INFO
+    offline_capturable: false
+    description_en: An unreceived transfer was cancelled and its issued stock restored at the source
+
+  - code: TRANSFER_SHORTFALL_DRAFTED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A short transfer receipt created an unposted in-transit damage discrepancy draft
 
   - code: STOCK_SOLD
     severity: INFO
@@ -207,3 +222,28 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A till uploaded a stock fact central does not apply yet
+
+  - code: EXPIRY_TASK_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: An expiry review task was opened for a batch entering its warning window
+
+  - code: EXPIRY_TASK_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: An expiry review task was closed after count, depletion, or write-off
+
+  - code: STOCK_DRIFT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Stock lot quantity on hand drifted from the sum of its movements
+
+  - code: STOCK_LOT_NEGATIVE_ESCALATED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: An oversold negative stock lot was escalated after remaining unacknowledged
+
+  - code: TRANSFER_OVERDUE
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A dispatched inventory transfer remained unreceived past its configured threshold

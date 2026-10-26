@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { replayPendingCommand, type ReplayOutcome } from "../api/pendingCommand";
@@ -25,6 +25,14 @@ export function StepUpReplay() {
   const scope = useScope();
   const queryClient = useQueryClient();
   const [state, setState] = useState<ReplayState>({ phase: "none" });
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const accessToken = session?.accessToken;
   const entityId = session?.entityId ?? null;
@@ -52,18 +60,14 @@ export function StepUpReplay() {
       setState({ phase: "reenter" });
       return;
     }
-    let cancelled = false;
     setState({ phase: "replaying" });
     replayPendingCommand(pending, { accessToken, locale, session: { entityId }, locationId })
       .then((outcome) => {
-        if (!cancelled) {
+        if (isMounted.current) {
           setState({ phase: "finished", outcome });
         }
       })
       .finally(() => void queryClient.invalidateQueries());
-    return () => {
-      cancelled = true;
-    };
   }, [accessToken, entityId, userId, locale, locationId, queryClient]);
 
   if (state.phase === "none") {

@@ -127,13 +127,14 @@ class ReportSources {
     private List<Map<String, String>> stock(ReportParameters parameters, Names names, boolean cost, String cap) {
         return jdbc.query(
                 """
-                select owner_entity_id, location_id, canonical_sku_id,
-                       sum(qty_on_hand) as qty, sum(qty_on_hand * coalesce(unit_cost, 0)) as value
-                  from reporting.stock_position
-                 where (?::uuid is null or location_id = ?)
-                 group by owner_entity_id, location_id, canonical_sku_id
-                having sum(qty_on_hand) <> 0
-                 order by owner_entity_id, location_id, canonical_sku_id
+                select sp.owner_entity_id, sp.location_id, coalesce(a.canonical_sku_id, sp.canonical_sku_id) as canonical_sku_id,
+                       sum(sp.qty_on_hand) as qty, sum(sp.qty_on_hand * coalesce(sp.unit_cost, 0)) as value
+                  from reporting.stock_position sp
+                  left join catalogue.sku_alias a on a.alias_sku_id = sp.canonical_sku_id
+                 where (?::uuid is null or sp.location_id = ?)
+                 group by sp.owner_entity_id, sp.location_id, coalesce(a.canonical_sku_id, sp.canonical_sku_id)
+                having sum(sp.qty_on_hand) <> 0
+                 order by sp.owner_entity_id, sp.location_id, canonical_sku_id
                 """
                         + cap,
                 (rs, n) -> {
@@ -156,10 +157,11 @@ class ReportSources {
     private List<Map<String, String>> trade(ReportParameters parameters, Names names, String cap) {
         return jdbc.query(
                 """
-                select business_date, seller_entity_id, buyer_entity_id, sku_id, sum(qty) as qty, sum(value) as value
-                  from reporting.trade_line_fact
+                select business_date, seller_entity_id, buyer_entity_id, coalesce(a.canonical_sku_id, f.sku_id) as sku_id, sum(qty) as qty, sum(value) as value
+                  from reporting.trade_line_fact f
+                  left join catalogue.sku_alias a on a.alias_sku_id = f.sku_id
                  where measure = 'RECEIVED' and business_date between ? and ?
-                 group by business_date, seller_entity_id, buyer_entity_id, sku_id
+                 group by business_date, seller_entity_id, buyer_entity_id, coalesce(a.canonical_sku_id, f.sku_id)
                  order by business_date, seller_entity_id, buyer_entity_id, sku_id
                 """
                         + cap,
@@ -346,11 +348,12 @@ class ReportSources {
     private List<Map<String, String>> shopSalesByItem(ReportParameters parameters, Names names, String cap) {
         return jdbc.query(
                 """
-                select sku_id, sum(qty) as qty, sum(line_total) as value
-                  from reporting.shop_sale_line_fact
-                 where business_date between ? and ? and (?::uuid is null or location_id = ?)
-                 group by sku_id
-                 order by sum(line_total) desc nulls last, sku_id
+                select coalesce(a.canonical_sku_id, f.sku_id) as sku_id, sum(f.qty) as qty, sum(f.line_total) as value
+                  from reporting.shop_sale_line_fact f
+                  left join catalogue.sku_alias a on a.alias_sku_id = f.sku_id
+                 where f.business_date between ? and ? and (?::uuid is null or f.location_id = ?)
+                 group by coalesce(a.canonical_sku_id, f.sku_id)
+                 order by sum(f.line_total) desc nulls last, sku_id
                 """
                         + cap,
                 (rs, n) -> {

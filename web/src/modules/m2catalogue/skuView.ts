@@ -35,29 +35,44 @@ export function errorText(error: unknown, fallback: string): string {
   return error instanceof ApiProblem && error.problem.title ? error.problem.title : fallback;
 }
 
+export type MultiMrpPolicy = "AUTO_LOWEST" | "BARCODE_RESOLVED" | "PICKER";
+export type OriginKind = "PURCHASED" | "REPACK_OUTPUT" | "LOCAL_SOURCED";
+
 /** The editor's form: every field as the author types it. */
 export type SkuForm = {
   nameEn: string;
   nameSi: string;
   nameTa: string;
+  descriptionEn: string;
+  descriptionSi: string;
+  descriptionTa: string;
   baseUomCode: string;
   taxCategoryId: string;
   soldByWeight: boolean;
   batchTracked: boolean;
   expiryTracked: boolean;
   hasPrintedMrp: boolean;
+  expiryWarningDays: string;
+  multiMrpPolicy: MultiMrpPolicy;
+  originKind: OriginKind;
 };
 
 export const EMPTY_FORM: SkuForm = {
   nameEn: "",
   nameSi: "",
   nameTa: "",
+  descriptionEn: "",
+  descriptionSi: "",
+  descriptionTa: "",
   baseUomCode: "EA",
   taxCategoryId: "",
   soldByWeight: false,
   batchTracked: false,
   expiryTracked: false,
-  hasPrintedMrp: false
+  hasPrintedMrp: false,
+  expiryWarningDays: "",
+  multiMrpPolicy: "AUTO_LOWEST",
+  originKind: "PURCHASED"
 };
 
 export function formOf(sku: Sku): SkuForm {
@@ -65,37 +80,43 @@ export function formOf(sku: Sku): SkuForm {
     nameEn: sku.nameEn,
     nameSi: sku.nameSi ?? "",
     nameTa: sku.nameTa ?? "",
+    descriptionEn: sku.descriptionEn ?? "",
+    descriptionSi: sku.descriptionSi ?? "",
+    descriptionTa: sku.descriptionTa ?? "",
     baseUomCode: sku.baseUomCode,
     taxCategoryId: sku.taxCategoryId,
     soldByWeight: sku.soldByWeight,
     batchTracked: sku.batchTracked,
     expiryTracked: sku.expiryTracked,
-    hasPrintedMrp: sku.hasPrintedMrp
+    hasPrintedMrp: sku.hasPrintedMrp,
+    expiryWarningDays: sku.expiryWarningDays != null ? String(sku.expiryWarningDays) : "",
+    multiMrpPolicy: (sku.multiMrpPolicy as MultiMrpPolicy) ?? "AUTO_LOWEST",
+    originKind: (sku.originKind as OriginKind) ?? "PURCHASED"
   };
 }
 
 /**
- * The request of a form. The fields the demo editor does not show keep the SKU's own values on
- * an update, and the catalogue's defaults on a create (AUTO_LOWEST, PURCHASED).
+ * The request of a form.
  */
 export function requestOf(form: SkuForm, existing?: Sku): SkuDetailsRequest {
   const optional = (text: string) => (text.trim() ? text.trim() : undefined);
+  const expiryDays = form.expiryWarningDays.trim() !== "" ? parseInt(form.expiryWarningDays, 10) : undefined;
   return {
     nameEn: form.nameEn.trim(),
     nameSi: optional(form.nameSi),
     nameTa: optional(form.nameTa),
-    descriptionEn: existing?.descriptionEn,
-    descriptionSi: existing?.descriptionSi,
-    descriptionTa: existing?.descriptionTa,
+    descriptionEn: optional(form.descriptionEn) ?? existing?.descriptionEn,
+    descriptionSi: optional(form.descriptionSi) ?? existing?.descriptionSi,
+    descriptionTa: optional(form.descriptionTa) ?? existing?.descriptionTa,
     baseUomCode: form.baseUomCode,
     soldByWeight: form.soldByWeight,
     batchTracked: form.batchTracked,
     expiryTracked: form.expiryTracked,
     hasPrintedMrp: form.hasPrintedMrp,
-    expiryWarningDays: existing?.expiryWarningDays,
+    expiryWarningDays: expiryDays != null && !isNaN(expiryDays) ? expiryDays : existing?.expiryWarningDays,
     taxCategoryId: form.taxCategoryId,
-    multiMrpPolicy: (existing?.multiMrpPolicy as SkuDetailsRequest["multiMrpPolicy"]) ?? "AUTO_LOWEST",
-    originKind: (existing?.originKind as SkuDetailsRequest["originKind"]) ?? "PURCHASED",
+    multiMrpPolicy: form.multiMrpPolicy ?? (existing?.multiMrpPolicy as MultiMrpPolicy) ?? "AUTO_LOWEST",
+    originKind: form.originKind ?? (existing?.originKind as OriginKind) ?? "PURCHASED",
     attributes: existing?.attributes
   };
 }

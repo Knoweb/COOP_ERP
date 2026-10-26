@@ -38,16 +38,22 @@ class PosIngestConsumer {
     static final String RECEIPT_ISSUED = "receipt.issued.v1";
     static final String SESSION_OPENED = "till_session.opened.v1";
     static final String SESSION_CLOSED = "till_session.closed.v1";
+    static final String CASH_MOVEMENT = "cash_movement.recorded.v1";
 
-    /** The one queue for a till's sessions and receipts; see the class comment. */
+    /** The one queue for a till's sessions, receipts and cash movements; see the class comment. */
     static final String CONSUMER = "m6.till";
 
     private final Handles<RecordReceipt, UUID> receipts;
     private final Handles<RecordSession, UUID> sessions;
+    private final Handles<RecordCashMovement, UUID> cashMovements;
 
-    PosIngestConsumer(Handles<RecordReceipt, UUID> receipts, Handles<RecordSession, UUID> sessions) {
+    PosIngestConsumer(
+            Handles<RecordReceipt, UUID> receipts,
+            Handles<RecordSession, UUID> sessions,
+            Handles<RecordCashMovement, UUID> cashMovements) {
         this.receipts = receipts;
         this.sessions = sessions;
+        this.cashMovements = cashMovements;
     }
 
     @EventConsumer(types = RECEIPT_ISSUED, consumer = CONSUMER)
@@ -67,7 +73,10 @@ class PosIngestConsumer {
         List<RecordReceipt.Tender> tenders = new ArrayList<>();
         for (JsonNode tender : payload.path("tenders")) {
             tenders.add(new RecordReceipt.Tender(
-                    tender.path("seq").asInt(), text(tender, "kind"), decimal(tender, "amount")));
+                    tender.path("seq").asInt(),
+                    text(tender, "kind"),
+                    decimal(tender, "amount"),
+                    tender.hasNonNull("reference") ? text(tender, "reference") : null));
         }
         receipts.handle(
                 new RecordReceipt(
@@ -128,6 +137,26 @@ class PosIngestConsumer {
                         decimal(payload, "counted_cash"),
                         decimal(payload, "expected_cash"),
                         decimal(payload, "variance")),
+                scope);
+    }
+
+    @EventConsumer(types = CASH_MOVEMENT, consumer = CONSUMER)
+    public void onCashMovement(JsonNode payload, ScopeContext scope) {
+        cashMovements.handle(
+                new RecordCashMovement(
+                        uuid(payload, "movement_id"),
+                        uuid(payload, "session_id"),
+                        uuid(payload, "location_id"),
+                        uuid(payload, "till_position_id"),
+                        uuid(payload, "device_id"),
+                        text(payload, "kind"),
+                        decimal(payload, "amount"),
+                        instant(payload, "occurred_at"),
+                        uuid(payload, "operator_user_id"),
+                        text(payload, "reason"),
+                        payload.hasNonNull("device_seq")
+                                ? payload.path("device_seq").asLong()
+                                : null),
                 scope);
     }
 

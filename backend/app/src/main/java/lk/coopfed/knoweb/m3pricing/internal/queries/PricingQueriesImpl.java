@@ -25,12 +25,16 @@ import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
+import lk.coopfed.knoweb.m3pricing.internal.adjustment.AdjustmentTypeStore;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
+import lk.coopfed.knoweb.m3pricing.internal.label.LabelJobStore;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
 import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
 import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
+import lk.coopfed.knoweb.m3pricing.query.AdjustmentTypeView;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
@@ -67,6 +71,8 @@ class PricingQueriesImpl implements PricingQueries {
 
     private final AuditReviewReader auditReviews;
     private final CatalogueQueries catalogue;
+    private final AdjustmentTypeStore adjustmentTypes;
+    private final LabelJobStore labelJobs;
 
     @SuppressWarnings("java:S107") // the inputs of the central resolution; a query service only reads
     PricingQueriesImpl(
@@ -78,7 +84,9 @@ class PricingQueriesImpl implements PricingQueries {
             RetailPriceResolution retail,
             ObjectMapper mapper,
             AuditReviewReader auditReviews,
-            CatalogueQueries catalogue) {
+            CatalogueQueries catalogue,
+            AdjustmentTypeStore adjustmentTypes,
+            LabelJobStore labelJobs) {
         this.catalogue = catalogue;
         this.store = store;
         this.relationships = relationships;
@@ -88,6 +96,13 @@ class PricingQueriesImpl implements PricingQueries {
         this.retail = retail;
         this.mapper = mapper;
         this.auditReviews = auditReviews;
+        this.adjustmentTypes = adjustmentTypes;
+        this.labelJobs = labelJobs;
+    }
+
+    @Override
+    public Optional<LabelJobView> labelJob(UUID jobId, ScopeContext scope) {
+        return labelJobs.find(jobId).map(labelJobs::view);
     }
 
     @Override
@@ -119,6 +134,12 @@ class PricingQueriesImpl implements PricingQueries {
     public Optional<RetailPrice> resolveRetailPrice(
             UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
         return retail.resolve(locationId, skuId, uomCode, quantity, date, scope);
+    }
+
+    @Override
+    public Optional<RetailPrice> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
+        return retail.resolveCommercial(locationId, skuId, uomCode, quantity, date, scope);
     }
 
     @Override
@@ -273,5 +294,15 @@ class PricingQueriesImpl implements PricingQueries {
                     default -> sku.nameEn();
                 };
         return name == null || name.isBlank() ? sku.nameEn() : name;
+    }
+
+    @Override
+    public Optional<AdjustmentTypeView> getAdjustmentType(String code, ScopeContext scope) {
+        return adjustmentTypes.find(code);
+    }
+
+    @Override
+    public List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope) {
+        return adjustmentTypes.list();
     }
 }

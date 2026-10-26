@@ -93,6 +93,7 @@ class EventApplier {
     private final EventPublisher events;
     private final DeviceAuditWriter deviceAudit;
     private final Map<String, DevicePayloadCheck> payloadChecks;
+    private final ClockOffset clockOffset;
 
     EventApplier(
             JdbcTemplate jdbc,
@@ -100,12 +101,14 @@ class EventApplier {
             AuditFacade audit,
             EventPublisher events,
             DeviceAuditWriter deviceAudit,
-            List<DevicePayloadCheck> payloadChecks) {
+            List<DevicePayloadCheck> payloadChecks,
+            ClockOffset clockOffset) {
         this.jdbc = jdbc;
         this.outbox = outbox;
         this.audit = audit;
         this.events = events;
         this.deviceAudit = deviceAudit;
+        this.clockOffset = clockOffset;
         Map<String, DevicePayloadCheck> byType = new LinkedHashMap<>();
         for (DevicePayloadCheck check : payloadChecks) {
             for (String type : check.eventTypes()) {
@@ -129,6 +132,17 @@ class EventApplier {
 
     Ack.Outcome apply(
             ScopeContext device, DeviceRecord record, UUID batchId, long seq, JsonNode event, int maxEventBytes) {
+        return apply(device, record, batchId, seq, event, maxEventBytes, null);
+    }
+
+    Ack.Outcome apply(
+            ScopeContext device,
+            DeviceRecord record,
+            UUID batchId,
+            long seq,
+            JsonNode event,
+            int maxEventBytes,
+            Long currentOffsetMs) {
         String raw = event == null ? "null" : event.toString();
         UUID eventId = null;
         String eventType = null;
@@ -151,6 +165,9 @@ class EventApplier {
             }
             Instant occurredAt = instant(event, "occurred_at");
             LocalDateTime occurredLocal = localDateTime(event, "occurred_local");
+            Boolean offlineTimed = booleanValue(event, "offline_timed");
+            Long eventOffsetMs = longValue(event, "clock_offset_ms");
+            Instant correctedOccurredAt = clockOffset.correct(occurredAt, offlineTimed, eventOffsetMs, currentOffsetMs);
 
             if (appliedBefore(eventId)) {
                 throw new Refused("DUPLICATE_ID", "event_id was applied before at another sequence");
@@ -193,7 +210,7 @@ class EventApplier {
                 }
             }
             DeviceAudit auditRow = eventType.startsWith(AUDIT_FAMILY)
-                    ? auditRow(device, record, seq, eventId, occurredAt, occurredLocal, event, payload)
+                    ? auditRow(device, record, seq, eventId, correctedOccurredAt, occurredLocal, event, payload)
                     : null;
 
             jdbc.update(
@@ -215,7 +232,7 @@ class EventApplier {
             outbox.write(new DeviceEvent(
                     eventId,
                     eventType,
-                    occurredAt,
+                    correctedOccurredAt,
                     occurredLocal,
                     record.deviceId(),
                     seq,
@@ -498,5 +515,27 @@ class EventApplier {
 
     private static UUID orElse(UUID value, UUID fallback) {
         return value == null ? fallback : value;
+    }
+
+    private static Boolean booleanValue(JsonNode node, String name) throws Refused {
+        JsonNode value = node == null ? null : node.get(name);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isBoolean()) {
+            throw new Refused("SCHEMA", name + " is not a boolean");
+        }
+        return value.asBoolean();
+    }
+
+    private static Long longValue(JsonNode node, String name) throws Refused {
+        JsonNode value = node == null ? null : node.get(name);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.canConvertToLong()) {
+            throw new Refused("SCHEMA", name + " is not an integer");
+        }
+        return value.asLong();
     }
 }

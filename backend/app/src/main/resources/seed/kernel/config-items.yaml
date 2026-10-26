@@ -535,6 +535,25 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  - key: catalogue.duplicate_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 1.0 }
+    description_en: Threshold above which two SKUs are considered a duplicate suspect for the data steward
+    description_si: දත්ත භාරකරු සඳහා අයිතම දෙකක් අනුපිටපත් සැකයක් ලෙස සලකනු ලබන සීමාව
+    description_ta: தரவு பொறுப்பாளருக்கு இரண்டு உருப்படிகள் நகல் சந்தேகமாகக் கருதப்படும் வரம்பு
+    default: "0.85"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  - key: catalogue.local_sku_requires_barcode
+    value_type: BOOLEAN
+    description_en: Whether local SKU activation requires at least one active barcode
+    description_si: දේශීය SKU සක්‍රිය කිරීම සඳහා අවම වශයෙන් එක් සක්‍රිය තීරු කේතයක් අවශ්‍යද යන්න
+    description_ta: உள்ளூர் SKU செயல்படுத்தலுக்கு குறைந்தது ஒரு செயலில் உள்ள பார்கோடு தேவையா என்பது
+    default: "false"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m2catalogue
   # M4 Trading Documents (24A section 3.1, "seed/m4/config.yaml"; doc 24 section 7): the defaults
   # of doc 24 DR-1 to DR-6 as doc 10 F-09 and A-03 assume them. Configuration, so a different
   # answer from the Federation admins is a value, not a code change.
@@ -671,6 +690,17 @@ config_items:
     scope_kind: ENTITY
     change_permission: prc.mrp_policy.set
     till_visible: true
+    module: m3pricing
+  # PRC-03 / doc 23 section 7: the A4Renderer template selected for a society's shelf labels.
+  - key: pricing.label_template
+    value_type: STRING
+    schema: { pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    description_en: The print template used for shelf price labels
+    description_si: රාක්ක මිල ලේබල මුද්‍රණය සඳහා භාවිත කරන ආකෘතිය
+    description_ta: அலமாரி விலைச் சீட்டுகளை அச்சிடப் பயன்படும் வார்ப்புரு
+    default: "default"
+    scope_kind: ENTITY
+    change_permission: prc.label.print
     module: m3pricing
   # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
   # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
@@ -853,6 +883,18 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m6pos
+  # TILL-SELL-11 (C-02c, doc 26 section 7): how many rupees a closed till session's cash shortage
+  # may reach before central raises a REVIEW audit event (pos.session_variance_review_threshold).
+  - key: pos.session_variance_review_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 1000000 }
+    description_en: How many rupees a closed till session's cash shortage may reach before central raises a review
+    description_si: මධ්‍යස්ථානය සමාලෝචනයක් මතු කිරීමට පෙර වසා දැමූ මුදල් යන්ත්‍ර සැසියක මුදල් හිඟය ළඟා විය හැකි රුපියල් ප්‍රමාණය
+    description_ta: மையம் ஒரு மதிப்பாய்வை எழுப்புவதற்கு முன் மூடப்பட்ட பணப்பெட்டி அமர்வின் பணப் பற்றாக்குறை எட்டக்கூடிய ரூபாய்
+    default: 500.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m6pos
   # wave 2, PR 12 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-pricing-rules.md
   # (3), CR-23A-1): how far back a control price may take effect, to the gazette's own date.
   - key: pricing.control_price_backdate_days
@@ -941,6 +983,36 @@ config_items:
     description_si: ප්‍රතික්ෂේප කිරීමට (වැඩි) හෝ හේතුවක් අවශ්‍ය වීමට (අඩු) පෙර නැවත ඇසුරුම් කිරීමක නිමැවුම වට්ටෝරුවේ අපේක්ෂිත නිමැවුමෙන් වෙනස් විය හැකි ප්‍රතිශතය
     description_ta: மறுபொதியின் வெளியீடு செய்முறையின் எதிர்பார்த்த வெளியீட்டிலிருந்து மறுக்கப்படும் (அதிகம்) அல்லது காரணம் தேவைப்படும் (குறைவு) முன் வேறுபடக்கூடிய சதவீதம்
     default: "2"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.expiry_warning_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days before batch expiry when an expiry review task and count task are opened
+    description_si: කල් ඉකුත්වීමේ සමාලෝචන කාර්යයක් සහ ගණන් කිරීමේ කාර්යයක් විවෘත වන කාණ්ඩය කල් ඉකුත්වීමට පෙර දින ගණන
+    description_ta: தொகுதி காலாவதியாகும் முன் காலாவதி மதிப்பாய்வு மற்றும் எண்ணிக்கை பணி திறக்கப்படும் நாட்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.negative_lot_escalation_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days an oversold stock lot may remain unacknowledged before escalating
+    description_si: අධික ලෙස විකිණූ තොග කාණ්ඩයක් ඉහළට යොමු කිරීමට පෙර පිළිගැනීමකින් තොරව පැවතිය හැකි දින ගණන
+    description_ta: அதிகப்படியாக விற்கப்பட்ட இருப்புத் தொகுதி தீவிரப்படுத்தப்படுவதற்கு முன் ஒப்புக்கொள்ளப்படாமல் இருக்கக்கூடிய நாட்கள்
+    default: 7
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.transfer_receipt_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Calendar days a dispatched transfer may remain unreceived before a review is raised
+    description_si: යැවූ මාරු කිරීමක් සමාලෝචනයක් මතු කිරීමට පෙර නොලැබී පැවතිය හැකි දින දර්ශන දින ගණන
+    description_ta: அனுப்பப்பட்ட இடமாற்றம் மதிப்பாய்வு எழுப்பப்படுவதற்கு முன் பெறப்படாமல் இருக்கக்கூடிய நாட்காட்டி நாட்கள்
+    default: 3
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory

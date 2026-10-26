@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.till.core.port
 
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.SessionRecord
@@ -44,6 +45,9 @@ interface TillStore {
     fun saveSession(session: SessionRecord)
     fun openSession(): SessionRecord?
     fun session(sessionId: String): SessionRecord?
+
+    fun saveCashMovement(movement: CashMovementRecord)
+    fun cashMovementsOfSession(sessionId: String): List<CashMovementRecord>
 
     fun saveReceipt(receipt: IssuedReceipt)
     fun receiptsOfSession(sessionId: String): List<IssuedReceipt>

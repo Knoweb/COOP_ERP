@@ -21,12 +21,12 @@ M5 deducts from the till's own bundle, as 25A section 7.4 says ("m5.sales consum
 
 | Path | What it holds |
 |---|---|
-| `api/` | `ReceiptRecorded` (`receipt.recorded.v1`), `TillSessionRecorded` (`till_session.recorded.v1`). |
-| `query/` | `PosQueries`: a location's receipts (with lines, tenders, till position, net, tax and flags) and its sessions, one business day a page at a time, and one receipt or one session. The web screens are `web/src/modules/m6pos` (receipts with a day and a "flagged only" filter, one receipt, till sessions; the flags in words, `pos.flag.<CODE>`). |
+| `api/` | `ReceiptRecorded` (`receipt.recorded.v1`), `TillSessionRecorded` (`till_session.recorded.v1`), and publishes kernel's `LocationSessionsClosed` (`location.sessions_closed.v1`). |
+| `query/` | `PosQueries`: a location's receipts (with lines, tenders, till position, net, tax and flags) and its sessions, one business day a page at a time, and one receipt or one session; receipt profit and margin calculation (`receiptProfit`), deriving authoritative net line revenues and joining with M5 SALE movements without faking zero cost for pending lots. The web screens are `web/src/modules/m6pos` (receipts with a day and a "flagged only" filter, one receipt with authorized staff profit/margin view, till sessions; the flags in words, `pos.flag.<CODE>`). |
 | `internal/ingest/` | `PosIngestConsumer` (reads the bundles), `RecordReceiptHandler`, `RecordSessionHandler`, `IngestGuards`, `SessionPayloadCheck` (the gateway's shape check of session events). |
-| `web/` | `PosController`: `GET /v1/pos/receipts?locationId=&businessDate=&flagged=&cursor=&limit=`, `GET /v1/pos/receipts/{documentId}`, `GET /v1/pos/sessions?locationId=&businessDate=&cursor=&limit=`, `GET /v1/pos/sessions/{sessionId}` (`pos.receipt.view`). |
+| `web/` | `PosController`: `GET /v1/pos/receipts?locationId=&businessDate=&flagged=&cursor=&limit=`, `GET /v1/pos/receipts/{documentId}`, `GET /v1/pos/receipts/{documentId}/profit` (`pos.receipt.margin`), `GET /v1/pos/sessions?locationId=&businessDate=&cursor=&limit=`, `GET /v1/pos/sessions/{sessionId}` (`pos.receipt.view`). |
 | `resources/db/migration/m6pos/V0001__pos.sql` | `till_session`, `till_session_close`, `receipt`, `receipt_line`, `receipt_tender`: insert-only, template RLS. |
-| `resources/seed/m6pos/audit-event-types.yaml` | `RECEIPT_RECORDED`, `RECEIPT_FLAGGED` (REVIEW), `RECEIPT_NUMBER_DUPLICATED`, `RECEIPT_REPLAY_DIFFERS`, `RECEIPT_NUMBER_JUMPED`, `TILL_SESSION_CLOSE_REPLAY_DIFFERS` (ALERT), `TILL_SESSION_OPENED`, `TILL_SESSION_CLOSED`. |
+| `resources/seed/m6pos/audit-event-types.yaml` | `RECEIPT_RECORDED`, `RECEIPT_FLAGGED` (REVIEW), `RECEIPT_NUMBER_DUPLICATED`, `RECEIPT_REPLAY_DIFFERS`, `RECEIPT_NUMBER_JUMPED`, `TILL_SESSION_CLOSE_REPLAY_DIFFERS` (ALERT), `TILL_SESSION_OPENED`, `TILL_SESSION_CLOSED`, `CASH_MOVEMENT_RECORDED`, `CASH_MOVEMENT_FLAGGED` (REVIEW), `CASH_MOVEMENT_REPLAY_DIFFERS` (ALERT), `TILL_SESSION_SHORTAGE_REVIEW` (REVIEW). |
 
 ## The receipt bundle (doc 32 section 3.1)
 
@@ -36,7 +36,17 @@ M5 deducts from the till's own bundle, as 25A section 7.4 says ("m5.sales consum
 - `lines[]`: `line_no`, `sku_id`, `batch_id` (the batch the till resolved; may be absent), `uom_code`, `qty`, `unit_price`, `tax_amount`, `line_total`;
 - `tenders[]`: `seq`, `kind`, `amount`; `session_id`.
 
-Sessions: `till_session.opened.v1` {`session_id`, `till_position_id`, `operator_user_id`, `business_date`, `opened_at`, `float_amount`}; `till_session.closed.v1` {`session_id`, ..., `closed_at`, `counted_cash`, `expected_cash`, `variance`}.
+Sessions: `till_session.opened.v1` {`session_id`, `till_position_id`, `operator_user_id`, `business_date`, `opened_at`, `float_amount`}; `till_session.closed.v1` {`session_id`, ..., `closed_at`, `counted_cash`, `expected_cash`, `variance`, `open_sessions_remaining`}.
+
+## Automatic day closing and offline session safety (TILL-SELL-12, C-02d, TWK-23)
+
+A till records `open_sessions_remaining: 0` in its own fact representing its device-local state. Central M6 POS determines the authoritative location-wide count by checking `pos.till_session` and `pos.till_session_close` for that location and business date, serialized under a PostgreSQL transaction-scoped advisory lock per location (`pos:location-sessions:<locationId>`). When the count reaches zero on the active trading date, M6 publishes `location.sessions_closed.v1`, triggering `DayCloseTrigger` in the kernel to advance `kernel.location_business_date` and audit `DAY_CLOSED`.
+
+**Offline till limitation and safety strategy**: Central cannot know of an offline till session that has never synced. The platform protects data integrity through:
+1. **Past-date guard**: Late-arriving session closes for a business date already superseded by the nightly cut-off cannot trigger day close.
+2. **Immutable document business dates**: Receipts retain the business date stamped at issue time on the till regardless of when central sync occurs.
+3. **Monotonic sequence ordering**: Outbox relay preserves dense `device_seq` order within each device's queue (`m6.till`).
+4. **Nightly cut-off backstop**: The 02:30 `DayCloseCutoffJob` advances any location that remained offline at close.
 
 ## Apply and flag, never refuse (AGENTS.md)
 
@@ -61,4 +71,4 @@ Wave 2 (decided 6 October 2026, `docs/progress/deviations/2026-10-06-wave2-till-
 1. **The receipt lives in `pos.receipt`, not in the kernel's document base.** 26A's ReceiptBundleHook inserts `doc_receipt` extending an OFFLINE `kernel.document`; the kernel's bundle handler that writes an offline document there (numbered by the till, lines after the header) is K-08-F4 in `docs/PLAN_TO_M2.md`, not built, and M6 may not write the kernel's schema. M6 keeps the issued receipt with its document identity (series, number, device sequence, content hash, origin) until K-08-F4 lands; then the header and lines move to the document base and `pos.receipt` becomes the `doc_receipt` extension.
 2. **M5 consumes the till's bundle directly**, not an event M6 re-publishes after its hook (26A section 10 says the hook publishes `receipt.issued.v1`): with no kernel bundle path in between, a second event of the same type would reach M5 twice. 25A section 7.4 reads the same way.
 3. **A session's close is a row of its own** (`till_session_close`), so no row is updated.
-4. **Deferred for the demo**: re-validation of each line at the reported snapshot and engine versions, voids and refunds (`receipt.voided.v1`, `receipt.refunded.v1`, SALE_REVERSAL), the cross-session refund, the variance threshold and its REVIEW, cash movements, device health and sync-health queries, M7's account tenders, park/resume, weigh-and-price, the Android till itself.
+4. **Deferred for the demo**: re-validation of each line at the reported snapshot and engine versions, voids and refunds (`receipt.voided.v1`, `receipt.refunded.v1`, SALE_REVERSAL), the cross-session refund, device health and sync-health queries, M7's account tenders, park/resume, weigh-and-price, the Android till itself.

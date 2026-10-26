@@ -20,11 +20,15 @@ import lk.coopfed.knoweb.m2catalogue.api.ActivateSharedSku;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
 import lk.coopfed.knoweb.m2catalogue.api.DeactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.InventoryLotQuery;
+import lk.coopfed.knoweb.m2catalogue.api.MergeIntoShared;
+import lk.coopfed.knoweb.m2catalogue.api.PromoteToShared;
 import lk.coopfed.knoweb.m2catalogue.api.ReactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.SkuActivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuCreated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDeactivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDetails;
+import lk.coopfed.knoweb.m2catalogue.api.SkuMerged;
+import lk.coopfed.knoweb.m2catalogue.api.SkuPromoted;
 import lk.coopfed.knoweb.m2catalogue.api.SkuReactivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuShared;
 import lk.coopfed.knoweb.m2catalogue.api.SkuUpdated;
@@ -47,6 +51,8 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID FEDERATION = UUID.fromString("0190e600-0000-7000-8000-000000000001");
 
     private static final UUID MPCS = UUID.fromString("0190e600-0000-7000-8000-000000000002");
+
+    private static final UUID BARCODE_TEST_ENTITY = UUID.fromString("0190e600-0000-7000-8000-000000000099");
 
     private static final UUID USER = UUID.fromString("0190e600-0000-7000-8000-000000000010");
 
@@ -76,6 +82,15 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     UpdateSharedSkuHandler updateShared;
 
+    @Autowired
+    PromoteToSharedHandler promoteHandler;
+
+    @Autowired
+    MergeIntoSharedHandler mergeHandler;
+
+    @Autowired
+    lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
+
     // Forces a code another entity holds, to prove the retry on the unique index.
     @MockitoSpyBean
     SkuCodeGenerator codes;
@@ -92,6 +107,10 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanCatalogue() {
+        theDatabaseNamesTheFederation(FEDERATION);
+        if (config != null) {
+            config.invalidate("catalogue.local_sku_requires_barcode");
+        }
         JdbcTemplate admin = superuserJdbc();
 
         admin.execute("truncate table catalogue.sku cascade");
@@ -134,6 +153,11 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.tag where tag_code = 'local-promo'");
+        admin.update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
+        if (config != null) {
+            config.invalidate("catalogue.local_sku_requires_barcode");
+        }
     }
 
     @Test
@@ -451,6 +475,220 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.rolledBackAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains("SKU_CREATED");
+    }
+
+    @Test
+    void activateSharedRefusesNonGovernedTags() {
+        UUID skuId = createLocal.handle(
+                new CreateSku(details("Shared Biscuits", "බිස්කට්", "பிஸ்கட்", "EA", false, false, false)),
+                own(FEDERATION));
+
+        UUID tagId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.tag (tag_id, tag_code, name_en, governed, owner_entity_id)
+                values (?, 'local-promo', 'Local Promotion', false, ?)
+                """,
+                        tagId,
+                        FEDERATION);
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id)
+                values (?, ?, ?)
+                """,
+                        skuId,
+                        tagId,
+                        FEDERATION);
+
+        kernel.reset();
+
+        refused(
+                () -> activateShared.handle(new ActivateSharedSku(skuId), own(FEDERATION)),
+                "m2.sku.governed_tags_only");
+
+        assertThat(status(skuId)).isEqualTo("DRAFT");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void activateSharedRefusesCaseBarcodeWithoutConversion() {
+        UUID skuId = createLocal.handle(
+                new CreateSku(details("Shared Juice", "යුෂ", "சாறு", "EA", false, false, false)), own(FEDERATION));
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.uom (uom_code, name_en, is_weight)
+                values ('CASE', 'Case', false)
+                on conflict do nothing
+                """);
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id, status)
+                values ('4791234560011', 'EAN13', ?, 'CASE', ?, 'ACTIVE')
+                """,
+                        skuId,
+                        FEDERATION);
+
+        kernel.reset();
+
+        refused(
+                () -> activateShared.handle(new ActivateSharedSku(skuId), own(FEDERATION)),
+                "m2.sku.case_conversion_required");
+
+        assertThat(status(skuId)).isEqualTo("DRAFT");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_uom_conversion (sku_id, uom_code, factor_to_base, effective_from, owner_entity_id)
+                values (?, 'CASE', 12.0, current_date, ?)
+                """,
+                        skuId,
+                        FEDERATION);
+
+        activateShared.handle(new ActivateSharedSku(skuId), own(FEDERATION));
+        assertThat(status(skuId)).isEqualTo("SHARED");
+    }
+
+    @Test
+    void activateLocalRefusesWhenBarcodeRequiredAndMissing() {
+        UUID entity = BARCODE_TEST_ENTITY;
+        UUID skuId = createLocal.handle(
+                new CreateSku(details("Local Veg", null, null, "EA", false, false, false)), own(entity));
+
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.config_item (key, value_type, description_en, default_value, scope_kind, change_permission, module)
+                        values ('catalogue.local_sku_requires_barcode', 'BOOLEAN', 'Barcode required for local SKU', 'false'::jsonb, 'ENTITY', 'sys.config.manage', 'm2catalogue')
+                        on conflict (key) do nothing
+                        """);
+
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.config_value (key, scope_entity_id, value, reason)
+                        values ('catalogue.local_sku_requires_barcode', ?, 'true'::jsonb, 'test')
+                        """,
+                        entity);
+        config.invalidate("catalogue.local_sku_requires_barcode");
+
+        kernel.reset();
+
+        try {
+            refused(() -> activateLocal.handle(new ActivateLocalSku(skuId), own(entity)), "m2.sku.barcode_required");
+
+            assertThat(status(skuId)).isEqualTo("DRAFT");
+            assertThat(kernel.committedAudit()).isEmpty();
+            assertThat(kernel.committedEvents()).isEmpty();
+
+            superuserJdbc()
+                    .update(
+                            """
+                    insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id, status)
+                    values ('4791234560028', 'EAN13', ?, 'EA', ?, 'ACTIVE')
+                    """,
+                            skuId,
+                            entity);
+
+            activateLocal.handle(new ActivateLocalSku(skuId), own(entity));
+            assertThat(status(skuId)).isEqualTo("LOCAL");
+        } finally {
+            superuserJdbc()
+                    .update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
+            config.invalidate("catalogue.local_sku_requires_barcode");
+        }
+    }
+
+    @Test
+    void promoteToSharedUpdatesStatusAndOwnerInsertsAliasAuditsAndPublishes() {
+        UUID local = createLocal.handle(
+                new CreateSku(details("Local Jam", "ජෑම්", "ஜாம்", "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+        assertThat(status(local)).isEqualTo("LOCAL");
+
+        kernel.reset();
+
+        UUID promoted = promoteHandler.handle(new PromoteToShared(local), own(FEDERATION));
+        assertThat(promoted).isEqualTo(local);
+
+        assertThat(status(local)).isEqualTo("SHARED");
+        UUID currentOwner = superuserJdbc()
+                .queryForObject("select owner_entity_id from catalogue.sku where sku_id = ?", UUID.class, local);
+        assertThat(currentOwner).isEqualTo(FEDERATION);
+
+        // Verify sku_alias self-reference for origin entity
+        UUID canonical = superuserJdbc()
+                .queryForObject(
+                        "select canonical_sku_id from catalogue.sku_alias where alias_sku_id = ?", UUID.class, local);
+        assertThat(canonical).isEqualTo(local);
+        UUID aliasOwner = superuserJdbc()
+                .queryForObject(
+                        "select owner_entity_id from catalogue.sku_alias where alias_sku_id = ?", UUID.class, local);
+        assertThat(aliasOwner).isEqualTo(MPCS);
+
+        assertThat(audit("SKU_PROMOTED")).hasSize(1);
+        List<SkuPromoted> events = events(SkuPromoted.class);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).skuId()).isEqualTo(local);
+        assertThat(events.get(0).originEntityId()).isEqualTo(MPCS);
+        assertThat(events.get(0).status()).isEqualTo("SHARED");
+    }
+
+    @Test
+    void mergeIntoSharedRetiresSourceMovesBarcodesInsertsAliasAuditsAndPublishes() {
+        UUID local = createLocal.handle(
+                new CreateSku(details("Local Biscuit", "බිස්කට්", "பிஸ்கட்", "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+
+        UUID shared = router.create(
+                new CreateSku(details("Shared Biscuit", "බිස්කට්", "பிஸ்கட்", "EA", false, false, false)),
+                own(FEDERATION));
+        activateShared.handle(new ActivateSharedSku(shared), own(FEDERATION));
+
+        // Add a barcode to local SKU
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id)
+                values ('4791000999001', 'EAN13', ?, 'EA', ?)
+                """,
+                        local,
+                        MPCS);
+
+        kernel.reset();
+
+        UUID result = mergeHandler.handle(new MergeIntoShared(local, shared), own(FEDERATION));
+        assertThat(result).isEqualTo(shared);
+
+        assertThat(status(local)).isEqualTo("INACTIVE");
+        assertThat(priorStatus(local)).isEqualTo("LOCAL");
+
+        // Verify barcode moved to shared SKU
+        UUID barcodeSku = superuserJdbc()
+                .queryForObject("select sku_id from catalogue.sku_barcode where barcode = '4791000999001'", UUID.class);
+        assertThat(barcodeSku).isEqualTo(shared);
+
+        // Verify sku_alias points local -> shared
+        UUID canonical = superuserJdbc()
+                .queryForObject(
+                        "select canonical_sku_id from catalogue.sku_alias where alias_sku_id = ?", UUID.class, local);
+        assertThat(canonical).isEqualTo(shared);
+
+        assertThat(audit("SKU_MERGED")).hasSize(1);
+        List<SkuMerged> events = events(SkuMerged.class);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).sourceSkuId()).isEqualTo(local);
+        assertThat(events.get(0).canonicalSkuId()).isEqualTo(shared);
+        assertThat(events.get(0).originEntityId()).isEqualTo(MPCS);
     }
 
     private static ScopeContext own(UUID entity) {

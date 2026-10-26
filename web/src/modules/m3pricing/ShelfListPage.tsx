@@ -16,6 +16,7 @@ import type { RetailPrice, SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { bindingCeiling, chipOf, errorText, incompleteLines, reasonMessageId } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
+import { ShelfLabelPrintAction } from "./ShelfLabelPrintAction";
 import "./pricing.css";
 
 /** A line as the author edits it: the price stays text until the server reads it. */
@@ -49,6 +50,11 @@ export function ShelfListPage() {
     queryKey: ["pricing", "advisory", advisoryDate],
     queryFn: () => api.advisoryLines(advisoryDate),
     enabled: detail.data?.list.kind === "RETAIL"
+  });
+  const retailVersions = useQuery({
+    queryKey: ["pricing", "priceLists", "RETAIL"],
+    queryFn: () => api.listPriceLists("RETAIL"),
+    enabled: detail.data?.list.kind === "RETAIL" && detail.data.list.status !== "DRAFT"
   });
   const advisoryBySku = useMemo(() => {
     const prices = new Map<string, number>();
@@ -130,6 +136,15 @@ export function ShelfListPage() {
 
   const list = detail.data.list;
   const retail = list.kind === "RETAIL";
+  const effectiveRetail = retailVersions.data
+    ?.filter(
+      (candidate) =>
+        candidate.rootPriceListId === list.rootPriceListId &&
+        (candidate.status === "PUBLISHED" || candidate.status === "SUPERSEDED") &&
+        candidate.applyFrom != null &&
+        candidate.applyFrom <= businessToday()
+    )
+    .sort((left, right) => right.version - left.version)[0];
   const editable = list.status === "DRAFT" && canAuthor;
   const refusedLines = outcomes?.outcomes.filter((outcome) => !outcome.ok).length ?? 0;
   const setRow = (index: number, change: Partial<Row>) => {
@@ -274,6 +289,9 @@ export function ShelfListPage() {
       )}
 
       {list.status !== "DRAFT" && retail && rows.length > 0 && <PriceCheck rows={rows} />}
+      {effectiveRetail?.priceListId === list.priceListId && rows.length > 0 && (
+        <ShelfLabelPrintAction skuIds={rows.map((row) => row.skuId)} />
+      )}
     </main>
   );
 }

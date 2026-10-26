@@ -9,13 +9,24 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.LocationSessionsClosed;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry;
+import lk.coopfed.knoweb.m6pos.api.CashMovementRecorded;
 import lk.coopfed.knoweb.m6pos.api.ReceiptRecorded;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptFilter;
@@ -56,16 +67,27 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     RecordSessionHandler sessions;
 
     @Autowired
+    RecordCashMovementHandler cashMovements;
+
+    @Autowired
     PosQueries pos;
+
+    @Autowired
+    ConfigRegistry config;
 
     private long nextNumber = 1;
 
     @BeforeEach
     void clean() {
         superuserJdbc()
-                .execute("truncate table pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
-                        + " pos.till_session");
+                .execute(
+                        "truncate table pos.cash_movement, pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
+                                + " pos.till_session");
         superuserJdbc().update("delete from kernel.numbering_series where owner_entity_id = ?", MPCS);
+        superuserJdbc().update("delete from kernel.config_value where key = 'pos.session_variance_review_threshold'");
+        if (config instanceof JdbcConfigRegistry jcr) {
+            jcr.invalidate("pos.session_variance_review_threshold");
+        }
         series(OWN_SERIES, Ids.next(), DEVICE);
         series(FOREIGN_SERIES, Ids.next(), ANOTHER_DEVICE);
         kernel.reset();
@@ -249,6 +271,175 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void successfulDigitalTendersWithReferencePersistToPostgresAndQueriesReturnReference() {
+        UUID session = openSession();
+        UUID id = Ids.next();
+        BigDecimal gross = new BigDecimal("1750.00");
+        RecordReceipt r = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                nextNumber++,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                null,
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(
+                        new RecordReceipt.Tender(1, "CARD", new BigDecimal("1000.00"), "AUTH-CARD-1001"),
+                        new RecordReceipt.Tender(2, "WALLET", new BigDecimal("500.00"), "AUTH-WAL-2002"),
+                        new RecordReceipt.Tender(3, "QR", new BigDecimal("250.00"), "AUTH-QR-3003")));
+
+        receipts.handle(r, device());
+
+        assertThat(pos.receipt(id, device())).hasValueSatisfying(receipt -> {
+            assertThat(receipt.grossAmount()).isEqualByComparingTo("1750.00");
+            assertThat(receipt.flags()).isEmpty();
+            assertThat(receipt.tenders()).hasSize(3);
+
+            PosQueries.ReceiptView.Tender t1 = receipt.tenders().get(0);
+            assertThat(t1.seq()).isEqualTo(1);
+            assertThat(t1.kind()).isEqualTo("CARD");
+            assertThat(t1.amount()).isEqualByComparingTo("1000.00");
+            assertThat(t1.reference()).isEqualTo("AUTH-CARD-1001");
+
+            PosQueries.ReceiptView.Tender t2 = receipt.tenders().get(1);
+            assertThat(t2.seq()).isEqualTo(2);
+            assertThat(t2.kind()).isEqualTo("WALLET");
+            assertThat(t2.amount()).isEqualByComparingTo("500.00");
+            assertThat(t2.reference()).isEqualTo("AUTH-WAL-2002");
+
+            PosQueries.ReceiptView.Tender t3 = receipt.tenders().get(2);
+            assertThat(t3.seq()).isEqualTo(3);
+            assertThat(t3.kind()).isEqualTo("QR");
+            assertThat(t3.amount()).isEqualByComparingTo("250.00");
+            assertThat(t3.reference()).isEqualTo("AUTH-QR-3003");
+        });
+
+        List<String> refs = superuserJdbc()
+                .queryForList(
+                        "select reference from pos.receipt_tender where document_id = ? order by seq",
+                        String.class,
+                        id);
+        assertThat(refs).containsExactly("AUTH-CARD-1001", "AUTH-WAL-2002", "AUTH-QR-3003");
+    }
+
+    @Test
+    void missingReferenceOnDigitalTenderIsFlaggedAsTenderReferenceMissing() {
+        UUID session = openSession();
+        UUID id = Ids.next();
+        BigDecimal gross = new BigDecimal("100.00");
+        RecordReceipt r = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                nextNumber++,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                null,
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(new RecordReceipt.Tender(1, "CARD", gross, null)));
+
+        receipts.handle(r, device());
+
+        assertThat(pos.receipt(id, device())).hasValueSatisfying(receipt -> {
+            assertThat(receipt.flags()).containsExactly("TENDER_REFERENCE_MISSING");
+        });
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_FLAGGED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TENDER_REFERENCE_MISSING"));
+    }
+
+    @Test
+    void replayWithDifferentTenderDataKeepsFirstAndAuditsReceiptReplayDiffers() {
+        UUID session = openSession();
+        UUID id = Ids.next();
+        BigDecimal gross = new BigDecimal("100.00");
+        RecordReceipt first = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                1L,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                "same-hash",
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(new RecordReceipt.Tender(1, "CARD", gross, "AUTH-ORIGINAL")));
+
+        receipts.handle(first, device());
+        kernel.reset();
+
+        // Exact redelivery: no audit
+        receipts.handle(first, device());
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        // Replay with altered tender reference:
+        RecordReceipt altered = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                1L,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                "same-hash",
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(new RecordReceipt.Tender(1, "CARD", gross, "AUTH-TAMPERED")));
+
+        receipts.handle(altered, device());
+
+        // First copy is preserved in DB!
+        assertThat(pos.receipt(id, device())).hasValueSatisfying(receipt -> {
+            assertThat(receipt.tenders().get(0).reference()).isEqualTo("AUTH-ORIGINAL");
+        });
+
+        // Replay differs is recorded
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("RECEIPT_REPLAY_DIFFERS");
+            assertThat(String.valueOf(a.after())).contains("tendersDiffer=true");
+        });
+    }
+
+    @Test
     void receiptsArePagedNewestFirstByDayWithACursorAndAFlaggedFilter() {
         UUID session = openSession();
         List<UUID> today = new ArrayList<>();
@@ -370,21 +561,42 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UUID openSession() {
+        return openSession(DEVICE, null);
+    }
+
+    private UUID openSession(UUID deviceId) {
+        return openSession(deviceId, null);
+    }
+
+    private UUID openSession(UUID deviceId, LocalDate businessDate) {
         UUID session = Ids.next();
         sessions.handle(
                 new RecordSession(
-                        session, false, null, null, null, MORNING.minusSeconds(600), BigDecimal.ZERO, null, null, null),
-                device());
+                        session,
+                        false,
+                        null,
+                        null,
+                        businessDate,
+                        MORNING.minusSeconds(600),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null),
+                device(deviceId));
         return session;
     }
 
     private static RecordSession close(UUID session, Instant at, String counted) {
+        return close(session, null, at, counted);
+    }
+
+    private static RecordSession close(UUID session, LocalDate businessDate, Instant at, String counted) {
         return new RecordSession(
                 session,
                 true,
                 null,
                 null,
-                null,
+                businessDate,
                 at,
                 null,
                 new BigDecimal(counted),
@@ -507,9 +719,13 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     /** The scope the consumer framework gives a till's fact: the device's entity at its shop. */
     private static ScopeContext device() {
+        return device(DEVICE);
+    }
+
+    private static ScopeContext device(UUID deviceId) {
         Scope scope = new Scope(MPCS, SHOP);
         return new ScopeContext(
-                null, DEVICE, MPCS, List.of(scope), scope, PolicyClass.OWN, Set.of(), null, Locale.ENGLISH, null);
+                null, deviceId, MPCS, List.of(scope), scope, PolicyClass.OWN, Set.of(), null, Locale.ENGLISH, null);
     }
 
     private static ScopeContext entityWide() {
@@ -519,5 +735,463 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     private static void assertProblem(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String id) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
                 .isEqualTo(id));
+    }
+
+    // ---- cash movement tests (TILL-SELL-10) ------------------------------------------------
+
+    @Test
+    void aCashMovementRecordedAndAudited() {
+        UUID session = openSession();
+        kernel.reset();
+
+        UUID movementId = Ids.next();
+        UUID id = cashMovements.handle(
+                cashMovement(movementId, session, "DROP", new BigDecimal("500.00"), "midday sweep"), device());
+
+        assertThat(id).isEqualTo(movementId);
+        List<PosQueries.CashMovementView> list = pos.cashMovements(session, device());
+        assertThat(list).singleElement().satisfies(m -> {
+            assertThat(m.movementId()).isEqualTo(movementId);
+            assertThat(m.sessionId()).isEqualTo(session);
+            assertThat(m.locationId()).isEqualTo(SHOP);
+            assertThat(m.kind()).isEqualTo("DROP");
+            assertThat(m.amount()).isEqualByComparingTo("500.00");
+            assertThat(m.reason()).isEqualTo("midday sweep");
+            assertThat(m.flags()).isEmpty();
+        });
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("CASH_MOVEMENT_RECORDED");
+        assertThat(kernel.committedEvents())
+                .filteredOn(CashMovementRecorded.class::isInstance)
+                .singleElement()
+                .satisfies(e -> {
+                    CashMovementRecorded ev = (CashMovementRecorded) e;
+                    assertThat(ev.movementId()).isEqualTo(movementId);
+                    assertThat(ev.kind()).isEqualTo("DROP");
+                    assertThat(ev.amount()).isEqualByComparingTo("500.00");
+                });
+    }
+
+    @Test
+    void aCashMovementCentralFindsOddIsKeptAndFlagged() {
+        UUID unknownSession = Ids.next();
+        UUID movementId = Ids.next();
+        UUID elsewhere = Ids.next();
+
+        RecordCashMovement strange = new RecordCashMovement(
+                movementId,
+                unknownSession,
+                elsewhere,
+                null,
+                DEVICE,
+                "PAYOUT",
+                new BigDecimal("120.00"),
+                MORNING,
+                Ids.next(),
+                "emergency milk",
+                1L);
+
+        UUID id = cashMovements.handle(strange, device());
+        assertThat(id).isEqualTo(movementId);
+
+        List<PosQueries.CashMovementView> list = pos.cashMovements(unknownSession, device());
+        assertThat(list).singleElement().satisfies(m -> {
+            assertThat(m.movementId()).isEqualTo(movementId);
+            assertThat(m.flags()).containsExactly("LOCATION_MISMATCH", "SESSION_UNKNOWN");
+        });
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("CASH_MOVEMENT_FLAGGED");
+    }
+
+    @Test
+    void aCashMovementReplayedWithSameDetailsIsNoOp() {
+        UUID session = openSession();
+        kernel.reset();
+
+        UUID movementId = Ids.next();
+        RecordCashMovement command =
+                cashMovement(movementId, session, "DROP", new BigDecimal("300.00"), "routine drop");
+
+        cashMovements.handle(command, device());
+        assertThat(kernel.committedAudit()).hasSize(1);
+        kernel.reset();
+
+        // Exact replay
+        UUID replayed = cashMovements.handle(command, device());
+        assertThat(replayed).isEqualTo(movementId);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aCashMovementReplayedWithDifferentDetailsAuditsReplayDiffersWithoutModifyingFirst() {
+        UUID session = openSession();
+        kernel.reset();
+
+        UUID movementId = Ids.next();
+        RecordCashMovement first = cashMovement(movementId, session, "DROP", new BigDecimal("300.00"), "routine drop");
+        cashMovements.handle(first, device());
+        kernel.reset();
+
+        // Arrives again with different amount
+        RecordCashMovement altered =
+                cashMovement(movementId, session, "DROP", new BigDecimal("600.00"), "routine drop");
+        cashMovements.handle(altered, device());
+
+        // First copy is kept
+        List<PosQueries.CashMovementView> list = pos.cashMovements(session, device());
+        assertThat(list).singleElement().satisfies(m -> {
+            assertThat(m.amount()).isEqualByComparingTo("300.00");
+        });
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("CASH_MOVEMENT_REPLAY_DIFFERS");
+    }
+
+    @Test
+    void aCashMovementGuardsInvalidAmountAndEmptyReason() {
+        UUID session = openSession();
+        UUID movementId = Ids.next();
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", BigDecimal.ZERO, "zero amount"), device()),
+                "m6.cash_movement.invalid_amount");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", new BigDecimal("-10.00"), "negative amount"),
+                        device()),
+                "m6.cash_movement.invalid_amount");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", new BigDecimal("100.00"), "   "), device()),
+                "m6.cash_movement.reason_required");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        new RecordCashMovement(
+                                null,
+                                session,
+                                SHOP,
+                                null,
+                                DEVICE,
+                                "DROP",
+                                new BigDecimal("100.00"),
+                                MORNING,
+                                Ids.next(),
+                                "reason",
+                                1L),
+                        device()),
+                "m6.cash_movement.malformed");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", new BigDecimal("100.00"), "reason"), entityWide()),
+                "m6.scope.device_required");
+    }
+
+    // ---- session shortage review tests (TILL-SELL-11) ---------------------------------------
+
+    @Test
+    void sessionCloseShortageBelowThresholdAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 600, expected 1000 => variance -400, shortage 400 <= default threshold 500
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "600.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseShortageAtExactThresholdBoundaryAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 500, expected 1000 => variance -500, shortage 500 == default threshold 500 (not strictly exceeded)
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "500.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseZeroVarianceAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 1000, expected 1000 => variance 0, zero shortage
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "1000.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseSurplusAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 1250, expected 1000 => variance +250 (surplus, not a shortage)
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "1250.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseShortageExceedingThresholdRaisesReviewAudit() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 400, expected 1000 => variance -600, shortage 600 > default threshold 500
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+
+        KernelRecorder.AuditRecord review = kernel.committedAudit().stream()
+                .filter(a -> a.eventType().equals("TILL_SESSION_SHORTAGE_REVIEW"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(review.subject().id()).isEqualTo(session);
+        assertThat(review.subject().type()).isEqualTo("till_session");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> after = (Map<String, Object>) review.after();
+        assertThat(after.get("messageId")).isEqualTo("m6.session.shortage_review");
+        assertThat(after.get("sessionId")).isEqualTo(session);
+        assertThat((BigDecimal) after.get("countedCash")).isEqualByComparingTo("400.00");
+        assertThat((BigDecimal) after.get("expectedCash")).isEqualByComparingTo("1000.00");
+        assertThat((BigDecimal) after.get("variance")).isEqualByComparingTo("-600.00");
+        assertThat((BigDecimal) after.get("shortage")).isEqualByComparingTo("600.00");
+        assertThat((BigDecimal) after.get("threshold")).isEqualByComparingTo("500.00");
+        assertThat(after.get("locationId")).isEqualTo(SHOP);
+        assertThat(after.get("deviceId")).isEqualTo(DEVICE);
+        assertThat(review.reason()).isEqualTo("Cash shortage of 600.00 exceeds review threshold 500.00");
+    }
+
+    @Test
+    void sessionCloseReviewIsIdempotentOnIdenticalReplay() {
+        UUID session = openSession();
+        kernel.reset();
+        // First close with shortage exceeding threshold
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+        kernel.reset();
+
+        // Identical replay: same amounts
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+        assertThat(kernel.committedAudit()).isEmpty();
+    }
+
+    @Test
+    void sessionCloseReviewDivergentReplayRaisesAlertAndNoDuplicateReview() {
+        UUID session = openSession();
+        kernel.reset();
+        // First close with shortage exceeding threshold
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+        kernel.reset();
+
+        // Divergent replay with different amounts
+        sessions.handle(close(session, MORNING.plusSeconds(3700), "350.00"), device());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSE_REPLAY_DIFFERS");
+    }
+
+    @Test
+    void sessionCloseShortageRespectsEntityConfiguredThresholdOverride() {
+        // Entity configures threshold to 100.00
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, value, reason) values ('pos.session_variance_review_threshold', ?, '100.00'::jsonb, 'test')",
+                        MPCS);
+        if (config instanceof JdbcConfigRegistry jcr) {
+            jcr.invalidate("pos.session_variance_review_threshold");
+        }
+
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 850, expected 1000 => variance -150, shortage 150
+        // 150 <= default 500.00, but 150 > entity override 100.00
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "850.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+        KernelRecorder.AuditRecord review = kernel.committedAudit().stream()
+                .filter(a -> a.eventType().equals("TILL_SESSION_SHORTAGE_REVIEW"))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> after = (Map<String, Object>) review.after();
+        assertThat((BigDecimal) after.get("threshold")).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void sessionCloseHandlesInvalidNegativeThresholdSafelyWithoutAbsMasking() {
+        // Entity configures invalid negative threshold: -100.00
+        // Handler must not use .abs() to mask this as 100.00; it falls back to default 500.00
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, value, reason) values ('pos.session_variance_review_threshold', ?, '-100.00'::jsonb, 'test')",
+                        MPCS);
+        if (config instanceof JdbcConfigRegistry jcr) {
+            jcr.invalidate("pos.session_variance_review_threshold");
+        }
+
+        UUID session = openSession();
+        kernel.reset();
+        // Shortage 250: would exceed 100 if abs() was used, but within fallback default 500
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "750.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseWithMissingAmountsDoesNotThrowOrRaiseReview() {
+        UUID session = openSession();
+        kernel.reset();
+        // Close with null amounts
+        RecordSession close =
+                new RecordSession(session, true, null, null, null, MORNING.plusSeconds(3600), null, null, null, null);
+        sessions.handle(close, device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    // ---- automatic day close tests (TILL-SELL-12) -------------------------------------------
+
+    @Test
+    void singleTillClosingLastSessionPublishesLocationSessionsClosed() {
+        UUID session = openSession();
+        kernel.reset();
+
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "1000.00"), device());
+
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .singleElement()
+                .satisfies(e -> {
+                    LocationSessionsClosed closed = (LocationSessionsClosed) e;
+                    assertThat(closed.closedLocationId()).isEqualTo(SHOP);
+                    assertThat(closed.ownerEntityId()).isEqualTo(MPCS);
+                    assertThat(closed.businessDate()).isNotNull();
+                });
+    }
+
+    @Test
+    void multiTillClosingInSequenceOnlyPublishesLocationSessionsClosedWhenAllClosed() {
+        UUID session1 = openSession(DEVICE);
+        UUID session2 = openSession(ANOTHER_DEVICE);
+        kernel.reset();
+
+        // First till closes: session2 is still open -> no LocationSessionsClosed
+        sessions.handle(close(session1, MORNING.plusSeconds(3600), "1000.00"), device(DEVICE));
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .isEmpty();
+
+        // Second till closes: 0 sessions remaining -> LocationSessionsClosed published
+        kernel.reset();
+        sessions.handle(close(session2, MORNING.plusSeconds(3700), "1000.00"), device(ANOTHER_DEVICE));
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .singleElement()
+                .satisfies(e -> {
+                    LocationSessionsClosed closed = (LocationSessionsClosed) e;
+                    assertThat(closed.closedLocationId()).isEqualTo(SHOP);
+                    assertThat(closed.ownerEntityId()).isEqualTo(MPCS);
+                });
+    }
+
+    @Test
+    void delayedPreviousDaySessionCloseDoesNotPublishLocationSessionsClosed() {
+        LocalDate currentTradingDate = LocalDate.now();
+        LocalDate yesterday = currentTradingDate.minusDays(1);
+        UUID session = openSession(DEVICE, yesterday);
+        kernel.reset();
+
+        // Till syncs delayed close from yesterday
+        sessions.handle(close(session, yesterday, MORNING.plusSeconds(3600), "1000.00"), device());
+
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .isEmpty();
+    }
+
+    @Test
+    void duplicateSessionCloseReplayDoesNotPublishDuplicateLocationSessionsClosed() {
+        UUID session = openSession();
+        kernel.reset();
+
+        RecordSession closeCommand = close(session, MORNING.plusSeconds(3600), "1000.00");
+        sessions.handle(closeCommand, device());
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
+
+        kernel.reset();
+        // Duplicate delivery / replay
+        sessions.handle(closeCommand, device());
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .isEmpty();
+    }
+
+    @Test
+    void concurrentSessionClosesSerializeSafelyAndPublishExactlyOneLocationSessionsClosed() throws Exception {
+        UUID session1 = openSession(DEVICE);
+        UUID session2 = openSession(ANOTHER_DEVICE);
+        kernel.reset();
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+
+        Callable<Void> task1 = () -> {
+            barrier.await();
+            sessions.handle(close(session1, MORNING.plusSeconds(3600), "1000.00"), device(DEVICE));
+            return null;
+        };
+        Callable<Void> task2 = () -> {
+            barrier.await();
+            sessions.handle(close(session2, MORNING.plusSeconds(3600), "1000.00"), device(ANOTHER_DEVICE));
+            return null;
+        };
+
+        Future<Void> f1 = pool.submit(task1);
+        Future<Void> f2 = pool.submit(task2);
+
+        f1.get(10, TimeUnit.SECONDS);
+        f2.get(10, TimeUnit.SECONDS);
+        pool.shutdown();
+
+        // Exactly one LocationSessionsClosed event must be published across both concurrent closes
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
+    }
+
+    private RecordCashMovement cashMovement(
+            UUID movementId, UUID session, String kind, BigDecimal amount, String reason) {
+        return new RecordCashMovement(
+                movementId, session, SHOP, null, DEVICE, kind, amount, MORNING, Ids.next(), reason, 1L);
     }
 }

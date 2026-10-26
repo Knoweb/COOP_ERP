@@ -127,6 +127,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/locations/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk register locations (shops), till positions, users and devices in one transaction
+         * @description Registers a network of shops, till positions, till users and POS devices for an entity. Every item is validated first; when any item has a problem nothing is registered and the report says which items and why. When all pass, all are registered in one transaction (CAT-08).
+         */
+        post: operations["bulkRegisterNetwork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/party/locations": {
         parameters: {
             query?: never;
@@ -767,6 +787,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/security/users/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Load users in bulk with identity-provider provisioning (CAT-09)
+         * @description Loads a sheet or payload of users for the caller's entity and provisions their accounts in the identity provider (Keycloak), enabling immediate sign-in.
+         */
+        post: operations["bulkImportUsers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/security/users/{userId}": {
         parameters: {
             query?: never;
@@ -907,6 +947,78 @@ export interface components {
             /** @description The column of the file */
             field: string;
             /** @description A message id from the bulk.* catalogue */
+            code: string;
+        };
+        BulkRegisterNetworkRequest: {
+            shops?: components["schemas"]["BulkShopItem"][];
+            users?: components["schemas"]["BulkUserItem"][];
+            devices?: components["schemas"]["BulkDeviceItem"][];
+        };
+        BulkShopItem: {
+            locationCode: string;
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /** @enum {string|null} */
+            language?: "en" | "si" | "ta" | null;
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+            tillPositions?: number[];
+        };
+        BulkUserItem: {
+            username: string;
+            displayName: string;
+            /** @enum {string|null} */
+            language?: "en" | "si" | "ta" | null;
+            /** @enum {string|null} */
+            userKind?: "BACK_OFFICE" | "TILL" | "BOTH" | null;
+            pin?: string | null;
+            locationCode?: string | null;
+            password?: string | null;
+        };
+        BulkImportUsersRequest: {
+            /** @description Raw CSV user spreadsheet text */
+            sheet?: string | null;
+            users?: components["schemas"]["BulkUserItem"][];
+        };
+        BulkUserImportReport: {
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED" | "EMPTY";
+            imported: number;
+            failed: number;
+            problems: components["schemas"]["BulkUserProblem"][];
+        };
+        BulkUserProblem: {
+            username: string;
+            field: string;
+            reason: string;
+        };
+        BulkDeviceItem: {
+            hardwareSerial: string;
+            /** @enum {string|null} */
+            deviceKind?: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE" | null;
+            locationCode: string;
+            positionNo?: number | null;
+            appVersion?: string | null;
+        };
+        BulkNetworkReport: {
+            /** @enum {string} */
+            status: "REGISTERED" | "REJECTED";
+            shopsRegistered: number;
+            positionsRegistered: number;
+            usersRegistered: number;
+            devicesRegistered: number;
+            problems: components["schemas"]["BulkNetworkProblem"][];
+        };
+        BulkNetworkProblem: {
+            /** @enum {string} */
+            category: "SHOP" | "USER" | "DEVICE" | "GENERAL";
+            identifier?: string | null;
+            field: string;
             code: string;
         };
         /** @description The hours of one day of the week; a day not listed is a closed day */
@@ -1664,6 +1776,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkValidationReport"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkRegisterNetwork: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkRegisterNetworkRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk network registration report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkNetworkReport"];
                 };
             };
             400: components["responses"]["RequestProblem"];
@@ -2839,6 +2980,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkImportUsers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportUsersRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk user import report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkUserImportReport"];
                 };
             };
             400: components["responses"]["RequestProblem"];

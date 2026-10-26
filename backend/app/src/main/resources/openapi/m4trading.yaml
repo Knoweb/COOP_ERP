@@ -319,6 +319,69 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/orders/{orderId}/adjustments:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    get:
+      tags: [Order]
+      operationId: listOrderAdjustments
+      summary: The adjustments recorded on this order
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The adjustments of the order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderAdjustmentResponse'
+        '404':
+          description: m4.order.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+    post:
+      tags: [Order]
+      operationId: recordOrderAdjustment
+      summary: The seller records a manual adjustment (special discount or delivery fee) on an order
+      description: >
+        Problems: m4.order.not_found, m4.order.not_seller, m4.order.not_adjustable,
+        m4.adjustment.type_unknown, m4.adjustment.amount_invalid,
+        m4.adjustment.exceeds_max_amount, m4.adjustment.exceeds_max_percent,
+        m4.adjustment.already_recorded, m4.adjustment.permission_denied.
+      x-permission: ord.order.adjust
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordOrderAdjustmentRequest'
+      responses:
+        '200':
+          description: The adjustment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderAdjustmentResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '404':
+          description: m4.order.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/trading/delivery-notes:
 
     get:
@@ -1939,6 +2002,56 @@ components:
           minLength: 1
           maxLength: 200
 
+    RecordOrderAdjustmentRequest:
+      type: object
+      required: [adjustmentType, amount]
+      properties:
+        adjustmentType:
+          type: string
+          minLength: 1
+          maxLength: 24
+        amount:
+          type: number
+          minimum: 0.01
+        description:
+          type: string
+          maxLength: 500
+
+    OrderAdjustmentResponse:
+      type: object
+      required: [adjustmentId, orderId, ownerEntityId, counterpartyEntityId, adjustmentType, kind, amount, recordedBy, recordedAt]
+      properties:
+        adjustmentId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        ownerEntityId:
+          type: string
+          format: uuid
+        counterpartyEntityId:
+          type: string
+          format: uuid
+        adjustmentType:
+          type: string
+        kind:
+          type: string
+          enum: [SPECIAL_DISCOUNT, DELIVERY_FEE]
+        amount:
+          type: number
+        description:
+          type: string
+        recordedBy:
+          type: string
+          format: uuid
+        recordedAt:
+          type: string
+          format: date-time
+        invoiceDocumentId:
+          type: string
+          format: uuid
+
     CreateDeliveryNoteRequest:
       type: object
       required: [drops]
@@ -3266,7 +3379,7 @@ components:
           description: The M5 transfer that fulfils the approved request, once the stores issued it
         transferStatus:
           type: string
-          enum: [IN_TRANSIT, RECEIVED]
+          enum: [ISSUED, IN_TRANSIT, RECEIVED, CANCELLED]
         lines:
           type: array
           items:

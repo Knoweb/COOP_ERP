@@ -128,6 +128,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void loadsTheDemoOnceAndASecondRunChangesNothing() {
+        assertOpeningBalanceShopsHaveRealOperators();
         DemoDataLoader.Report first = loader.load();
         Map<String, Long> afterFirst = counts();
 
@@ -149,6 +150,8 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 // 40 at each of the four stores, 23 at the town shop, 16 at Hettipola, 20 at each of
                 // Pannala and Point Pedro, and the society's own 5 kg packs (the repack).
                 .containsEntry("lots", 240L)
+                .containsEntry("dispatched transfers to the town shop", 1L)
+                .containsEntry("dispatched transfers to the Hettipola shop", 1L)
                 .containsEntry("received transfers to the town shop", 1L)
                 .containsEntry("received transfers to the Hettipola shop", 1L)
                 // Each shop's first stock: DemoShopStock's everyday range, one lot of each item.
@@ -191,7 +194,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("RaiseClaim", 1)
                     .containsEntry("ApproveClaim", 1)
                     .containsEntry("RequestTransfer", 1)
-                    .containsEntry("ApproveTransferRequest", 1);
+                    .containsEntry("ApproveTransferRequest", 1)
+                    .containsEntry("DispatchTransfer", 2)
+                    .containsEntry("ActivateLocation", 6);
             theHistorySpreadsOverEightWeeks();
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();
@@ -204,6 +209,31 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(second.total()).isZero();
         assertThat(counts()).isEqualTo(afterFirst);
+    }
+
+    /** The two shops activated after their OPBs satisfy M1's real operator predicate. */
+    private void assertOpeningBalanceShopsHaveRealOperators() {
+        Long operators = superuserJdbc()
+                .queryForObject(
+                        """
+                select count(*)
+                  from security.app_user u
+                  join security.user_role ur on ur.user_id = u.user_id
+                 where u.user_id in (?, ?)
+                   and u.user_kind in ('TILL', 'BOTH')
+                   and u.status = 'ACTIVE'
+                   and u.pin_hash is not null
+                   and ur.role_id = '01999a10-2c4e-7f1a-8b3d-5e6f70819a11'
+                   and (ur.scope_entity_id, ur.scope_location_id) in ((?, ?), (?, ?))
+                """,
+                        Long.class,
+                        DemoCast.M102_SHOP_STAFF.userId(),
+                        DemoCast.M103_SHOP_STAFF.userId(),
+                        DemoCast.M102,
+                        DemoCast.M102_SHOP,
+                        DemoCast.M103,
+                        DemoCast.M103_SHOP);
+        assertThat(operators).isEqualTo(2L);
     }
 
     /**
@@ -606,6 +636,18 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         counts.put(
                 "lots",
                 count(admin, "select count(*) from inventory.stock_lot where location_id::text like '0190f0de-%'"));
+        counts.put(
+                "dispatched transfers to the town shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.transfer_dispatch where to_location_id = ?::uuid",
+                        DemoCast.M101_TOWN_SHOP.toString()));
+        counts.put(
+                "dispatched transfers to the Hettipola shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.transfer_dispatch where to_location_id = ?::uuid",
+                        DemoCast.M101_HETTIPOLA_SHOP.toString()));
         counts.put(
                 "received transfers to the town shop",
                 count(

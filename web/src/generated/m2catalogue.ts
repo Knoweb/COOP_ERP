@@ -79,6 +79,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/skus/{skuId}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote a LOCAL SKU to SHARED, or merge it into an existing SHARED SKU */
+        post: operations["promoteSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/skus/{skuId}/deactivate": {
         parameters: {
             query?: never;
@@ -331,6 +348,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk import catalogue SKUs from payload rows or raw CSV
+         * @description Validates or commits a bulk batch of catalogue SKUs (~20,000 items). Translates missing names, scores duplicates, and executes batch inserts.
+         */
+        post: operations["importSkus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/steward/suspects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List duplicate suspect pairs
+         * @description Returns duplicate suspects flagged during catalogue import or creation.
+         */
+        get: operations["listDuplicateSuspects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/steward/suspects/{suspectId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a duplicate suspect pair as MERGED or DISMISSED */
+        post: operations["resolveDuplicateSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/tax/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all tax categories */
+        get: operations["listTaxCategories"];
+        put?: never;
+        /** Define a new tax category */
+        post: operations["defineTaxCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/tax/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List rates of a category or the rate in force */
+        get: operations["listTaxRates"];
+        put?: never;
+        /** Publish a tax rate for a category */
+        post: operations["publishTaxRate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -361,6 +471,12 @@ export interface components {
         ActivateSkuRequest: {
             /** @enum {string} */
             target: "LOCAL" | "SHARED";
+        };
+        PromoteSkuRequest: {
+            /** @enum {string} */
+            mode: "NEW" | "MERGE";
+            /** Format: uuid */
+            targetSkuId?: string;
         };
         ReasonRequest: {
             reasonCode?: string;
@@ -573,6 +689,109 @@ export interface components {
             name: string;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+        };
+        BulkImportSkusRequest: {
+            /** @enum {string} */
+            mode: "VALIDATE" | "COMMIT";
+            csvContent?: string;
+            rows?: components["schemas"]["ImportSkuRowItem"][];
+        };
+        ImportSkuRowItem: {
+            rowNumber: number;
+            skuCode?: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            descriptionEn?: string;
+            descriptionSi?: string;
+            descriptionTa?: string;
+            baseUomCode?: string;
+            soldByWeight?: boolean;
+            batchTracked?: boolean;
+            expiryTracked?: boolean;
+            hasPrintedMrp?: boolean;
+            expiryWarningDays?: number;
+            taxCategoryCode?: string;
+            price?: number;
+            barcodes?: string[];
+            brand?: string;
+            tags?: string[];
+        };
+        ImportReportResponse: {
+            /** @enum {string} */
+            status: "VALIDATED" | "ACCEPTED" | "REJECTED";
+            rows: number;
+            accepted: number;
+            rejected: number;
+            errors: components["schemas"]["ImportValidationError"][];
+            suspects: components["schemas"]["ImportDuplicateSuspectItem"][];
+        };
+        ImportValidationError: {
+            rowNumber: number;
+            field: string;
+            code: string;
+            message: string;
+            params?: string;
+        };
+        ImportDuplicateSuspectItem: {
+            rowNumber: number;
+            candidateName: string;
+            /** Format: uuid */
+            matchedSkuId?: string;
+            matchedSkuCode?: string;
+            matchedSkuName?: string;
+            score: number;
+            reasons: string[];
+        };
+        DuplicateSuspectResponse: {
+            /** Format: uuid */
+            suspectId: string;
+            /** Format: uuid */
+            skuA: string;
+            /** Format: uuid */
+            skuB: string;
+            skuACode?: string;
+            skuAName?: string;
+            skuBCode?: string;
+            skuBName?: string;
+            score: number;
+            reasons: string[];
+            /** @enum {string} */
+            status: "OPEN" | "MERGED" | "DISMISSED";
+            decidedBy?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ResolveDuplicateSuspectRequest: {
+            /** @enum {string} */
+            decision: "MERGED" | "DISMISSED";
+            /** Format: uuid */
+            canonicalSkuId?: string;
+        };
+        DefineTaxCategoryRequest: {
+            code: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+        };
+        PublishTaxRateRequest: {
+            /** Format: uuid */
+            taxCategoryId: string;
+            ratePercent: number;
+            /** Format: date */
+            applyFrom: string;
+        };
+        TaxRateResponse: {
+            /** Format: uuid */
+            taxCategoryId: string;
+            taxCategoryCode?: string;
+            ratePercent: number;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -789,6 +1008,35 @@ export interface operations {
         };
         responses: {
             /** @description SKU activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    promoteSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteSkuRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU promoted or merged */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -1337,6 +1585,191 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    importSkus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportSkusRequest"];
+            };
+        };
+        responses: {
+            /** @description Import report with validation errors and duplicate suspects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDuplicateSuspects: {
+        parameters: {
+            query?: {
+                status?: "OPEN" | "MERGED" | "DISMISSED";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of duplicate suspect pairs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateSuspectResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    resolveDuplicateSuspect: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                suspectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveDuplicateSuspectRequest"];
+            };
+        };
+        responses: {
+            /** @description Suspect resolved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTaxCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of tax categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCategoryResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    defineTaxCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineTaxCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Tax category defined */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCategoryResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTaxRates: {
+        parameters: {
+            query?: {
+                categoryId?: string;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tax rates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    publishTaxRate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishTaxRateRequest"];
+            };
+        };
+        responses: {
+            /** @description Tax rate published */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
