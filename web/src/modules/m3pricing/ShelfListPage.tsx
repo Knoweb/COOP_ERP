@@ -458,50 +458,50 @@ function PriceCheck({ rows }: { rows: Row[] }) {
       )}
       {result && (
         <div className="pricing-check-result" aria-live="polite">
-          <div className="pricing-check-highlight">
+          <dl className="pricing-check-highlight">
             <div>
-              <div className="pricing-check-highlight__label">{t("pricing.check.price").text}</div>
-              <div className="pricing-check-highlight__value">
+              <dt className="pricing-check-highlight__label">{t("pricing.check.price").text}</dt>
+              <dd className="pricing-check-highlight__value">
                 {result.sellable ? (
                   <MoneyDisplay amount={result.unitPrice ?? ""} />
                 ) : (
                   <span>{t(`pricing.check.not_sellable.${result.reason === "price.needs_pick" ? "pick" : "no_line"}`).text}</span>
                 )}
-              </div>
+              </dd>
             </div>
             {result.sellable && (
               <span className="pricing-meta-badge">
                 {t("pricing.check.bound").text}: {t(`pricing.cap.${result.capReason.toLowerCase()}`).text}
               </span>
             )}
-          </div>
+          </dl>
 
-          <div className="pricing-check-grid">
+          <dl className="pricing-check-grid">
             <div className="pricing-check-item">
-              <div className="pricing-check-item__label">{t("pricing.check.list_price").text}</div>
-              <div className="pricing-check-item__value">
+              <dt className="pricing-check-item__label">{t("pricing.check.list_price").text}</dt>
+              <dd className="pricing-check-item__value">
                 {result.listPrice == null ? "—" : <MoneyDisplay amount={result.listPrice} />}
-              </div>
+              </dd>
             </div>
             <div className="pricing-check-item">
-              <div className="pricing-check-item__label">{t("pricing.check.mrp").text}</div>
-              <div className="pricing-check-item__value">
+              <dt className="pricing-check-item__label">{t("pricing.check.mrp").text}</dt>
+              <dd className="pricing-check-item__value">
                 {result.mrpApplied == null ? "—" : <MoneyDisplay amount={result.mrpApplied} />}
-              </div>
+              </dd>
             </div>
             <div className="pricing-check-item">
-              <div className="pricing-check-item__label">{t("pricing.check.control").text}</div>
-              <div className="pricing-check-item__value">
+              <dt className="pricing-check-item__label">{t("pricing.check.control").text}</dt>
+              <dd className="pricing-check-item__value">
                 {result.controlPrice == null ? "—" : <MoneyDisplay amount={result.controlPrice} />}
-              </div>
+              </dd>
             </div>
             <div className="pricing-check-item">
-              <div className="pricing-check-item__label">{t("pricing.check.policy").text}</div>
-              <div className="pricing-check-item__value">
+              <dt className="pricing-check-item__label">{t("pricing.check.policy").text}</dt>
+              <dd className="pricing-check-item__value">
                 {t(`pricing.policy.${result.policy.toLowerCase()}`).text}
-              </div>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
       )}
     </section>

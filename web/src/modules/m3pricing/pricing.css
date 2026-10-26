@@ -1111,7 +1111,12 @@ span.pricing-version-text {
   background: var(--color-issued-bg);
   border: var(--border-width) solid var(--color-issued-text);
   border-radius: var(--radius);
-  margin-bottom: var(--space-3);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.pricing-check-highlight dd,
+.pricing-check-grid dd {
+  margin: 0;
 }
 
 .pricing-check-highlight__label {
@@ -1130,6 +1135,7 @@ span.pricing-version-text {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2), 1fr));
   gap: var(--space-2);
+  margin: 0;
 }
 
 .pricing-check-item {
