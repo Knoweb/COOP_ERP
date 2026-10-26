@@ -46,32 +46,36 @@ test("a repack executes successfully after validation and is reversed to keep th
   test.setTimeout(180_000);
   const buyer = DEMO.m101Buyer;
   let page = await openAs(browser, buyer, "/inventory/repacks");
-  await page.getByLabel(textOf(buyer, "inventory.field.location")).selectOption(DEMO_LOCATIONS.m101Stores);
+  await page
+    .getByLabel(textOf(buyer, "inventory.field.location"), { exact: true })
+    .selectOption(DEMO_LOCATIONS.m101Stores);
 
   await expect(page.getByRole("button", { name: textOf(buyer, "inventory.repack.execute") })).toBeDisabled();
-  await page.getByLabel(textOf(buyer, "inventory.repack.recipe")).selectOption({ index: 1 });
-  const lots = page.getByLabel(textOf(buyer, "inventory.repack.input_lot"));
+  await page.getByLabel(textOf(buyer, "inventory.repack.recipe"), { exact: true }).selectOption({ index: 1 });
+  const lots = page.getByLabel(textOf(buyer, "inventory.repack.input_lot"), { exact: true });
   await expect(lots.locator("option")).not.toHaveCount(1);
   await lots.selectOption({ index: 1 });
-  await page.getByLabel(textOf(buyer, "inventory.repack.input_qty")).fill("1");
-  await page.getByLabel(textOf(buyer, "inventory.repack.actual")).fill("999");
+  await page.getByLabel(textOf(buyer, "inventory.repack.input_qty"), { exact: true }).fill("1");
+  await page.getByLabel(textOf(buyer, "inventory.repack.actual"), { exact: true }).fill("999");
   await page.getByRole("button", { name: textOf(buyer, "inventory.repack.execute") }).click();
   await expect(page.getByRole("alert")).toHaveText(backendSinhala["m5.repack.yield_out_of_range"]);
 
   const executed = page.getByText(textOf(buyer, "inventory.repack.status.EXECUTED"), { exact: true });
   const before = await executed.count();
-  await page.getByLabel(textOf(buyer, "inventory.repack.input_qty")).fill("5");
-  await page.getByLabel(textOf(buyer, "inventory.repack.actual")).fill("1");
+  await page.getByLabel(textOf(buyer, "inventory.repack.input_qty"), { exact: true }).fill("5");
+  await page.getByLabel(textOf(buyer, "inventory.repack.actual"), { exact: true }).fill("1");
   await page.getByRole("button", { name: textOf(buyer, "inventory.repack.execute") }).click();
   await expect(executed).toHaveCount(before + 1);
   await page.context().close();
 
   const manager = DEMO.m101Manager;
   page = await openAs(browser, manager, "/inventory/repacks");
-  await page.getByLabel(textOf(manager, "inventory.field.location")).selectOption(DEMO_LOCATIONS.m101Stores);
+  await page
+    .getByLabel(textOf(manager, "inventory.field.location"), { exact: true })
+    .selectOption(DEMO_LOCATIONS.m101Stores);
   const newestExecuted = page.getByRole("row").filter({ hasText: textOf(manager, "inventory.repack.status.EXECUTED") }).first();
   await newestExecuted.getByRole("button", { name: textOf(manager, "inventory.repack.reverse") }).click();
-  await page.getByLabel(textOf(manager, "shell.reason.code")).selectOption("WRONG_QTY");
+  await page.getByLabel(textOf(manager, "shell.reason.code"), { exact: true }).selectOption("WRONG_QTY");
   await page.getByRole("button", { name: textOf(manager, "shell.reason.confirm") }).click();
   await expect(page.getByText(textOf(manager, "inventory.repack.status.REVERSED"), { exact: true }).first()).toBeVisible();
   await page.context().close();
