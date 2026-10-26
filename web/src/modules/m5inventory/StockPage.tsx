@@ -16,6 +16,8 @@ export function StockPage() {
   const formatDate = useFormatDate();
   const api = useInventoryApi();
   const canPrepare = useHasPermission("inv.opening.prepare");
+  const canPick = useHasPermission("whs.pick");
+  const canViewStock = useHasPermission("inv.stock.view");
   const [locationId, setLocationId] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -133,6 +135,11 @@ export function StockPage() {
       <Link className="action-link" to="/inventory/transfer-requests">
         <span>{t("inventory.request.link").text}</span>
       </Link>
+
+      {canPick && <Link className="action-link" to="/inventory/pick-lists"><span>{t("inventory.pick.link").text}</span></Link>}
+      {canViewStock && <Link className="action-link" to="/inventory/expiry"><span>{t("inventory.expiry.link").text}</span></Link>}
+      {canViewStock && <Link className="action-link" to="/inventory/losses"><span>{t("inventory.loss.link").text}</span></Link>}
+      {canViewStock && <Link className="action-link" to="/inventory/policies"><span>{t("inventory.policy.link").text}</span></Link>}
     </div>
   </section>
 
