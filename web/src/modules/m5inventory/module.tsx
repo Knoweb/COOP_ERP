@@ -1,8 +1,8 @@
 // What the inventory module (M5) tells the shell about itself (17A section 7). It is listed once
 // in ../registry.ts; the shell builds the router and the navigation from there.
 //
-// M5-12 (demo scope, doc 30 section 5.5): the stock position of a location and the opening
-// balance (prepare, sign, countersign). The other screens of 25A section 8 follow after the demo.
+// M5-12 (doc 30 section 5.5; 25A section 8): stock and stock-control workflows, plus the
+// warehouse pick, expiry, loss and policy views added by INV-10.
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
@@ -17,6 +17,10 @@ import { CountPage } from "./CountPage";
 import { WriteOffsPage } from "./WriteOffsPage";
 import { WriteOffPage } from "./WriteOffPage";
 import { RepacksPage } from "./RepacksPage";
+import { PickListPage } from "./PickListPage";
+import { ExpiryListPage } from "./ExpiryListPage";
+import { LossShrinkagePage } from "./LossShrinkagePage";
+import { InventoryPoliciesPage } from "./InventoryPoliciesPage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -44,7 +48,23 @@ export const inventoryModule: ModuleDefinition = {
     { path: "inventory/counts/:taskId", element: <CountPage /> },
     { path: "inventory/write-offs", element: <WriteOffsPage /> },
     { path: "inventory/write-offs/:writeOffId", element: <WriteOffPage /> },
-    { path: "inventory/repacks", element: <RepacksPage /> }
+    { path: "inventory/repacks", element: <RepacksPage /> },
+    {
+      path: "inventory/pick-lists",
+      element: <RequirePermission anyOf={["whs.pick"]}><PickListPage /></RequirePermission>
+    },
+    {
+      path: "inventory/expiry",
+      element: <RequirePermission anyOf={["inv.stock.view"]}><ExpiryListPage /></RequirePermission>
+    },
+    {
+      path: "inventory/losses",
+      element: <RequirePermission anyOf={["inv.stock.view"]}><LossShrinkagePage /></RequirePermission>
+    },
+    {
+      path: "inventory/policies",
+      element: <RequirePermission anyOf={["inv.stock.view"]}><InventoryPoliciesPage /></RequirePermission>
+    }
   ],
 
   // The label is a message id of inventory.messages.json, never literal text.
@@ -59,6 +79,14 @@ export const inventoryModule: ModuleDefinition = {
     "inv.transfer.issue",
     "shop.transfer.receive",
     "shop.transfer.request",
-    "mpcs.transfer.approve"
+    "mpcs.transfer.approve",
+    "inv.count.schedule",
+    "inv.writeoff.request",
+    "inv.writeoff.witness",
+    "inv.writeoff.approve",
+    "inv.recipe.manage",
+    "inv.repack.execute",
+    "inv.repack.reverse",
+    "whs.pick"
   ]
 };
