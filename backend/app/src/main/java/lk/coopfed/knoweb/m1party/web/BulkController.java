@@ -103,7 +103,8 @@ class BulkController implements BulkApi {
                 item.getLanguage() != null ? item.getLanguage().getValue() : null,
                 item.getUserKind() != null ? item.getUserKind().getValue() : null,
                 item.getPin(),
-                item.getLocationCode());
+                item.getLocationCode(),
+                item.getPassword());
     }
 
     private static BulkRegisterNetwork.Device toDeviceCommand(BulkDeviceItem item) {
