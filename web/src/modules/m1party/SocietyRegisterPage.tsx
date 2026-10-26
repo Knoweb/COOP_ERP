@@ -169,7 +169,7 @@ export function SocietyRegisterPage() {
   const [district, setDistrict] = useState("");
   const [districtSearch, setDistrictSearch] = useState("");
   const [search, setSearch] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filter = {
