@@ -1,3 +1,8 @@
+/*
+ * Inventory module styling (M5).
+ * Follows design/tokens.css: tokens only, no literal lengths or colours.
+ */
+
 .inventory-section {
   margin-bottom: var(--space-3);
 }
@@ -53,7 +58,7 @@
 .stock-positions-filters .modern-location-picker,
 .modern-filter-panel--stock .modern-location-picker {
   width: 100%;
-  max-width: 320px;
+  max-width: calc(var(--space-8) * 4);
 }
 
 .stock-positions-filters .modern-location-picker select {
@@ -79,20 +84,20 @@
 
 .stock-card-header h1 {
   margin: 0;
-  font-size: var(--font-size-xl, 24px);
-  font-weight: 700;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-strong);
   color: var(--color-text);
 }
 
 .stock-card-sku {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  background: var(--color-surface-subtle, rgba(0, 0, 0, 0.03));
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius, 6px);
+  padding: var(--space-half) calc(var(--space-1) + var(--space-half));
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
   width: fit-content;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 
@@ -100,10 +105,10 @@
 
 .modern-table-card {
   max-width: 100%;
-  border-radius: 16px;
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-  background: var(--color-surface, #fff);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-14);
+  background: var(--color-surface);
   overflow: hidden;
   margin-bottom: var(--space-4);
 }
@@ -125,23 +130,22 @@
 
 .stock-table th,
 .stock-table td {
-  padding: 11px 14px;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
   vertical-align: middle;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .stock-table th {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
   text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: var(--color-polish-27, var(--color-surface-subtle));
+  color: var(--color-brand-dark);
+  background: var(--color-polish-22);
   white-space: nowrap;
 }
 
 .stock-table td {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text);
 }
 
@@ -150,11 +154,11 @@
 }
 
 .stock-table tbody tr:nth-child(even) {
-  background: var(--color-polish-29, rgba(0, 0, 0, 0.01));
+  background: var(--color-polish-29);
 }
 
 .stock-table tbody tr:hover {
-  background: var(--color-polish-14, rgba(0, 0, 0, 0.03));
+  background: var(--color-polish-31);
 }
 
 .stock-table tbody tr:last-child td {
@@ -169,7 +173,7 @@
 }
 
 .stock-table td.numeric-cell--strong {
-  font-weight: var(--font-weight-strong, 600);
+  font-weight: var(--font-weight-strong);
 }
 
 /* Chips & Badges */
@@ -182,23 +186,23 @@
 .stock-table .movement-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill, 12px);
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--color-surface-subtle, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--color-border);
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
   white-space: nowrap;
 }
 
 .stock-table .qty--positive {
-  color: var(--color-success, #16a34a);
-  font-weight: 600;
+  color: var(--color-issued-text);
+  font-weight: var(--font-weight-strong);
 }
 
 .stock-table .qty--negative {
-  color: var(--color-danger, #dc2626);
-  font-weight: 600;
+  color: var(--color-alert-text);
+  font-weight: var(--font-weight-strong);
 }
 
 .stock-table td .entity-link {
@@ -207,7 +211,7 @@
   gap: var(--space-1);
   word-break: break-word;
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
   text-decoration: none;
 }
 
@@ -218,83 +222,83 @@
 /* ---------- 1. Main Stock Positions Table ----------------------------------- */
 
 .stock-table.stock-positions-table {
-  min-width: 780px;
+  min-width: calc(var(--space-8) * 12);
 }
 
 .stock-positions-table col.col-item {
   width: 24%;
-  min-width: 170px;
+  min-width: calc(var(--space-8) * 3);
 }
 
 .stock-positions-table col.col-batch {
   width: 15%;
-  min-width: 120px;
+  min-width: calc(var(--space-8) * 2);
 }
 
 .stock-positions-table col.col-expiry {
   width: 12%;
-  min-width: 100px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-positions-table col.col-condition {
   width: 11%;
-  min-width: 90px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-positions-table col.col-on-hand {
   width: 10%;
-  min-width: 80px;
+  min-width: calc(var(--space-8) * 1.25);
 }
 
 .stock-positions-table col.col-fefo {
   width: 9%;
-  min-width: 80px;
+  min-width: calc(var(--space-8) * 1.25);
 }
 
 .stock-positions-table col.col-available {
   width: 9%;
-  min-width: 80px;
+  min-width: calc(var(--space-8) * 1.25);
 }
 
 .stock-positions-table col.col-unit-cost {
   width: 10%;
-  min-width: 90px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 /* ---------- 2. Item Details (Stock Card) Table ------------------------------ */
 
 .stock-table.stock-card-table {
-  min-width: 700px;
+  min-width: calc(var(--space-8) * 10);
 }
 
 .stock-card-table col.col-when {
   width: 22%;
-  min-width: 140px;
+  min-width: calc(var(--space-8) * 2);
 }
 
 .stock-card-table col.col-movement {
   width: 20%;
-  min-width: 130px;
+  min-width: calc(var(--space-8) * 2);
 }
 
 .stock-card-table col.col-condition {
   width: 14%;
-  min-width: 95px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table col.col-qty {
   width: 14%;
-  min-width: 90px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table col.col-balance {
   width: 14%;
-  min-width: 90px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table col.col-unit-cost {
   width: 16%;
-  min-width: 100px;
+  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table td.cell-when {
@@ -304,7 +308,7 @@
 /* ---------- 3. Opening Balance Table (Adding & Viewing Items) --------------- */
 
 .stock-table.opening-balance-table {
-  min-width: 760px;
+  min-width: calc(var(--space-8) * 11);
 }
 
 .stock-table td.empty-table-cell {
@@ -317,11 +321,11 @@
 .opening-balance-table input,
 .opening-balance-table select {
   width: 100%;
-  padding: 6px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius, 6px);
-  font-size: 13px;
-  background: var(--color-surface, #fff);
+  padding: var(--space-1) calc(var(--space-1) + var(--space-half));
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  background: var(--color-surface);
   color: var(--color-text);
 }
 
@@ -334,44 +338,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-danger, #dc2626);
+  padding: var(--space-half) var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-alert-text);
   background: transparent;
-  border: 1px solid currentColor;
-  border-radius: var(--radius, 4px);
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .opening-balance-table .btn-remove:hover {
-  background: var(--color-danger, #dc2626);
-  color: #fff;
+  background: var(--color-alert-text);
+  color: var(--color-on-accent);
 }
-
-/* ---------- Responsive Adjustments across Devices -------------------------- */
-
-@media (max-width: 768px) {
-  .stock-positions-filters {
-    padding: var(--space-2);
-    gap: var(--space-2);
-  }
-
-  .stock-positions-filters .modern-location-picker,
-  .modern-filter-panel--stock .modern-location-picker {
-    max-width: 100%;
-  }
-
-  .stock-table th,
-  .stock-table td {
-    padding: 8px 10px;
-    font-size: 13px;
-  }
-
-  .stock-card-header h1 {
-    font-size: 20px;
-  }
-}
-
-
