@@ -22,12 +22,15 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.m7customers.api.AccountCharged;
 import lk.coopfed.knoweb.m7customers.api.AccountOpened;
 import lk.coopfed.knoweb.m7customers.api.AmendCustomer;
+import lk.coopfed.knoweb.m7customers.api.BulkImportMembers;
+import lk.coopfed.knoweb.m7customers.api.BulkMemberReport;
 import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.ConsentRecorded;
 import lk.coopfed.knoweb.m7customers.api.CustomerDeactivated;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentRecorded;
 import lk.coopfed.knoweb.m7customers.api.CustomerRegistered;
 import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
+import lk.coopfed.knoweb.m7customers.api.MembersBulkImported;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
@@ -53,6 +56,9 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Handles<RegisterCustomer, UUID> register;
+
+    @Autowired
+    Handles<BulkImportMembers, BulkMemberReport> bulkImport;
 
     @Autowired
     Handles<AmendCustomer, UUID> amend;
@@ -143,6 +149,79 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
         CustomerCard card = customers.card(first, office()).orElseThrow();
         assertThat(card.phone()).isEqualTo("+94700000103");
         assertThat(card.phones()).hasSize(2);
+    }
+
+    @Test
+    void aMemberSheetRegistersCustomersWithTheReusePromptHonoured() {
+        // 1. Arrange an existing customer who held and gave up a phone within the reuse window
+        UUID previousHolder = registerMember("K. Dissanayake", "0700000201", false);
+        changePhone.handle(new ChangePhone(previousHolder, "0700000202", "Replaced SIM", false), office());
+        kernel.reset();
+
+        String sheet =
+                """
+                name,sinhala_name,lang,mobile,nic,limit,tags
+                Anoma Herath,අනෝමා හේරත්,si,0700000201,199012345678,5000.00,member
+                Sunil Shantha,,en,0700000203,,0.00,regular
+                """;
+
+        // 2. Unconfirmed: reuse prompt (m7.customer.phone_reuse_confirm) is raised
+        assertThatThrownBy(() -> bulkImport.handle(BulkImportMembers.ofSheet(sheet, false), office()))
+                .isInstanceOfSatisfying(ProblemException.class, p -> {
+                    assertThat(p.getMessage()).contains("m7.customer.phone_reuse_confirm");
+                });
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        // 3. With reuse confirmed: the reuse prompt is honoured and customers are registered
+        BulkMemberReport report = bulkImport.handle(BulkImportMembers.ofSheet(sheet, true), office());
+        assertThat(report.status()).isEqualTo(BulkMemberReport.IMPORTED);
+        assertThat(report.totalRows()).isEqualTo(2);
+        assertThat(report.registeredCount()).isEqualTo(2);
+        assertThat(report.updatedCount()).isEqualTo(0);
+        assertThat(report.failedCount()).isEqualTo(0);
+
+        // Verify the customer who reused the released phone
+        CustomerCard card1 = customers.search("Anoma Herath", null, 10, office()).stream()
+                .findFirst()
+                .flatMap(s -> customers.card(s.customerId(), office()))
+                .orElseThrow();
+        assertThat(card1.phone()).isEqualTo("+94700000201");
+        assertThat(card1.status()).isEqualTo("ACTIVE");
+        assertThat(card1.tags()).contains("member");
+        assertThat(card1.account()).isNotNull();
+        assertThat(card1.account().creditLimit()).isEqualByComparingTo("5000.00");
+
+        // Verify previous holder is audited under CUSTOMER_REGISTERED
+        AuditRecord regAudit = kernel.committedAudit().stream()
+                .filter(a -> a.eventType().equals("CUSTOMER_REGISTERED")
+                        && a.subject().id().equals(card1.customerId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(String.valueOf(regAudit.after())).contains(previousHolder.toString());
+
+        // Verify batch audit and domain events
+        AuditRecord batchAudit = single("MEMBERS_BULK_IMPORTED");
+        assertThat(((Map<?, ?>) batchAudit.after()).get("registered")).isEqualTo(2);
+        assertThat(kernel.committedEvents())
+                .anyMatch(e ->
+                        e instanceof MembersBulkImported mbi && mbi.registeredCount() == 2 && mbi.totalRows() == 2);
+
+        // 4. Existing member: re-importing with updated details honours existing customer rather than blindly failing
+        kernel.reset();
+        String updateSheet =
+                """
+                name,sinhala_name,lang,mobile,nic,limit,tags
+                Anoma Herath Updated,අනෝමා හේරත්,si,0700000201,199012345678,5000.00,vip
+                """;
+        BulkMemberReport updateReport = bulkImport.handle(BulkImportMembers.ofSheet(updateSheet, true), office());
+        assertThat(updateReport.status()).isEqualTo(BulkMemberReport.IMPORTED);
+        assertThat(updateReport.registeredCount()).isEqualTo(0);
+        assertThat(updateReport.updatedCount()).isEqualTo(1);
+
+        CustomerCard updatedCard = customers.card(card1.customerId(), office()).orElseThrow();
+        assertThat(updatedCard.displayName()).isEqualTo("Anoma Herath Updated");
+        assertThat(updatedCard.tags()).contains("vip");
     }
 
     @Test
