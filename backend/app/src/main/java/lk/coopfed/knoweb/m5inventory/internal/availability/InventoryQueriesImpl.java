@@ -1,15 +1,21 @@
 package lk.coopfed.knoweb.m5inventory.internal.availability;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -17,12 +23,14 @@ import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.EntityCost;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,10 +79,15 @@ class InventoryQueriesImpl implements InventoryQueries {
 
     private final JdbcTemplate jdbc;
     private final BusinessDay businessDay;
+    private final ZoneId zone;
 
-    InventoryQueriesImpl(JdbcTemplate jdbc, BusinessDay businessDay) {
+    InventoryQueriesImpl(
+            JdbcTemplate jdbc,
+            BusinessDay businessDay,
+            @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
+        this.zone = ZoneId.of(zone);
     }
 
     @Override
@@ -490,5 +503,47 @@ class InventoryQueriesImpl implements InventoryQueries {
 
     private Date today() {
         return Date.valueOf(businessDay.today());
+    }
+
+    @Override
+    public Map<UUID, LocationSalesCost> locationsSalesCost(LocalDate from, LocalDate to, ScopeContext scope) {
+        if (from == null || to == null) {
+            return Map.of();
+        }
+        Instant start = from.atStartOfDay(zone).toInstant();
+        Instant end = to.plusDays(1).atStartOfDay(zone).toInstant();
+
+        Map<UUID, LocationSalesCost> result = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select location_id,
+                       coalesce(sum(case when movement_type = 'SALE' then abs(qty_delta) * unit_cost_at_movement
+                                         when movement_type = 'SALE_REVERSAL' then -1 * abs(qty_delta) * unit_cost_at_movement
+                                         else 0 end), 0) as recognized_cost,
+                       bool_or(unit_cost_at_movement <= 0) as has_pending,
+                       count(*) as movement_count
+                  from inventory.stock_movement
+                 where movement_type in ('SALE', 'SALE_REVERSAL')
+                   and occurred_at >= ? and occurred_at < ?
+                 group by location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    BigDecimal cost = rs.getBigDecimal("recognized_cost");
+                    boolean pending = Boolean.TRUE.equals(rs.getObject("has_pending", Boolean.class));
+                    long count = rs.getLong("movement_count");
+                    result.put(
+                            locId,
+                            new LocationSalesCost(
+                                    locId,
+                                    cost != null
+                                            ? cost.setScale(2, RoundingMode.HALF_UP)
+                                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                                    pending,
+                                    count));
+                },
+                Timestamp.from(start),
+                Timestamp.from(end));
+        return result;
     }
 }

@@ -93,5 +93,15 @@
   "m8.shop_report.location_unknown": "වෙළඳසැල හමු නොවීය හෝ ඔබගේ සංවිධානයෙන් පිටත වේ",
   "m8.shop_report.location_forbidden": "වෙනත් වෙළඳසැලක වාර්තා බැලීමට ඔබට අවසර නැත",
   "m8.shop_report.date_invalid": "වාර්තාකරණ දිනය වලංගු නොවේ",
-  "m8.shop_report.month_invalid": "වාර්තාකරණ මාස ආකෘතිය වලංගු නොවේ, YYYY-MM අපේක්ෂිතයි"
+  "m8.shop_report.month_invalid": "වාර්තාකරණ මාස ආකෘතිය වලංගු නොවේ, YYYY-MM අපේක්ෂිතයි",
+  "m8.profit_center.own_required": "ලාභ මධ්‍යස්ථාන කළමනාකරණය කළ හැක්කේ තම ආයතනය වෙනුවෙන් ක්‍රියාකරන පරිශීලකයින්ට පමණි",
+  "m8.profit_center.code_required": "ලාභ මධ්‍යස්ථාන කේතය අවශ්‍යයි",
+  "m8.profit_center.code_too_long": "ලාභ මධ්‍යස්ථාන කේතය අක්ෂර 32 නොඉක්මවිය යුතුය",
+  "m8.profit_center.name_required": "ලාභ මධ්‍යස්ථානයේ නම අවශ්‍යයි",
+  "m8.profit_center.category_invalid": "ප්‍රවර්ගය AGENCY, PACKING, RETAIL හෝ GENERAL විය යුතුය",
+  "m8.profit_center.location_unknown": "මෙහෙයුම් ස්ථානය හමු නොවීය හෝ ඔබේ ආයතනයෙන් පිටත වේ",
+  "m8.profit_center.location_scope_mismatch": "මෙම ස්ථානය ඔබගේ සංවිධානයට හෝ විෂය පථයට අයත් නොවේ",
+  "m8.profit_center.duplicate_code": "මෙම කේතය සහිත ලාභ මධ්‍යස්ථානයක් දැනටමත් ඔබේ ආයතනයේ පවතී",
+  "m8.profit_center.not_found": "ඉල්ලූ ලාභ මධ්‍යස්ථානය ඔබේ විෂය පථය තුළ හමු නොවීය",
+  "m8.profit_center.month_invalid": "වාර්තාකරණ මාස ආකෘතිය වලංගු නොවේ, YYYY-MM අපේක්ෂිතයි"
 }

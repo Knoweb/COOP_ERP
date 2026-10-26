@@ -5,6 +5,7 @@ templates:
     permissions:
       - "rpt.report.run"
       - "rpt.target.view"
+      - "rpt.profit_center.view"
       - "gov.entity.view"
       - "prt.relationship.view"
       - "prt.location.view"
@@ -30,6 +31,8 @@ templates:
       - "rpt.export.run"
       - "rpt.target.view"
       - "rpt.target.manage"
+      - "rpt.profit_center.view"
+      - "rpt.profit_center.manage"
       - "gov.entity.view"
       - "gov.user.manage"
       - "gov.user.view"
