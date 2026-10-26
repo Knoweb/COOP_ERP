@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Link } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -11,6 +11,114 @@ import { StateChip } from "../../shell/components/StateChip";
 import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
+
+/** Custom Status dropdown with styled selection, checkmark, custom hover and responsive layout */
+function StatusDropdown(props: {
+  value: SocietyStatus | "";
+  onChange: (value: SocietyStatus | "") => void;
+  anyLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const t = useT();
+
+  const options: { value: SocietyStatus | ""; label: string }[] = [
+    { value: "", label: props.anyLabel },
+    ...STATUSES.map((status) => ({
+      value: status,
+      label: t(statusMessageId(status)).text
+    }))
+  ];
+
+  const currentOption = options.find((opt) => opt.value === props.value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="custom-status-dropdown" ref={containerRef}>
+      <button
+        type="button"
+        className="custom-status-dropdown__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span className="custom-status-dropdown__label">{currentOption.label}</span>
+        <svg
+          className="custom-status-dropdown__arrow"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="m7 9 5 5 5-5" />
+        </svg>
+      </button>
+
+      {open && (
+        <ul className="custom-status-dropdown__menu" role="listbox">
+          {options.map((opt) => {
+            const isSelected = props.value === opt.value;
+            return (
+              <li key={opt.value} role="presentation">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={
+                    isSelected
+                      ? "custom-status-dropdown__option custom-status-dropdown__option--selected"
+                      : "custom-status-dropdown__option"
+                  }
+                  onClick={() => {
+                    props.onChange(opt.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="custom-status-dropdown__option-label">{opt.label}</span>
+                  {isSelected && (
+                    <span className="custom-status-dropdown__check" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
@@ -32,6 +140,7 @@ export function SocietyRegisterPage() {
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
   const [search, setSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(true);
   const deferredSearch = useDeferredValue(search);
 
   const filter = {
@@ -70,30 +179,66 @@ export function SocietyRegisterPage() {
         )}
       </div>
 
-      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel">
-        <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
-        </label>
-        <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
-          <div className="modern-select">
-            <select value={status} onChange={(event) => setStatus(event.target.value as SocietyStatus | "")}>
-              <option value="">{t("party.filter.status.any").text}</option>
-              {STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {t(statusMessageId(value)).text}
-                </option>
-              ))}
-            </select>
-            <svg className="modern-select__arrow" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" /></svg>
-          </div>
-        </label>
-        <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
-          <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
-        </label>
-      </form>
+      <div className="society-filters-wrap">
+        <button
+          type="button"
+          className="society-filter-toggle-btn"
+          aria-expanded={showFilters}
+          onClick={() => setShowFilters((prev) => !prev)}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="7" y1="12" x2="17" y2="12" />
+            <line x1="10" y1="18" x2="14" y2="18" />
+          </svg>
+          <span>{t("party.filter.toggle").text}</span>
+          <svg
+            className={`society-filter-arrow ${showFilters ? "society-filter-arrow--open" : ""}`}
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+
+        {showFilters && (
+          <form role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">
+            <label className="modern-field">
+              <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
+            </label>
+            <div className="modern-field">
+              <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
+              <StatusDropdown
+                value={status}
+                onChange={(val) => setStatus(val)}
+                anyLabel={t("party.filter.status.any").text}
+              />
+            </div>
+            <label className="modern-field">
+              <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
+              <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
+            </label>
+          </form>
+        )}
+      </div>
 
       {societies.isLoading && <p>{t("party.list.loading").text}</p>}
       {societies.isError && <p role="alert">{errorText(societies.error, t("party.error.generic").text)}</p>}
