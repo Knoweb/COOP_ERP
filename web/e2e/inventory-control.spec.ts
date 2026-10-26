@@ -78,8 +78,10 @@ test("a repack executes successfully after validation and is reversed to keep th
     .selectOption(DEMO_LOCATIONS.m101Stores);
   const newestExecuted = page.getByRole("row").filter({ hasText: textOf(manager, "inventory.repack.status.EXECUTED") }).first();
   await newestExecuted.getByRole("button", { name: textOf(manager, "inventory.repack.reverse") }).click();
-  await page.getByLabel(textOf(manager, "shell.reason.code"), { exact: true }).selectOption("WRONG_QTY");
-  await page.getByRole("button", { name: textOf(manager, "shell.reason.confirm") }).click();
+  const reversal = page.getByRole("dialog", { name: textOf(manager, "inventory.repack.reverse.question") });
+  await expect(reversal).toBeVisible();
+  await reversal.getByRole("combobox").selectOption("WRONG_QTY");
+  await reversal.getByRole("button", { name: textOf(manager, "shell.reason.confirm") }).click();
   await expect(page.getByText(textOf(manager, "inventory.repack.status.REVERSED"), { exact: true }).first()).toBeVisible();
   await page.context().close();
 });
