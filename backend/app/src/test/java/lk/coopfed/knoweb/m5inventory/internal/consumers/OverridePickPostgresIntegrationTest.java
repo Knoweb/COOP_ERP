@@ -158,9 +158,7 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         });
 
         kernel.reset();
-        outer.run(
-                own(OWNER),
-                () -> dispatch.handle(new DispatchDelivery(pick.deliveryNoteId(), OWNER, null), own(OWNER)));
+        dispatch.handle(new DispatchDelivery(pick.deliveryNoteId(), OWNER, null), own(OWNER));
 
         assertThat(queries.movementsOf(pick.deliveryNoteId(), own(OWNER)))
                 .singleElement()
@@ -172,9 +170,7 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(onHand(early)).isEqualByComparingTo("10");
         assertThat(onHand(late)).isEqualByComparingTo("6");
 
-        outer.run(
-                own(OWNER),
-                () -> dispatch.handle(new DispatchDelivery(pick.deliveryNoteId(), OWNER, null), own(OWNER)));
+        dispatch.handle(new DispatchDelivery(pick.deliveryNoteId(), OWNER, null), own(OWNER));
         assertThat(queries.movementsOf(pick.deliveryNoteId(), own(OWNER))).hasSize(1);
     }
 
@@ -197,12 +193,9 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         assertProblem(() -> runOverride(pick, wrongLocationLot, "Wrong warehouse"), "m5.pick.location_mismatch");
         assertProblem(() -> runOverride(pick, expiredLot, "Expired"), "m5.pick.lot_expired");
         assertProblem(
-                () -> outer.run(
-                        own(OTHER),
-                        () -> override.handle(
-                                new OverridePick(
-                                        pick.deliveryNoteId(), pick.pickLineId(), lot(warehouse, late), "Other"),
-                                own(OTHER))),
+                () -> override.handle(
+                        new OverridePick(pick.deliveryNoteId(), pick.pickLineId(), lot(warehouse, late), "Other"),
+                        own(OTHER)),
                 "m5.pick_list.not_found");
         assertThat(overrides()).isZero();
         assertThat(kernel.committedAudit()).isEmpty();
@@ -214,14 +207,12 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         Pick pick = openPick("8");
         UUID lateLot = lot(warehouse, late);
         UUID anotherDelivery = Ids.next();
-        outer.run(
-                own(OWNER),
-                () -> reserve.handle(
-                        new ReserveDelivery(
-                                anotherDelivery,
-                                OWNER,
-                                List.of(new ReserveDelivery.Line(Ids.next(), sku, late, new BigDecimal("5")))),
-                        own(OWNER)));
+        reserve.handle(
+                new ReserveDelivery(
+                        anotherDelivery,
+                        OWNER,
+                        List.of(new ReserveDelivery.Line(Ids.next(), sku, late, new BigDecimal("5")))),
+                own(OWNER));
         kernel.reset();
 
         assertProblem(() -> runOverride(pick, lateLot, "Need the later batch"), "m5.pick.lot_unavailable");
@@ -238,20 +229,14 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
 
         ScopeContext view = federationView(OWNER);
         assertProblem(
-                () -> outer.run(
-                        view,
-                        () -> override.handle(
-                                new OverridePick(
-                                        first.deliveryNoteId(), first.pickLineId(), lateLot, "Read-only viewer"),
-                                view)),
+                () -> override.handle(
+                        new OverridePick(first.deliveryNoteId(), first.pickLineId(), lateLot, "Read-only viewer"),
+                        view),
                 "m5.scope.own_required");
         ScopeContext system = InventoryFixture.system(OWNER);
         assertProblem(
-                () -> outer.run(
-                        system,
-                        () -> override.handle(
-                                new OverridePick(first.deliveryNoteId(), first.pickLineId(), lateLot, "System actor"),
-                                system)),
+                () -> override.handle(
+                        new OverridePick(first.deliveryNoteId(), first.pickLineId(), lateLot, "System actor"), system),
                 "m5.pick.user_required");
         assertProblem(
                 () -> runOverride(
@@ -279,14 +264,12 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         assertProblem(() -> runOverride(pick, emptyLot, "Empty stock"), "m5.pick.lot_unavailable");
 
         UUID delivery = Ids.next();
-        UUID pickList = outer.run(
-                own(OWNER),
-                () -> reserve.handle(
-                        new ReserveDelivery(
-                                delivery,
-                                OWNER,
-                                List.of(new ReserveDelivery.Line(Ids.next(), sku, null, new BigDecimal("30")))),
-                        own(OWNER)));
+        UUID pickList = reserve.handle(
+                new ReserveDelivery(
+                        delivery,
+                        OWNER,
+                        List.of(new ReserveDelivery.Line(Ids.next(), sku, null, new BigDecimal("30")))),
+                own(OWNER));
         UUID shortLine = superuserJdbc()
                 .queryForObject(
                         "select pick_line_id from inventory.pick_list_line"
@@ -334,9 +317,7 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         assertProblem(() -> runOverride(first, lateLot, "Duplicate"), "m5.pick.already_overridden");
 
         Pick second = openPick("2");
-        outer.run(
-                own(OWNER),
-                () -> dispatch.handle(new DispatchDelivery(second.deliveryNoteId(), OWNER, null), own(OWNER)));
+        dispatch.handle(new DispatchDelivery(second.deliveryNoteId(), OWNER, null), own(OWNER));
         kernel.reset();
         assertProblem(() -> runOverride(second, lateLot, "Too late"), "m5.pick_list.not_open");
         assertThat(overrides()).isEqualTo(1);
@@ -377,10 +358,7 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
                     pool.submit(() -> outcome(start, () -> runOverride(pick, lateLot, "Concurrent replacement")));
             Future<String> dispatchResult = pool.submit(() -> outcome(
                     start,
-                    () -> outer.run(
-                            own(OWNER),
-                            () -> dispatch.handle(
-                                    new DispatchDelivery(pick.deliveryNoteId(), OWNER, null), own(OWNER)))));
+                    () -> dispatch.handle(new DispatchDelivery(pick.deliveryNoteId(), OWNER, null), own(OWNER))));
             start.countDown();
 
             assertThat(List.of(overrideResult.get(20, TimeUnit.SECONDS), dispatchResult.get(20, TimeUnit.SECONDS)))
@@ -406,15 +384,10 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
         Pick pick = openPick("4");
 
         assertProblem(
-                () -> outer.run(
-                        at(OWNER, otherWarehouse),
-                        () -> override.handle(
-                                new OverridePick(
-                                        pick.deliveryNoteId(),
-                                        pick.pickLineId(),
-                                        lot(warehouse, late),
-                                        "Sibling warehouse"),
-                                at(OWNER, otherWarehouse))),
+                () -> override.handle(
+                        new OverridePick(
+                                pick.deliveryNoteId(), pick.pickLineId(), lot(warehouse, late), "Sibling warehouse"),
+                        at(OWNER, otherWarehouse)),
                 "m5.pick.line_not_found");
         assertThat(overrides()).isZero();
     }
@@ -453,14 +426,10 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private Pick openPick(String qty) {
         UUID delivery = Ids.next();
-        UUID pickList = outer.run(
-                own(OWNER),
-                () -> reserve.handle(
-                        new ReserveDelivery(
-                                delivery,
-                                OWNER,
-                                List.of(new ReserveDelivery.Line(Ids.next(), sku, null, new BigDecimal(qty)))),
-                        own(OWNER)));
+        UUID pickList = reserve.handle(
+                new ReserveDelivery(
+                        delivery, OWNER, List.of(new ReserveDelivery.Line(Ids.next(), sku, null, new BigDecimal(qty)))),
+                own(OWNER));
         PickListView.Pick line =
                 queries.pickList(delivery, own(OWNER)).orElseThrow().lines().get(0);
         kernel.reset();
@@ -473,9 +442,7 @@ class OverridePickPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private UUID runOverride(
             UUID deliveryNoteId, UUID pickLineId, UUID replacementLotId, String reason, ScopeContext scope) {
-        return outer.run(
-                scope,
-                () -> override.handle(new OverridePick(deliveryNoteId, pickLineId, replacementLotId, reason), scope));
+        return override.handle(new OverridePick(deliveryNoteId, pickLineId, replacementLotId, reason), scope);
     }
 
     private UUID post(UUID location, UUID batch, String qty, String cost) {
