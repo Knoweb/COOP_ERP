@@ -15,7 +15,6 @@ import { usePricingApi } from "./pricingApi";
 import type { RetailPrice, SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { bindingCeiling, chipOf, errorText, incompleteLines, reasonMessageId } from "./priceListState";
-import { PricingTabs } from "./PricingTabs";
 import { ShelfLabelPrintAction } from "./ShelfLabelPrintAction";
 import "./pricing.css";
 
