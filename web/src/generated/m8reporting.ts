@@ -243,6 +243,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/profit-centers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List profit center reporting dimensions
+         * @description Returns all active profit center dimensions for the caller's permitted scope.
+         */
+        get: operations["listProfitCenters"];
+        put?: never;
+        /**
+         * Define a profit center reporting dimension
+         * @description Creates a profit center reporting dimension for an agency or packing operation. Codes this operation can answer with 422: m8.profit_center.own_required, m8.profit_center.code_required, m8.profit_center.name_required, m8.profit_center.category_invalid, m8.profit_center.duplicate_code, m8.profit_center.location_unknown, m8.profit_center.location_scope_mismatch.
+         */
+        post: operations["createProfitCenter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/profit-centers/monthly-pnl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Month-end revenue, cost and profit/loss by profit center
+         * @description Produces month-end revenue, cost of goods sold, gross profit/loss, and margin percentage by profit center, reconciling totals with underlying posted sales facts. Surfaces pending/unresolved costs without faking zero cost or overstating profit.
+         */
+        get: operations["getMonthlyProfitCenterPnl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -520,6 +564,63 @@ export interface components {
             /** @enum {string} */
             performanceState: "TARGET_MET" | "BEHIND_TARGET" | "NO_TARGET";
             currency: string;
+        };
+        CreateProfitCenterRequest: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            category: "AGENCY" | "PACKING" | "RETAIL" | "GENERAL";
+            /** Format: uuid */
+            locationId?: string | null;
+        };
+        ProfitCenterResponse: {
+            /** Format: uuid */
+            profitCenterId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            code: string;
+            name: string;
+            category: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            locationName?: string | null;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ProfitCenterListResponse: {
+            items: components["schemas"]["ProfitCenterResponse"][];
+        };
+        ProfitCenterPnlItem: {
+            /** Format: uuid */
+            profitCenterId?: string | null;
+            code: string;
+            name: string;
+            category: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            locationName?: string | null;
+            revenue: string;
+            cost?: string | null;
+            grossProfit?: string | null;
+            marginPercent?: string | null;
+            costPending: boolean;
+            /** Format: int64 */
+            txnCount: number;
+        };
+        ProfitCenterPnlSummary: {
+            totalRevenue: string;
+            totalCost?: string | null;
+            grossProfit?: string | null;
+            marginPercent?: string | null;
+            costPending: boolean;
+        };
+        MonthlyProfitCenterPnlResponse: {
+            month: string;
+            currency: string;
+            summary: components["schemas"]["ProfitCenterPnlSummary"];
+            items: components["schemas"]["ProfitCenterPnlItem"][];
+            unallocated?: components["schemas"]["ProfitCenterPnlItem"];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -985,6 +1086,103 @@ export interface operations {
                 content?: never;
             };
             /** @description Shop not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listProfitCenters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of profit centers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitCenterListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createProfitCenter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProfitCenterRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitCenterResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getMonthlyProfitCenterPnl: {
+        parameters: {
+            query?: {
+                /** @description Year and month (YYYY-MM), defaults to current business month */
+                month?: string;
+                profitCenterId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly profit center P&L report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyProfitCenterPnlResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Profit center not found in caller's permitted scope */
             404: {
                 headers: {
                     [name: string]: unknown;

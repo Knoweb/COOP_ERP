@@ -1,7 +1,9 @@
 package lk.coopfed.knoweb.m5inventory.query;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -81,4 +83,11 @@ public interface InventoryQueries {
 
     /** The transfers leaving or arriving at a location, newest first, with their lines. */
     List<TransferView> transfers(UUID locationId, ScopeContext scope);
+
+    /**
+     * Authoritative Cost of Goods Sold (COGS) aggregated by location for SALE and SALE_REVERSAL movements
+     * within the date bounds [from, to] (inclusive, in the business timezone).
+     * If any SALE movement has an unresolved or non-positive unit cost, {@code costPending} is true.
+     */
+    Map<UUID, LocationSalesCost> locationsSalesCost(LocalDate from, LocalDate to, ScopeContext scope);
 }

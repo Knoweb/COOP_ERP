@@ -326,6 +326,80 @@ paths:
         '404':
           description: Shop not found in caller's permitted scope
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/profit-centers:
+    get:
+      tags: [Reporting]
+      operationId: listProfitCenters
+      summary: List profit center reporting dimensions
+      description: Returns all active profit center dimensions for the caller's permitted scope.
+      x-permission: rpt.profit_center.view
+      responses:
+        '200':
+          description: List of profit centers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfitCenterListResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+    post:
+      tags: [Reporting]
+      operationId: createProfitCenter
+      summary: Define a profit center reporting dimension
+      description: >
+        Creates a profit center reporting dimension for an agency or packing operation.
+        Codes this operation can answer with 422: m8.profit_center.own_required,
+        m8.profit_center.code_required, m8.profit_center.name_required,
+        m8.profit_center.category_invalid, m8.profit_center.duplicate_code,
+        m8.profit_center.location_unknown, m8.profit_center.location_scope_mismatch.
+      x-permission: rpt.profit_center.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProfitCenterRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfitCenterResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/profit-centers/monthly-pnl:
+    get:
+      tags: [Reporting]
+      operationId: getMonthlyProfitCenterPnl
+      summary: Month-end revenue, cost and profit/loss by profit center
+      description: >
+        Produces month-end revenue, cost of goods sold, gross profit/loss, and margin percentage
+        by profit center, reconciling totals with underlying posted sales facts.
+        Surfaces pending/unresolved costs without faking zero cost or overstating profit.
+      x-permission: rpt.profit_center.view
+      parameters:
+        - name: month
+          in: query
+          required: false
+          description: 'Year and month (YYYY-MM), defaults to current business month'
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+        - name: profitCenterId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Monthly profit center P&L report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyProfitCenterPnlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+        '404':
+          description: Profit center not found in caller's permitted scope
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     ReportId:
@@ -634,3 +708,78 @@ components:
           type: string
           enum: [TARGET_MET, BEHIND_TARGET, NO_TARGET]
         currency: { type: string }
+    CreateProfitCenterRequest:
+      type: object
+      required: [code, name, category]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+        name:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          enum: [AGENCY, PACKING, RETAIL, GENERAL]
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+    ProfitCenterResponse:
+      type: object
+      required: [profitCenterId, ownerEntityId, code, name, category, status, createdAt]
+      properties:
+        profitCenterId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        locationId: { type: string, format: uuid, nullable: true }
+        locationName: { type: string, nullable: true }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+    ProfitCenterListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ProfitCenterResponse' }
+    ProfitCenterPnlItem:
+      type: object
+      required: [code, name, category, revenue, costPending, txnCount]
+      properties:
+        profitCenterId: { type: string, format: uuid, nullable: true }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        locationId: { type: string, format: uuid, nullable: true }
+        locationName: { type: string, nullable: true }
+        revenue: { type: string }
+        cost: { type: string, nullable: true }
+        grossProfit: { type: string, nullable: true }
+        marginPercent: { type: string, nullable: true }
+        costPending: { type: boolean }
+        txnCount: { type: integer, format: int64 }
+    ProfitCenterPnlSummary:
+      type: object
+      required: [totalRevenue, costPending]
+      properties:
+        totalRevenue: { type: string }
+        totalCost: { type: string, nullable: true }
+        grossProfit: { type: string, nullable: true }
+        marginPercent: { type: string, nullable: true }
+        costPending: { type: boolean }
+    MonthlyProfitCenterPnlResponse:
+      type: object
+      required: [month, currency, summary, items]
+      properties:
+        month: { type: string }
+        currency: { type: string }
+        summary: { $ref: '#/components/schemas/ProfitCenterPnlSummary' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ProfitCenterPnlItem' }
+        unallocated:
+          $ref: '#/components/schemas/ProfitCenterPnlItem'
