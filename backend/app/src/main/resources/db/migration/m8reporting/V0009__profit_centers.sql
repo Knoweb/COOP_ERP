@@ -23,20 +23,20 @@ ALTER TABLE reporting.profit_center FORCE ROW LEVEL SECURITY;
 CREATE POLICY own_read ON reporting.profit_center FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND owner_entity_id = kernel.scope_entity()
-           AND (kernel.scope_location() IS NULL OR location_id IS NULL OR location_id = kernel.scope_location()));
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
 CREATE POLICY own_write ON reporting.profit_center FOR INSERT TO app_rw
     WITH CHECK (kernel.scope_class() = 'OWN'
                 AND owner_entity_id = kernel.scope_entity()
-                AND (kernel.scope_location() IS NULL OR location_id IS NULL OR location_id = kernel.scope_location()));
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
 CREATE POLICY own_update ON reporting.profit_center FOR UPDATE TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND owner_entity_id = kernel.scope_entity()
-           AND (kernel.scope_location() IS NULL OR location_id IS NULL OR location_id = kernel.scope_location()))
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))
     WITH CHECK (kernel.scope_class() = 'OWN'
                 AND owner_entity_id = kernel.scope_entity()
-                AND (kernel.scope_location() IS NULL OR location_id IS NULL OR location_id = kernel.scope_location()));
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
 CREATE POLICY fed_view ON reporting.profit_center FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'FEDERATION_VIEW');
