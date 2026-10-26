@@ -17,6 +17,7 @@ import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
+import lk.coopfed.knoweb.m5inventory.api.OverridePick;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
@@ -34,6 +35,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.LotBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.MovementResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.OverridePickRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
@@ -65,6 +67,7 @@ class InventoryController implements InventoryApi {
     private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
     private final Handles<CancelTransfer, UUID> cancelTransfer;
+    private final Handles<OverridePick, UUID> overridePick;
 
     InventoryController(
             InventoryQueries queries,
@@ -76,7 +79,8 @@ class InventoryController implements InventoryApi {
             Handles<IssueTransfer, UUID> issueTransfer,
             Handles<DispatchTransfer, UUID> dispatchTransfer,
             Handles<ReceiveTransfer, UUID> receiveTransfer,
-            Handles<CancelTransfer, UUID> cancelTransfer) {
+            Handles<CancelTransfer, UUID> cancelTransfer,
+            Handles<OverridePick, UUID> overridePick) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
@@ -87,6 +91,7 @@ class InventoryController implements InventoryApi {
         this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
         this.cancelTransfer = cancelTransfer;
+        this.overridePick = overridePick;
     }
 
     // ---- transfers (M5-09) ----------------------------------------------------------------
@@ -237,6 +242,16 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
+    public ResponseEntity<Void> overridePick(
+            String idempotencyKey, UUID deliveryNoteId, UUID pickLineId, OverridePickRequest request) {
+        ScopeContext scope = currentScope.get();
+        overridePick.handle(
+                new OverridePick(deliveryNoteId, pickLineId, request.getReplacementStockLotId(), request.getReason()),
+                scope);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
     public ResponseEntity<OpeningBalanceResponse> getOpeningBalance(UUID openingBalanceId) {
         return queries.openingBalance(openingBalanceId, currentScope.get())
                 .map(InventoryController::toResponse)
@@ -335,7 +350,7 @@ class InventoryController implements InventoryApi {
                 list.deliveryDocumentId(),
                 PickListResponse.StatusEnum.fromValue(list.status()),
                 list.lines().stream()
-                        .map(p -> new PickResponse(p.deliveryLineId(), p.skuId(), p.qty())
+                        .map(p -> new PickResponse(p.pickLineId(), p.deliveryLineId(), p.skuId(), p.qty())
                                 .locationId(p.locationId())
                                 .stockLotId(p.stockLotId())
                                 .batchId(p.batchId()))

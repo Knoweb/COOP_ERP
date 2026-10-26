@@ -156,6 +156,39 @@ paths:
               schema: { $ref: '#/components/schemas/PickListResponse' }
         '404':
           description: No pick list for this delivery note, or the caller's scope may not see it
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override:
+    post:
+      tags: [Inventory]
+      operationId: overridePick
+      summary: Replace one FEFO-suggested lot before dispatch
+      description: >
+        The original pick line remains immutable. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid,
+        m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found,
+        m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original,
+        m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch,
+        m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+      x-permission: whs.pick
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OverridePickRequest' }
+      responses:
+        '204':
+          description: The replacement lot is now the effective reservation
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/inventory/opening-balances:
     post:
       tags: [Inventory]
@@ -1069,14 +1102,21 @@ components:
           items: { $ref: '#/components/schemas/PickResponse' }
     PickResponse:
       type: object
-      required: [deliveryLineId, skuId, qty]
+      required: [pickLineId, deliveryLineId, skuId, qty]
       properties:
+        pickLineId: { type: string, format: uuid }
         deliveryLineId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         locationId: { type: string, format: uuid, description: 'absent on the short part of a line' }
         stockLotId: { type: string, format: uuid }
         batchId: { type: string, format: uuid }
         qty: { type: number }
+    OverridePickRequest:
+      type: object
+      required: [replacementStockLotId, reason]
+      properties:
+        replacementStockLotId: { type: string, format: uuid }
+        reason: { type: string, minLength: 1, maxLength: 500 }
     PrepareOpeningBalanceRequest:
       type: object
       required: [locationId, lines]

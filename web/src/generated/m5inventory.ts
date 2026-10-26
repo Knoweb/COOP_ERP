@@ -101,6 +101,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace one FEFO-suggested lot before dispatch
+         * @description The original pick line remains immutable. Codes this operation can answer with 422: m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid, m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found, m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original, m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch, m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+         */
+        post: operations["overridePick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/opening-balances": {
         parameters: {
             query?: never;
@@ -785,6 +805,8 @@ export interface components {
         };
         PickResponse: {
             /** Format: uuid */
+            pickLineId: string;
+            /** Format: uuid */
             deliveryLineId: string;
             /** Format: uuid */
             skuId: string;
@@ -798,6 +820,11 @@ export interface components {
             /** Format: uuid */
             batchId?: string;
             qty: number;
+        };
+        OverridePickRequest: {
+            /** Format: uuid */
+            replacementStockLotId: string;
+            reason: string;
         };
         PrepareOpeningBalanceRequest: {
             /** Format: uuid */
@@ -1326,6 +1353,36 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    overridePick: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: string;
+                pickLineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverridePickRequest"];
+            };
+        };
+        responses: {
+            /** @description The replacement lot is now the effective reservation */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
     prepareOpeningBalance: {
