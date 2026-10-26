@@ -25,6 +25,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customers/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import customers/members in bulk from a sheet or payload
+         * @description Loads members in bulk from a CSV sheet or list of member rows (CAT-10). Honours reuse detection for recently released phone numbers when confirmedIdentity/confirmedReuse is set; otherwise returns m7.customer.phone_reuse_confirm. Handles existing members matching NIC or phone.
+         */
+        post: operations["bulkImportCustomers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customers/{customerId}": {
         parameters: {
             query?: never;
@@ -761,6 +781,44 @@ export interface components {
             /** @description The account's balance after the payment */
             balance: number;
         };
+        BulkImportCustomersRequest: {
+            sheet?: string;
+            /** @default false */
+            confirmedReuse: boolean;
+            members?: components["schemas"]["MemberRowRequest"][];
+        };
+        MemberRowRequest: {
+            displayName: string;
+            displayNameSi?: string | null;
+            displayNameTa?: string | null;
+            language?: components["schemas"]["Language"];
+            phone: string;
+            nic?: string | null;
+            creditLimit?: number | null;
+            termsDays?: number | null;
+            offlineCap?: number | null;
+            tags?: string[];
+            consents?: ("CREDIT_ACCOUNT" | "STATEMENTS_NOTIFICATIONS")[];
+            /** @default false */
+            confirmedIdentity: boolean;
+        };
+        BulkCustomerReport: {
+            /** Format: uuid */
+            importId: string;
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED" | "EMPTY";
+            totalRows: number;
+            registeredCount: number;
+            updatedCount: number;
+            failedCount: number;
+            problems: components["schemas"]["MemberProblem"][];
+        };
+        MemberProblem: {
+            rowNumber: number;
+            nameOrPhone: string;
+            field: string;
+            reason: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -863,6 +921,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerCard"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkImportCustomers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportCustomersRequest"];
+            };
+        };
+        responses: {
+            /** @description Import completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCustomerReport"];
                 };
             };
             400: components["responses"]["RequestProblem"];
