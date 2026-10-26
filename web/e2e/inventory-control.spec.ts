@@ -58,7 +58,10 @@ test("a repack executes successfully after validation and is reversed to keep th
   await page.getByLabel(textOf(buyer, "inventory.repack.input_qty"), { exact: true }).fill("1");
   await page.getByLabel(textOf(buyer, "inventory.repack.actual"), { exact: true }).fill("999");
   await page.getByRole("button", { name: textOf(buyer, "inventory.repack.execute") }).click();
-  await expect(page.getByRole("alert")).toHaveText(backendSinhala["m5.repack.yield_out_of_range"]);
+  const invalidYieldMessage = backendSinhala["m5.repack.yield_out_of_range"]
+    .replace("{actual}", "999")
+    .replace("{expected}", "0.200");
+  await expect(page.getByRole("alert")).toHaveText(invalidYieldMessage);
 
   const executed = page.getByText(textOf(buyer, "inventory.repack.status.EXECUTED"), { exact: true });
   const before = await executed.count();
