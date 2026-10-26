@@ -47,7 +47,7 @@ test("a repack executes successfully after validation and is reversed to keep th
   const buyer = DEMO.m101Buyer;
   let page = await openAs(browser, buyer, "/inventory/repacks");
   await page
-    .getByLabel(textOf(buyer, "inventory.field.location"), { exact: true })
+    .getByLabel(textOf(buyer, "inventory.field.location"))
     .selectOption(DEMO_LOCATIONS.m101Stores);
 
   await expect(page.getByRole("button", { name: textOf(buyer, "inventory.repack.execute") })).toBeDisabled();
@@ -74,7 +74,7 @@ test("a repack executes successfully after validation and is reversed to keep th
   const manager = DEMO.m101Manager;
   page = await openAs(browser, manager, "/inventory/repacks");
   await page
-    .getByLabel(textOf(manager, "inventory.field.location"), { exact: true })
+    .getByLabel(textOf(manager, "inventory.field.location"))
     .selectOption(DEMO_LOCATIONS.m101Stores);
   const newestExecuted = page.getByRole("row").filter({ hasText: textOf(manager, "inventory.repack.status.EXECUTED") }).first();
   await newestExecuted.getByRole("button", { name: textOf(manager, "inventory.repack.reverse") }).click();
