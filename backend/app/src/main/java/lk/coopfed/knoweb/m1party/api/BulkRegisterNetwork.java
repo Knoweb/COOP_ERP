@@ -33,9 +33,26 @@ public record BulkRegisterNetwork(List<Shop> shops, List<User> users, List<Devic
         }
     }
 
-    /** A user to create for the entity with optional till credentials (PIN). */
+    /** A user to create for the entity with optional till credentials (PIN) and login password. */
     public record User(
-            String username, String displayName, String language, String userKind, String pin, String locationCode) {}
+            String username,
+            String displayName,
+            String language,
+            String userKind,
+            String pin,
+            String locationCode,
+            String password) {
+
+        public User(
+                String username,
+                String displayName,
+                String language,
+                String userKind,
+                String pin,
+                String locationCode) {
+            this(username, displayName, language, userKind, pin, locationCode, null);
+        }
+    }
 
     /** A device to enrol and optionally assign to a shop lane. */
     public record Device(

@@ -173,3 +173,7 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Network shops, till positions, users and devices bulk registered
+  - code: USERS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Users bulk imported with identity-provider provisioning

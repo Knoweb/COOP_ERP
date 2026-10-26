@@ -199,6 +199,27 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         return new TemporaryPassword(value);
     }
 
+    @Override
+    public void setPassword(ScopeContext ctx, String subjectId, String password, boolean temporary) {
+        assertInScope(ctx, homeEntityOf(subjectId));
+        call(() -> rest.put()
+                .uri(realmPath + "/users/{id}/reset-password", subjectId)
+                .headers(this::bearer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("type", "password", "value", password, "temporary", temporary))
+                .retrieve()
+                .toBodilessEntity());
+        if (!temporary) {
+            call(() -> rest.put()
+                    .uri(realmPath + "/users/{id}", subjectId)
+                    .headers(this::bearer)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("requiredActions", List.of()))
+                    .retrieve()
+                    .toBodilessEntity());
+        }
+    }
+
     /**
      * Removes the user's OTP credentials and asks for a new one at the next sign-in. The
      * required actions are read and then written back whole, so a {@link #setTemporaryPassword}
