@@ -787,6 +787,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/security/users/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Load users in bulk with identity-provider provisioning (CAT-09)
+         * @description Loads a sheet or payload of users for the caller's entity and provisions their accounts in the identity provider (Keycloak), enabling immediate sign-in.
+         */
+        post: operations["bulkImportUsers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/security/users/{userId}": {
         parameters: {
             query?: never;
@@ -958,6 +978,24 @@ export interface components {
             userKind?: "BACK_OFFICE" | "TILL" | "BOTH" | null;
             pin?: string | null;
             locationCode?: string | null;
+            password?: string | null;
+        };
+        BulkImportUsersRequest: {
+            /** @description Raw CSV user spreadsheet text */
+            sheet?: string | null;
+            users?: components["schemas"]["BulkUserItem"][];
+        };
+        BulkUserImportReport: {
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED" | "EMPTY";
+            imported: number;
+            failed: number;
+            problems: components["schemas"]["BulkUserProblem"][];
+        };
+        BulkUserProblem: {
+            username: string;
+            field: string;
+            reason: string;
         };
         BulkDeviceItem: {
             hardwareSerial: string;
@@ -2942,6 +2980,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkImportUsers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportUsersRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk user import report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkUserImportReport"];
                 };
             };
             400: components["responses"]["RequestProblem"];
