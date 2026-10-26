@@ -284,9 +284,7 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
         // After reactivation, a till charge succeeds normally WITHOUT the customer inactive flag
         kernel.reset();
         charge(accountId, "300.00", LocalDate.of(2026, 9, 2));
-        assertThat(kernel.committedAudit())
-                .extracting(AuditRecord::eventType)
-                .containsExactly("ACCOUNT_CHARGED");
+        assertThat(kernel.committedAudit()).extracting(AuditRecord::eventType).containsExactly("ACCOUNT_CHARGED");
     }
 
     // ---- the till's account tenders (27A 6.2) ------------------------------------------------------
