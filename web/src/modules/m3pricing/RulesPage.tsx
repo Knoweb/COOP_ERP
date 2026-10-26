@@ -413,8 +413,9 @@ function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
     }
 
     const requestBody: AuthorRuleRequest = {
-      name: name.trim(),
-      kind,
+    name: name.trim(),
+     advisory: false,
+     kind,
       predicate: {
         skuId: kind !== "BILL_THRESHOLD" && sku ? sku.skuId : null,
         uomCode: kind === "TIME_LIMITED_PRICE" && uomCode.trim() ? uomCode.trim() : null,
