@@ -42,7 +42,11 @@ export function LocationPicker({ value, onChange }: { value: string; onChange: (
   return (
     <label className="inventory-form-field">
       {t("inventory.field.location").text}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
+      <select
+        aria-label={t("inventory.field.location").text}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
         {(locations.data ?? []).map((location) => (
           <option key={location.locationId} value={location.locationId}>
             {`${location.locationCode} ${nameOf(location, intl.locale)}`}
