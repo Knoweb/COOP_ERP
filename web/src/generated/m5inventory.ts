@@ -141,6 +141,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/opening-balances/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import opening stock in bulk from a sheet or rows
+         * @description Parses opening stock data and registers it as an opening balance in status DRAFT, awaiting signatures before becoming active. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding, m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required, m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+         */
+        post: operations["bulkImportOpeningStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/opening-balances/{openingBalanceId}": {
         parameters: {
             query?: never;
@@ -826,6 +846,46 @@ export interface components {
             replacementStockLotId: string;
             reason: string;
         };
+        BulkImportStockRequest: {
+            /** Format: uuid */
+            locationId: string;
+            sheet?: string;
+            lines?: components["schemas"]["StockRowRequest"][];
+        };
+        StockRowRequest: {
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** Format: uuid */
+            batchId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            qty?: number;
+            unitCost?: number;
+        };
+        BulkStockReport: {
+            /** Format: uuid */
+            importId: string;
+            /** Format: uuid */
+            openingBalanceId: string;
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED" | "EMPTY";
+            totalRows: number;
+            importedLines: number;
+            problems?: components["schemas"]["StockProblem"][];
+        };
+        StockProblem: {
+            line: number;
+            sku?: string;
+            message: string;
+        };
         PrepareOpeningBalanceRequest: {
             /** Format: uuid */
             locationId: string;
@@ -1408,6 +1468,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkImportOpeningStock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportStockRequest"];
+            };
+        };
+        responses: {
+            /** @description Opening stock imported and converted into opening balance awaiting signatures */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkStockReport"];
                 };
             };
             400: components["responses"]["RequestProblem"];
