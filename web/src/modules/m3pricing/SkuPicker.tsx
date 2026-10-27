@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { businessToday } from "../../shell/i18n/formats";
 import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
@@ -52,5 +53,65 @@ export function SkuPicker({ onPick }: { onPick: (sku: Sku) => void }) {
         </ul>
       )}
     </form>
+  );
+}
+
+/**
+ * The selectable pricing units of a SKU. M2 owns the conversions;
+ * M3 still validates the selected unit again when saving and publishing.
+ */
+export function SkuUomPicker({
+  skuId,
+  uomCode,
+  onChange
+}: {
+  skuId: string;
+  uomCode: string;
+  onChange: (code: string) => void;
+}) {
+  const api = usePricingApi();
+  const t = useT();
+  const sku = useQuery({
+    queryKey: ["pricing", "sku", skuId],
+    queryFn: () => api.getSku(skuId),
+    staleTime: Infinity
+  });
+  const conversions = useQuery({
+    queryKey: ["pricing", "skuConversions", skuId],
+    queryFn: () => api.skuConversions(skuId)
+  });
+
+  const today = businessToday();
+  const choices = new Set<string>();
+
+  if (sku.data?.baseUomCode) {
+    choices.add(sku.data.baseUomCode);
+  }
+
+  for (const conversion of conversions.data ?? []) {
+    if (
+      conversion.effectiveFrom <= today &&
+      (!conversion.effectiveTo || conversion.effectiveTo >= today)
+    ) {
+      choices.add(conversion.uomCode);
+    }
+  }
+
+  // Keep an existing unit visible even when its conversion has expired.
+  // Saving or publishing will then return the backend's UOM refusal.
+  choices.add(uomCode);
+
+  return (
+    <select
+      aria-label={t("pricing.column.unit").text}
+      value={uomCode}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {[...choices].map((code) => (
+        <option value={code} key={code}>
+          {code}
+        </option>
+      ))}
+    </select>
   );
 }

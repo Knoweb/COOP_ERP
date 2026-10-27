@@ -11,7 +11,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { SetLinesResponse } from "./pricingApi";
-import { SkuName, SkuPicker } from "./SkuPicker";
+import { SkuName, SkuPicker, SkuUomPicker } from "./SkuPicker";
 import { ListRelationships } from "./ListRelationships";
 import { chipOf, errorText, reasonMessageId } from "./priceListState";
 import "./pricing.css";
@@ -42,6 +42,16 @@ export function TradePriceListPage() {
   const detail = useQuery({
     queryKey: ["pricing", "priceList", listId],
     queryFn: () => api.getPriceList(listId)
+  });
+
+  const sourceVersionId =
+    detail.data?.list.status === "DRAFT"
+      ? detail.data.list.sourceVersionId
+      : null;
+  const sourceVersion = useQuery({
+    queryKey: ["pricing", "priceList", sourceVersionId],
+    queryFn: () => api.getPriceList(sourceVersionId!),
+    enabled: Boolean(sourceVersionId)
   });
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -150,6 +160,13 @@ export function TradePriceListPage() {
         {list.applyFrom && <span>{t("pricing.applies_from", undefined, { date: formatDate(list.applyFrom) }).text}</span>}
       </p>
 
+      {list.status === "SUPERSEDED" && canAuthor && (
+        <p role="alert">{t("pricing.warning.superseded_source").text}</p>
+      )}
+      {list.status === "DRAFT" && sourceVersion.data?.list.status === "SUPERSEDED" && (
+        <p role="alert">{t("pricing.warning.draft_from_superseded").text}</p>
+      )}
+
       <table>
         <thead>
           <tr>
@@ -168,7 +185,23 @@ export function TradePriceListPage() {
                 <td>
                   <SkuName skuId={row.skuId} />
                 </td>
-                <td>{row.uomCode}</td>
+                <td>
+                  {editable ? (
+                    <SkuUomPicker
+                      skuId={row.skuId}
+                      uomCode={row.uomCode}
+                      onChange={(code) =>
+                        setRow(index, {
+                          uomCode: code,
+                          tierFromQty: "0",
+                          price: ""
+                        })
+                      }
+                    />
+                  ) : (
+                    row.uomCode
+                  )}
+                </td>
                 <td>
                   {editable ? (
                     <input
@@ -243,7 +276,7 @@ export function TradePriceListPage() {
         </section>
       )}
 
-      {list.status === "PUBLISHED" && canAuthor && (
+      {(list.status === "PUBLISHED" || list.status === "SUPERSEDED") && canAuthor && (
         <p>
           <button type="button" disabled={nextVersion.isPending} onClick={() => nextVersion.mutate()}>
             {t("pricing.next_version").text}

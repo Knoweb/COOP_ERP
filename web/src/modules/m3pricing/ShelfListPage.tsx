@@ -45,6 +45,16 @@ export function ShelfListPage() {
   const versionKey = useIdempotencyKey();
 
   const detail = useQuery({ queryKey: ["pricing", "priceList", listId], queryFn: () => api.getPriceList(listId) });
+  const sourceVersionId =
+    detail.data?.list.status === "DRAFT"
+      ? detail.data.list.sourceVersionId
+      : null;
+  const sourceVersion = useQuery({
+    queryKey: ["pricing", "priceList", sourceVersionId],
+    queryFn: () => api.getPriceList(sourceVersionId!),
+    enabled: Boolean(sourceVersionId)
+  });
+
   const advisoryDate = detail.data?.list.applyFrom ?? businessToday();
   const advisory = useQuery({
     queryKey: ["pricing", "advisory", advisoryDate],
@@ -170,6 +180,13 @@ export function ShelfListPage() {
         {list.applyFrom && <span>{t("pricing.applies_from", undefined, { date: formatDate(list.applyFrom) }).text}</span>}
       </p>
 
+      {list.status === "SUPERSEDED" && canAuthor && (
+        <p role="alert">{t("pricing.warning.superseded_source").text}</p>
+      )}
+      {list.status === "DRAFT" && sourceVersion.data?.list.status === "SUPERSEDED" && (
+        <p role="alert">{t("pricing.warning.draft_from_superseded").text}</p>
+      )}
+
       <div className="modern-table-card">
         <div className="modern-table-scroll">
           <table className="modern-table">
@@ -279,7 +296,7 @@ export function ShelfListPage() {
         </section>
       )}
 
-      {list.status === "PUBLISHED" && canAuthor && (
+      {(list.status === "PUBLISHED" || list.status === "SUPERSEDED") && canAuthor && (
         <p>
           <button type="button" disabled={nextVersion.isPending} onClick={() => nextVersion.mutate()}>
             {t("pricing.next_version").text}
