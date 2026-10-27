@@ -29,6 +29,9 @@ export type Repack = components["schemas"]["RepackResponse"];
 export type ExecuteRepackRequest = components["schemas"]["ExecuteRepackRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
+export type Batch = catalogueComponents["schemas"]["BatchResponse"];
+export type PickList = components["schemas"]["PickListResponse"];
+export type PickLine = components["schemas"]["PickResponse"];
 export type TransferRequest = tradingComponents["schemas"]["TransferRequestResponse"];
 export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
 
@@ -331,6 +334,20 @@ export function useInventoryApi() {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
         });
         return data!;
+      },
+
+      async pickList(deliveryNoteId: string): Promise<PickList | null> {
+        const { data } = await api.GET("/v1/inventory/pick-lists/{deliveryNoteId}", {
+          params: { path: { deliveryNoteId } }
+        });
+        return data ?? null;
+      },
+
+      async batch(batchId: string): Promise<Batch | null> {
+        const { data } = await catalogue.GET("/v1/catalogue/batches/{batchId}", {
+          params: { path: { batchId } }
+        });
+        return data ?? null;
       }
     }),
     [api, party, catalogue, trading]

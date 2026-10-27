@@ -5,7 +5,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
-import { useInventoryApi } from "./inventoryApi";
+import { useInventoryApi, type Batch, type PickLine } from "./inventoryApi";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 import "./inventory.css";
@@ -29,12 +29,12 @@ export function PickListPage() {
     event.preventDefault();
     if (valid) setDeliveryNoteId(entry.trim());
   };
-  const batchIds = [...new Set((pick.data?.lines ?? []).flatMap((line) => line.batchId ? [line.batchId] : []))];
+  const batchIds = [...new Set((pick.data?.lines ?? []).flatMap((line: PickLine) => line.batchId ? [line.batchId] : []))];
   const batches = useQuery({
     queryKey: ["inventory", "pick-list", "batches", batchIds],
     queryFn: async () => {
-      const found = (await Promise.all(batchIds.map((id) => api.batch(id)))).filter((batch) => batch !== null);
-      return new Map(found.map((batch) => [batch.batchId, batch]));
+      const found = (await Promise.all(batchIds.map((id) => api.batch(id)))).filter((batch): batch is Batch => batch !== null);
+      return new Map<string, Batch>(found.map((batch) => [batch.batchId, batch]));
     },
     enabled: batchIds.length > 0
   });
@@ -67,7 +67,7 @@ export function PickListPage() {
           <div className="modern-table-scroll">
             <table className="modern-table stock-table">
               <thead><tr><th>{t("inventory.column.item").text}</th><th>{t("inventory.column.batch").text}</th><th>{t("inventory.column.expiry").text}</th><th>{t("inventory.column.qty").text}</th><th>{t("inventory.pick.result").text}</th></tr></thead>
-              <tbody>{pick.data.lines.map((line, index) => (
+              <tbody>{pick.data.lines.map((line: PickLine, index: number) => (
                 <tr key={`${line.deliveryLineId}-${line.stockLotId ?? index}`}>
                   <td><SkuLabel skuId={line.skuId} /></td>
                   <td>{line.batchId ? (() => {
