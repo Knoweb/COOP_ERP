@@ -61,9 +61,9 @@ export function OpeningBalancePage() {
       <main className="shell-page">
         <p role="alert">{errorText(balance.error, t("inventory.error.not_found").text)}</p>
         <Link className="back-link" to="/inventory">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("inventory.back").text}
-      </Link>
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+          {t("inventory.back").text}
+        </Link>
       </main>
     );
   }

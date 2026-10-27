@@ -14,8 +14,10 @@
 
 .inventory-action-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
+  width: 100%;
 }
 
 .inventory-form-row {
@@ -37,18 +39,52 @@
 .inventory-control-links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--target-gap);
+  align-items: center;
+  gap: var(--space-1);
   margin-bottom: var(--space-3);
+  width: 100%;
+}
+
+.shell-page .inventory-control-links .action-link,
+.inventory-control-links .action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding: var(--space-half) var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shell-page .inventory-control-links .action-link:hover,
+.inventory-control-links .action-link:hover {
+  transform: translateY(-1px);
+}
+
+.shell-page .inventory-control-links .action-link:focus,
+.shell-page .inventory-control-links .action-link:focus-visible,
+.shell-page .inventory-control-links .action-link:active,
+.inventory-control-links .action-link:focus,
+.inventory-control-links .action-link:focus-visible,
+.inventory-control-links .action-link:active {
+  outline: none;
+  box-shadow: none;
 }
 
 /* ---------- Stock Navigation & Filter Controls ----------------------------- */
 
-.shell-page > .back-link {
+.shell-page>.back-link,
+.shell-page .back-link {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: calc(var(--space-4) + var(--space-half));
-  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-2) + var(--space-half));
+  gap: calc(var(--space-half) + var(--space-half) / 2);
+  min-height: calc(var(--space-3) + var(--space-half));
+  padding: calc(var(--space-half) / 2) var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--color-polish-31);
   border: var(--border-width) solid var(--color-polish-6);
@@ -57,30 +93,42 @@
   font-weight: var(--font-weight-strong);
   text-decoration: none;
   margin-bottom: var(--space-2);
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.shell-page > .back-link:hover {
+.shell-page>.back-link:hover,
+.shell-page .back-link:hover {
   background: var(--color-polish-22);
   border-color: var(--color-accent);
   transform: translateX(calc(var(--space-half) * -1 / 2));
 }
 
-.shell-page > .back-link:focus,
-.shell-page > .back-link:focus-visible,
-.shell-page > .back-link:active {
-  outline: var(--border-width-strong) solid var(--color-accent);
-  outline-offset: calc(var(--border-width-strong) + var(--border-width));
-  box-shadow: 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-18);
+.shell-page>.back-link:focus,
+.shell-page>.back-link:focus-visible,
+.shell-page>.back-link:active,
+.shell-page .back-link:focus,
+.shell-page .back-link:focus-visible,
+.shell-page .back-link:active {
+  outline: none;
+  box-shadow: none;
 }
 
-.shell-page > .back-link:active {
+.shell-page>.back-link:active,
+.shell-page .back-link:active {
   transform: scale(0.98);
 }
 
-.shell-page > .back-link svg {
-  width: var(--space-2);
-  height: var(--space-2);
+.shell-page>.back-link svg,
+.shell-page .back-link svg {
+  flex-shrink: 0;
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
   fill: none;
   stroke: currentColor;
   stroke-width: var(--border-width-strong);
@@ -97,6 +145,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+  width: 100%;
 }
 
 .stock-controls-toolbar .filter-toggle {
@@ -107,24 +156,35 @@
   position: relative;
   display: flex;
   align-items: center;
-  flex: 1;
-  max-width: calc(var(--space-8) * 4);
-  min-width: calc(var(--space-8) * 3);
+  flex: 0 0 auto;
+  width: calc(var(--space-8) * 3 + var(--space-4) + var(--space-1));
+  max-width: 100%;
 }
 
 .stock-search-control {
   width: 100%;
 }
 
+.stock-search-control .modern-control__leading-icon {
+  left: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
+}
+
 .stock-search-input {
   width: 100%;
-  min-height: var(--target-min);
-  padding-left: calc(var(--space-4) + var(--space-1));
-  padding-right: calc(var(--space-4) + var(--space-1));
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding-top: var(--space-half);
+  padding-bottom: var(--space-half);
+  padding-left: calc(var(--space-3) - var(--space-half) / 2);
+  padding-right: calc(var(--space-1) + var(--space-half) / 2);
   border: var(--border-width) solid var(--color-border-control);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   font-size: var(--font-size-sm);
+  line-height: 1.2;
   color: var(--color-text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -141,12 +201,14 @@
 
 .stock-search-clear {
   position: absolute;
-  right: var(--space-2);
+  right: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--space-2) + var(--space-half));
-  height: calc(var(--space-2) + var(--space-half));
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
   border: none;
   background: var(--color-surface-subtle);
   color: var(--color-text-muted);
@@ -181,11 +243,12 @@
   max-width: 100%;
 }
 
+.modern-filter-panel--stock .inventory-control-links,
 .stock-positions-filters .inventory-control-links {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--target-gap);
+  gap: var(--space-1);
   margin-bottom: 0;
 }
 
@@ -219,13 +282,86 @@
 
 /* ---------- Table Container & Scrolling ------------------------------------ */
 
-/* Note: Base .modern-table-card and .modern-table-scroll are defined in shell.css */
+.modern-table-card {
+  border: var(--border-width-strong) solid var(--color-polish-21);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-8);
+  border-radius: calc(var(--radius) * 3);
+  overflow: hidden;
+  max-width: 100%;
+  width: 100%;
+  background: var(--color-surface);
+}
+
+.modern-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-polish-6) transparent;
+}
+
+.modern-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.modern-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modern-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-polish-6);
+  border-radius: var(--radius-pill);
+}
+
+.modern-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
 
 /* ---------- Common Table Styling (Main & Item Details) --------------------- */
 
-.stock-table th.numeric-cell,
+.stock-table {
+  border: var(--border-width) solid var(--color-polish-6);
+}
+
+.stock-table th {
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
+  background: var(--color-polish-27);
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+  line-height: var(--line-height-normal, 1.3);
+  padding: calc(var(--space-1) + 2px) var(--space-1);
+}
+
+.stock-table td {
+  border-bottom: var(--border-width) solid var(--color-polish-18);
+  vertical-align: middle !important;
+  text-align: center !important;
+  padding: calc(var(--space-1) + 2px) var(--space-1);
+  word-break: normal;
+}
+
+.stock-table th:not(:last-child),
+.stock-table td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-18);
+}
+
+.stock-table th.numeric-cell {
+  text-align: center !important;
+  vertical-align: middle !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+}
+
 .stock-table td.numeric-cell {
-  text-align: right !important;
+  text-align: center !important;
+  vertical-align: middle !important;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -266,6 +402,7 @@
 .stock-table td .entity-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
   word-break: break-word;
   color: var(--color-polish-25);
@@ -295,11 +432,13 @@
 .modern-table-scroll.stock-positions-scroll {
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden; /* Fixed table: prevents horizontal dragging/sliding on desktop */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stock-table.stock-positions-table {
   width: 100%;
+  min-width: 900px;
   max-width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
@@ -307,152 +446,212 @@
 
 .stock-positions-table th,
 .stock-positions-table td {
-  padding: calc(var(--space-1) + var(--space-half)) var(--space-1);
-  overflow-wrap: break-word;
+  padding: calc(var(--space-1) + 2px) var(--space-1);
+  vertical-align: middle;
 }
 
 .stock-positions-table th {
-  white-space: normal;
-  vertical-align: bottom;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  vertical-align: middle !important;
   line-height: var(--line-height-normal, 1.3);
 }
 
 .stock-positions-table .col-item,
 .stock-positions-table col.col-item {
-  width: 25%;
+  width: 23%;
+  min-width: 180px;
+}
+
+.stock-positions-table th.col-item,
+.stock-positions-table td.col-item {
+  text-align: center !important;
 }
 
 .stock-positions-table .col-batch,
 .stock-positions-table col.col-batch {
-  width: 15%;
-  overflow-wrap: anywhere;
+  width: 13%;
+  min-width: 110px;
+}
+
+.stock-positions-table th.col-batch,
+.stock-positions-table td.col-batch {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
 }
 
 .stock-positions-table .col-expiry,
 .stock-positions-table col.col-expiry {
-  width: 12%;
-  white-space: nowrap;
+  width: 10%;
+  min-width: 95px;
+}
+
+.stock-positions-table th.col-expiry,
+.stock-positions-table td.col-expiry {
+  text-align: center !important;
+  white-space: nowrap !important;
 }
 
 .stock-positions-table .col-condition,
 .stock-positions-table col.col-condition {
-  width: 10%;
+  width: 11%;
+  min-width: 110px;
+}
+
+.stock-positions-table th.col-condition,
+.stock-positions-table td.col-condition {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
 }
 
 .stock-positions-table .col-on-hand,
 .stock-positions-table col.col-on-hand {
-  width: 9%;
-  text-align: right !important;
+  width: 10%;
+  min-width: 90px;
+}
+
+.stock-positions-table th.col-on-hand,
+.stock-positions-table td.col-on-hand {
+  text-align: center !important;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-positions-table .col-fefo,
 .stock-positions-table col.col-fefo {
-  width: 9%;
-  text-align: right !important;
+  width: 10%;
+  min-width: 95px;
+}
+
+.stock-positions-table th.col-fefo,
+.stock-positions-table td.col-fefo {
+  text-align: center !important;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-positions-table .col-available,
 .stock-positions-table col.col-available {
-  width: 9%;
-  text-align: right !important;
-  white-space: nowrap;
+  width: 11%;
+  min-width: 110px;
+}
+
+.stock-positions-table th.col-available,
+.stock-positions-table td.col-available {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-positions-table .col-unit-cost,
 .stock-positions-table col.col-unit-cost {
-  width: 11%;
-  text-align: right !important;
-  white-space: nowrap;
+  width: 12%;
+  min-width: 110px;
+}
+
+.stock-positions-table th.col-unit-cost,
+.stock-positions-table td.col-unit-cost {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- 2. Item Details (Stock Card) Table ------------------------------ */
 
 .stock-table.stock-card-table {
-  min-width: calc(var(--space-8) * 10);
+  width: 100%;
+  min-width: 590px;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
 .stock-card-table col.col-when {
   width: 22%;
+  min-width: 130px;
 }
 
 .stock-card-table col.col-movement {
-  width: 20%;
+  width: 18%;
+  min-width: 110px;
 }
 
 .stock-card-table col.col-condition {
   width: 14%;
+  min-width: 90px;
 }
 
 .stock-card-table col.col-qty {
-  width: 14%;
+  width: 15%;
+  min-width: 85px;
 }
 
 .stock-card-table col.col-balance {
-  width: 14%;
+  width: 15%;
+  min-width: 85px;
 }
 
 .stock-card-table col.col-unit-cost {
   width: 16%;
+  min-width: 90px;
+}
+
+.stock-card-table th,
+.stock-card-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
 .stock-card-table td.cell-when {
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: center !important;
 }
 
 /* ---------- 3. Opening Balance Table (Adding & Viewing Items) --------------- */
 
 .stock-table.opening-balance-table {
-  min-width: calc(var(--space-8) * 11);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
-.opening-balance-table--new col.col-item {
-  width: 22%;
-}
-
-.opening-balance-table--new col.col-batch {
-  width: 15%;
-}
-
-.opening-balance-table--new col.col-expiry {
-  width: 13%;
-}
-
-.opening-balance-table--new col.col-mrp {
-  width: 11%;
-}
-
-.opening-balance-table--new col.col-qty {
-  width: 10%;
-}
-
-.opening-balance-table--new col.col-unit-cost {
-  width: 11%;
-}
-
-.opening-balance-table--new col.col-condition {
-  width: 11%;
-}
-
-.opening-balance-table--new col.col-action {
-  width: 7%;
+.stock-table.opening-balance-table--view {
+  min-width: 440px;
 }
 
 .opening-balance-table--view col.col-item {
   width: 40%;
+  min-width: 160px;
 }
 
 .opening-balance-table--view col.col-condition {
   width: 20%;
+  min-width: 95px;
 }
 
 .opening-balance-table--view col.col-qty {
   width: 20%;
+  min-width: 85px;
 }
 
 .opening-balance-table--view col.col-unit-cost {
   width: 20%;
+  min-width: 95px;
+}
+
+.opening-balance-table th,
+.opening-balance-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
 .stock-table td.empty-table-cell {
@@ -508,3 +707,220 @@
   color: var(--color-on-accent);
 }
 
+.stock-table .sku-link,
+.stock-table td a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+
+.stock-table .sku-link:hover,
+.stock-table td a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---------- 4. Responsive Breakpoints for Stock Section -------------------- */
+
+@media (max-width: 47.99rem) {
+  .modern-filter-panel--stock {
+    padding: var(--space-2);
+  }
+
+  .modern-filter-panel--stock .modern-location-picker {
+    max-width: 100%;
+  }
+
+  .inventory-control-links,
+  .modern-filter-panel--stock .inventory-control-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-1);
+    width: 100%;
+    margin-bottom: var(--space-2);
+  }
+
+  .shell-page .inventory-control-links .action-link,
+  .inventory-control-links .action-link,
+  .modern-filter-panel--stock .inventory-control-links .action-link {
+    width: 100%;
+    min-height: calc(var(--space-4) + var(--space-half));
+    padding: var(--space-half) var(--space-1);
+    font-size: var(--font-size-xs);
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+    line-height: 1.25;
+  }
+
+  /* Preserved traditional table layout with responsive compact padding & readable typography */
+  .stock-positions-table {
+    min-width: 900px;
+  }
+
+  .stock-card-table {
+    min-width: 580px;
+  }
+
+  .opening-balance-table--new {
+    min-width: 720px;
+  }
+
+  .opening-balance-table--view {
+    min-width: 420px;
+  }
+
+  .stock-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .stock-positions-table th,
+  .stock-positions-table td,
+  .stock-card-table th,
+  .stock-card-table td,
+  .opening-balance-table th,
+  .opening-balance-table td,
+  .stock-table th,
+  .stock-table td {
+    padding: calc(var(--space-half) + 1px) var(--space-1);
+    font-size: var(--font-size-xs);
+    line-height: 1.25;
+  }
+
+  .stock-positions-table th,
+  .stock-card-table th,
+  .opening-balance-table th,
+  .stock-table th {
+    font-size: var(--font-size-xs);
+    line-height: 1.2;
+    white-space: normal !important;
+    overflow-wrap: break-word;
+    word-break: normal;
+    vertical-align: middle !important;
+    text-align: center !important;
+  }
+
+  .stock-table th.numeric-cell,
+  .stock-table td.numeric-cell {
+    text-align: center !important;
+  }
+
+  .stock-table .condition-chip,
+  .stock-table .movement-chip {
+    padding: 1px var(--space-half);
+    font-size: var(--font-size-xs);
+  }
+
+  .stock-card-header h1 {
+    font-size: var(--font-size-lg);
+  }
+
+  .opening-balance-table input,
+  .opening-balance-table select,
+  .stock-table input,
+  .stock-table select {
+    font-size: var(--font-size-xs);
+    padding: 2px 4px;
+    min-height: calc(var(--space-3) + var(--space-half));
+  }
+
+  .opening-balance-table .btn-remove,
+  .stock-table .btn-remove {
+    padding: 2px 6px;
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-width: 35rem) {
+  .stock-controls-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .stock-controls-toolbar .filter-toggle {
+    width: 100%;
+  }
+
+  .stock-search-wrap {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .stock-search-control {
+    width: 100%;
+  }
+
+  .stock-search-input {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .inventory-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventory-action-bar button,
+  .inventory-action-bar .action-link {
+    width: 100%;
+  }
+}
+
+@media (max-width: 27rem) {
+  .inventory-control-links,
+  .modern-filter-panel--stock .inventory-control-links {
+    grid-template-columns: 1fr;
+    gap: var(--space-half);
+  }
+
+  .shell-page .inventory-control-links .action-link,
+  .inventory-control-links .action-link,
+  .modern-filter-panel--stock .inventory-control-links .action-link {
+    width: 100%;
+    min-height: calc(var(--space-4));
+    padding: calc(var(--space-half) + 1px) var(--space-1);
+  }
+
+  .shell-page>.back-link,
+  .shell-page .back-link {
+    font-size: var(--font-size-xs);
+    padding: calc(var(--space-half) / 2) calc(var(--space-half) + 2px);
+    gap: var(--space-half);
+  }
+}
+
+@media (max-width: 25rem) {
+  .stock-positions-table th,
+  .stock-positions-table td,
+  .stock-card-table th,
+  .stock-card-table td,
+  .opening-balance-table th,
+  .opening-balance-table td,
+  .stock-table th,
+  .stock-table td {
+    padding: calc(var(--space-half) / 2 + 1px) calc(var(--space-half) + 1px);
+    font-size: calc(var(--font-size-xs) - 0.5px);
+  }
+}
+
+@media (min-width: 90rem) {
+  .stock-positions-table th,
+  .stock-positions-table td,
+  .stock-card-table th,
+  .stock-card-table td,
+  .opening-balance-table th,
+  .opening-balance-table td,
+  .stock-table th,
+  .stock-table td {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-sm);
+  }
+
+  .modern-table-card {
+    box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-8);
+  }
+}

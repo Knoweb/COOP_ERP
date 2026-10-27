@@ -642,12 +642,13 @@ textarea {
 .shell-page table {
   width: 100%;
   border-collapse: collapse;
+  border: var(--border-width) solid var(--color-polish-6);
 }
 
 .shell-page th,
 .shell-page td {
   padding: 14px var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-polish-18);
   text-align: left;
   vertical-align: middle;
 }
@@ -657,6 +658,12 @@ textarea {
   color: var(--color-brand-dark);
   font-size: var(--font-size-sm);
   font-weight: 700;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
+}
+
+.shell-page th:not(:last-child),
+.shell-page td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-18);
 }
 
 .shell-page tbody tr {
@@ -907,6 +914,8 @@ textarea {
 .shell-topbar-left {
   display: flex;
   align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .shell-content-container {
@@ -943,6 +952,7 @@ textarea {
   padding: 0;
   border: none;
   background: transparent;
+  min-width: 0;
 }
 
 .scope-banner--warning {
@@ -954,9 +964,11 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .scope-acting__icon {
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 36px;
@@ -969,10 +981,21 @@ textarea {
 
 .scope-acting__text {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 0 4px;
   line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-acting__text span,
+.scope-acting__text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scope-user,
@@ -1375,14 +1398,51 @@ textarea {
 
 /* Mobile: remove the heavy outer card while keeping spacing */
 @media (max-width: 47.99rem) {
-  .shell-header {
-    flex-direction: column;
+  .shell-topbar {
+    padding: var(--space-2) var(--space-3);
+    height: auto;
+    min-height: calc(var(--space-6) + var(--space-2));
+    gap: var(--space-2);
+  }
+
+  .shell-topbar-left {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .scope-acting {
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .scope-acting__text {
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .shell-topbar-right {
+    flex-shrink: 0;
   }
 
   .user-menu {
-    justify-content: space-between;
-    padding-left: 0;
-    border-left: 0;
+    gap: var(--space-1);
+    justify-content: flex-end;
+  }
+
+  .user-menu .user-menu__info,
+  .user-menu .user-menu__chevron {
+    display: none;
+  }
+
+  .shell-content-container {
+    padding: var(--space-2);
+  }
+
+  .shell-header {
+    flex-direction: column;
   }
 
   .shell-nav {
@@ -1392,9 +1452,8 @@ textarea {
   .shell-page,
   .shell-message {
     margin: 0;
-    padding: var(--space-2);
-    border-left: 0;
-    border-right: 0;
+    padding: var(--space-3) var(--space-2);
+    border-radius: var(--radius-card, 12px);
   }
 
   .shell-page table {
@@ -1520,7 +1579,7 @@ textarea {
 }
 
 .page-toolbar input[type="search"] {
-  min-width: calc(var(--space-8) * 4);
+  max-width: calc(var(--space-8) * 3 + var(--space-6));
 }
 
 .page-toolbar--stock {
@@ -1529,19 +1588,29 @@ textarea {
 
 .data-table-wrap {
   overflow-x: auto;
-  border: var(--border-width) solid var(--color-border);
+  border: var(--border-width-strong) solid var(--color-polish-21);
   border-radius: var(--radius);
   background: var(--color-surface);
 }
 
 .data-table-wrap .data-table {
   min-width: 100%;
+  border-collapse: collapse;
   border: 0;
 }
 
 .data-table-wrap .data-table th {
-  border-bottom: var(--border-width-strong) solid var(--color-border);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
   background: var(--color-draft-bg);
+}
+
+.data-table-wrap .data-table td {
+  border-bottom: var(--border-width) solid var(--color-polish-18);
+}
+
+.data-table-wrap .data-table th:not(:last-child),
+.data-table-wrap .data-table td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-18);
 }
 
 .data-table-wrap .data-table tbody tr:last-child td {
@@ -1761,11 +1830,50 @@ textarea {
   background: var(--color-surface);
 }
 
+.modern-control--search {
+  max-width: calc(var(--space-8) * 3 + var(--space-4) + var(--space-1));
+}
+
+.modern-control--search input,
+input[type="search"],
+.party-filter-input {
+  width: 100%;
+  max-width: calc(var(--space-8) * 3 + var(--space-4) + var(--space-1));
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding-top: var(--space-half);
+  padding-bottom: var(--space-half);
+  padding-left: calc(var(--space-3) - var(--space-half) / 2);
+  padding-right: calc(var(--space-1) + var(--space-half) / 2);
+  border: var(--border-width) solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  line-height: 1.2;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="search"]:hover,
+.modern-control--search input:hover,
+.party-filter-input:hover {
+  border-color: var(--color-accent);
+}
+
+input[type="search"]:focus,
+.modern-control--search input:focus,
+.party-filter-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-18);
+}
+
 .modern-control__leading-icon {
   position: absolute;
-  left: var(--space-2);
-  width: var(--space-3);
-  height: var(--space-3);
+  left: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
   color: var(--color-text-muted);
   fill: none;
   stroke: currentColor;
@@ -2045,26 +2153,38 @@ textarea {
 .back-link {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: 38px;
-  padding: 6px 10px;
-  border-radius: var(--radius);
+  gap: calc(var(--space-half) + var(--space-half) / 2);
+  min-height: calc(var(--space-3) + var(--space-half));
+  padding: calc(var(--space-half) / 2) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-polish-31);
+  border: var(--border-width) solid var(--color-polish-6);
   color: var(--color-accent);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
   text-decoration: none;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .back-link:hover {
-  background: var(--color-draft-bg);
+  background: var(--color-polish-22);
+  border-color: var(--color-accent);
+  transform: translateX(calc(var(--space-half) * -1 / 2));
+}
+
+.back-link:focus,
+.back-link:focus-visible,
+.back-link:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .back-link svg {
-  width: 18px;
-  height: 18px;
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: var(--border-width-strong);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -2134,7 +2254,6 @@ textarea {
   letter-spacing: 0.5px;
 }
 
-.party-filter-input,
 .modern-select select {
   width: 100%;
   padding: 12px 16px;
@@ -2148,7 +2267,6 @@ textarea {
   appearance: none;
 }
 
-.party-filter-input:focus,
 .modern-select select:focus {
   border-color: var(--color-polish-25);
   background: var(--color-polish-4);
@@ -2175,11 +2293,11 @@ textarea {
 .modern-table-card {
   background: var(--color-polish-26);
   border-radius: 16px;
-  box-shadow: 0 8px 30px var(--color-polish-23);
-  border: 1px solid var(--color-polish-14);
+  box-shadow: 0 4px 20px var(--color-polish-23);
+  border: var(--border-width-strong) solid var(--color-polish-21);
   overflow: hidden;
   margin-bottom: 24px;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .modern-table-card:hover {
@@ -2195,6 +2313,7 @@ textarea {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  border: var(--border-width) solid var(--color-polish-6);
 }
 
 .modern-table th {
@@ -2205,7 +2324,7 @@ textarea {
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--color-polish-13);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
   white-space: nowrap;
 }
 
@@ -2213,7 +2332,7 @@ textarea {
   padding: 12px 12px;
   font-size: 14px;
   color: var(--color-text);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-polish-18);
   vertical-align: middle;
   white-space: normal;
   word-break: keep-all;
@@ -2221,7 +2340,7 @@ textarea {
 
 .modern-table th:not(:last-child),
 .modern-table td:not(:last-child) {
-  border-right: 1px solid var(--color-polish-28);
+  border-right: var(--border-width) solid var(--color-polish-18);
 }
 
 .modern-table tbody tr {
@@ -2594,8 +2713,7 @@ textarea {
 
 .stock-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
 }
 
 .stock-table th,

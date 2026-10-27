@@ -250,7 +250,7 @@ export function StockPage() {
                   <th className="col-expiry">{t("inventory.column.expiry").text}</th>
                   <th className="col-condition">{t("inventory.column.condition").text}</th>
                   <th className="col-on-hand numeric-cell">{t("inventory.column.on_hand").text}</th>
-                  <th className="col-fefo numeric-cell">{t("inventory.column.fefo").text}</th>
+                  <th className="col-fefo">{t("inventory.column.fefo").text}</th>
                   <th className="col-available numeric-cell">{t("inventory.column.available").text}</th>
                   <th className="col-unit-cost numeric-cell">{t("inventory.column.unit_cost").text}</th>
                 </tr>
@@ -291,10 +291,10 @@ export function StockPage() {
                       <td className="col-batch">
                         {isSyntheticBatchNo(lot.batchNo)
                           ? t("inventory.field.batch_not_tracked").text
-                          : (lot.batchNo ?? "")}
+                          : (lot.batchNo || "—")}
                       </td>
 
-                      <td className="col-expiry">{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
+                      <td className="col-expiry">{lot.expiryDate ? formatDate(lot.expiryDate) : "—"}</td>
 
                       <td className="col-condition">
                         <span className="condition-chip">
@@ -306,20 +306,20 @@ export function StockPage() {
                         {lot.qtyOnHand}
                       </td>
 
-                      <td className="col-fefo numeric-cell">
+                      <td className="col-fefo">
                         {lot.expired ? (
                           <span className="condition-chip">{t("inventory.lot.expired").text}</span>
                         ) : (
-                          (lot.fefoRank ?? "")
+                          (lot.fefoRank ?? "—")
                         )}
                       </td>
 
                       <td className="col-available numeric-cell numeric-cell--strong">
-                        {availableOf(lot.skuId) ?? ""}
+                        {availableOf(lot.skuId) ?? "—"}
                       </td>
 
                       <td className="col-unit-cost numeric-cell">
-                        {lot.unitCost != null && <MoneyDisplay amount={lot.unitCost} />}
+                        {lot.unitCost != null ? <MoneyDisplay amount={lot.unitCost} /> : "—"}
                       </td>
                     </tr>
                   ))

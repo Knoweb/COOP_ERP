@@ -124,10 +124,10 @@ export function TransfersPage() {
             <tbody>
               {transfer.lines.map((line) => (
                 <tr key={line.lineNo}>
-                  <td>
+                  <td className="col-item" data-label={t("inventory.column.item").text}>
                     <SkuLabel skuId={line.skuId} />
                   </td>
-                  <td>{line.qty}</td>
+                  <td className="numeric-cell" data-label={t("inventory.column.qty").text}>{line.qty}</td>
                 </tr>
               ))}
             </tbody>

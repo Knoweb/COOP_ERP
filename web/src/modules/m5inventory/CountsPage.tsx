@@ -173,75 +173,75 @@ export function CountsPage() {
         {counts.data && counts.data.length > 0 && (
           <div className="modern-table-scroll">
             <table className="modern-table stock-table">
-          <thead>
-            <tr>
-              <th>{t("inventory.count.scheduled_for").text}</th>
-              <th>{t("inventory.count.scope").text}</th>
-              <th>{t("inventory.repack.column.status").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {counts.data.map((count) => (
-              <tr key={count.taskId}>
-                <td>{formatDate(count.scheduledFor)}</td>
-                <td>{t(`inventory.count.scope.${count.scopeKind}`).text}</td>
-                <td>
-                  <StateChip state={countChip(count.status)} label={t(`inventory.count.status.${count.status}`).text} />
-                  {count.outcome && ` ${t(`inventory.count.outcome.${count.outcome}`).text}`}
-                </td>
-                <td>
-                  <Link to={`/inventory/counts/${count.taskId}`}>{t("inventory.count.open").text}</Link>
-                </td>
-              </tr>
-            ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              <thead>
+                <tr>
+                  <th>{t("inventory.count.scheduled_for").text}</th>
+                  <th>{t("inventory.count.scope").text}</th>
+                  <th>{t("inventory.repack.column.status").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {counts.data.map((count) => (
+                  <tr key={count.taskId}>
+                    <td>{formatDate(count.scheduledFor)}</td>
+                    <td>{t(`inventory.count.scope.${count.scopeKind}`).text}</td>
+                    <td>
+                      <StateChip state={countChip(count.status)} label={t(`inventory.count.status.${count.status}`).text} />
+                      {count.outcome && ` ${t(`inventory.count.outcome.${count.outcome}`).text}`}
+                    </td>
+                    <td>
+                      <Link to={`/inventory/counts/${count.taskId}`}>{t("inventory.count.open").text}</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="modern-table-card" style={{ marginTop: 'var(--space-4)' }}>
         <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
           <h2>{t("inventory.negative.title").text}</h2>
         </div>
-      {negative.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.negative.none").text}</p>}
-      {negative.data && negative.data.length > 0 && (
-        <div className="modern-table-scroll">
-          <table className="modern-table stock-table">
-          <thead>
-            <tr>
-              <th>{t("inventory.column.item").text}</th>
-              <th>{t("inventory.column.batch").text}</th>
-              <th>{t("inventory.column.on_hand").text}</th>
-              <th>{t("inventory.negative.since").text}</th>
-              <th>{t("inventory.negative.acknowledged").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {negative.data.map((lot) => (
-              <tr key={lot.stockLotId}>
-                <td>
-                  <SkuLabel skuId={lot.skuId} />
-                </td>
-                <td>{lot.batchNo ?? ""}</td>
-                <td className="numeric-cell">{lot.qtyOnHand}</td>
-                <td>{lot.negativeSince ? formatInstant(lot.negativeSince) : ""}</td>
-                <td>
-                  {lot.acknowledgedAt ? (
-                    formatInstant(lot.acknowledgedAt)
-                  ) : canSchedule ? (
-                    <button type="button" onClick={() => setAcknowledging(lot.stockLotId)}>
-                      {t("inventory.negative.acknowledge").text}
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        {negative.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.negative.none").text}</p>}
+        {negative.data && negative.data.length > 0 && (
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
+              <thead>
+                <tr>
+                  <th>{t("inventory.column.item").text}</th>
+                  <th>{t("inventory.column.batch").text}</th>
+                  <th>{t("inventory.column.on_hand").text}</th>
+                  <th>{t("inventory.negative.since").text}</th>
+                  <th>{t("inventory.negative.acknowledged").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {negative.data.map((lot) => (
+                  <tr key={lot.stockLotId}>
+                    <td>
+                      <SkuLabel skuId={lot.skuId} />
+                    </td>
+                    <td>{lot.batchNo ?? ""}</td>
+                    <td className="numeric-cell">{lot.qtyOnHand}</td>
+                    <td>{lot.negativeSince ? formatInstant(lot.negativeSince) : ""}</td>
+                    <td>
+                      {lot.acknowledgedAt ? (
+                        formatInstant(lot.acknowledgedAt)
+                      ) : canSchedule ? (
+                        <button type="button" onClick={() => setAcknowledging(lot.stockLotId)}>
+                          {t("inventory.negative.acknowledge").text}
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       {acknowledging && (
         <ReasonCapture
