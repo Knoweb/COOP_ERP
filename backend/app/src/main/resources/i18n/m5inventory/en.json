@@ -21,6 +21,7 @@
   "m5.opening.already_open": "An opening balance for this location is already being prepared",
   "m5.opening.lines_required": "An opening balance needs at least one counted line",
   "m5.opening.line_invalid": "A counted line needs a batch, a quantity above zero and a cost of zero or more",
+  "m5.opening.sku_not_found": "The SKU was not found",
   "m5.opening.not_found": "The opening balance was not found",
   "m5.opening.not_draft": "Only an opening balance in preparation can be signed",
   "m5.opening.not_signed": "The entity must sign the opening balance before it is countersigned",
