@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m8reporting.web;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -11,6 +12,7 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m8reporting.api.CreateProfitCenter;
 import lk.coopfed.knoweb.m8reporting.api.CreateShopTarget;
 import lk.coopfed.knoweb.m8reporting.api.ExportReportCsv;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
@@ -18,7 +20,9 @@ import lk.coopfed.knoweb.m8reporting.api.UpdateShopTarget;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
+import lk.coopfed.knoweb.m8reporting.query.ProfitCenterView;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
@@ -26,6 +30,7 @@ import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreateProfitCenterRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateShopTargetRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportResponse;
@@ -34,9 +39,14 @@ import lk.coopfed.knoweb.m8reporting.web.generated.DashboardResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardTile;
 import lk.coopfed.knoweb.m8reporting.web.generated.ExceptionItemResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyDailyTrendItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyProfitCenterPnlResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportSummary;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterListResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlSummary;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportColumn;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDataResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDefinitionResponse;
@@ -72,8 +82,10 @@ class ReportingController implements ReportingApi {
     private final Handles<ExportReportCsv, ReportTable> exportCsv;
     private final Handles<CreateShopTarget, UUID> createTarget;
     private final Handles<UpdateShopTarget, Void> updateTarget;
+    private final Handles<CreateProfitCenter, UUID> createProfitCenterHandler;
     private final Messages messages;
     private final ObjectProvider<A4Renderer> renderer;
+    private final Clock clock;
 
     ReportingController(
             ReportingQueries queries,
@@ -82,16 +94,20 @@ class ReportingController implements ReportingApi {
             Handles<ExportReportCsv, ReportTable> exportCsv,
             Handles<CreateShopTarget, UUID> createTarget,
             Handles<UpdateShopTarget, Void> updateTarget,
+            Handles<CreateProfitCenter, UUID> createProfitCenterHandler,
             Messages messages,
-            ObjectProvider<A4Renderer> renderer) {
+            ObjectProvider<A4Renderer> renderer,
+            Clock clock) {
         this.queries = queries;
         this.currentScope = currentScope;
         this.requestRun = requestRun;
         this.exportCsv = exportCsv;
         this.createTarget = createTarget;
         this.updateTarget = updateTarget;
+        this.createProfitCenterHandler = createProfitCenterHandler;
         this.messages = messages;
         this.renderer = renderer;
+        this.clock = clock;
     }
 
     @Override
@@ -487,5 +503,112 @@ class ReportingController implements ReportingApi {
                 .toList();
 
         return new MonthlyShopReportResponse(summaryDto, trendDto, shopsDto);
+    }
+
+    @Override
+    public ResponseEntity<ProfitCenterResponse> createProfitCenter(
+            String idempotencyKey, CreateProfitCenterRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID id = createProfitCenterHandler.handle(
+                new CreateProfitCenter(
+                        request.getCode(),
+                        request.getName(),
+                        request.getCategory() != null ? request.getCategory().getValue() : null,
+                        request.getLocationId()),
+                scope);
+
+        ProfitCenterView pc = queries.listProfitCenters(scope).stream()
+                .filter(c -> c.profitCenterId().equals(id))
+                .findFirst()
+                .orElseGet(() -> new ProfitCenterView(
+                        id,
+                        scope.entityId(),
+                        request.getCode(),
+                        request.getName(),
+                        request.getCategory() != null ? request.getCategory().getValue() : "GENERAL",
+                        request.getLocationId(),
+                        null,
+                        "ACTIVE",
+                        clock.instant()));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(toProfitCenterResponse(pc));
+    }
+
+    @Override
+    public ResponseEntity<ProfitCenterListResponse> listProfitCenters() {
+        List<ProfitCenterView> list = queries.listProfitCenters(currentScope.get());
+        List<ProfitCenterResponse> items =
+                list.stream().map(ReportingController::toProfitCenterResponse).toList();
+        return ResponseEntity.ok(new ProfitCenterListResponse(items));
+    }
+
+    @Override
+    public ResponseEntity<MonthlyProfitCenterPnlResponse> getMonthlyProfitCenterPnl(String month, UUID profitCenterId) {
+        MonthlyProfitCenterPnlReport report = queries.monthlyProfitCenterPnl(month, profitCenterId, currentScope.get());
+        return ResponseEntity.ok(toMonthlyProfitCenterPnlResponse(report));
+    }
+
+    private static ProfitCenterResponse toProfitCenterResponse(ProfitCenterView view) {
+        ProfitCenterResponse response = new ProfitCenterResponse(
+                view.profitCenterId(),
+                view.ownerEntityId(),
+                view.code(),
+                view.name(),
+                view.category(),
+                view.status(),
+                view.createdAt());
+        response.setLocationId(view.locationId());
+        response.setLocationName(view.locationName());
+        return response;
+    }
+
+    private static MonthlyProfitCenterPnlResponse toMonthlyProfitCenterPnlResponse(
+            MonthlyProfitCenterPnlReport report) {
+        ProfitCenterPnlSummary summaryDto = new ProfitCenterPnlSummary(
+                report.summary().totalRevenue().toPlainString(),
+                report.summary().costPending());
+        if (report.summary().totalCost() != null) {
+            summaryDto.setTotalCost(report.summary().totalCost().toPlainString());
+        }
+        if (report.summary().grossProfit() != null) {
+            summaryDto.setGrossProfit(report.summary().grossProfit().toPlainString());
+        }
+        if (report.summary().marginPercent() != null) {
+            summaryDto.setMarginPercent(report.summary().marginPercent().toPlainString());
+        }
+
+        List<ProfitCenterPnlItem> itemsDto =
+                report.items().stream().map(ReportingController::toPnlItemDto).toList();
+
+        MonthlyProfitCenterPnlResponse response =
+                new MonthlyProfitCenterPnlResponse(report.month(), report.currency(), summaryDto, itemsDto);
+
+        if (report.unallocated() != null) {
+            response.setUnallocated(toPnlItemDto(report.unallocated()));
+        }
+        return response;
+    }
+
+    private static ProfitCenterPnlItem toPnlItemDto(lk.coopfed.knoweb.m8reporting.query.ProfitCenterPnlItem item) {
+        ProfitCenterPnlItem dto = new ProfitCenterPnlItem(
+                item.code(),
+                item.name(),
+                item.category(),
+                item.revenue().toPlainString(),
+                item.costPending(),
+                item.txnCount());
+        dto.setProfitCenterId(item.profitCenterId());
+        dto.setLocationId(item.locationId());
+        dto.setLocationName(item.locationName());
+        if (item.cost() != null) {
+            dto.setCost(item.cost().toPlainString());
+        }
+        if (item.grossProfit() != null) {
+            dto.setGrossProfit(item.grossProfit().toPlainString());
+        }
+        if (item.marginPercent() != null) {
+            dto.setMarginPercent(item.marginPercent().toPlainString());
+        }
+        return dto;
     }
 }

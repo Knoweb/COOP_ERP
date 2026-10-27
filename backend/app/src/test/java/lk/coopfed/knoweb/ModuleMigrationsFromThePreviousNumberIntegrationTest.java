@@ -55,8 +55,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m3pricing", "9");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        // INV-07 and INV-09: m5inventory V0012-V0015 (receipt, shortfall, cancellation and
-        // Federation opening-balance countersign) from V0011.
+        // INV-07, INV-09 and INV-05: m5inventory V0012-V0016 (receipt, shortfall, cancellation,
+        // Federation opening-balance countersign and insert-only pick overrides) from V0011.
         streams.put("m5inventory", "11");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
@@ -200,9 +200,10 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 11)
                 .containsEntry("m3pricing", 10)
-                .containsEntry("m5inventory", 15)
+                .containsEntry("m5inventory", 16)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
-                .containsEntry("m7customers", 5);
+                .containsEntry("m7customers", 5)
+                .containsEntry("m8reporting", 9);
 
         // What the new numbers leave in place, read from the catalogue.
         List<String> functions = admin.queryForList(
@@ -317,11 +318,18 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // are numbered in their line_id order under the new key, as the migrator (not a superuser)
         // could only do with the table's FORCE lifted for that statement, and FORCE is back.
         // POL-M1-01: m8reporting V0008 adds reporting.shop_target with 4-class RLS.
-        assertThat(after).containsEntry("m8reporting", 8);
+        // POL-M1-08: m8reporting V0009 adds reporting.profit_center with 4-class RLS.
+        assertThat(after).containsEntry("m8reporting", 9);
         assertThat(admin.queryForObject("select to_regclass('reporting.shop_target')::text", String.class))
                 .isEqualTo("reporting.shop_target");
         assertThat(admin.queryForObject(
                         "select relforcerowsecurity from pg_class where oid = 'reporting.shop_target'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject("select to_regclass('reporting.profit_center')::text", String.class))
+                .isEqualTo("reporting.profit_center");
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'reporting.profit_center'::regclass",
                         Boolean.class))
                 .isTrue();
         assertThat(admin.queryForList(

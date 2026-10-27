@@ -12,10 +12,12 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +30,8 @@ import lk.coopfed.knoweb.m1party.query.LocationFilter;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
 import lk.coopfed.knoweb.m8reporting.internal.report.ReportCatalogue.Definition;
 import lk.coopfed.knoweb.m8reporting.internal.report.TileCatalogue.TileDefinition;
@@ -37,9 +41,12 @@ import lk.coopfed.knoweb.m8reporting.query.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyDailyTrendItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportSummary;
+import lk.coopfed.knoweb.m8reporting.query.ProfitCenterPnlItem;
+import lk.coopfed.knoweb.m8reporting.query.ProfitCenterView;
 import lk.coopfed.knoweb.m8reporting.query.ReportDefinitionView;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
@@ -94,6 +101,7 @@ class ReportQueriesImpl implements ReportingQueries {
     private final ConfigRegistry config;
     private final Clock clock;
     private final ZoneId zone;
+    private final InventoryQueries inventoryQueries;
 
     /**
      * What a dashboard depends on: the caller's whole visibility, as the policies of M8 read it
@@ -129,7 +137,8 @@ class ReportQueriesImpl implements ReportingQueries {
             ExceptionQueue exceptions,
             ConfigRegistry config,
             Clock clock,
-            @Value("${coop-erp.business-timezone}") String zone) {
+            @Value("${coop-erp.business-timezone}") String zone,
+            InventoryQueries inventoryQueries) {
         this.jdbc = jdbc;
         this.party = party;
         this.catalogue = catalogue;
@@ -141,6 +150,7 @@ class ReportQueriesImpl implements ReportingQueries {
         this.config = config;
         this.clock = clock;
         this.zone = ZoneId.of(zone);
+        this.inventoryQueries = inventoryQueries;
     }
 
     @Override
@@ -939,5 +949,228 @@ class ReportQueriesImpl implements ReportingQueries {
                 "LKR");
 
         return new MonthlyShopReport(summary, new ArrayList<>(dailyTrendMap.values()), items);
+    }
+
+    @Override
+    public List<ProfitCenterView> listProfitCenters(ScopeContext scope) {
+        Names names = new Names(party, catalogue, scope);
+        return jdbc.query(
+                """
+                select profit_center_id, owner_entity_id, code, name, category, location_id,
+                       status, created_at
+                  from reporting.profit_center
+                 where status = 'ACTIVE'
+                 order by code
+                """,
+                (rs, n) -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    String locName = locId != null ? names.location(locId) : null;
+                    return new ProfitCenterView(
+                            rs.getObject("profit_center_id", UUID.class),
+                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getString("code"),
+                            rs.getString("name"),
+                            rs.getString("category"),
+                            locId,
+                            locName,
+                            rs.getString("status"),
+                            rs.getTimestamp("created_at").toInstant());
+                });
+    }
+
+    @Override
+    public MonthlyProfitCenterPnlReport monthlyProfitCenterPnl(
+            String yearMonth, UUID profitCenterId, ScopeContext scope) {
+        YearMonth ym;
+        if (yearMonth == null || yearMonth.isBlank()) {
+            ym = YearMonth.now(clock);
+        } else {
+            try {
+                ym = YearMonth.parse(yearMonth);
+            } catch (Exception e) {
+                throw new ProblemException("m8.profit_center.month_invalid");
+            }
+        }
+        LocalDate periodStart = ym.atDay(1);
+        LocalDate periodEnd = ym.atEndOfMonth();
+
+        List<ProfitCenterView> allCenters = listProfitCenters(scope);
+        if (profitCenterId != null) {
+            allCenters = allCenters.stream()
+                    .filter(c -> c.profitCenterId().equals(profitCenterId))
+                    .toList();
+            if (allCenters.isEmpty()) {
+                throw new ProblemException("m8.profit_center.not_found");
+            }
+        }
+
+        record LocationSales(UUID locationId, BigDecimal netSales, long txnCount) {}
+        Map<UUID, LocationSales> salesByLocation = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select location_id,
+                       coalesce(sum(net), 0) as net_sales,
+                       count(receipt_id) as txn_count
+                  from reporting.shop_sale_fact
+                 where business_date between ? and ?
+                 group by location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    salesByLocation.put(
+                            locId, new LocationSales(locId, rs.getBigDecimal("net_sales"), rs.getLong("txn_count")));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd));
+
+        Map<UUID, LocationSalesCost> costByLocation =
+                inventoryQueries.locationsSalesCost(periodStart, periodEnd, scope);
+
+        Set<UUID> mappedLocations = new HashSet<>();
+        List<ProfitCenterPnlItem> items = new ArrayList<>();
+
+        for (ProfitCenterView pc : allCenters) {
+            UUID locId = pc.locationId();
+            BigDecimal revenue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            long txnCount = 0;
+            if (locId != null) {
+                mappedLocations.add(locId);
+                LocationSales ls = salesByLocation.get(locId);
+                if (ls != null) {
+                    revenue = ls.netSales() != null ? ls.netSales().setScale(2, RoundingMode.HALF_UP) : revenue;
+                    txnCount = ls.txnCount();
+                }
+            }
+
+            LocationSalesCost lc = locId != null ? costByLocation.get(locId) : null;
+            boolean costPending = false;
+            BigDecimal cogs = null;
+            BigDecimal grossProfit = null;
+            BigDecimal marginPercent = null;
+
+            if (locId != null) {
+                if (revenue.compareTo(BigDecimal.ZERO) > 0 && (lc == null || lc.movementCount() == 0)) {
+                    // Revenue exists but no inventory movement cost recognized -> flag pending
+                    costPending = true;
+                } else if (lc != null && lc.costPending()) {
+                    costPending = true;
+                } else {
+                    cogs = (lc != null && lc.recognizedCost() != null)
+                            ? lc.recognizedCost().setScale(2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    grossProfit = revenue.subtract(cogs).setScale(2, RoundingMode.HALF_UP);
+                    marginPercent = revenue.compareTo(BigDecimal.ZERO) > 0
+                            ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(revenue, 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                }
+            } else {
+                cogs = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                grossProfit = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                marginPercent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            }
+
+            items.add(new ProfitCenterPnlItem(
+                    pc.profitCenterId(),
+                    pc.code(),
+                    pc.name(),
+                    pc.category(),
+                    locId,
+                    pc.locationName(),
+                    revenue,
+                    cogs,
+                    grossProfit,
+                    marginPercent,
+                    costPending,
+                    txnCount));
+        }
+
+        ProfitCenterPnlItem unallocated = null;
+        BigDecimal unallocatedRev = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal unallocatedCost = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        long unallocatedTxns = 0;
+        boolean unallocatedPending = false;
+
+        if (profitCenterId == null) {
+            Set<UUID> allActiveLocations = new HashSet<>();
+            allActiveLocations.addAll(salesByLocation.keySet());
+            allActiveLocations.addAll(costByLocation.keySet());
+            allActiveLocations.removeAll(mappedLocations);
+
+            if (!allActiveLocations.isEmpty()) {
+                for (UUID unmappedLoc : allActiveLocations) {
+                    LocationSales ls = salesByLocation.get(unmappedLoc);
+                    if (ls != null) {
+                        if (ls.netSales() != null) {
+                            unallocatedRev = unallocatedRev.add(ls.netSales());
+                        }
+                        unallocatedTxns += ls.txnCount();
+                    }
+                    LocationSalesCost lc = costByLocation.get(unmappedLoc);
+                    if (ls != null
+                            && ls.netSales() != null
+                            && ls.netSales().compareTo(BigDecimal.ZERO) > 0
+                            && (lc == null || lc.movementCount() == 0)) {
+                        unallocatedPending = true;
+                    } else if (lc != null && lc.costPending()) {
+                        unallocatedPending = true;
+                    } else if (lc != null && lc.recognizedCost() != null) {
+                        unallocatedCost = unallocatedCost.add(lc.recognizedCost());
+                    }
+                }
+                BigDecimal unallocProfit = !unallocatedPending ? unallocatedRev.subtract(unallocatedCost) : null;
+                BigDecimal unallocMargin = (!unallocatedPending && unallocatedRev.compareTo(BigDecimal.ZERO) > 0)
+                        ? unallocProfit
+                                .multiply(BigDecimal.valueOf(100))
+                                .divide(unallocatedRev, 2, RoundingMode.HALF_UP)
+                        : (!unallocatedPending ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : null);
+
+                unallocated = new ProfitCenterPnlItem(
+                        null,
+                        "UNALLOCATED",
+                        "Unallocated / General",
+                        "GENERAL",
+                        null,
+                        null,
+                        unallocatedRev.setScale(2, RoundingMode.HALF_UP),
+                        !unallocatedPending ? unallocatedCost.setScale(2, RoundingMode.HALF_UP) : null,
+                        unallocProfit != null ? unallocProfit.setScale(2, RoundingMode.HALF_UP) : null,
+                        unallocMargin != null ? unallocMargin.setScale(2, RoundingMode.HALF_UP) : null,
+                        unallocatedPending,
+                        unallocatedTxns);
+            }
+        }
+
+        BigDecimal totalRevenue = items.stream()
+                .map(ProfitCenterPnlItem::revenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .add(unallocated != null ? unallocated.revenue() : BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        boolean totalCostPending = items.stream().anyMatch(ProfitCenterPnlItem::costPending)
+                || (unallocated != null && unallocated.costPending());
+
+        BigDecimal totalCost = null;
+        BigDecimal grossProfit = null;
+        BigDecimal marginPercent = null;
+
+        if (!totalCostPending) {
+            BigDecimal itemsCost = items.stream()
+                    .map(ProfitCenterPnlItem::cost)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (unallocated != null && unallocated.cost() != null) {
+                itemsCost = itemsCost.add(unallocated.cost());
+            }
+            totalCost = itemsCost.setScale(2, RoundingMode.HALF_UP);
+            grossProfit = totalRevenue.subtract(totalCost).setScale(2, RoundingMode.HALF_UP);
+            marginPercent = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                    ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        MonthlyProfitCenterPnlReport.Summary summary = new MonthlyProfitCenterPnlReport.Summary(
+                totalRevenue, totalCost, grossProfit, marginPercent, totalCostPending);
+
+        return new MonthlyProfitCenterPnlReport(ym.toString(), "LKR", summary, items, unallocated);
     }
 }

@@ -60,6 +60,31 @@ paths:
               schema: { $ref: '#/components/schemas/CustomerCard' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/bulk:
+    post:
+      tags: [Customers]
+      operationId: bulkImportCustomers
+      summary: Import customers/members in bulk from a sheet or payload
+      description: >
+        Loads members in bulk from a CSV sheet or list of member rows (CAT-10). Honours reuse detection
+        for recently released phone numbers when confirmedIdentity/confirmedReuse is set; otherwise
+        returns m7.customer.phone_reuse_confirm. Handles existing members matching NIC or phone.
+      x-permission: cus.customer.register
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkImportCustomersRequest' }
+      responses:
+        '200':
+          description: Import completed successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkCustomerReport' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/customers/{customerId}:
     parameters:
       - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
@@ -891,3 +916,54 @@ components:
         allocated: { type: number }
         unallocated: { type: number }
         balance: { type: number, description: The account's balance after the payment }
+    BulkImportCustomersRequest:
+      type: object
+      properties:
+        sheet: { type: string }
+        confirmedReuse: { type: boolean, default: false }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/MemberRowRequest' }
+    MemberRowRequest:
+      type: object
+      required: [displayName, phone]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        displayNameSi: { type: [string, 'null'], maxLength: 120 }
+        displayNameTa: { type: [string, 'null'], maxLength: 120 }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: string, minLength: 9, maxLength: 20 }
+        nic: { type: [string, 'null'], maxLength: 20 }
+        creditLimit: { type: [number, 'null'], minimum: 0 }
+        termsDays: { type: [integer, 'null'], minimum: 1 }
+        offlineCap: { type: [number, 'null'], minimum: 0 }
+        tags:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 40 }
+        consents:
+          type: array
+          maxItems: 2
+          items: { type: string, enum: [CREDIT_ACCOUNT, STATEMENTS_NOTIFICATIONS] }
+        confirmedIdentity: { type: boolean, default: false }
+    BulkCustomerReport:
+      type: object
+      required: [importId, status, totalRows, registeredCount, updatedCount, failedCount, problems]
+      properties:
+        importId: { type: string, format: uuid }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY] }
+        totalRows: { type: integer }
+        registeredCount: { type: integer }
+        updatedCount: { type: integer }
+        failedCount: { type: integer }
+        problems:
+          type: array
+          items: { $ref: '#/components/schemas/MemberProblem' }
+    MemberProblem:
+      type: object
+      required: [rowNumber, nameOrPhone, field, reason]
+      properties:
+        rowNumber: { type: integer }
+        nameOrPhone: { type: string }
+        field: { type: string }
+        reason: { type: string }

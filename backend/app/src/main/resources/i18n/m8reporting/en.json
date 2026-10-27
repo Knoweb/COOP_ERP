@@ -93,5 +93,15 @@
   "m8.shop_report.location_unknown": "The shop was not found or is outside your organisation",
   "m8.shop_report.location_forbidden": "You are not permitted to view reports for another shop",
   "m8.shop_report.date_invalid": "The reporting date is invalid",
-  "m8.shop_report.month_invalid": "The reporting month format is invalid, expected YYYY-MM"
+  "m8.shop_report.month_invalid": "The reporting month format is invalid, expected YYYY-MM",
+  "m8.profit_center.own_required": "Profit centers can only be managed by users acting for their own organisation",
+  "m8.profit_center.code_required": "Profit center code is required",
+  "m8.profit_center.code_too_long": "Profit center code must be at most 32 characters",
+  "m8.profit_center.name_required": "Profit center name is required",
+  "m8.profit_center.category_invalid": "Category must be AGENCY, PACKING, RETAIL or GENERAL",
+  "m8.profit_center.location_unknown": "The operational location was not found or is outside your organisation",
+  "m8.profit_center.location_scope_mismatch": "The location does not belong to your organisation or scope",
+  "m8.profit_center.duplicate_code": "A profit center with this code already exists in your organisation",
+  "m8.profit_center.not_found": "The requested profit center was not found in your scope",
+  "m8.profit_center.month_invalid": "The month format is invalid, expected YYYY-MM"
 }

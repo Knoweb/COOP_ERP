@@ -28,6 +28,11 @@ audit_event_types:
     offline_capturable: false
     description_en: An issued delivery note reserved the seller's lots on a pick list
 
+  - code: PICK_OVERRIDDEN
+    severity: INFO
+    offline_capturable: false
+    description_en: A warehouse user replaced a FEFO-suggested lot on an open pick list
+
   - code: PICK_LIST_DISPATCHED
     severity: INFO
     offline_capturable: false
@@ -37,6 +42,11 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: An opening stock balance was prepared
+
+  - code: STOCK_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Opening stock was imported in bulk for a location
 
   - code: OPB_SIGNED_ENTITY
     severity: INFO

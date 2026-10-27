@@ -197,7 +197,7 @@ public final class InventoryFixture {
         users.clear();
         roles.clear();
         admin.execute("truncate table inventory.stock_lot, inventory.stock_movement, inventory.movement_sequence,"
-                + " inventory.entity_sku_cost, inventory.pick_list_line, inventory.pick_list,"
+                + " inventory.entity_sku_cost, inventory.pick_override, inventory.pick_list_line, inventory.pick_list,"
                 + " inventory.opening_balance_line, inventory.opening_balance, inventory.transfer_shortfall_line,"
                 + " inventory.transfer_shortfall, inventory.transfer_receipt_line, inventory.transfer_cancellation,"
                 + " inventory.transfer_receipt, inventory.transfer_dispatch,"

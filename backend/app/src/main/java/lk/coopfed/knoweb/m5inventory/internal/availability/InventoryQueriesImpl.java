@@ -1,15 +1,21 @@
 package lk.coopfed.knoweb.m5inventory.internal.availability;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -17,12 +23,14 @@ import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.EntityCost;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,7 +64,10 @@ class InventoryQueriesImpl implements InventoryQueries {
                    coalesce((select sum(p.qty)
                                from inventory.pick_list_line p
                                join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
-                              where pl.status = 'OPEN' and p.stock_lot_id = l.stock_lot_id), 0) as reserved,
+                               left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                              where pl.status = 'OPEN'
+                                and coalesce(o.replacement_stock_lot_id, p.stock_lot_id)
+                                    = l.stock_lot_id), 0) as reserved,
                    case when l.condition = 'GOOD' and l.qty_on_hand > 0
                              and (l.expiry_date is null or l.expiry_date >= d.today)
                         then row_number() over (
@@ -71,10 +82,15 @@ class InventoryQueriesImpl implements InventoryQueries {
 
     private final JdbcTemplate jdbc;
     private final BusinessDay businessDay;
+    private final ZoneId zone;
 
-    InventoryQueriesImpl(JdbcTemplate jdbc, BusinessDay businessDay) {
+    InventoryQueriesImpl(
+            JdbcTemplate jdbc,
+            BusinessDay businessDay,
+            @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
+        this.zone = ZoneId.of(zone);
     }
 
     @Override
@@ -108,9 +124,14 @@ class InventoryQueriesImpl implements InventoryQueries {
                                    - coalesce((select sum(p.qty)
                                                  from inventory.pick_list_line p
                                                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
-                                                 join inventory.stock_lot r on r.stock_lot_id = p.stock_lot_id
+                                                  left join inventory.pick_override o
+                                                    on o.pick_line_id = p.pick_line_id
+                                                 join inventory.stock_lot r
+                                                   on r.stock_lot_id = coalesce(
+                                                       o.replacement_stock_lot_id, p.stock_lot_id)
                                                 where pl.status = 'OPEN'
-                                                  and p.location_id = loc.id and p.sku_id = sku.id
+                                                  and coalesce(o.location_id, p.location_id) = loc.id
+                                                  and p.sku_id = sku.id
                                                   and (r.expiry_date is null or r.expiry_date >= ?)), 0) as on_hand
                               from unnest(?::uuid[]) as loc (id)
                              cross join unnest(?::uuid[]) as sku (id)
@@ -290,12 +311,20 @@ class InventoryQueriesImpl implements InventoryQueries {
                         head.status(),
                         jdbc.query(
                                 """
-                                select delivery_line_id, sku_id, location_id, stock_lot_id, batch_id, qty
-                                  from inventory.pick_list_line
-                                 where pick_list_id = ?
-                                 order by delivery_line_id, stock_lot_id is null, location_id
+                                select p.pick_line_id, p.delivery_line_id, p.sku_id,
+                                       coalesce(o.location_id, p.location_id) as location_id,
+                                       coalesce(o.replacement_stock_lot_id, p.stock_lot_id) as stock_lot_id,
+                                       coalesce(o.replacement_batch_id, p.batch_id) as batch_id,
+                                       p.qty
+                                  from inventory.pick_list_line p
+                                  left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                                 where p.pick_list_id = ?
+                                 order by p.delivery_line_id,
+                                          coalesce(o.replacement_stock_lot_id, p.stock_lot_id) is null,
+                                          coalesce(o.location_id, p.location_id)
                                 """,
                                 (rs, n) -> new PickListView.Pick(
+                                        rs.getObject("pick_line_id", UUID.class),
                                         rs.getObject("delivery_line_id", UUID.class),
                                         rs.getObject("sku_id", UUID.class),
                                         rs.getObject("location_id", UUID.class),
@@ -490,5 +519,47 @@ class InventoryQueriesImpl implements InventoryQueries {
 
     private Date today() {
         return Date.valueOf(businessDay.today());
+    }
+
+    @Override
+    public Map<UUID, LocationSalesCost> locationsSalesCost(LocalDate from, LocalDate to, ScopeContext scope) {
+        if (from == null || to == null) {
+            return Map.of();
+        }
+        Instant start = from.atStartOfDay(zone).toInstant();
+        Instant end = to.plusDays(1).atStartOfDay(zone).toInstant();
+
+        Map<UUID, LocationSalesCost> result = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select location_id,
+                       coalesce(sum(case when movement_type = 'SALE' then abs(qty_delta) * unit_cost_at_movement
+                                         when movement_type = 'SALE_REVERSAL' then -1 * abs(qty_delta) * unit_cost_at_movement
+                                         else 0 end), 0) as recognized_cost,
+                       bool_or(unit_cost_at_movement <= 0) as has_pending,
+                       count(*) as movement_count
+                  from inventory.stock_movement
+                 where movement_type in ('SALE', 'SALE_REVERSAL')
+                   and occurred_at >= ? and occurred_at < ?
+                 group by location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    BigDecimal cost = rs.getBigDecimal("recognized_cost");
+                    boolean pending = Boolean.TRUE.equals(rs.getObject("has_pending", Boolean.class));
+                    long count = rs.getLong("movement_count");
+                    result.put(
+                            locId,
+                            new LocationSalesCost(
+                                    locId,
+                                    cost != null
+                                            ? cost.setScale(2, RoundingMode.HALF_UP)
+                                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                                    pending,
+                                    count));
+                },
+                Timestamp.from(start),
+                Timestamp.from(end));
+        return result;
     }
 }
