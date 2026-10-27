@@ -229,7 +229,11 @@ export function StockPage() {
         </p>
       )}
 
-      {balances.data && (
+      {balances.data && balances.data.length === 0 && (
+        <p>{t("inventory.balances.empty").text}</p>
+      )}
+
+      {balances.data && balances.data.length > 0 && (
         <section className="modern-table-card stock-positions-card">
           <div className="modern-table-scroll stock-positions-scroll">
             <table className="modern-table stock-table stock-positions-table">
@@ -257,13 +261,7 @@ export function StockPage() {
               </thead>
 
               <tbody>
-                {balances.data.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="empty-table-cell">
-                      {t("inventory.balances.empty").text}
-                    </td>
-                  </tr>
-                ) : filteredBalances.length === 0 ? (
+                {filteredBalances.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="empty-table-cell">
                       {t("inventory.find.none").text}
