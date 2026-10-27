@@ -178,7 +178,7 @@ export function StockPage() {
                 type="button"
                 className="stock-search-clear"
                 onClick={() => setSearchQuery("")}
-                aria-label="Clear search"
+                aria-label={t("inventory.remove").text}
               >
                 ✕
               </button>
