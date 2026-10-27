@@ -391,12 +391,9 @@ public class BulkReceivableImporter implements Handles<BulkImportReceivables, Bu
     }
 
     private boolean isFederation(ScopeContext scope) {
-        if (scope.policyClass() == PolicyClass.FEDERATION_VIEW) {
-            return true;
-        }
         try {
-            UUID sysEntity = jdbc.queryForObject("select kernel.system_entity()", UUID.class);
-            return sysEntity != null && sysEntity.equals(scope.entityId());
+            return Boolean.TRUE.equals(
+                    jdbc.queryForObject("select kernel.scope_entity() = kernel.system_entity()", Boolean.class));
         } catch (Exception e) {
             return false;
         }

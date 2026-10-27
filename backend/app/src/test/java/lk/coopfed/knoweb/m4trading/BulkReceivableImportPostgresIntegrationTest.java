@@ -54,8 +54,8 @@ class BulkReceivableImportPostgresIntegrationTest extends PostgresIntegrationTes
         superuserJdbc()
                 .update(
                         """
-                insert into security.app_user (user_id, home_entity_id, username, display_name, status)
-                values (?, ?, 'seller_officer', 'Seller Officer', 'ACTIVE')
+                insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)
+                values (?, ?, 'seller_officer', 'Seller Officer', 'BACK_OFFICE', 'ACTIVE')
                 on conflict (user_id) do nothing
                 """,
                         SELLER_USER,
@@ -64,8 +64,8 @@ class BulkReceivableImportPostgresIntegrationTest extends PostgresIntegrationTes
         superuserJdbc()
                 .update(
                         """
-                insert into security.app_user (user_id, home_entity_id, username, display_name, status)
-                values (?, ?, 'buyer_manager', 'Buyer Manager', 'ACTIVE')
+                insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)
+                values (?, ?, 'buyer_manager', 'Buyer Manager', 'BACK_OFFICE', 'ACTIVE')
                 on conflict (user_id) do nothing
                 """,
                         BUYER_USER,
