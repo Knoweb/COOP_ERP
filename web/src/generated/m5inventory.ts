@@ -121,6 +121,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Eligible replacement lots for one FEFO-suggested pick
+         * @description Returns only in-date GOOD lots of the same SKU and source location with enough currently unreserved stock for the whole pick line, excluding its original lot. The OverridePick command locks and revalidates the selected lot because availability may change after this read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+         */
+        get: operations["listPickReplacementCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/opening-balances": {
         parameters: {
             query?: never;
@@ -846,6 +866,16 @@ export interface components {
             replacementStockLotId: string;
             reason: string;
         };
+        PickReplacementCandidateResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            availableQty: number;
+        };
         BulkImportStockRequest: {
             /** Format: uuid */
             locationId: string;
@@ -1443,6 +1473,29 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPickReplacementCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: string;
+                pickLineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Currently eligible replacement lots in FEFO order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickReplacementCandidateResponse"][];
+                };
+            };
         };
     };
     prepareOpeningBalance: {
