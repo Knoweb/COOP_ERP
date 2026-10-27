@@ -9,6 +9,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi } from "./inventoryApi";
 import { SkuLabel } from "./SkuLabel";
 import { chipOf, errorText } from "./stockView";
+import "./inventory.css";
 
 /**
  * One opening balance (doc 25 section 4.7, flow 6.9): its counted lines and state. A DRAFT is
@@ -81,7 +82,7 @@ export function OpeningBalancePage() {
 
       <section className="modern-table-card">
         <div className="modern-table-scroll">
-          <table className="modern-table stock-table opening-balance-table">
+          <table className="modern-table stock-table opening-balance-table opening-balance-table--view">
             <colgroup>
               <col className="col-item" />
               <col className="col-condition" />

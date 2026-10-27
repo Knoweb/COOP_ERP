@@ -76,7 +76,7 @@ export function NewOpeningBalancePage() {
         <LocationPicker value={locationId} onChange={setLocationId} />
         <section className="modern-table-card">
           <div className="modern-table-scroll">
-            <table className="modern-table stock-table opening-balance-table">
+            <table className="modern-table stock-table opening-balance-table opening-balance-table--new">
               <colgroup>
                 <col className="col-item" />
                 <col className="col-batch" />

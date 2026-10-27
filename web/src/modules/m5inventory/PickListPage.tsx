@@ -41,7 +41,11 @@ export function PickListPage() {
 
   return (
     <main className="shell-page">
-      <PageHeader icon="stock" title={t("inventory.pick.title").text} actions={<Link className="action-link" to="/inventory">{t("inventory.back").text}</Link>} />
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
+      <PageHeader icon="stock" title={t("inventory.pick.title").text} />
       <p className="modern-intro-text">{t("inventory.pick.intro").text}</p>
       <form className="modern-filter-panel inventory-form-row" onSubmit={submit}>
         <label className="inventory-form-field">

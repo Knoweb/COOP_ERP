@@ -99,14 +99,13 @@ export function CountsPage() {
 
   return (
     <main className="shell-page">
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <PageHeader
         icon="stock"
         title={t("inventory.title").text}
-        actions={
-          <Link className="action-link" to="/inventory">
-            <span>{t("inventory.back").text}</span>
-          </Link>
-        }
       />
 
       <div className="inventory-control-links">

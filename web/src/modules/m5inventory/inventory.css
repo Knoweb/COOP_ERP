@@ -44,7 +44,123 @@
 /* ---------- Stock Navigation & Filter Controls ----------------------------- */
 
 .shell-page > .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-2) + var(--space-half));
+  border-radius: var(--radius-pill);
+  background: var(--color-polish-31);
+  border: var(--border-width) solid var(--color-polish-6);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  text-decoration: none;
   margin-bottom: var(--space-2);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shell-page > .back-link:hover {
+  background: var(--color-polish-22);
+  border-color: var(--color-accent);
+  transform: translateX(calc(var(--space-half) * -1 / 2));
+}
+
+.shell-page > .back-link:focus,
+.shell-page > .back-link:focus-visible,
+.shell-page > .back-link:active {
+  outline: var(--border-width-strong) solid var(--color-accent);
+  outline-offset: calc(var(--border-width-strong) + var(--border-width));
+  box-shadow: 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-18);
+}
+
+.shell-page > .back-link:active {
+  transform: scale(0.98);
+}
+
+.shell-page > .back-link svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Stock Controls & Search Toolbar -------------------------------- */
+
+.stock-controls-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.stock-controls-toolbar .filter-toggle {
+  margin-bottom: 0;
+}
+
+.stock-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: calc(var(--space-8) * 4);
+  min-width: calc(var(--space-8) * 3);
+}
+
+.stock-search-control {
+  width: 100%;
+}
+
+.stock-search-input {
+  width: 100%;
+  min-height: var(--target-min);
+  padding-left: calc(var(--space-4) + var(--space-1));
+  padding-right: calc(var(--space-4) + var(--space-1));
+  border: var(--border-width) solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stock-search-input:hover {
+  border-color: var(--color-accent);
+}
+
+.stock-search-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-18);
+}
+
+.stock-search-clear {
+  position: absolute;
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-2) + var(--space-half));
+  height: calc(var(--space-2) + var(--space-half));
+  border: none;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.stock-search-clear:hover {
+  background: var(--color-polish-22);
+  color: var(--color-text);
 }
 
 .stock-positions-filters {
@@ -103,67 +219,9 @@
 
 /* ---------- Table Container & Scrolling ------------------------------------ */
 
-.modern-table-card {
-  max-width: 100%;
-  border-radius: var(--radius);
-  border: var(--border-width) solid var(--color-border);
-  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-14);
-  background: var(--color-surface);
-  overflow: hidden;
-  margin-bottom: var(--space-4);
-}
-
-.modern-table-scroll {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
+/* Note: Base .modern-table-card and .modern-table-scroll are defined in shell.css */
 
 /* ---------- Common Table Styling (Main & Item Details) --------------------- */
-
-.stock-table.modern-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.stock-table th,
-.stock-table td {
-  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
-  vertical-align: middle;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.stock-table th {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-strong);
-  text-transform: uppercase;
-  color: var(--color-brand-dark);
-  background: var(--color-polish-22);
-  white-space: nowrap;
-}
-
-.stock-table td {
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-}
-
-.stock-table tbody tr {
-  transition: background 0.15s ease;
-}
-
-.stock-table tbody tr:nth-child(even) {
-  background: var(--color-polish-29);
-}
-
-.stock-table tbody tr:hover {
-  background: var(--color-polish-31);
-}
-
-.stock-table tbody tr:last-child td {
-  border-bottom: none;
-}
 
 .stock-table th.numeric-cell,
 .stock-table td.numeric-cell {
@@ -210,59 +268,103 @@
   align-items: center;
   gap: var(--space-1);
   word-break: break-word;
-  color: var(--color-accent);
+  color: var(--color-polish-25);
   font-weight: var(--font-weight-strong);
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .stock-table td .entity-link:hover {
+  color: var(--color-polish-30);
   text-decoration: underline;
+}
+
+.stock-table td .entity-link__icon svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
 }
 
 /* ---------- 1. Main Stock Positions Table ----------------------------------- */
 
+.modern-table-card.stock-positions-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.modern-table-scroll.stock-positions-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden; /* Fixed table: prevents horizontal dragging/sliding on desktop */
+}
+
 .stock-table.stock-positions-table {
-  min-width: calc(var(--space-8) * 12);
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
+.stock-positions-table th,
+.stock-positions-table td {
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-1);
+  overflow-wrap: break-word;
+}
+
+.stock-positions-table th {
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: var(--line-height-normal, 1.3);
+}
+
+.stock-positions-table .col-item,
 .stock-positions-table col.col-item {
-  width: 24%;
-  min-width: calc(var(--space-8) * 3);
+  width: 25%;
 }
 
+.stock-positions-table .col-batch,
 .stock-positions-table col.col-batch {
   width: 15%;
-  min-width: calc(var(--space-8) * 2);
+  overflow-wrap: anywhere;
 }
 
+.stock-positions-table .col-expiry,
 .stock-positions-table col.col-expiry {
   width: 12%;
-  min-width: calc(var(--space-8) * 1.5);
+  white-space: nowrap;
 }
 
+.stock-positions-table .col-condition,
 .stock-positions-table col.col-condition {
-  width: 11%;
-  min-width: calc(var(--space-8) * 1.5);
-}
-
-.stock-positions-table col.col-on-hand {
   width: 10%;
-  min-width: calc(var(--space-8) * 1.25);
 }
 
+.stock-positions-table .col-on-hand,
+.stock-positions-table col.col-on-hand {
+  width: 9%;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.stock-positions-table .col-fefo,
 .stock-positions-table col.col-fefo {
   width: 9%;
-  min-width: calc(var(--space-8) * 1.25);
+  text-align: right !important;
+  white-space: nowrap;
 }
 
+.stock-positions-table .col-available,
 .stock-positions-table col.col-available {
   width: 9%;
-  min-width: calc(var(--space-8) * 1.25);
+  text-align: right !important;
+  white-space: nowrap;
 }
 
+.stock-positions-table .col-unit-cost,
 .stock-positions-table col.col-unit-cost {
-  width: 10%;
-  min-width: calc(var(--space-8) * 1.5);
+  width: 11%;
+  text-align: right !important;
+  white-space: nowrap;
 }
 
 /* ---------- 2. Item Details (Stock Card) Table ------------------------------ */
@@ -273,32 +375,26 @@
 
 .stock-card-table col.col-when {
   width: 22%;
-  min-width: calc(var(--space-8) * 2);
 }
 
 .stock-card-table col.col-movement {
   width: 20%;
-  min-width: calc(var(--space-8) * 2);
 }
 
 .stock-card-table col.col-condition {
   width: 14%;
-  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table col.col-qty {
   width: 14%;
-  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table col.col-balance {
   width: 14%;
-  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table col.col-unit-cost {
   width: 16%;
-  min-width: calc(var(--space-8) * 1.5);
 }
 
 .stock-card-table td.cell-when {
@@ -311,6 +407,54 @@
   min-width: calc(var(--space-8) * 11);
 }
 
+.opening-balance-table--new col.col-item {
+  width: 22%;
+}
+
+.opening-balance-table--new col.col-batch {
+  width: 15%;
+}
+
+.opening-balance-table--new col.col-expiry {
+  width: 13%;
+}
+
+.opening-balance-table--new col.col-mrp {
+  width: 11%;
+}
+
+.opening-balance-table--new col.col-qty {
+  width: 10%;
+}
+
+.opening-balance-table--new col.col-unit-cost {
+  width: 11%;
+}
+
+.opening-balance-table--new col.col-condition {
+  width: 11%;
+}
+
+.opening-balance-table--new col.col-action {
+  width: 7%;
+}
+
+.opening-balance-table--view col.col-item {
+  width: 40%;
+}
+
+.opening-balance-table--view col.col-condition {
+  width: 20%;
+}
+
+.opening-balance-table--view col.col-qty {
+  width: 20%;
+}
+
+.opening-balance-table--view col.col-unit-cost {
+  width: 20%;
+}
+
 .stock-table td.empty-table-cell {
   text-align: center !important;
   color: var(--color-text-muted);
@@ -321,12 +465,21 @@
 .opening-balance-table input,
 .opening-balance-table select {
   width: 100%;
-  padding: var(--space-1) calc(var(--space-1) + var(--space-half));
+  box-sizing: border-box;
+  padding: calc(var(--space-1) + var(--space-half) / 2) var(--space-1);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius);
   font-size: var(--font-size-sm);
-  background: var(--color-surface);
+  background: var(--color-polish-24);
   color: var(--color-text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.opening-balance-table input:focus,
+.opening-balance-table select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--border-width) var(--color-polish-18);
 }
 
 .opening-balance-table td.numeric-cell input {
@@ -340,12 +493,13 @@
   justify-content: center;
   padding: var(--space-half) var(--space-1);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-strong);
   color: var(--color-alert-text);
   background: transparent;
-  border: var(--border-width) solid currentColor;
+  border: var(--border-width) solid var(--color-alert-text);
   border-radius: var(--radius);
   cursor: pointer;
+  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
@@ -353,3 +507,4 @@
   background: var(--color-alert-text);
   color: var(--color-on-accent);
 }
+
