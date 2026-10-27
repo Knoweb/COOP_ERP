@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.m4trading.api.BulkImportReceivables;
@@ -124,21 +125,29 @@ class BulkReceivableImportPostgresIntegrationTest extends PostgresIntegrationTes
         assertThat(invoice.sellerEntityId()).isEqualTo(SELLER);
         assertThat(invoice.buyerEntityId()).isEqualTo(BUYER);
         assertThat(invoice.grossAmount()).isEqualByComparingTo("150000.00");
-        assertThat(invoice.settledAmount()).isEqualByComparingTo("0.00");
-        assertThat(invoice.amountDue()).isEqualByComparingTo("150000.00");
+
+        var balance = invoices.balance(invoiceId, seller())
+                .orElseThrow(() -> new AssertionError("Invoice balance not found"));
+        assertThat(balance.settledAmount()).isEqualByComparingTo("0.00");
+        assertThat(balance.amountDue()).isEqualByComparingTo("150000.00");
+        assertThat(balance.paymentState()).isEqualTo("OPEN");
 
         // Verify audit log
         var audits = kernel.committedAudit();
         assertThat(audits).anySatisfy(a -> {
-            assertThat(a.action()).isEqualTo(BulkReceivableImporter.AUDIT_RECEIVABLE_IMPORTED);
-            assertThat(a.payload().get("sellerSignedBy")).isEqualTo(SELLER_USER);
-            assertThat(a.payload().get("buyerSignedBy")).isEqualTo(BUYER_USER);
-            assertThat(a.payload().get("amount")).isEqualTo(new BigDecimal("150000.00"));
+            assertThat(a.eventType()).isEqualTo(BulkReceivableImporter.AUDIT_RECEIVABLE_IMPORTED);
+            assertThat(a.after()).isInstanceOf(Map.class);
+            Map<?, ?> map = (Map<?, ?>) a.after();
+            assertThat(map.get("sellerSignedBy")).isEqualTo(SELLER_USER);
+            assertThat(map.get("buyerSignedBy")).isEqualTo(BUYER_USER);
+            assertThat(map.get("amount")).isEqualTo(new BigDecimal("150000.00"));
         });
         assertThat(audits).anySatisfy(a -> {
-            assertThat(a.action()).isEqualTo(BulkReceivableImporter.AUDIT_BULK_IMPORTED);
-            assertThat(a.payload().get("totalRows")).isEqualTo(1);
-            assertThat(a.payload().get("importedCount")).isEqualTo(1);
+            assertThat(a.eventType()).isEqualTo(BulkReceivableImporter.AUDIT_BULK_IMPORTED);
+            assertThat(a.after()).isInstanceOf(Map.class);
+            Map<?, ?> map = (Map<?, ?>) a.after();
+            assertThat(map.get("totalRows")).isEqualTo(1);
+            assertThat(map.get("importedCount")).isEqualTo(1);
         });
 
         // Verify domain events
