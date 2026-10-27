@@ -63,7 +63,7 @@
 
 .shell-page .inventory-control-links .action-link:hover,
 .inventory-control-links .action-link:hover {
-  transform: translateY(-1px);
+  transform: translateY(calc(var(--border-width) * -1));
 }
 
 .shell-page .inventory-control-links .action-link:focus,
