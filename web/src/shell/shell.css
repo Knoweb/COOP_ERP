@@ -3355,22 +3355,23 @@ textarea {
 }
 
 .party-empty-card {
-  padding: 48px 24px;
+  padding: 8px 16px;
   text-align: center;
   background: var(--color-polish-24);
   border: 1px dashed var(--color-polish-14);
-  border-radius: 16px;
-  margin-top: 16px;
+  border-radius: 10px;
+  margin: 6px auto 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 160px;
+  min-height: 0;
+  max-width: 440px;
 }
 
 .party-empty-text {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -3466,6 +3467,203 @@ textarea {
   box-shadow: 0 2px 8px var(--color-polish-13);
   transform: translateY(-1px);
 }
+
+/* ---- External Access Grants Page Enhancement ------------------------------------------- */
+
+.party-grants-page .page-heading {
+  margin-bottom: 0 !important;
+  padding-bottom: 4px !important;
+}
+
+.party-grants-page .party-empty-card {
+  margin: 4px 0 10px 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.party-grants-page .party-empty-text {
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  font-size: 14px !important;
+  color: var(--color-text-muted) !important;
+}
+
+.party-grant-header-wrap {
+  width: 100%;
+  text-align: left;
+  margin: 10px 0 14px;
+}
+
+.party-grant-section-title {
+  font-size: 18px;
+  color: var(--color-text);
+  font-weight: 700;
+  margin: 0 0 4px;
+  text-align: left;
+}
+
+.party-grant-section-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.party-grant-form {
+  max-width: 440px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.party-grant-form .party-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.party-grant-form .party-form-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.party-grant-form input[type="date"],
+.party-grant-form textarea,
+.party-grant-form .custom-dropdown__trigger {
+  min-height: 38px !important;
+  padding: 7px 12px !important;
+  font-size: 13.5px;
+  border-radius: 8px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-polish-24);
+  color: var(--color-text);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.party-grant-form input[type="date"]:hover,
+.party-grant-form textarea:hover,
+.party-grant-form .custom-dropdown__trigger:hover {
+  background: var(--color-polish-4);
+  border-color: var(--color-accent);
+}
+
+.party-grant-form input[type="date"]:focus,
+.party-grant-form textarea:focus,
+.party-grant-form .custom-dropdown--open .custom-dropdown__trigger {
+  background: var(--color-polish-4);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-polish-13);
+}
+
+.party-grant-select-multiple {
+  width: 100%;
+  max-width: 100%;
+  min-height: 110px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-polish-24);
+  color: var(--color-text);
+  font-size: 13.5px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.party-grant-select-multiple:hover {
+  background: var(--color-polish-4);
+}
+
+.party-grant-select-multiple:focus {
+  background: var(--color-polish-4);
+  box-shadow: 0 0 0 3px var(--color-polish-13);
+}
+
+.party-grant-select-multiple option {
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+}
+
+.party-grant-select-multiple option:checked {
+  background-color: var(--color-accent-light) !important;
+  background-image: linear-gradient(0deg, var(--color-accent-light) 0%, var(--color-accent-light) 100%) !important;
+  color: var(--color-accent) !important;
+  -webkit-text-fill-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 100px var(--color-accent-light) inset !important;
+  font-weight: 600 !important;
+}
+
+.party-grant-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.party-grant-form .custom-dropdown {
+  max-width: 100%;
+  width: 100%;
+}
+
+.party-grant-form .custom-dropdown__arrow {
+  width: 14px;
+  height: 14px;
+}
+
+.party-grant-form .custom-dropdown__item {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.party-grant-submit-btn {
+  justify-self: center;
+  align-self: center;
+  min-width: 200px;
+  width: auto;
+  border-radius: 50px !important;
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px var(--color-polish-6);
+}
+
+.party-grant-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px var(--color-polish-21);
+}
+
+.party-grant-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.party-grant-form ~ p[role="status"],
+.party-grant-form ~ p[role="alert"] {
+  max-width: 440px;
+  margin: 12px auto 0;
+  text-align: center;
+}
+
 
 
 

@@ -13,6 +13,7 @@ import { useAdminApi } from "./adminApi";
 import type { ExternalGrant } from "./adminApi";
 import { usePartyApi } from "./partyApi";
 import { GRANT_STATUS_LOOK, REVOKE_REASONS, refusalOf } from "./adminView";
+import { CustomSelect } from "./CustomSelect";
 
 /**
  * The Federation's register of external grants (21A M1-09; doc 21 section 4.6): read-only
@@ -86,11 +87,15 @@ export function GrantsPage() {
   const rows = grants.data ?? [];
 
   return (
-    <main className="shell-page">
+    <main className="shell-page party-grants-page">
       <PageHeader icon="society" title={t("party.grants.title").text} />
       {grants.isLoading && <p>{t("party.list.loading").text}</p>}
       {grants.isError && <p role="alert">{refusalOf(grants.error, t("party.error.generic").text).text}</p>}
-      {grants.isSuccess && rows.length === 0 && <p>{t("party.grants.empty").text}</p>}
+      {grants.isSuccess && rows.length === 0 && (
+        <div className="party-empty-card">
+          <p className="party-empty-text">{t("party.grants.empty").text}</p>
+        </div>
+      )}
 
       {rows.length > 0 && (
         <div className="modern-table-card">
@@ -145,24 +150,34 @@ export function GrantsPage() {
         />
       )}
 
-      <form onSubmit={submit} className="party-form-row" aria-labelledby="party-grant-title">
-        <h2 id="party-grant-title">{t("party.grants.new").text}</h2>
-        {externals.isSuccess && externals.data.items.length === 0 && <p role="note">{t("party.grants.no_external").text}</p>}
+      <div className="party-grant-header-wrap">
+        <h2 id="party-grant-title" className="party-grant-section-title">{t("party.grants.new").text}</h2>
+        {externals.isSuccess && externals.data.items.length === 0 && (
+          <p role="note" className="party-grant-section-note">{t("party.grants.no_external").text}</p>
+        )}
+      </div>
+
+      <form onSubmit={submit} className="party-form-row party-grant-form" aria-labelledby="party-grant-title">
         <label className="party-form-field">
-          {t("party.grants.grantee").text}
-          <select value={grantee} onChange={(event) => setGrantee(event.target.value)} required>
-            <option value="">{t("party.roles.choose").text}</option>
-            {(externals.data?.items ?? []).map((user) => (
-              <option key={user.userId} value={user.userId}>
-                {user.displayName} ({user.username})
-              </option>
-            ))}
-          </select>
+          <span className="party-form-field__label">{t("party.grants.grantee").text}</span>
+          <CustomSelect
+            value={grantee}
+            onChange={(val) => setGrantee(val)}
+            ariaLabel={t("party.grants.grantee").text}
+            options={[
+              { value: "", label: t("party.roles.choose").text },
+              ...(externals.data?.items ?? []).map((user) => ({
+                value: user.userId,
+                label: `${user.displayName} (${user.username})`
+              }))
+            ]}
+          />
         </label>
         <label className="party-form-field">
-          {t("party.grants.entities").text}
+          <span className="party-form-field__label">{t("party.grants.entities").text}</span>
           <select
             multiple
+            className="party-grant-select-multiple"
             value={entities}
             onChange={(event) => setEntities(Array.from(event.target.selectedOptions, (option) => option.value))}
             required
@@ -175,14 +190,18 @@ export function GrantsPage() {
           </select>
         </label>
         <label className="party-form-field">
-          {t("party.grants.until").text}
+          <span className="party-form-field__label">{t("party.grants.until").text}</span>
           <input type="date" value={until} onChange={(event) => setUntil(event.target.value)} required />
         </label>
         <label className="party-form-field">
-          {t("party.grants.reason").text}
-          <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} required maxLength={500} />
+          <span className="party-form-field__label">{t("party.grants.reason").text}</span>
+          <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} required maxLength={500} />
         </label>
-        <button type="submit" className="modern-btn" disabled={!grantee || entities.length === 0 || !until || !reason.trim() || grant.isPending}>
+        <button
+          type="submit"
+          className="modern-btn party-grant-submit-btn"
+          disabled={!grantee || entities.length === 0 || !until || !reason.trim() || grant.isPending}
+        >
           {t("party.grants.submit").text}
         </button>
       </form>
