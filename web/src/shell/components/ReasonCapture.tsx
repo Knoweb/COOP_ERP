@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useT } from "../i18n/useT";
 
@@ -34,6 +34,16 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
   const [code, setCode] = useState("");
   const [text, setText] = useState("");
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !pending) {
+        onCancel();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel, pending]);
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!code) {
@@ -43,33 +53,42 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
   };
 
   return (
-    <form className="reason-capture" role="dialog" aria-labelledby="reason-capture-title" onSubmit={submit}>
-      <h2 id="reason-capture-title" className="reason-capture__title">
-        {title}
-      </h2>
-      <label className="reason-capture__field">
-        {t("shell.reason.code").text}
-        <select value={code} onChange={(event) => setCode(event.target.value)} required>
-          <option value="">{t("shell.reason.choose").text}</option>
-          {codes.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="reason-capture__field">
-        {t("shell.reason.text").text}
-        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={3} />
-      </label>
-      <div className="reason-capture__actions">
-        <button type="submit" className="approval-bar__button approval-bar__button--primary" disabled={pending || !code}>
-          {t("shell.reason.confirm").text}
-        </button>
-        <button type="button" className="approval-bar__button" onClick={onCancel} disabled={pending}>
-          {t("shell.reason.cancel").text}
-        </button>
-      </div>
-    </form>
+    <div
+      className="reason-capture-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !pending) {
+          onCancel();
+        }
+      }}
+    >
+      <form className="reason-capture" role="dialog" aria-labelledby="reason-capture-title" onSubmit={submit}>
+        <h2 id="reason-capture-title" className="reason-capture__title">
+          {title}
+        </h2>
+        <label className="reason-capture__field">
+          {t("shell.reason.code").text}
+          <select value={code} onChange={(event) => setCode(event.target.value)} required>
+            <option value="">{t("shell.reason.choose").text}</option>
+            {codes.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="reason-capture__field">
+          {t("shell.reason.text").text}
+          <textarea value={text} onChange={(event) => setText(event.target.value)} rows={3} />
+        </label>
+        <div className="reason-capture__actions">
+          <button type="submit" className="approval-bar__button approval-bar__button--primary" disabled={pending || !code}>
+            {t("shell.reason.confirm").text}
+          </button>
+          <button type="button" className="approval-bar__button" onClick={onCancel} disabled={pending}>
+            {t("shell.reason.cancel").text}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
