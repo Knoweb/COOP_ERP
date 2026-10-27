@@ -875,6 +875,7 @@ export interface components {
             /** Format: date */
             expiryDate?: string;
             availableQty: number;
+        };
         BulkImportStockRequest: {
             /** Format: uuid */
             locationId: string;
