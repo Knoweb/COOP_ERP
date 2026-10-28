@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -95,8 +96,12 @@ class AccountPostingImmutabilityIntegrationTest extends PostgresIntegrationTest 
 
         assertThatThrownBy(() -> inSocietyScope(() -> jdbc.update(
                         "update customers.account_posting set amount = 999.00 where posting_id = ?", POSTING_ID)))
-                .isInstanceOf(DataAccessException.class)
-                .hasMessageContaining("permission denied for table account_posting");
+                .isInstanceOfSatisfying(BadSqlGrammarException.class, denied -> assertThat(denied.getCause())
+                        .isInstanceOfSatisfying(SQLException.class, postgres -> {
+                            assertThat(postgres.getClass().getName()).isEqualTo("org.postgresql.util.PSQLException");
+                            assertThat(postgres.getSQLState()).isEqualTo("42501");
+                            assertThat(postgres.getMessage()).contains("permission denied for table account_posting");
+                        }));
 
         assertThat(inSocietyScope(this::posting)).isEqualTo(before);
     }
