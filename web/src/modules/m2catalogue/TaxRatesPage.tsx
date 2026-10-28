@@ -345,7 +345,7 @@ export function TaxRatesPage() {
             </p>
           </div>
 
-          <label className="modern-field modern-field--select">
+          <label className="catalogue-form-field tax-category-filter">
             <span className="modern-select">
               <select
                 id="filter-tax-rates-category-select"
@@ -359,6 +359,14 @@ export function TaxRatesPage() {
                   </option>
                 ))}
               </select>
+              <svg
+                className="modern-select__arrow"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="m7 9 5 5 5-5" />
+              </svg>
             </span>
           </label>
         </div>
