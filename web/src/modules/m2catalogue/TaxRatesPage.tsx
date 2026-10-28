@@ -6,6 +6,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip, type ChipState } from "../../shell/components/StateChip";
+import { DropdownSelect } from "../../shell/components/DropdownSelect";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
@@ -229,19 +230,19 @@ export function TaxRatesPage() {
             <form onSubmit={handlePublishRateSubmit} className="catalogue-form-row">
               <label className="catalogue-form-field">
                 <span className="tax-field-required">{t("catalogue.tax.field.category").text} *</span>
-                <select
+                <DropdownSelect
                   id="publish-rate-category-select"
-                  required
                   value={rateTaxCategoryId}
-                  onChange={(e) => setRateTaxCategoryId(e.target.value)}
-                >
-                  <option value="">{t("catalogue.field.choose").text}</option>
-                  {categories.map((cat: TaxCategory) => (
-                    <option key={cat.taxCategoryId} value={cat.taxCategoryId}>
-                      {cat.code} - {cat.nameEn}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setRateTaxCategoryId(val)}
+                  placeholder={t("catalogue.field.choose").text}
+                  options={[
+                    { value: "", label: t("catalogue.field.choose").text },
+                    ...categories.map((cat: TaxCategory) => ({
+                      value: cat.taxCategoryId,
+                      label: `${cat.code} - ${cat.nameEn}`
+                    }))
+                  ]}
+                />
               </label>
 
               <label className="catalogue-form-field">
@@ -346,28 +347,18 @@ export function TaxRatesPage() {
           </div>
 
           <label className="catalogue-form-field tax-category-filter">
-            <span className="modern-select">
-              <select
-                id="filter-tax-rates-category-select"
-                value={selectedCategoryId}
-                onChange={(e) => setSelectedCategoryId(e.target.value)}
-              >
-                <option value="">{t("catalogue.tax.filter.all_categories").text}</option>
-                {categories.map((cat: TaxCategory) => (
-                  <option key={cat.taxCategoryId} value={cat.taxCategoryId}>
-                    {cat.code} - {cat.nameEn}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="modern-select__arrow"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="m7 9 5 5 5-5" />
-              </svg>
-            </span>
+            <DropdownSelect
+              id="filter-tax-rates-category-select"
+              value={selectedCategoryId}
+              onChange={(val) => setSelectedCategoryId(val)}
+              options={[
+                { value: "", label: t("catalogue.tax.filter.all_categories").text },
+                ...categories.map((cat: TaxCategory) => ({
+                  value: cat.taxCategoryId,
+                  label: `${cat.code} - ${cat.nameEn}`
+                }))
+              ]}
+            />
           </label>
         </div>
 

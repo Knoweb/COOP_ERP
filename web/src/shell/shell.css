@@ -2172,6 +2172,173 @@ textarea {
   pointer-events: none;
 }
 
+/* ---------- DropdownSelect (custom interactive system dropdown) ---------- */
+
+.dropdown-select {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.dropdown-select__native {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.dropdown-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: calc(var(--space-4) + var(--space-1));
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: var(--border-width-strong) solid var(--color-polish-25);
+  background: var(--color-surface);
+  color: var(--color-brand-dark);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  cursor: pointer;
+  box-sizing: border-box;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.dropdown-select__trigger:hover {
+  background: var(--color-polish-31);
+  border-color: var(--color-polish-25);
+  color: var(--color-brand-dark);
+  box-shadow: 0 0 0 3px var(--color-polish-13);
+  transform: translateY(calc(var(--border-width) * -1));
+}
+
+.dropdown-select__trigger:focus,
+.dropdown-select__trigger--active {
+  background: var(--color-surface);
+  border: var(--border-width-strong) solid var(--color-polish-25);
+  color: var(--color-brand-dark);
+  box-shadow: 0 0 0 4px var(--color-polish-18);
+  outline: none;
+}
+
+.dropdown-select--disabled .dropdown-select__trigger {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dropdown-select__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.dropdown-select__chevron {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  stroke: var(--color-brand-dark);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-select__chevron--open {
+  transform: rotate(180deg);
+}
+
+.dropdown-select__menu {
+  position: absolute;
+  top: calc(100% + var(--space-half));
+  left: 0;
+  z-index: 1000;
+  min-width: 100%;
+  width: max-content;
+  max-width: calc(var(--space-8) * 5);
+  margin: 0;
+  padding: var(--space-half) 0;
+  list-style: none;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px var(--color-polish-1);
+  max-height: calc(var(--space-8) * 4);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.dropdown-select__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.dropdown-select__item:hover {
+  background: var(--color-polish-31);
+}
+
+.dropdown-select__item-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.dropdown-select__indicator {
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  background-color: var(--color-accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.dropdown-select__item-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition: color 0.15s ease;
+}
+
+.dropdown-select__item-text--selected {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-strong);
+}
+
+.dropdown-select__item:not(.dropdown-select__item--selected) .dropdown-select__item-content {
+  padding-left: calc(3px + var(--space-1));
+}
+
+.dropdown-select__check {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  flex-shrink: 0;
+}
+
 .modern-table-card {
   background: var(--color-polish-26);
   border-radius: 16px;
