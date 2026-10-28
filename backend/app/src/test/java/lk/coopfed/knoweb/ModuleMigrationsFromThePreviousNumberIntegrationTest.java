@@ -202,7 +202,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m3pricing", 10)
                 .containsEntry("m5inventory", 16)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
-                .containsEntry("m7customers", 5)
+                // PGL-M3-01: m7customers V0006 adds regional registration & centralized loyalty.
+                .containsEntry("m7customers", 6)
                 .containsEntry("m8reporting", 9);
 
         // What the new numbers leave in place, read from the catalogue.
@@ -265,6 +266,18 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isEqualTo("trading.opening_receivable");
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'trading.opening_receivable'::regclass",
+                        Boolean.class))
+                .isTrue();
+
+        // PGL-M3-01: m7customers V0006 (regional registration & centralized loyalty).
+        assertThat(admin.queryForObject("select to_regclass('customers.loyalty_customer')::text", String.class))
+                .isEqualTo("customers.loyalty_customer");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'customers.loyalty_customer'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'customers.loyalty_permitted_location'::regclass",
                         Boolean.class))
                 .isTrue();
 

@@ -2,6 +2,8 @@ package lk.coopfed.knoweb.m7customers.web;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
@@ -13,7 +15,12 @@ import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.RecaptureNic;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
+import lk.coopfed.knoweb.m7customers.api.RegisterLoyaltyCustomer;
+import lk.coopfed.knoweb.m7customers.api.UpdateRegionalRegistration;
 import lk.coopfed.knoweb.m7customers.query.CustomerQueries;
+import lk.coopfed.knoweb.m7customers.query.LoyaltyCustomerQueries;
+import lk.coopfed.knoweb.m7customers.query.LoyaltyCustomerView;
+import lk.coopfed.knoweb.m7customers.query.LoyaltyEligibility;
 import lk.coopfed.knoweb.m7customers.web.generated.AmendCustomerRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport;
 import lk.coopfed.knoweb.m7customers.web.generated.BulkImportCustomersRequest;
@@ -21,9 +28,13 @@ import lk.coopfed.knoweb.m7customers.web.generated.ChangePhoneRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerCard;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerSummary;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomersApi;
+import lk.coopfed.knoweb.m7customers.web.generated.LoyaltyCustomerResponse;
+import lk.coopfed.knoweb.m7customers.web.generated.LoyaltyEligibilityResponse;
 import lk.coopfed.knoweb.m7customers.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.RecaptureNicRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.RegisterCustomerRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.RegisterLoyaltyCustomerRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.UpdateRegionalRegistrationRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,7 +50,10 @@ class CustomerController implements CustomersApi {
     private final Handles<ChangePhone, UUID> changePhone;
     private final Handles<DeactivateCustomer, UUID> deactivate;
     private final Handles<RecaptureNic, UUID> recapture;
+    private final Handles<RegisterLoyaltyCustomer, UUID> registerLoyalty;
+    private final Handles<UpdateRegionalRegistration, Void> updateRegional;
     private final CustomerQueries queries;
+    private final LoyaltyCustomerQueries loyaltyQueries;
     private final CurrentScope currentScope;
 
     CustomerController(
@@ -49,7 +63,10 @@ class CustomerController implements CustomersApi {
             Handles<ChangePhone, UUID> changePhone,
             Handles<DeactivateCustomer, UUID> deactivate,
             Handles<RecaptureNic, UUID> recapture,
+            Handles<RegisterLoyaltyCustomer, UUID> registerLoyalty,
+            Handles<UpdateRegionalRegistration, Void> updateRegional,
             CustomerQueries queries,
+            LoyaltyCustomerQueries loyaltyQueries,
             CurrentScope currentScope) {
         this.register = register;
         this.bulkImporter = bulkImporter;
@@ -57,7 +74,10 @@ class CustomerController implements CustomersApi {
         this.changePhone = changePhone;
         this.deactivate = deactivate;
         this.recapture = recapture;
+        this.registerLoyalty = registerLoyalty;
+        this.updateRegional = updateRegional;
         this.queries = queries;
+        this.loyaltyQueries = loyaltyQueries;
         this.currentScope = currentScope;
     }
 
@@ -181,5 +201,79 @@ class CustomerController implements CustomersApi {
 
     private CustomerCard card(UUID customerId, ScopeContext scope) {
         return CustomerResponses.card(queries.card(customerId, scope).orElseThrow());
+    }
+
+    @Override
+    public ResponseEntity<LoyaltyCustomerResponse> registerLoyaltyCustomer(
+            String idempotencyKey, RegisterLoyaltyCustomerRequest request) {
+        ScopeContext scope = currentScope.get();
+        RegisterLoyaltyCustomer cmd = new RegisterLoyaltyCustomer(
+                request.getCustomerId(),
+                request.getDisplayName(),
+                request.getDisplayNameSi(),
+                request.getDisplayNameTa(),
+                request.getLanguage() != null ? request.getLanguage().getValue() : null,
+                request.getPhone(),
+                request.getNic(),
+                request.getRegisteredLocationId(),
+                request.getRegionCode(),
+                request.getRegionalMemberNo(),
+                request.getLoyaltyTier() != null ? request.getLoyaltyTier().getValue() : "STANDARD",
+                request.getAllLocationsPermitted() != null ? request.getAllLocationsPermitted() : true,
+                request.getPermittedLocationIds() != null ? Set.copyOf(request.getPermittedLocationIds()) : Set.of(),
+                request.getRegionalAttributes());
+
+        UUID loyaltyId = registerLoyalty.handle(cmd, scope);
+        LoyaltyCustomerView view = loyaltyQueries
+                .getLoyaltyCustomer(request.getCustomerId() != null ? request.getCustomerId() : cmd.customerId(), scope)
+                .or(() -> loyaltyQueries.lookupByPhone(request.getPhone(), scope))
+                .orElseThrow();
+
+        return ResponseEntity.created(URI.create("/v1/customers/loyalty/" + loyaltyId))
+                .body(CustomerResponses.toLoyaltyCustomerResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<LoyaltyCustomerResponse> lookupLoyaltyCustomer(String phone, String nic, UUID customerId) {
+        ScopeContext scope = currentScope.get();
+        Optional<LoyaltyCustomerView> view = Optional.empty();
+        if (customerId != null) {
+            view = loyaltyQueries.getLoyaltyCustomer(customerId, scope);
+        } else if (phone != null && !phone.isBlank()) {
+            view = loyaltyQueries.lookupByPhone(phone, scope);
+        } else if (nic != null && !nic.isBlank()) {
+            view = loyaltyQueries.lookupByNic(nic, scope);
+        }
+        return view.map(v -> ResponseEntity.ok(CustomerResponses.toLoyaltyCustomerResponse(v)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<LoyaltyEligibilityResponse> checkLoyaltyEligibility(String identifier, UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        UUID effectiveLocation = locationId != null ? locationId : scope.locationId();
+        LoyaltyEligibility eligibility = loyaltyQueries.checkEligibility(identifier, effectiveLocation, scope);
+        return ResponseEntity.ok(CustomerResponses.toLoyaltyEligibilityResponse(eligibility));
+    }
+
+    @Override
+    public ResponseEntity<LoyaltyCustomerResponse> updateRegionalRegistration(
+            String idempotencyKey, UUID customerId, UpdateRegionalRegistrationRequest request) {
+        ScopeContext scope = currentScope.get();
+        UpdateRegionalRegistration cmd = new UpdateRegionalRegistration(
+                customerId,
+                request.getRegisteredLocationId(),
+                request.getRegionCode(),
+                request.getRegionalMemberNo(),
+                request.getLoyaltyTier() != null ? request.getLoyaltyTier().getValue() : "STANDARD",
+                request.getStatus() != null ? request.getStatus().getValue() : "ACTIVE",
+                request.getAllLocationsPermitted() != null ? request.getAllLocationsPermitted() : true,
+                request.getPermittedLocationIds() != null ? Set.copyOf(request.getPermittedLocationIds()) : Set.of(),
+                request.getRegionalAttributes());
+
+        updateRegional.handle(cmd, scope);
+        LoyaltyCustomerView view =
+                loyaltyQueries.getLoyaltyCustomer(customerId, scope).orElseThrow();
+        return ResponseEntity.ok(CustomerResponses.toLoyaltyCustomerResponse(view));
     }
 }

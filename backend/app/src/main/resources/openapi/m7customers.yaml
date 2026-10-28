@@ -85,6 +85,88 @@ paths:
               schema: { $ref: '#/components/schemas/BulkCustomerReport' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty:
+    post:
+      tags: [Customers]
+      operationId: registerLoyaltyCustomer
+      summary: Register or enroll a customer in centralized loyalty with regional registration
+      description: >
+        Enrolls an existing customer or registers a new member with centralized loyalty identity
+        and regional registration details (PGL-M3-01). Preserves tenant and location scope isolation.
+      x-permission: cus.customer.register
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterLoyaltyCustomerRequest' }
+      responses:
+        '201':
+          description: Enrolled in loyalty; the loyalty profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyCustomerResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty/lookup:
+    get:
+      tags: [Customers]
+      operationId: lookupLoyaltyCustomer
+      summary: Look up a centralized loyalty customer by phone, NIC, or customer ID across permitted branches
+      x-permission: cus.customer.view
+      x-federation-view: false
+      parameters:
+        - { in: query, name: phone, required: false, schema: { type: string, maxLength: 20 } }
+        - { in: query, name: nic, required: false, schema: { type: string, maxLength: 20 } }
+        - { in: query, name: customerId, required: false, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The loyalty customer profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyCustomerResponse' }
+        '404':
+          description: Not found, or caller scope is not permitted to access this customer
+  /v1/customers/loyalty/eligibility:
+    get:
+      tags: [Customers]
+      operationId: checkLoyaltyEligibility
+      summary: Check loyalty eligibility and tier for a customer at a specified branch/location
+      x-permission: cus.customer.view
+      x-federation-view: false
+      parameters:
+        - { in: query, name: identifier, required: true, schema: { type: string, maxLength: 100 } }
+        - { in: query, name: locationId, required: false, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Eligibility evaluation result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyEligibilityResponse' }
+  /v1/customers/{customerId}/regional-registration:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Customers]
+      operationId: updateRegionalRegistration
+      summary: Update regional registration details and permitted branch access
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRegionalRegistrationRequest' }
+      responses:
+        '200':
+          description: Updated regional registration; returns loyalty profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyCustomerResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/customers/{customerId}:
     parameters:
       - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
@@ -967,3 +1049,78 @@ components:
         nameOrPhone: { type: string }
         field: { type: string }
         reason: { type: string }
+    RegisterLoyaltyCustomerRequest:
+      type: object
+      required: [registeredLocationId, regionCode]
+      properties:
+        customerId: { type: [string, 'null'], format: uuid }
+        displayName: { type: [string, 'null'], maxLength: 120 }
+        displayNameSi: { type: [string, 'null'], maxLength: 120 }
+        displayNameTa: { type: [string, 'null'], maxLength: 120 }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: [string, 'null'], maxLength: 20 }
+        nic: { type: [string, 'null'], maxLength: 20 }
+        registeredLocationId: { type: string, format: uuid }
+        regionCode: { type: string, maxLength: 32 }
+        regionalMemberNo: { type: [string, 'null'], maxLength: 60 }
+        loyaltyTier: { type: string, enum: [STANDARD, SILVER, GOLD, PLATINUM, MEMBER], default: STANDARD }
+        allLocationsPermitted: { type: boolean, default: true }
+        permittedLocationIds:
+          type: array
+          items: { type: string, format: uuid }
+        regionalAttributes:
+          type: object
+          additionalProperties: { type: string }
+    UpdateRegionalRegistrationRequest:
+      type: object
+      required: [registeredLocationId, regionCode]
+      properties:
+        registeredLocationId: { type: string, format: uuid }
+        regionCode: { type: string, maxLength: 32 }
+        regionalMemberNo: { type: [string, 'null'], maxLength: 60 }
+        loyaltyTier: { type: string, enum: [STANDARD, SILVER, GOLD, PLATINUM, MEMBER], default: STANDARD }
+        status: { type: string, enum: [ACTIVE, SUSPENDED, INACTIVE], default: ACTIVE }
+        allLocationsPermitted: { type: boolean, default: true }
+        permittedLocationIds:
+          type: array
+          items: { type: string, format: uuid }
+        regionalAttributes:
+          type: object
+          additionalProperties: { type: string }
+    LoyaltyCustomerResponse:
+      type: object
+      required: [loyaltyId, customerId, ownerEntityId, registeredLocationId, regionCode, loyaltyTier, status, allLocationsPermitted]
+      properties:
+        loyaltyId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        displayName: { type: [string, 'null'] }
+        displayNameSi: { type: [string, 'null'] }
+        displayNameTa: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        nicLast4: { type: [string, 'null'] }
+        registeredLocationId: { type: string, format: uuid }
+        regionCode: { type: string }
+        regionalMemberNo: { type: [string, 'null'] }
+        loyaltyTier: { type: string }
+        status: { type: string }
+        allLocationsPermitted: { type: boolean }
+        permittedLocationIds:
+          type: array
+          items: { type: string, format: uuid }
+        regionalAttributes:
+          type: object
+          additionalProperties: { type: string }
+        enrolledAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    LoyaltyEligibilityResponse:
+      type: object
+      required: [eligible, status, reason]
+      properties:
+        eligible: { type: boolean }
+        status: { type: string }
+        reason: { type: string }
+        customerId: { type: [string, 'null'], format: uuid }
+        locationId: { type: [string, 'null'], format: uuid }
+        loyaltyTier: { type: [string, 'null'] }
+        customer: { $ref: '#/components/schemas/LoyaltyCustomerResponse', nullable: true }

@@ -395,6 +395,15 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "no fed_view or ext_view (m7customers V0003, CR-18-2): its notes and outcome are free text about"
                             + " the person, redacted at an erasure and read by the society alone until then",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            // PGL-M3-01: loyalty customers and permitted branch locations belong to the society
+            new Departure(
+                    "customers.loyalty_customer",
+                    "no fed_view or ext_view (PGL-M3-01): member loyalty personal data is the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.loyalty_permitted_location",
+                    "no fed_view or ext_view (PGL-M3-01): permitted branch locations are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "integration.notification_contact",
                     "own_* only (m9integration V0003, fed_view dropped by V0006; wave 2, M9-06 and"

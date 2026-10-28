@@ -63,5 +63,11 @@
   "m7.privacy.recently_closed": "An account of the customer was closed only recently; erasure waits until the shops’ offline sales have arrived",
   "m7.privacy.not_access": "This request is not a request for the customer’s data",
   "m7.privacy.not_fulfilled": "This request has not been fulfilled, so there is no export to hand over",
-  "m7.field.personal_data": "Do not type a phone number or NIC number here; it would stay on the record after an erasure"
+  "m7.field.personal_data": "Do not type a phone number or NIC number here; it would stay on the record after an erasure",
+  "m7.loyalty.location_required": "Choose the registered branch for the loyalty customer",
+  "m7.loyalty.region_required": "Enter the regional registration code",
+  "m7.loyalty.not_found": "This loyalty customer was not found, or your branch cannot access it",
+  "m7.loyalty.not_eligible": "This customer is not eligible for loyalty at this branch",
+  "m7.loyalty.tier_invalid": "Choose a valid loyalty tier",
+  "m7.loyalty.already_enrolled": "This customer is already enrolled in the loyalty program"
 }
