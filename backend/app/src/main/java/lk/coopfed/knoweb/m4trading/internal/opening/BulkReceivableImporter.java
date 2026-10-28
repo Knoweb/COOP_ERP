@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m4trading.internal.opening;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -235,11 +236,11 @@ public class BulkReceivableImporter implements Handles<BulkImportReceivables, Bu
                     amount,
                     row.referenceNo(),
                     sellerSignedBy,
-                    sellerSignedAt,
+                    Timestamp.from(sellerSignedAt),
                     buyerSignedBy,
-                    buyerSignedAt,
+                    Timestamp.from(buyerSignedAt),
                     row.notes(),
-                    clock.now());
+                    Timestamp.from(clock.now()));
 
             documentIds.add(invoiceId);
 
