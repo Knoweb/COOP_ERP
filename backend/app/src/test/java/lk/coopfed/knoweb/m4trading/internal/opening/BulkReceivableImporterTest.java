@@ -289,8 +289,8 @@ class BulkReceivableImporterTest {
                 .thenReturn(Optional.of(rel));
 
         // Signer fallback and simulation
-        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(SELLER_USER), eq(SELLER_ENTITY)))
-                .thenReturn(1);
+        when(jdbc.query(anyString(), any(RowMapper.class), eq(SELLER_ENTITY), any()))
+                .thenReturn(List.of(SELLER_USER));
         when(jdbc.query(anyString(), any(RowMapper.class), eq(BUYER_ENTITY))).thenReturn(List.of(BUYER_USER));
 
         EntityView sellerView = mock(EntityView.class);

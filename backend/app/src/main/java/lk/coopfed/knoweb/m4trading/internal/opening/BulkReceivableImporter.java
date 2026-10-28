@@ -298,15 +298,11 @@ public class BulkReceivableImporter implements Handles<BulkImportReceivables, Bu
     }
 
     private UUID resolveEntity(String text) {
-        try {
-            return UUID.fromString(text);
-        } catch (IllegalArgumentException ignored) {
+        if (text == null || text.isBlank()) {
+            return null;
         }
         List<UUID> ids = jdbc.query(
-                "select entity_id from party.entity where entity_code = ? or legal_name_en = ? limit 1",
-                (rs, rowNum) -> rs.getObject("entity_id", UUID.class),
-                text,
-                text);
+                "select trading.resolve_opening_entity(?)", (rs, rowNum) -> rs.getObject(1, UUID.class), text.strip());
         return ids.isEmpty() ? null : ids.get(0);
     }
 
@@ -321,7 +317,7 @@ public class BulkReceivableImporter implements Handles<BulkImportReceivables, Bu
         }
         List<UUID> ids = jdbc.query(
                 """
-                select relationship_id from party.relationship
+                select relationship_id from party.entity_relationship
                  where seller_entity_id = ? and buyer_entity_id = ?
                  order by created_at desc limit 1
                 """,
@@ -332,43 +328,43 @@ public class BulkReceivableImporter implements Handles<BulkImportReceivables, Bu
     }
 
     private UUID resolveSigner(UUID entityId, UUID directId, String username, UUID fallbackId, boolean simulate) {
+        if (entityId == null) {
+            return null;
+        }
         if (directId != null) {
-            Integer count = jdbc.queryForObject(
-                    "select count(*) from security.app_user where user_id = ? and home_entity_id = ?",
-                    Integer.class,
-                    directId,
-                    entityId);
-            if (count != null && count > 0) {
-                return directId;
+            List<UUID> ids = jdbc.query(
+                    "select trading.resolve_opening_signer(?, ?)",
+                    (rs, rowNum) -> rs.getObject(1, UUID.class),
+                    entityId,
+                    directId.toString());
+            if (!ids.isEmpty() && ids.get(0) != null) {
+                return ids.get(0);
             }
         }
         if (username != null && !username.isBlank()) {
             List<UUID> ids = jdbc.query(
-                    "select user_id from security.app_user where (username = ? or display_name = ?) and home_entity_id = ? limit 1",
-                    (rs, rowNum) -> rs.getObject("user_id", UUID.class),
-                    username.strip(),
-                    username.strip(),
-                    entityId);
-            if (!ids.isEmpty()) {
+                    "select trading.resolve_opening_signer(?, ?)",
+                    (rs, rowNum) -> rs.getObject(1, UUID.class),
+                    entityId,
+                    username.strip());
+            if (!ids.isEmpty() && ids.get(0) != null) {
                 return ids.get(0);
             }
         }
         if (fallbackId != null) {
-            Integer count = jdbc.queryForObject(
-                    "select count(*) from security.app_user where user_id = ? and home_entity_id = ?",
-                    Integer.class,
-                    fallbackId,
-                    entityId);
-            if (count != null && count > 0) {
-                return fallbackId;
+            List<UUID> ids = jdbc.query(
+                    "select trading.resolve_opening_signer(?, ?)",
+                    (rs, rowNum) -> rs.getObject(1, UUID.class),
+                    entityId,
+                    fallbackId.toString());
+            if (!ids.isEmpty() && ids.get(0) != null) {
+                return ids.get(0);
             }
         }
         if (simulate) {
             List<UUID> ids = jdbc.query(
-                    "select user_id from security.app_user where home_entity_id = ? and status = 'ACTIVE' order by user_id limit 1",
-                    (rs, rowNum) -> rs.getObject("user_id", UUID.class),
-                    entityId);
-            if (!ids.isEmpty()) {
+                    "select trading.simulate_opening_signer(?)", (rs, rowNum) -> rs.getObject(1, UUID.class), entityId);
+            if (!ids.isEmpty() && ids.get(0) != null) {
                 return ids.get(0);
             }
         }
