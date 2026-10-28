@@ -1,6 +1,5 @@
 package lk.coopfed.knoweb.m8reporting.web;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -94,7 +93,6 @@ class ReportingController implements ReportingApi {
     private final Handles<RegisterAsset, UUID> registerAssetHandler;
     private final Messages messages;
     private final ObjectProvider<A4Renderer> renderer;
-    private final ObjectProvider<HttpServletRequest> requestProvider;
     private final Clock clock;
 
     ReportingController(
@@ -108,7 +106,6 @@ class ReportingController implements ReportingApi {
             Handles<RegisterAsset, UUID> registerAssetHandler,
             Messages messages,
             ObjectProvider<A4Renderer> renderer,
-            ObjectProvider<HttpServletRequest> requestProvider,
             Clock clock) {
         this.queries = queries;
         this.currentScope = currentScope;
@@ -120,7 +117,6 @@ class ReportingController implements ReportingApi {
         this.registerAssetHandler = registerAssetHandler;
         this.messages = messages;
         this.renderer = renderer;
-        this.requestProvider = requestProvider;
         this.clock = clock;
     }
 
@@ -672,11 +668,7 @@ class ReportingController implements ReportingApi {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : locationId;
-        HttpServletRequest req = requestProvider.getIfAvailable();
-        String effectiveType = (assetType != null && !assetType.isBlank())
-                ? assetType
-                : (req != null ? req.getParameter("type") : null);
-        AssetFilter filter = new AssetFilter(effectiveLocationId, effectiveType, status);
+        AssetFilter filter = new AssetFilter(effectiveLocationId, assetType, status);
         List<AssetView> assets = queries.listAssets(filter, scope);
         List<AssetResponse> items =
                 assets.stream().map(ReportingController::toAssetResponse).toList();

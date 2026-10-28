@@ -166,7 +166,7 @@ class AssetRegisterHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
         // Filter by type VEHICLE
         ResponseEntity<JsonNode> vehicleResponse = http.exchange(
-                "/v1/reporting/assets?type=VEHICLE",
+                "/v1/reporting/assets?assetType=VEHICLE",
                 HttpMethod.GET,
                 new HttpEntity<>(asEntity(USER_A, ENTITY_A)),
                 JsonNode.class);
