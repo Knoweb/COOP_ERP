@@ -34,3 +34,9 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A profit center or agency dimension was created
+
+  # Polgolla M1-04: asset register & branch asset view
+  - code: ASSET_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: A fixed asset was registered for an entity or location
