@@ -10,9 +10,10 @@ export interface CustomSelectProps<T extends string> {
   options: CustomSelectOption<T>[];
   onChange: (value: T) => void;
   ariaLabel: string;
+  placeholder?: string;
 }
 
-export function CustomSelect<T extends string>({ value, options, onChange, ariaLabel }: CustomSelectProps<T>) {
+export function CustomSelect<T extends string>({ value, options, onChange, ariaLabel, placeholder }: CustomSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,8 @@ export function CustomSelect<T extends string>({ value, options, onChange, ariaL
     };
   }, [open]);
 
-  const selectedOption = options.find((opt) => opt.value === value) ?? options[0];
+  const selectedOption = options.find((opt) => opt.value === value);
+  const triggerLabel = selectedOption?.label ?? placeholder ?? "";
 
   return (
     <div className={`custom-dropdown ${open ? "custom-dropdown--open" : ""} ${openUp ? "custom-dropdown--up" : ""}`} ref={containerRef}>
@@ -61,6 +63,9 @@ export function CustomSelect<T extends string>({ value, options, onChange, ariaL
         aria-label={ariaLabel}
         tabIndex={-1}
       >
+        {placeholder && !options.some((o) => o.value === "") && (
+          <option value="">{placeholder}</option>
+        )}
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -75,7 +80,7 @@ export function CustomSelect<T extends string>({ value, options, onChange, ariaL
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="custom-dropdown__value">{selectedOption?.label}</span>
+        <span className="custom-dropdown__value">{triggerLabel}</span>
         <svg
           className={`custom-dropdown__arrow ${open ? "custom-dropdown__arrow--open" : ""}`}
           viewBox="0 0 24 24"

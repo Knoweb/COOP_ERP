@@ -14,6 +14,7 @@ import type { ExternalGrant } from "./adminApi";
 import { usePartyApi } from "./partyApi";
 import { GRANT_STATUS_LOOK, REVOKE_REASONS, refusalOf } from "./adminView";
 import { CustomSelect } from "./CustomSelect";
+import { CustomDatePicker } from "./CustomDatePicker";
 
 /**
  * The Federation's register of external grants (21A M1-09; doc 21 section 4.6): read-only
@@ -30,7 +31,7 @@ export function GrantsPage() {
   const idempotencyKey = useIdempotencyKey();
 
   const [grantee, setGrantee] = useState("");
-  const [entities, setEntities] = useState<string[]>([]);
+  const [entity, setEntity] = useState("");
   const [until, setUntil] = useState("");
   const [reason, setReason] = useState("");
   const [revoking, setRevoking] = useState<ExternalGrant | null>(null);
@@ -57,13 +58,13 @@ export function GrantsPage() {
     mutationFn: () =>
       api.grantExternalView(
         // The end of the chosen day, in UTC: the grant holds through that day.
-        { granteeUserId: grantee, scopeEntityIds: entities, validUntil: `${until}T23:59:59Z`, reason: reason.trim() },
+        { granteeUserId: grantee, scopeEntityIds: entity ? [entity] : [], validUntil: `${until}T23:59:59Z`, reason: reason.trim() },
         idempotencyKey.current()
       ),
     onSuccess: () => {
       afterCommand("party.grants.granted");
       setGrantee("");
-      setEntities([]);
+      setEntity("");
       setUntil("");
       setReason("");
     },
@@ -150,61 +151,92 @@ export function GrantsPage() {
         />
       )}
 
-      <div className="party-grant-header-wrap">
-        <h2 id="party-grant-title" className="party-grant-section-title">{t("party.grants.new").text}</h2>
-        {externals.isSuccess && externals.data.items.length === 0 && (
-          <p role="note" className="party-grant-section-note">{t("party.grants.no_external").text}</p>
-        )}
-      </div>
+      <div className="party-grant-card">
+        <div className="party-grant-card__header">
+          <div className="party-grant-card__icon-badge">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <div className="party-grant-card__titles">
+            <h2 id="party-grant-title" className="party-grant-card__title">{t("party.grants.new").text}</h2>
+            {externals.isSuccess && externals.data.items.length === 0 && (
+              <p role="note" className="party-grant-card__note">{t("party.grants.no_external").text}</p>
+            )}
+          </div>
+        </div>
 
-      <form onSubmit={submit} className="party-form-row party-grant-form" aria-labelledby="party-grant-title">
-        <label className="party-form-field">
-          <span className="party-form-field__label">{t("party.grants.grantee").text}</span>
-          <CustomSelect
-            value={grantee}
-            onChange={(val) => setGrantee(val)}
-            ariaLabel={t("party.grants.grantee").text}
-            options={[
-              { value: "", label: t("party.roles.choose").text },
-              ...(externals.data?.items ?? []).map((user) => ({
-                value: user.userId,
-                label: `${user.displayName} (${user.username})`
-              }))
-            ]}
-          />
-        </label>
-        <label className="party-form-field">
-          <span className="party-form-field__label">{t("party.grants.entities").text}</span>
-          <select
-            multiple
-            className="party-grant-select-multiple"
-            value={entities}
-            onChange={(event) => setEntities(Array.from(event.target.selectedOptions, (option) => option.value))}
-            required
-          >
-            {(societies.data?.items ?? []).map((society) => (
-              <option key={society.entityId} value={society.entityId}>
-                {society.entityCode} {society.legalNameEn}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="party-form-field">
-          <span className="party-form-field__label">{t("party.grants.until").text}</span>
-          <input type="date" value={until} onChange={(event) => setUntil(event.target.value)} required />
-        </label>
-        <label className="party-form-field">
-          <span className="party-form-field__label">{t("party.grants.reason").text}</span>
-          <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} required maxLength={500} />
-        </label>
-        <button
-          type="submit"
-          className="modern-btn party-grant-submit-btn"
-          disabled={!grantee || entities.length === 0 || !until || !reason.trim() || grant.isPending}
-        >
-          {t("party.grants.submit").text}
-        </button>
-      </form>
+        <form onSubmit={submit} className="party-grant-form" aria-labelledby="party-grant-title">
+          <div className="party-grant-form__grid">
+            <label className="party-form-field">
+              <span className="party-form-field__label">{t("party.grants.grantee").text}</span>
+              <CustomSelect
+                value={grantee}
+                onChange={(val) => setGrantee(val)}
+                ariaLabel={t("party.grants.grantee").text}
+                placeholder={t("party.roles.choose").text}
+                options={[
+                  { value: "", label: t("party.roles.choose").text },
+                  ...(externals.data?.items ?? []).map((user) => ({
+                    value: user.userId,
+                    label: `${user.displayName} (${user.username})`
+                  }))
+                ]}
+              />
+            </label>
+
+            <label className="party-form-field">
+              <span className="party-form-field__label">{t("party.grants.entities").text}</span>
+              <CustomSelect
+                value={entity}
+                onChange={(val) => setEntity(val)}
+                ariaLabel={t("party.grants.entities").text}
+                placeholder={t("party.roles.choose").text}
+                options={(societies.data?.items ?? []).map((society) => ({
+                  value: society.entityId,
+                  label: `${society.entityCode} ${society.legalNameEn}`
+                }))}
+              />
+            </label>
+
+            <label className="party-form-field">
+              <span className="party-form-field__label">{t("party.grants.until").text}</span>
+              <CustomDatePicker
+                value={until}
+                onChange={(val) => setUntil(val)}
+                ariaLabel={t("party.grants.until").text}
+                required
+              />
+            </label>
+
+            <label className="party-form-field party-form-field--full">
+              <span className="party-form-field__label">{t("party.grants.reason").text}</span>
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                rows={2}
+                required
+                maxLength={500}
+                placeholder={t("party.grants.reason").text}
+              />
+            </label>
+          </div>
+
+          <div className="party-grant-form__footer">
+            <button
+              type="submit"
+              className="party-grant-submit-btn"
+              disabled={!grantee || !entity || !until || !reason.trim() || grant.isPending}
+            >
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              <span>{t("party.grants.submit").text}</span>
+            </button>
+          </div>
+        </form>
+      </div>
 
       {done && <p role="status">{t(done).text}</p>}
       {refusal != null && <p role="alert">{refusalOf(refusal, t("party.error.generic").text).text}</p>}
