@@ -255,7 +255,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
         // PRC-10: m4trading V0014 (order adjustments).
         // CAT-12: m4trading V0015 (inter-entity receivable opening balances).
-        assertThat(after).containsEntry("m4trading", 15);
+        // ORD-10: m4trading V0016 (discrepancy photos).
+        assertThat(after).containsEntry("m4trading", 16);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
@@ -265,6 +266,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isEqualTo("trading.opening_receivable");
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'trading.opening_receivable'::regclass",
+                        Boolean.class))
+                .isTrue();
+
+        assertThat(admin.queryForObject("select to_regclass('trading.discrepancy_photo')::text", String.class))
+                .isEqualTo("trading.discrepancy_photo");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'trading.discrepancy_photo'::regclass",
                         Boolean.class))
                 .isTrue();
 
