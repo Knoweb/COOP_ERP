@@ -6,6 +6,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
+import { DropdownSelect } from "../../shell/components/DropdownSelect";
 import { useCatalogueApi, type SkuStatus } from "./catalogueApi";
 import { chipOf, errorText, languageOf, nameIn } from "./skuView";
 import "./catalogue.css";
@@ -154,34 +155,17 @@ export function CataloguePage() {
           <span className="modern-field__label">
             {t("catalogue.filter.status").text}
           </span>
-
-          <span className="modern-select">
-            <select
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as SkuStatus | "")
-              }
-            >
-              <option value="">
-                {t("catalogue.filter.status.all").text}
-              </option>
-
-              {STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {t(`catalogue.status.${value}`).text}
-                </option>
-              ))}
-            </select>
-
-            <svg
-              className="modern-select__arrow"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path d="m7 9 5 5 5-5" />
-            </svg>
-          </span>
+          <DropdownSelect
+            value={status}
+            onChange={(val) => setStatus(val as SkuStatus | "")}
+            options={[
+              { value: "", label: t("catalogue.filter.status.all").text },
+              ...STATUSES.map((value) => ({
+                value,
+                label: t(`catalogue.status.${value}`).text
+              }))
+            ]}
+          />
         </label>
       </section>
       )}
