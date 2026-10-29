@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../../shell/i18n/useT";
+import { businessToday } from "../../shell/i18n/formats";
 
 type CatalogueDatePickerProps = {
   id?: string;
@@ -40,7 +41,6 @@ export function CatalogueDatePicker({
   label,
   value,
   onChange,
-  placeholder = "YYYY-MM-DD",
   disabled,
   required
 }: CatalogueDatePickerProps) {
@@ -58,9 +58,10 @@ export function CatalogueDatePicker({
     return null;
   })();
 
-  const today = new Date();
-  const [viewYear, setViewYear] = useState<number>(parsedDate ? parsedDate.year : today.getFullYear());
-  const [viewMonth, setViewMonth] = useState<number>(parsedDate ? parsedDate.month : today.getMonth());
+  const todayStr = businessToday();
+  const todayParts = todayStr.split("-").map(Number);
+  const [viewYear, setViewYear] = useState<number>(parsedDate ? parsedDate.year : todayParts[0]);
+  const [viewMonth, setViewMonth] = useState<number>(parsedDate ? parsedDate.month : todayParts[1] - 1);
 
   // Update view when value changes from outside
   useEffect(() => {
@@ -133,15 +134,13 @@ export function CatalogueDatePicker({
   // Today
   const handleToday = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const now = new Date();
-    const iso = formatIso(now.getFullYear(), now.getMonth(), now.getDate());
-    onChange(iso);
+    onChange(todayStr);
     setOpen(false);
   };
 
-  // Calendar math
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay(); // 0 = Sunday
+  // Calendar math using UTC so local timezone cannot shift dates
+  const daysInMonth = new Date(Date.UTC(viewYear, viewMonth + 1, 0)).getUTCDate();
+  const firstDayOfWeek = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay(); // 0 = Sunday
 
   return (
     <div className="catalogue-datepicker-wrap" ref={containerRef}>
@@ -274,10 +273,10 @@ export function CatalogueDatePicker({
           {/* Footer (Clear and Today) */}
           <div className="catalogue-calendar-footer">
             <button type="button" className="catalogue-calendar-action" onClick={handleClear}>
-              Clear
+              {t("catalogue.datepicker.clear").text}
             </button>
             <button type="button" className="catalogue-calendar-action" onClick={handleToday}>
-              Today
+              {t("catalogue.datepicker.today").text}
             </button>
           </div>
         </div>

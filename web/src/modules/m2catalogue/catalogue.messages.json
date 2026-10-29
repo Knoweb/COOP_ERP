@@ -228,7 +228,9 @@
     "catalogue.suspects.reasons": "Reasons",
     "catalogue.suspects.resolved_success": "Suspect resolved successfully.",
     "catalogue.datepicker.prev_month": "Previous month",
-    "catalogue.datepicker.next_month": "Next month"
+    "catalogue.datepicker.next_month": "Next month",
+    "catalogue.datepicker.clear": "Clear",
+    "catalogue.datepicker.today": "Today"
   },
   "si": {
     "catalogue.filter.toggle": "පෙරහන්",
@@ -459,7 +461,9 @@
     "catalogue.suspects.reasons": "හේතු",
     "catalogue.suspects.resolved_success": "අනුපිටපත් සැකය සාර්ථකව විසඳන ලදී.",
     "catalogue.datepicker.prev_month": "පෙර මාසය",
-    "catalogue.datepicker.next_month": "ඊළඟ මාසය"
+    "catalogue.datepicker.next_month": "ඊළඟ මාසය",
+    "catalogue.datepicker.clear": "පිරිසිදු කරන්න",
+    "catalogue.datepicker.today": "අද"
   },
   "ta": {
     "catalogue.filter.toggle": "வடிகட்டிகள்",
@@ -690,6 +694,8 @@
     "catalogue.suspects.reasons": "காரணங்கள்",
     "catalogue.suspects.resolved_success": "சந்தேகம் வெற்றிகரமாக தீர்க்கப்பட்டது.",
     "catalogue.datepicker.prev_month": "முந்தைய மாதம்",
-    "catalogue.datepicker.next_month": "அடுத்த மாதம்"
+    "catalogue.datepicker.next_month": "அடுத்த மாதம்",
+    "catalogue.datepicker.clear": "அழி",
+    "catalogue.datepicker.today": "இன்று"
   }
 }

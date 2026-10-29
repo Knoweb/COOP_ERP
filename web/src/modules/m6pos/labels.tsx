@@ -14,7 +14,7 @@ export function TillLabel({ number }: { number: number | null }) {
 export function useTenderText() {
   const t = useT();
   return (kind: string) => {
-    const message = t(`pos.tender.${kind}`);
+    const message = t(`pos.tender.${kind}`, kind);
     return message.isFallback ? kind : message.text;
   };
 }
@@ -27,7 +27,7 @@ export function useTenderText() {
 export function useFlagText() {
   const t = useT();
   return (code: string) => {
-    const message = t(`pos.flag.${code}`);
+    const message = t(`pos.flag.${code}`, code);
     return message.isFallback ? code : message.text;
   };
 }
