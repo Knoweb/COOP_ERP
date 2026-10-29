@@ -6,6 +6,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
+import { DropdownSelect } from "../../shell/components/DropdownSelect";
 import { useCatalogueApi, type SkuStatus } from "./catalogueApi";
 import { chipOf, errorText, languageOf, nameIn } from "./skuView";
 import "./catalogue.css";
@@ -275,16 +276,22 @@ export function CataloguePage() {
             </span>
           </label>
 
-          <div className="modern-field catalogue-filter-field">
-            <span className="modern-field__label catalogue-filter-label">
+          <label className="modern-field modern-field--select">
+            <span className="modern-field__label">
               {t("catalogue.filter.status").text}
             </span>
-            <SkuStatusDropdown
+            <DropdownSelect
               value={status}
-              onChange={(val) => setStatus(val)}
-              anyLabel={t("catalogue.filter.status.all").text}
+              onChange={(val) => setStatus(val as SkuStatus | "")}
+              options={[
+                { value: "", label: t("catalogue.filter.status.all").text },
+                ...STATUSES.map((value) => ({
+                  value,
+                  label: t(`catalogue.status.${value}`).text
+                }))
+              ]}
             />
-          </div>
+          </label>
         </section>
       )}
 
