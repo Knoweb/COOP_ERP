@@ -107,7 +107,7 @@ till track's (CR-30-1); this module gives them the snapshot and applies what the
   `REOPENED`, audit `ACCOUNT_REOPENED`, `account.reopened.v1`; CR-27A-1 item 1), settled or
   reversed, and closed again; every change is a row of `account_history` with its reason.
   Deactivation refuses a customer with a balance on an OPEN or SUSPENDED account and leaves the
-  account untouched; reactivation is not built (see "Deferred").
+  account untouched; reactivation restores status to ACTIVE and eligibility for credit purchasing (CUS-07).
 - **Reuse detection (27A 6.1)** reads the holders of a number across societies through
   `customers.phone_holders`, which under the cross-tenant pattern
   (`2026-10-06-wave2-cross-tenant-functions.md`; `RLS_POLICY_TEMPLATE.md`, fifth case) answers an
@@ -229,7 +229,7 @@ Statements as A4 documents (the kernel's A4Renderer runs on the worker role only
 statement document, a consumer and a stored key: more than a screen) and the statement job; SMS
 statements (M9's lane); banking (M7-09); receivables and ageing by bucket for the society; the
 privacy CI gate that scans event payloads (27A section 9) beyond the assertions in the tests;
-audit of the office's reads; reactivating a deactivated customer; a web screen for `RecaptureNic`
+audit of the office's reads; a web screen for `RecaptureNic`
 (the command and its endpoint exist); a dedupe table for the till's tenders (the inbox and the
 gateway's content hash are the guards); the retention purge (doc 10 D-02); storing the access
 export under an object key (the kernel attachment API); the cross-society account opening path
