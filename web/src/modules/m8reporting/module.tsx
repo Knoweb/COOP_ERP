@@ -12,6 +12,8 @@ import { ReportPage } from "./ReportPage";
 import { ExceptionsPage } from "./ExceptionList";
 import { ShopTargetsPage } from "./ShopTargetsPage";
 import { ShopReportsPage } from "./ShopReportsPage";
+import { ProfitCentersPnlPage } from "./ProfitCentersPnlPage";
+import { AssetRegisterPage } from "./AssetRegisterPage";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 
 // Every M8 screen reads APIs that need rpt.report.run; rpt.export.run alone (a custom role) must
@@ -19,8 +21,12 @@ import { RequirePermission } from "../../shell/auth/RequirePermission";
 // to rpt.export.run only (M1A-07).
 const REPORT = ["rpt.report.run"];
 const TARGETS = ["rpt.target.view"];
+const PROFIT_CENTERS = ["rpt.profit_center.view"];
+const ASSETS = ["rpt.asset.view"];
 const guard = (page: ReactElement) => <RequirePermission anyOf={REPORT}>{page}</RequirePermission>;
 const guardTargets = (page: ReactElement) => <RequirePermission anyOf={TARGETS}>{page}</RequirePermission>;
+const guardProfitCenters = (page: ReactElement) => <RequirePermission anyOf={PROFIT_CENTERS}>{page}</RequirePermission>;
+const guardAssets = (page: ReactElement) => <RequirePermission anyOf={ASSETS}>{page}</RequirePermission>;
 
 export const reportingModule: ModuleDefinition = {
   id: "reporting",
@@ -30,6 +36,8 @@ export const reportingModule: ModuleDefinition = {
     { path: "reporting/exceptions", element: guard(<ExceptionsPage />) },
     { path: "reporting/targets", element: guardTargets(<ShopTargetsPage />) },
     { path: "reporting/shop-reports", element: guard(<ShopReportsPage />) },
+    { path: "reporting/profit-centers", element: guardProfitCenters(<ProfitCentersPnlPage />) },
+    { path: "reporting/assets", element: guardAssets(<AssetRegisterPage />) },
     { path: "reporting/reports/:reportId", element: guard(<ReportPage />) }
   ],
 
@@ -37,9 +45,20 @@ export const reportingModule: ModuleDefinition = {
   navItems: [
     { labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT },
     { labelId: "reporting.shop_reports.nav", to: "/reporting/shop-reports", requiredPermissions: REPORT },
+    { labelId: "reporting.profit_centers.nav", to: "/reporting/profit-centers", requiredPermissions: PROFIT_CENTERS },
+    { labelId: "reporting.assets.nav", to: "/reporting/assets", requiredPermissions: ASSETS },
     { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS }
   ],
 
   // x-permissions of openapi/m8reporting.yaml, read from the session's resolved set (PR #144).
-  requiredPermissions: ["rpt.report.run", "rpt.export.run", "rpt.target.view", "rpt.target.manage"]
+  requiredPermissions: [
+    "rpt.report.run",
+    "rpt.export.run",
+    "rpt.target.view",
+    "rpt.target.manage",
+    "rpt.profit_center.view",
+    "rpt.profit_center.manage",
+    "rpt.asset.view",
+    "rpt.asset.manage"
+  ]
 };

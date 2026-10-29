@@ -53,4 +53,16 @@ public interface ReportingQueries {
 
     /** Monthly operational sales report, daily trend, and cross-shop comparison for a month. */
     MonthlyShopReport monthlyShopReport(String yearMonth, UUID locationId, ScopeContext scope);
+
+    /** List all active profit center dimensions in the caller's scope. */
+    List<ProfitCenterView> listProfitCenters(ScopeContext scope);
+
+    /** Month-end P&L by profit center for a year-month and optional profit center ID. */
+    MonthlyProfitCenterPnlReport monthlyProfitCenterPnl(String yearMonth, UUID profitCenterId, ScopeContext scope);
+
+    /** List assets according to the filter in the caller's scope (Polgolla M1-04). */
+    List<AssetView> listAssets(AssetFilter filter, ScopeContext scope);
+
+    /** Retrieve a single asset by ID in the caller's scope (Polgolla M1-04). */
+    Optional<AssetView> getAsset(UUID assetId, ScopeContext scope);
 }

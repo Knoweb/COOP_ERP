@@ -48,7 +48,7 @@ help:
 	@echo "make demo-data    load the demo for cooperative staff (docs/DEMO.md; safe to repeat)"
 	@echo "make demo-till-sale  a till sale at the demo shop through the sync contract (after demo-data)"
 	@echo "make roles        apply the database users and groups to the running database (make up does this)"
-	@echo "make build        build backend and web on the host"
+	@echo "make build        build backend, web and till on the host"
 	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
 	@echo "make format       format the Java files you changed (the pipeline checks this)"
@@ -180,6 +180,7 @@ urls:
 build:
 	cd backend && ./gradlew build -x test
 	cd web && pnpm install --frozen-lockfile && pnpm build
+	cd till && ./gradlew build :desktop:createDistributable
 
 test:
 	cd backend && ./gradlew spotlessCheck test

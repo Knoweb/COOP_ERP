@@ -21,6 +21,7 @@
   "m5.opening.already_open": "මෙම ස්ථානය සඳහා ආරම්භක ශේෂයක් දැනටමත් සකස් කෙරේ",
   "m5.opening.lines_required": "ආරම්භක ශේෂයකට අවම වශයෙන් ගණන් කළ පේළියක් අවශ්‍යයි",
   "m5.opening.line_invalid": "ගණන් කළ පේළියකට කාණ්ඩයක්, ශුන්‍යයට වැඩි ප්‍රමාණයක් සහ ශුන්‍ය හෝ වැඩි පිරිවැයක් අවශ්‍යයි",
+  "m5.opening.sku_not_found": "අදාළ SKU හමු නොවීය",
   "m5.opening.not_found": "ආරම්භක ශේෂය හමු නොවීය",
   "m5.opening.not_draft": "අත්සන් කළ හැක්කේ සකස් වෙමින් පවතින ආරම්භක ශේෂයක් පමණි",
   "m5.opening.not_signed": "ප්‍රති-අත්සන් කිරීමට පෙර ආයතනය ආරම්භක ශේෂය අත්සන් කළ යුතුය",
@@ -102,5 +103,18 @@
   "m5.repack.yield_out_of_range": "මෙම ප්‍රමාණයෙන් වට්ටෝරුව ඉඩ දෙනවාට වඩා ඇසුරුම් ({actual}) (අපේක්ෂිත {expected}); ඇසුරුම් ගණන පරීක්ෂා කරන්න",
   "m5.repack.yield_reason_required": "වට්ටෝරුව අපේක්ෂා කරනවාට වඩා අඩු ඇසුරුම් ({actual}) (අපේක්ෂිත {expected}); අඩුවට හේතුව දෙන්න",
   "m5.till_fact.type_required": "මුදල් යන්ත්‍රයේ කරුණේ වර්ගයක් නම් කර නැත",
-  "m5.expiry_task.not_found": "කල් ඉකුත්වීමේ කාර්යය හමු නොවීය"
+  "m5.expiry_task.not_found": "කල් ඉකුත්වීමේ කාර්යය හමු නොවීය",
+  "m5.pick_list.not_found": "තේරීම් ලැයිස්තුව හමු නොවීය",
+  "m5.pick_list.not_open": "මෙම තේරීම් ලැයිස්තුව දැනටමත් යවා ඇත",
+  "m5.pick.user_required": "ගබඩා පරිශීලකයෙකු තේරීම වෙනස් කළ යුතුය",
+  "m5.pick.reason_invalid": "අක්ෂර 500කට නොවැඩි හේතුවක් දෙන්න",
+  "m5.pick.line_not_found": "තේරීම් ලැයිස්තු පේළිය හමු නොවීය",
+  "m5.pick.short_line_not_overridable": "අඩු පේළියකට වෙනස් කිරීමට යෝජිත තොගයක් නොමැත",
+  "m5.pick.replacement_same_as_original": "යෝජිත තොගයට වෙනස් තොගයක් තෝරන්න",
+  "m5.pick.already_overridden": "මෙම තේරීම් පේළිය දැනටමත් වෙනස් කර ඇත",
+  "m5.pick.replacement_lot_not_found": "ආදේශක තොග කොටස හමු නොවීය",
+  "m5.pick.sku_mismatch": "ආදේශක තොගයේ එම භාණ්ඩයම තිබිය යුතුය",
+  "m5.pick.location_mismatch": "ආදේශක තොගය එම ගබඩාවේම තිබිය යුතුය",
+  "m5.pick.lot_unavailable": "ආදේශක තොගයේ ප්‍රමාණවත් වෙන් නොකළ තොග නොමැත",
+  "m5.pick.lot_expired": "ආදේශක තොගය කල් ඉකුත් වී ඇත හෝ කල් ඉකුත්වීමට ඉතා ආසන්නය"
 }

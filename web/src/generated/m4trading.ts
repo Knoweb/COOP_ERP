@@ -1014,6 +1014,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/opening-receivables/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk import inter-entity receivable opening balances from a sheet or rows
+         * @description Parses inter-entity receivable opening balances and registers them as authorized two-party signed invoices and opening receivable records.
+         */
+        post: operations["bulkImportReceivables"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/opening-receivables/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One opening receivable record with two-party signatures */
+        get: operations["getOpeningReceivable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1884,6 +1923,81 @@ export interface components {
             /** Format: uuid */
             skuId: string;
             qty: number;
+        };
+        BulkImportReceivablesRequest: {
+            /** Format: uuid */
+            sellerEntityId?: string;
+            sheet?: string;
+            rows?: components["schemas"]["ReceivableOpeningRowRequest"][];
+            /** @default false */
+            simulateSignatures: boolean;
+        };
+        ReceivableOpeningRowRequest: {
+            /** Format: uuid */
+            sellerEntityId?: string;
+            sellerCode?: string;
+            /** Format: uuid */
+            buyerEntityId?: string;
+            buyerCode?: string;
+            amount: number;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: date */
+            asOfDate?: string;
+            referenceNo?: string;
+            /** Format: uuid */
+            sellerSignedBy?: string;
+            sellerSigner?: string;
+            /** Format: uuid */
+            buyerSignedBy?: string;
+            buyerSigner?: string;
+            notes?: string;
+        };
+        BulkReceivableReport: {
+            /** Format: uuid */
+            importId: string;
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED";
+            totalRows: number;
+            importedCount: number;
+            documentIds: string[];
+            problems: components["schemas"]["ReceivableProblemResponse"][];
+        };
+        ReceivableProblemResponse: {
+            row: number;
+            code: string;
+            message: string;
+        };
+        OpeningReceivableResponse: {
+            /** Format: uuid */
+            openingReceivableId: string;
+            /** Format: uuid */
+            documentId: string;
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            sellerCode?: string;
+            sellerName?: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            buyerCode?: string;
+            buyerName?: string;
+            amount: number;
+            referenceNo?: string;
+            /** Format: uuid */
+            sellerSignedBy: string;
+            sellerSignerName?: string;
+            /** Format: date-time */
+            sellerSignedAt: string;
+            /** Format: uuid */
+            buyerSignedBy: string;
+            buyerSignerName?: string;
+            /** Format: date-time */
+            buyerSignedAt: string;
+            notes?: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -3560,8 +3674,66 @@ export interface operations {
                     "application/json": components["schemas"]["TransferRequestResponse"];
                 };
             };
+        };
+    };
+    bulkImportReceivables: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportReceivablesRequest"];
+            };
+        };
+        responses: {
+            /** @description Opening receivables imported */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReceivableReport"];
+                };
+            };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    getOpeningReceivable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The opening receivable */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningReceivableResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
 }

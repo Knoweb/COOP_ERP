@@ -64,6 +64,7 @@ public final class BulkNetworkCsvParser {
             String displayName = valueOf(row, "display_name", "user_display_name", "full_name");
             String userKind = valueOf(row, "user_kind", "kind");
             String pin = valueOf(row, "pin", "user_pin");
+            String password = valueOf(row, "password", "temp_password", "temporary_password", "initial_password");
             if (!username.isEmpty()) {
                 users.put(
                         username.toLowerCase(),
@@ -73,7 +74,8 @@ public final class BulkNetworkCsvParser {
                                 lang.isEmpty() ? null : lang,
                                 userKind.isEmpty() ? "TILL" : userKind,
                                 pin.isEmpty() ? null : pin,
-                                shopCode.isEmpty() ? null : shopCode));
+                                shopCode.isEmpty() ? null : shopCode,
+                                password.isEmpty() ? null : password));
             }
 
             String serial = valueOf(row, "hardware_serial", "serial", "device_serial");

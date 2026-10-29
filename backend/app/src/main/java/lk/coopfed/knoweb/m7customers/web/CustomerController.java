@@ -7,12 +7,16 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m7customers.api.AmendCustomer;
+import lk.coopfed.knoweb.m7customers.api.BulkImportMembers;
+import lk.coopfed.knoweb.m7customers.api.BulkMemberReport;
 import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.RecaptureNic;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
 import lk.coopfed.knoweb.m7customers.query.CustomerQueries;
 import lk.coopfed.knoweb.m7customers.web.generated.AmendCustomerRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport;
+import lk.coopfed.knoweb.m7customers.web.generated.BulkImportCustomersRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.ChangePhoneRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerCard;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerSummary;
@@ -30,6 +34,7 @@ class CustomerController implements CustomersApi {
     static final int DEFAULT_LIMIT = 50;
 
     private final Handles<RegisterCustomer, UUID> register;
+    private final Handles<BulkImportMembers, BulkMemberReport> bulkImporter;
     private final Handles<AmendCustomer, UUID> amend;
     private final Handles<ChangePhone, UUID> changePhone;
     private final Handles<DeactivateCustomer, UUID> deactivate;
@@ -39,6 +44,7 @@ class CustomerController implements CustomersApi {
 
     CustomerController(
             Handles<RegisterCustomer, UUID> register,
+            Handles<BulkImportMembers, BulkMemberReport> bulkImporter,
             Handles<AmendCustomer, UUID> amend,
             Handles<ChangePhone, UUID> changePhone,
             Handles<DeactivateCustomer, UUID> deactivate,
@@ -46,6 +52,7 @@ class CustomerController implements CustomersApi {
             CustomerQueries queries,
             CurrentScope currentScope) {
         this.register = register;
+        this.bulkImporter = bulkImporter;
         this.amend = amend;
         this.changePhone = changePhone;
         this.deactivate = deactivate;
@@ -84,6 +91,36 @@ class CustomerController implements CustomersApi {
                 scope);
         return ResponseEntity.created(URI.create(CustomersApi.PATH_REGISTER_CUSTOMER + "/" + id))
                 .body(card(id, scope));
+    }
+
+    @Override
+    public ResponseEntity<BulkCustomerReport> bulkImportCustomers(
+            String idempotencyKey, BulkImportCustomersRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<BulkImportMembers.MemberRow> rows = null;
+        if (request.getMembers() != null) {
+            rows = request.getMembers().stream()
+                    .map(m -> new BulkImportMembers.MemberRow(
+                            m.getDisplayName(),
+                            m.getDisplayNameSi(),
+                            m.getDisplayNameTa(),
+                            m.getLanguage() == null ? null : m.getLanguage().getValue(),
+                            m.getPhone(),
+                            m.getNic(),
+                            m.getCreditLimit(),
+                            m.getTermsDays(),
+                            m.getOfflineCap(),
+                            m.getTags(),
+                            m.getConsents() == null
+                                    ? null
+                                    : m.getConsents().stream().map(Enum::name).toList(),
+                            Boolean.TRUE.equals(m.getConfirmedIdentity())))
+                    .toList();
+        }
+        BulkMemberReport report = bulkImporter.handle(
+                new BulkImportMembers(request.getSheet(), rows, Boolean.TRUE.equals(request.getConfirmedReuse())),
+                scope);
+        return ResponseEntity.ok(CustomerResponses.bulkReport(report));
     }
 
     @Override

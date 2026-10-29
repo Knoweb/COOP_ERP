@@ -18,11 +18,14 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.m1party.api.ActivateLocation;
 import lk.coopfed.knoweb.m1party.api.LocationActivated;
 import lk.coopfed.knoweb.m5inventory.InventoryFixture;
+import lk.coopfed.knoweb.m5inventory.api.BulkImportOpeningStock;
+import lk.coopfed.knoweb.m5inventory.api.BulkOpeningStockReport;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceChanged;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalancePosted;
+import lk.coopfed.knoweb.m5inventory.api.OpeningStockBulkImported;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
@@ -58,6 +61,9 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     CountersignOpeningBalanceHandler countersign;
+
+    @Autowired
+    BulkOpeningStockImporter bulkImporter;
 
     @Autowired
     InventoryQueries queries;
@@ -254,6 +260,73 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(queries.balances(shop, null, true, own(MPCS))).isEmpty();
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aStockSheetBecomesOpeningBalancesAwaitingSignatures() {
+        String sheet =
+                """
+                sku,batch,expiry,qty,condition,unit_cost,printed_mrp
+                DHAL1,%s,2027-05-31,24.000,GOOD,310.5000,500.00
+                %s,NEW-SHEET-BATCH,2027-12-31,6.000,DAMAGED,290.0000,350.00
+                """
+                        .formatted(batch, sku);
+
+        BulkOpeningStockReport report = bulkImporter.handle(BulkImportOpeningStock.ofSheet(shop, sheet), own(MPCS));
+
+        assertThat(report.status()).isEqualTo(BulkOpeningStockReport.IMPORTED);
+        assertThat(report.totalRows()).isEqualTo(2);
+        assertThat(report.importedLines()).isEqualTo(2);
+        assertThat(report.problems()).isEmpty();
+        UUID id = report.openingBalanceId();
+
+        // 1. Stock sheet becomes opening balances awaiting signatures (DRAFT status, lots not active yet)
+        assertThat(queries.openingBalance(id, own(MPCS))).hasValueSatisfying(b -> {
+            assertThat(b.status()).isEqualTo("DRAFT");
+            assertThat(b.lines()).hasSize(2);
+            assertThat(b.preparedBy()).isEqualTo(InventoryFixture.USER);
+            assertThat(b.signedEntityBy()).isNull();
+            assertThat(b.countersignedBy()).isNull();
+            assertThat(b.documentId()).isNull();
+        });
+
+        // Stock lots are NOT active yet
+        assertThat(queries.balances(shop, null, false, own(MPCS))).isEmpty();
+
+        // Audit records and domain events
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("OPB_PREPARED", "STOCK_BULK_IMPORTED");
+        assertThat(events(OpeningBalanceChanged.class)).singleElement().satisfies(e -> {
+            assertThat(e.openingBalanceId()).isEqualTo(id);
+            assertThat(e.status()).isEqualTo("DRAFT");
+        });
+        assertThat(events(OpeningStockBulkImported.class)).singleElement().satisfies(e -> {
+            assertThat(e.importId()).isEqualTo(report.importId());
+            assertThat(e.openingBalanceId()).isEqualTo(id);
+            assertThat(e.totalRows()).isEqualTo(2);
+            assertThat(e.importedLines()).isEqualTo(2);
+        });
+
+        // 2. Can be signed by entity officer
+        kernel.reset();
+        sign.handle(new SignOpeningBalance(id), own(MPCS, OFFICER));
+        assertThat(queries.openingBalance(id, own(MPCS)).orElseThrow().status()).isEqualTo("SIGNED_ENTITY");
+
+        // 3. Countersigned by federation officer, issuing OPB and activating lots
+        kernel.reset();
+        UUID document = countersign.handle(new CountersignOpeningBalance(id), federationOfficer());
+        assertThat(queries.openingBalance(id, own(MPCS))).hasValueSatisfying(b -> {
+            assertThat(b.status()).isEqualTo("POSTED");
+            assertThat(b.documentId()).isEqualTo(document);
+        });
+
+        List<LotBalance> lots = queries.balances(shop, null, false, own(MPCS));
+        assertThat(lots)
+                .extracting(LotBalance::condition, l -> l.qtyOnHand().intValue())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("GOOD", 24),
+                        org.assertj.core.groups.Tuple.tuple("DAMAGED", 6));
     }
 
     @Test

@@ -37,10 +37,6 @@ include::module-m7customers.adoc[]
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]
 
-== M8 Reporting Pipeline
-plantuml::module-m8reporting.puml[,,format=svg]
-include::module-m8reporting.adoc[]
-
 == M5 Inventory, Costing, Repack & Loss
 plantuml::module-m5inventory.puml[,,format=svg]
 include::module-m5inventory.adoc[]
@@ -52,6 +48,10 @@ include::module-m4trading.adoc[]
 == M6 Point of Sale
 plantuml::module-m6pos.puml[,,format=svg]
 include::module-m6pos.adoc[]
+
+== M8 Reporting Pipeline
+plantuml::module-m8reporting.puml[,,format=svg]
+include::module-m8reporting.adoc[]
 
 == Demo data
 plantuml::module-demo.puml[,,format=svg]

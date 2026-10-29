@@ -243,6 +243,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/profit-centers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List profit center reporting dimensions
+         * @description Returns all active profit center dimensions for the caller's permitted scope.
+         */
+        get: operations["listProfitCenters"];
+        put?: never;
+        /**
+         * Define a profit center reporting dimension
+         * @description Creates a profit center reporting dimension for an agency or packing operation. Codes this operation can answer with 422: m8.profit_center.own_required, m8.profit_center.code_required, m8.profit_center.name_required, m8.profit_center.category_invalid, m8.profit_center.duplicate_code, m8.profit_center.location_unknown, m8.profit_center.location_scope_mismatch.
+         */
+        post: operations["createProfitCenter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/profit-centers/monthly-pnl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Month-end revenue, cost and profit/loss by profit center
+         * @description Produces month-end revenue, cost of goods sold, gross profit/loss, and margin percentage by profit center, reconciling totals with underlying posted sales facts. Surfaces pending/unresolved costs without faking zero cost or overstating profit.
+         */
+        get: operations["getMonthlyProfitCenterPnl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List society-owned fixed assets
+         * @description Returns all fixed assets for the caller's permitted scope, optionally filtered by location, type, or status.
+         */
+        get: operations["listAssets"];
+        put?: never;
+        /**
+         * Register a society-owned fixed asset
+         * @description Registers a new fixed/non-stock asset (land, building, vehicle, equipment, furniture, other). Codes this operation can answer with 422: m8.asset.own_required, m8.asset.code_required, m8.asset.code_too_long, m8.asset.name_required, m8.asset.type_invalid, m8.asset.location_unknown, m8.asset.location_scope_mismatch, m8.asset.duplicate_code.
+         */
+        post: operations["registerAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/assets/{assetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Details of a single fixed asset
+         * @description Returns a single fixed asset by ID in the caller's permitted scope.
+         */
+        get: operations["getAsset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -521,6 +609,98 @@ export interface components {
             performanceState: "TARGET_MET" | "BEHIND_TARGET" | "NO_TARGET";
             currency: string;
         };
+        CreateProfitCenterRequest: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            category: "AGENCY" | "PACKING" | "RETAIL" | "GENERAL";
+            /** Format: uuid */
+            locationId?: string | null;
+        };
+        ProfitCenterResponse: {
+            /** Format: uuid */
+            profitCenterId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            code: string;
+            name: string;
+            category: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            locationName?: string | null;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ProfitCenterListResponse: {
+            items: components["schemas"]["ProfitCenterResponse"][];
+        };
+        ProfitCenterPnlItem: {
+            /** Format: uuid */
+            profitCenterId?: string | null;
+            code: string;
+            name: string;
+            category: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            locationName?: string | null;
+            revenue: string;
+            cost?: string | null;
+            grossProfit?: string | null;
+            marginPercent?: string | null;
+            costPending: boolean;
+            /** Format: int64 */
+            txnCount: number;
+        };
+        ProfitCenterPnlSummary: {
+            totalRevenue: string;
+            totalCost?: string | null;
+            grossProfit?: string | null;
+            marginPercent?: string | null;
+            costPending: boolean;
+        };
+        MonthlyProfitCenterPnlResponse: {
+            month: string;
+            currency: string;
+            summary: components["schemas"]["ProfitCenterPnlSummary"];
+            items: components["schemas"]["ProfitCenterPnlItem"][];
+            unallocated?: components["schemas"]["ProfitCenterPnlItem"];
+        };
+        RegisterAssetRequest: {
+            assetCode: string;
+            name: string;
+            description?: string | null;
+            /** @enum {string} */
+            assetType: "LAND" | "BUILDING" | "VEHICLE" | "EQUIPMENT" | "FURNITURE" | "OTHER";
+            /** Format: uuid */
+            locationId?: string | null;
+            /** Format: date */
+            acquisitionDate?: string | null;
+            /** @description Historical acquisition cost in LKR */
+            acquisitionCost?: string | null;
+        };
+        AssetResponse: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            assetCode: string;
+            name: string;
+            description?: string | null;
+            assetType: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            locationName?: string | null;
+            /** Format: date */
+            acquisitionDate?: string | null;
+            acquisitionCost?: string | null;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AssetListResponse: {
+            items: components["schemas"]["AssetResponse"][];
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -574,6 +754,13 @@ export interface components {
         To: string;
         /** @description One location (the stock position); all the caller reads when absent */
         LocationId: string;
+        /** @description Filter assets by branch or location */
+        AssetLocationId: string;
+        /** @description Filter assets by type (LAND, BUILDING, VEHICLE, EQUIPMENT, FURNITURE, OTHER) */
+        AssetTypeParam: string;
+        /** @description Filter assets by status (ACTIVE, DISPOSED, MAINTENANCE, INACTIVE) */
+        AssetStatusParam: string;
+        AssetIdParam: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -992,6 +1179,204 @@ export interface operations {
                 content?: never;
             };
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listProfitCenters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of profit centers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitCenterListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createProfitCenter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProfitCenterRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitCenterResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getMonthlyProfitCenterPnl: {
+        parameters: {
+            query?: {
+                /** @description Year and month (YYYY-MM), defaults to current business month */
+                month?: string;
+                profitCenterId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly profit center P&L report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyProfitCenterPnlResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Profit center not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listAssets: {
+        parameters: {
+            query?: {
+                /** @description Filter assets by branch or location */
+                locationId?: components["parameters"]["AssetLocationId"];
+                /** @description Filter assets by type (LAND, BUILDING, VEHICLE, EQUIPMENT, FURNITURE, OTHER) */
+                assetType?: components["parameters"]["AssetTypeParam"];
+                /** @description Filter assets by status (ACTIVE, DISPOSED, MAINTENANCE, INACTIVE) */
+                status?: components["parameters"]["AssetStatusParam"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of assets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    registerAsset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: components["parameters"]["AssetIdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Asset details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Asset not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
 }

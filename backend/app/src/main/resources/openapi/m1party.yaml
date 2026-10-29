@@ -50,6 +50,8 @@
 # CR-21A-8 (INV-08): the Java-only m1party::api contract gains
 # LocationActivationPrerequisite so another module can contribute an activation guard without M1
 # depending on that module. The REST slice is unchanged, so its version remains 1.5.0.
+#
+# 1.6.0 (CAT-09, bulk user import): POST /v1/security/users/bulk bulk imports users with identity-provider provisioning. Additive.
 openapi: 3.1.0
 
 info:
@@ -58,7 +60,8 @@ info:
   # no request or response changes shape. 1.4.2 (CR-21A-7) is described in the header above.
   # 1.4.4 (wave 3 review) and 1.4.5 (wave 4 review) are described in the header above.
   # 1.5.0 (CAT-08) adds bulkRegisterNetwork for shops, positions, users, and devices.
-  version: 1.5.0
+  # 1.6.0 (CAT-09) adds bulkImportUsers for user sheet import with Keycloak provisioning.
+  version: 1.6.0
   x-change-request: CR-21A-8
 
 paths:
@@ -1858,6 +1861,42 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/security/users/bulk:
+
+    post:
+      tags: [Users]
+      operationId: bulkImportUsers
+      summary: Load users in bulk with identity-provider provisioning (CAT-09)
+      description: >
+        Loads a sheet or payload of users for the caller's entity and provisions their accounts
+        in the identity provider (Keycloak), enabling immediate sign-in.
+      x-permission: gov.user.manage
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportUsersRequest'
+
+      responses:
+
+        '200':
+          description: Bulk user import report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkUserImportReport'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/security/users/{userId}:
 
     get:
@@ -2398,6 +2437,50 @@ components:
           type:
             - string
             - 'null'
+        password:
+          type:
+            - string
+            - 'null'
+
+    BulkImportUsersRequest:
+      type: object
+      properties:
+        sheet:
+          type:
+            - string
+            - 'null'
+          description: Raw CSV user spreadsheet text
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkUserItem'
+
+    BulkUserImportReport:
+      type: object
+      required: [status, imported, failed, problems]
+      properties:
+        status:
+          type: string
+          enum: [IMPORTED, REJECTED, EMPTY]
+        imported:
+          type: integer
+        failed:
+          type: integer
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkUserProblem'
+
+    BulkUserProblem:
+      type: object
+      required: [username, field, reason]
+      properties:
+        username:
+          type: string
+        field:
+          type: string
+        reason:
+          type: string
 
     BulkDeviceItem:
       type: object

@@ -236,3 +236,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The society rejected a transfer request, with a reason
+
+  # CAT-12 Opening receivables bulk import
+  - code: RECEIVABLE_OPENING_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Inter-entity receivable opening balance imported with two-party signatures
+
+  - code: RECEIVABLES_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Inter-entity receivable opening balances bulk imported

@@ -28,3 +28,15 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A sales target was updated for a shop and period
+
+  # Polgolla M1-08: profit centers & agency P&L
+  - code: PROFIT_CENTER_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A profit center or agency dimension was created
+
+  # Polgolla M1-04: asset register & branch asset view
+  - code: ASSET_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: A fixed asset was registered for an entity or location
