@@ -61,10 +61,25 @@ export function SuppliersPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/catalogue">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("catalogue.back").text}
-      </Link>
+      <div style={{ marginBottom: "var(--space-2)" }}>
+        <Link className="back-pill-btn" to="/catalogue">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("catalogue.back").text}
+        </Link>
+      </div>
 
       <PageHeader
         icon="catalogue"
@@ -74,23 +89,26 @@ export function SuppliersPage() {
 
       {/* Register Supplier Form */}
       {canManage && (
-        <section className="catalogue-section">
+        <section className="catalogue-section supplier-register-card">
           <h2>{t("catalogue.suppliers.register").text}</h2>
-          <form onSubmit={handleRegisterSubmit} className="catalogue-filter-bar">
-            <label className="catalogue-form-field">
-              {t("catalogue.suppliers.name").text}
-              <input
-                type="text"
-                required
-                maxLength={120}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t("catalogue.suppliers.placeholder").text}
-              />
-            </label>
+          <form onSubmit={handleRegisterSubmit} className="supplier-register-form">
+            <div className="supplier-register-field-wrap">
+              <label className="catalogue-form-field">
+                <span className="catalogue-field-label">{t("catalogue.suppliers.name").text}</span>
+                <input
+                  type="text"
+                  required
+                  maxLength={120}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t("catalogue.suppliers.placeholder").text}
+                  className="supplier-name-input"
+                />
+              </label>
+            </div>
             <button
               type="submit"
-              className="action-button action-button--primary"
+              className="register-submit-btn supplier-register-btn"
               disabled={registerMutation.isPending || !name.trim()}
             >
               {t("catalogue.suppliers.submit").text}
@@ -98,13 +116,13 @@ export function SuppliersPage() {
           </form>
 
           {successMsg && (
-            <div className="import-alert import-alert--success" role="status">
+            <div className="import-alert import-alert--success" role="status" style={{ marginTop: "var(--space-2)" }}>
               <span>{successMsg}</span>
             </div>
           )}
 
           {registerMutation.isError && (
-            <p role="alert" className="error-text">
+            <p role="alert" className="error-text" style={{ marginTop: "var(--space-2)" }}>
               {errorText(registerMutation.error, t("catalogue.error.generic").text)}
             </p>
           )}
@@ -116,34 +134,40 @@ export function SuppliersPage() {
         {suppliersQuery.isLoading && <p>{t("catalogue.loading").text}</p>}
 
         {suppliers.length === 0 && !suppliersQuery.isLoading && (
-          <p>{t("catalogue.suppliers.empty").text}</p>
+          <div className="supplier-empty-state">
+            <p>{t("catalogue.suppliers.empty").text}</p>
+          </div>
         )}
 
         {suppliers.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>{t("catalogue.suppliers.name").text}</th>
-                <th>{t("catalogue.column.status").text}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suppliers.map((s) => {
-                const chipState: ChipState = s.status === "ACTIVE" ? "issued" : "void";
-                return (
-                  <tr key={s.supplierId}>
-                    <td>{s.name}</td>
-                    <td>
-                      <StateChip
-                        state={chipState}
-                        label={t(`catalogue.supplier.status.${s.status}`).text}
-                      />
-                    </td>
+          <div className="modern-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table catalogue-table">
+                <thead>
+                  <tr>
+                    <th>{t("catalogue.suppliers.name").text}</th>
+                    <th>{t("catalogue.column.status").text}</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {suppliers.map((s) => {
+                    const chipState: ChipState = s.status === "ACTIVE" ? "issued" : "void";
+                    return (
+                      <tr key={s.supplierId}>
+                        <td>{s.name}</td>
+                        <td>
+                          <StateChip
+                            state={chipState}
+                            label={t(`catalogue.supplier.status.${s.status}`).text}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </section>
     </main>
