@@ -42,7 +42,8 @@ export function CatalogueDatePicker({
   value,
   onChange,
   disabled,
-  required
+  required,
+  placeholder
 }: CatalogueDatePickerProps) {
   const t = useT();
   const [open, setOpen] = useState(false);

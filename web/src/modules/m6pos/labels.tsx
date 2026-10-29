@@ -12,10 +12,14 @@ export function TillLabel({ number }: { number: number | null }) {
 
 /** One tender kind in the reader's language; a kind this screen does not know shows as sent. */
 export function useTenderText() {
+  const intl = useIntl();
   const t = useT();
   return (kind: string) => {
-    const message = t(`pos.tender.${kind}`, kind);
-    return message.isFallback ? kind : message.text;
+    const key = `pos.tender.${kind}`;
+    if (intl.messages[key] === undefined) {
+      return kind;
+    }
+    return t(key).text;
   };
 }
 
@@ -25,10 +29,14 @@ export function useTenderText() {
  * never breaks the page.
  */
 export function useFlagText() {
+  const intl = useIntl();
   const t = useT();
   return (code: string) => {
-    const message = t(`pos.flag.${code}`, code);
-    return message.isFallback ? code : message.text;
+    const key = `pos.flag.${code}`;
+    if (intl.messages[key] === undefined) {
+      return code;
+    }
+    return t(key).text;
   };
 }
 
