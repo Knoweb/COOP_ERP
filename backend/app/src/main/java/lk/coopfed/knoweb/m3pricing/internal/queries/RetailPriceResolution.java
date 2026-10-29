@@ -279,4 +279,116 @@ class RetailPriceResolution {
 
         return Optional.of(BasketResolver.resolve(basket, index, date, tender));
     }
+
+    Optional<RetailPrice> resolveCommercial(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
+        Optional<LocationView> location = party.getLocation(locationId, scope);
+        Optional<SkuView> sku = catalogue.getSku(skuId, scope);
+        if (location.isEmpty() || sku.isEmpty() || uomCode == null || quantity == null || date == null) {
+            return Optional.empty();
+        }
+        Quantity qty;
+        try {
+            qty = Quantity.of(quantity);
+        } catch (ArithmeticException moreThanThreeDecimals) {
+            return Optional.empty();
+        }
+        UUID owner = location.get().ownerEntityId();
+
+        // 1. Look for published COMMERCIAL line in force; fallback to RETAIL line in force
+        Optional<PriceListView> commercialVersion =
+                lists.rootOfKind(PriceListStore.COMMERCIAL, owner).flatMap(root -> lists.versionInForce(root, date));
+        List<RetailLine> activeLines = commercialVersion
+                .map(v -> lists.lines(v.priceListId()).stream()
+                        .filter(line ->
+                                line.skuId().equals(skuId) && line.tierFromQty().signum() == 0)
+                        .map(line -> new RetailLine(
+                                line.skuId(),
+                                line.uomCode(),
+                                Money.rounded(line.price()),
+                                line.effectiveFrom(),
+                                line.effectiveTo(),
+                                Quantity.ZERO))
+                        .toList())
+                .orElse(List.of());
+
+        Optional<PriceListView> effectiveVersion = commercialVersion;
+        if (activeLines.isEmpty()) {
+            effectiveVersion =
+                    lists.rootOfKind(PriceListStore.RETAIL, owner).flatMap(root -> lists.versionInForce(root, date));
+            activeLines = effectiveVersion
+                    .map(v -> lists.lines(v.priceListId()).stream()
+                            .filter(line -> line.skuId().equals(skuId)
+                                    && line.tierFromQty().signum() == 0)
+                            .map(line -> new RetailLine(
+                                    line.skuId(),
+                                    line.uomCode(),
+                                    Money.rounded(line.price()),
+                                    line.effectiveFrom(),
+                                    line.effectiveTo(),
+                                    Quantity.ZERO))
+                            .toList())
+                    .orElse(List.of());
+        }
+
+        // 2. the batches on this shop's shelves, and the policy that picks among their MRPs
+        List<BatchCandidate> candidates = shelf.inStock(List.of(locationId), skuId, scope).stream()
+                .map(batch -> new BatchCandidate(
+                        batch.batchId(),
+                        batch.batchNo(),
+                        batch.printedMrp() == null ? null : Money.rounded(batch.printedMrp()),
+                        batch.expiry(),
+                        Quantity.of(batch.onHand())))
+                .toList();
+        MrpPolicyView policy = policies.of(skuId, owner, scope);
+
+        // 3. the control price in force, in the line's unit
+        Optional<ControlPriceView> control = controlPrices.ceilingFor(skuId, uomCode, date);
+        Map<UUID, List<Ceiling>> ceilings = control.map(c -> Map.of(
+                        skuId,
+                        List.of(new Ceiling(
+                                Money.rounded(c.ceilingPrice()),
+                                c.ceilingUomCode(),
+                                c.gazetteReference(),
+                                c.effectiveFrom(),
+                                c.effectiveTo()))))
+                .orElse(Map.of());
+
+        BigDecimal taxRate = catalogue
+                .taxRateInForce(skuId, date, scope)
+                .map(TaxRateView::ratePercent)
+                .orElse(BigDecimal.ZERO);
+        PricingSnapshotIndex index = new PricingSnapshotIndex(
+                0L,
+                StackingPolicy.PRIORITY_THEN_BEST,
+                List.of(new SkuFacts(skuId, sku.get().hasPrintedMrp(), taxRate, Set.of())),
+                activeLines,
+                Map.of(skuId, candidates),
+                Map.of(skuId, EffectivePolicy.toEngine(policy)),
+                ceilings,
+                Map.of(),
+                List.of());
+
+        LineResult result = PriceResolver.resolveLine(new LineInput(skuId, uomCode, qty, null, null), index, date);
+        BigDecimal listPrice = activeLines.stream()
+                .filter(line -> line.getUom().equals(uomCode) && line.inForce(date))
+                .findFirst()
+                .map(line -> line.getPrice().getAmount())
+                .orElse(null);
+        return Optional.of(new RetailPrice(
+                locationId,
+                skuId,
+                uomCode,
+                result.getSellable(),
+                result.getReason(),
+                effectiveVersion.map(PriceListView::priceListId).orElse(null),
+                listPrice,
+                result.getSellable() ? result.getUnitPrice().getAmount() : null,
+                result.getMrpApplied() == null ? null : result.getMrpApplied().getAmount(),
+                control.map(ControlPriceView::ceilingPrice).orElse(null),
+                result.getCapReason().name(),
+                policy.policy(),
+                result.getBatch() == null ? null : result.getBatch().getBatchId(),
+                EngineVersionKt.ENGINE_VERSION));
+    }
 }

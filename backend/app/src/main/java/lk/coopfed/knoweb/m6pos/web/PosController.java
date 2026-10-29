@@ -9,13 +9,16 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.CashMovementView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptFilter;
+import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptProfitView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.SessionFilter;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.SessionView;
 import lk.coopfed.knoweb.m6pos.web.generated.CashMovementResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.PosApi;
+import lk.coopfed.knoweb.m6pos.web.generated.ReceiptLineProfitResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptLineResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptPage;
+import lk.coopfed.knoweb.m6pos.web.generated.ReceiptProfitResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptTenderResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.SessionPage;
@@ -63,6 +66,13 @@ class PosController implements PosApi {
     public ResponseEntity<ReceiptResponse> getPosReceipt(UUID documentId) {
         return queries.receipt(documentId, currentScope.get())
                 .map(r -> ResponseEntity.ok(toResponse(r)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<ReceiptProfitResponse> getReceiptProfit(UUID documentId) {
+        return queries.receiptProfit(documentId, currentScope.get())
+                .map(p -> ResponseEntity.ok(toResponse(p)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -154,5 +164,28 @@ class PosController implements PosApi {
                 .operatorUserId(m.operatorUserId())
                 .deviceSeq(m.deviceSeq())
                 .flags(m.flags());
+    }
+
+    private static ReceiptProfitResponse toResponse(ReceiptProfitView p) {
+        List<ReceiptLineProfitResponse> lines = p.lines().stream()
+                .map(l -> new ReceiptLineProfitResponse(
+                                l.lineNo(),
+                                l.skuId(),
+                                l.qty(),
+                                l.unitPrice(),
+                                l.lineTotal(),
+                                l.lineNet(),
+                                l.costPending())
+                        .unitCost(l.unitCost())
+                        .lineCost(l.lineCost())
+                        .lineProfit(l.lineProfit())
+                        .marginPercent(l.marginPercent()))
+                .toList();
+
+        return new ReceiptProfitResponse(
+                        p.documentId(), p.locationId(), p.netSales(), p.costPending(), p.currency(), lines)
+                .totalCost(p.totalCost())
+                .grossProfit(p.grossProfit())
+                .marginPercent(p.marginPercent());
     }
 }

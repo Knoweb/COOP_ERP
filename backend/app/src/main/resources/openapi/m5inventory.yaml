@@ -156,6 +156,67 @@ paths:
               schema: { $ref: '#/components/schemas/PickListResponse' }
         '404':
           description: No pick list for this delivery note, or the caller's scope may not see it
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override:
+    post:
+      tags: [Inventory]
+      operationId: overridePick
+      summary: Replace one FEFO-suggested lot before dispatch
+      description: >
+        The original pick line remains immutable. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid,
+        m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found,
+        m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original,
+        m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch,
+        m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+      x-permission: whs.pick
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OverridePickRequest' }
+      responses:
+        '204':
+          description: The replacement lot is now the effective reservation
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates:
+    get:
+      tags: [Inventory]
+      operationId: listPickReplacementCandidates
+      summary: Eligible replacement lots for one FEFO-suggested pick
+      description: >
+        Returns only in-date GOOD lots of the same SKU and source location with enough currently
+        unreserved stock for the whole pick line, excluding its original lot. The OverridePick
+        command locks and revalidates the selected lot because availability may change after this
+        read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+      x-permission: whs.pick
+      parameters:
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Currently eligible replacement lots in FEFO order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PickReplacementCandidateResponse' }
   /v1/inventory/opening-balances:
     post:
       tags: [Inventory]
@@ -179,6 +240,33 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/bulk:
+    post:
+      tags: [Inventory]
+      operationId: bulkImportOpeningStock
+      summary: Import opening stock in bulk from a sheet or rows
+      description: >
+        Parses opening stock data and registers it as an opening balance in status DRAFT,
+        awaiting signatures before becoming active. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding,
+        m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required,
+        m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+      x-permission: inv.opening.prepare
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkImportStockRequest' }
+      responses:
+        '201':
+          description: Opening stock imported and converted into opening balance awaiting signatures
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkStockReport' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/inventory/opening-balances/{openingBalanceId}:
@@ -228,9 +316,13 @@ paths:
       operationId: countersignOpeningBalance
       summary: The Federation's officer countersigns; the OPB is issued and the stock posted
       description: >
-        Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found,
+        Codes this operation can answer with 422: m5.scope.own_required,
+        m5.opening.user_required, m5.opening.federation_required, m5.opening.not_found,
         m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock,
-        m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+        m5.opening.entity_unknown, m2.sku.not_found, m2.batch.sku_not_active,
+        m2.batch.batch_no_too_long, m2.batch.mrp_required, m2.batch.mrp_invalid,
+        m2.batch.expiry_required, m2.batch.dates_invalid; mfa.required when the second factor is
+        not fresh.
       x-permission: inv.opening.countersign
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -253,7 +345,7 @@ paths:
       description: >
         A session at the source sees the transfers it sent, a session at the destination the ones
         addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until
-        the destination receives, then RECEIVED.
+        the destination receives, then RECEIVED, or CANCELLED when cancelled before receipt.
       x-permission: inv.stock.view
       parameters:
         - in: query
@@ -342,10 +434,17 @@ paths:
     post:
       tags: [Inventory]
       operationId: receiveTransfer
-      summary: The destination receives the transfer in full
+      summary: The destination receives the transfer
       description: >
+        An absent body preserves the original full-receipt operation. When a body is supplied it
+        must name every immutable transfer line exactly once. A positive quantity below the issued
+        quantity receives only that amount and creates an unposted DAMAGED_IN_TRANSIT shortfall draft.
         Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
-        m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received.
+        m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received,
+        m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid,
+        m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown,
+        m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid,
+        m5.transfer.receipt_qty_exceeds_sent.
       x-permission: shop.transfer.receive
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -353,12 +452,50 @@ paths:
           name: transferId
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceiveTransferRequest' }
       responses:
         '200':
           description: Received
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/transfers/{transferId}/cancel:
+    post:
+      tags: [Inventory]
+      operationId: cancelTransfer
+      summary: Cancel an unreceived transfer and restore its stock at the source
+      description: >
+        An ISSUED transfer can be cancelled directly. An IN_TRANSIT transfer can be cancelled only
+        after the source user verifies that the goods physically returned to the original source.
+        Cancellation posts one compensating TRANSFER_IN at that source per issued line. Codes this
+        operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
+        m5.transfer.not_source, m5.transfer.already_received, m5.transfer.already_cancelled,
+        m5.transfer.physical_return_required, m5.transfer.cancellation_reason_invalid.
+      x-permission: inv.transfer.issue
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: transferId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelTransferRequest' }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   # ---- stock control (M5-11, M5-13, repack): counts, write-offs, recipes, repacks ----------
   /v1/inventory/counts:
@@ -915,6 +1052,38 @@ components:
       properties:
         batchId: { type: string, format: uuid }
         qty: { type: number, exclusiveMinimum: 0 }
+    ReceiveTransferRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/ReceiveTransferLineRequest' }
+    ReceiveTransferLineRequest:
+      type: object
+      required: [transferLineId, receivedQty]
+      properties:
+        transferLineId: { type: string, format: uuid }
+        receivedQty:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 99999999999.999
+          multipleOf: 0.001
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 11, fraction = 3)'
+    CancelTransferRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          pattern: '.*\S.*'
+        physicalReturnVerified:
+          type: boolean
+          description: Must be true when cancelling an IN_TRANSIT transfer after physical return
     TransferResponse:
       type: object
       required: [transferId, fromLocationId, toLocationId, status, lines]
@@ -922,7 +1091,7 @@ components:
         transferId: { type: string, format: uuid }
         fromLocationId: { type: string, format: uuid }
         toLocationId: { type: string, format: uuid }
-        status: { type: string, enum: [ISSUED, IN_TRANSIT, RECEIVED] }
+        status: { type: string, enum: [ISSUED, IN_TRANSIT, RECEIVED, CANCELLED] }
         documentNo: { type: string }
         issuedBy: { type: string, format: uuid }
         issuedAt: { type: string, format: date-time }
@@ -930,17 +1099,30 @@ components:
         dispatchedAt: { type: string, format: date-time }
         receivedBy: { type: string, format: uuid }
         receivedAt: { type: string, format: date-time }
+        shortfallId:
+          type: string
+          format: uuid
+          description: The destination-owned unposted discrepancy draft, when the receipt was short
+        shortfallStatus: { type: string, enum: [DRAFT] }
+        shortfallCategory: { type: string, enum: [DAMAGED_IN_TRANSIT] }
         lines:
           type: array
           items: { $ref: '#/components/schemas/TransferLineResponse' }
     TransferLineResponse:
       type: object
-      required: [lineNo, batchId, skuId, qty]
+      required: [transferLineId, lineNo, batchId, skuId, qty]
       properties:
+        transferLineId: { type: string, format: uuid }
         lineNo: { type: integer }
         batchId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         qty: { type: number }
+        receivedQty:
+          type: number
+          description: The accepted receipt quantity; absent before receipt
+        shortfallQty:
+          type: number
+          description: The positive missing quantity recorded on the shortfall draft, when any
     MovementResponse:
       type: object
       required: [movementId, locationId, skuId, batchId, condition, movementType, qtyDelta, documentId, movementSeq]
@@ -975,14 +1157,70 @@ components:
           items: { $ref: '#/components/schemas/PickResponse' }
     PickResponse:
       type: object
-      required: [deliveryLineId, skuId, qty]
+      required: [pickLineId, deliveryLineId, skuId, qty]
       properties:
+        pickLineId: { type: string, format: uuid }
         deliveryLineId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         locationId: { type: string, format: uuid, description: 'absent on the short part of a line' }
         stockLotId: { type: string, format: uuid }
         batchId: { type: string, format: uuid }
         qty: { type: number }
+    OverridePickRequest:
+      type: object
+      required: [replacementStockLotId, reason]
+      properties:
+        replacementStockLotId: { type: string, format: uuid }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PickReplacementCandidateResponse:
+      type: object
+      required: [stockLotId, batchId, availableQty]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        availableQty: { type: number }
+    BulkImportStockRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+        sheet: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowRequest' }
+    StockRowRequest:
+      type: object
+      properties:
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string, maxLength: 40 }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        qty: { type: number, exclusiveMinimum: 0 }
+        unitCost: { type: number, minimum: 0 }
+    BulkStockReport:
+      type: object
+      required: [importId, openingBalanceId, status, totalRows, importedLines]
+      properties:
+        importId: { type: string, format: uuid }
+        openingBalanceId: { type: string, format: uuid }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY] }
+        totalRows: { type: integer }
+        importedLines: { type: integer }
+        problems:
+          type: array
+          items: { $ref: '#/components/schemas/StockProblem' }
+    StockProblem:
+      type: object
+      required: [line, message]
+      properties:
+        line: { type: integer }
+        sku: { type: string }
+        message: { type: string }
     PrepareOpeningBalanceRequest:
       type: object
       required: [locationId, lines]
@@ -997,7 +1235,8 @@ components:
       type: object
       description: >
         A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and
-        printedMrp as the item requires), which the prepare registers in M2 (M5-12).
+        printedMrp as the item requires). The counted attributes remain on the signed line and
+        the Federation countersign registers the batch in M2 in the posting transaction.
       required: [qty, unitCost]
       properties:
         batchId: { type: string, format: uuid }
@@ -1024,11 +1263,14 @@ components:
           items: { $ref: '#/components/schemas/OpeningBalanceLineResponse' }
     OpeningBalanceLineResponse:
       type: object
-      required: [lineNo, batchId, skuId, condition, qty, unitCost]
+      required: [lineNo, skuId, condition, qty, unitCost]
       properties:
         lineNo: { type: integer }
         batchId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number }
         condition: { type: string, enum: [GOOD, DAMAGED] }
         qty: { type: number }
         unitCost: { type: number }

@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>Only dispatched, in-transit transfers addressed to the requesting location ({@code
  *       to_location_id}).
- *   <li>Transfers already received (a receipt row exists) are excluded, producing tombstones.
+ *   <li>Transfers already received or cancelled are excluded, producing tombstones.
  *   <li>Includes line items (line ID, line number, batch ID, SKU ID, quantity).
  *   <li>Unit costs are strictly excluded (data minimization / security rule).
  * </ul>
@@ -72,6 +72,10 @@ public class ExpectedTransferContributor implements SnapshotContributor {
                    and not exists (
                        select 1 from inventory.transfer_receipt r
                         where r.transfer_id = t.transfer_id
+                   )
+                   and not exists (
+                       select 1 from inventory.transfer_cancellation c
+                        where c.transfer_id = t.transfer_id
                    )
                 """
                         + (rowIds == null ? "" : " and t.transfer_id = any(?)")

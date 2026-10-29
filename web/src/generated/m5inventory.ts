@@ -101,6 +101,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace one FEFO-suggested lot before dispatch
+         * @description The original pick line remains immutable. Codes this operation can answer with 422: m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid, m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found, m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original, m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch, m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+         */
+        post: operations["overridePick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Eligible replacement lots for one FEFO-suggested pick
+         * @description Returns only in-date GOOD lots of the same SKU and source location with enough currently unreserved stock for the whole pick line, excluding its original lot. The OverridePick command locks and revalidates the selected lot because availability may change after this read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+         */
+        get: operations["listPickReplacementCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/opening-balances": {
         parameters: {
             query?: never;
@@ -115,6 +155,26 @@ export interface paths {
          * @description Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required, m5.opening.line_invalid, m5.batch.not_found.
          */
         post: operations["prepareOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import opening stock in bulk from a sheet or rows
+         * @description Parses opening stock data and registers it as an opening balance in status DRAFT, awaiting signatures before becoming active. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding, m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required, m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+         */
+        post: operations["bulkImportOpeningStock"];
         delete?: never;
         options?: never;
         head?: never;
@@ -169,7 +229,7 @@ export interface paths {
         put?: never;
         /**
          * The Federation's officer countersigns; the OPB is issued and the stock posted
-         * @description Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.opening.user_required, m5.opening.federation_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown, m2.sku.not_found, m2.batch.sku_not_active, m2.batch.batch_no_too_long, m2.batch.mrp_required, m2.batch.mrp_invalid, m2.batch.expiry_required, m2.batch.dates_invalid; mfa.required when the second factor is not fresh.
          */
         post: operations["countersignOpeningBalance"];
         delete?: never;
@@ -187,7 +247,7 @@ export interface paths {
         };
         /**
          * The transfers leaving or arriving at a location, newest first
-         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until the destination receives, then RECEIVED.
+         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until the destination receives, then RECEIVED, or CANCELLED when cancelled before receipt.
          */
         get: operations["listTransfers"];
         put?: never;
@@ -249,10 +309,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * The destination receives the transfer in full
-         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received.
+         * The destination receives the transfer
+         * @description An absent body preserves the original full-receipt operation. When a body is supplied it must name every immutable transfer line exactly once. A positive quantity below the issued quantity receives only that amount and creates an unposted DAMAGED_IN_TRANSIT shortfall draft. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received, m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid, m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown, m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid, m5.transfer.receipt_qty_exceeds_sent.
          */
         post: operations["receiveTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/transfers/{transferId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an unreceived transfer and restore its stock at the source
+         * @description An ISSUED transfer can be cancelled directly. An IN_TRANSIT transfer can be cancelled only after the source user verifies that the goods physically returned to the original source. Cancellation posts one compensating TRANSFER_IN at that source per issued line. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_source, m5.transfer.already_received, m5.transfer.already_cancelled, m5.transfer.physical_return_required, m5.transfer.cancellation_reason_invalid.
+         */
+        post: operations["cancelTransfer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -667,6 +747,19 @@ export interface components {
             batchId: string;
             qty: number;
         };
+        ReceiveTransferRequest: {
+            lines: components["schemas"]["ReceiveTransferLineRequest"][];
+        };
+        ReceiveTransferLineRequest: {
+            /** Format: uuid */
+            transferLineId: string;
+            receivedQty: number;
+        };
+        CancelTransferRequest: {
+            reason: string;
+            /** @description Must be true when cancelling an IN_TRANSIT transfer after physical return */
+            physicalReturnVerified?: boolean;
+        };
         TransferResponse: {
             /** Format: uuid */
             transferId: string;
@@ -675,7 +768,7 @@ export interface components {
             /** Format: uuid */
             toLocationId: string;
             /** @enum {string} */
-            status: "ISSUED" | "IN_TRANSIT" | "RECEIVED";
+            status: "ISSUED" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
             documentNo?: string;
             /** Format: uuid */
             issuedBy?: string;
@@ -689,15 +782,30 @@ export interface components {
             receivedBy?: string;
             /** Format: date-time */
             receivedAt?: string;
+            /**
+             * Format: uuid
+             * @description The destination-owned unposted discrepancy draft, when the receipt was short
+             */
+            shortfallId?: string;
+            /** @enum {string} */
+            shortfallStatus?: "DRAFT";
+            /** @enum {string} */
+            shortfallCategory?: "DAMAGED_IN_TRANSIT";
             lines: components["schemas"]["TransferLineResponse"][];
         };
         TransferLineResponse: {
+            /** Format: uuid */
+            transferLineId: string;
             lineNo: number;
             /** Format: uuid */
             batchId: string;
             /** Format: uuid */
             skuId: string;
             qty: number;
+            /** @description The accepted receipt quantity; absent before receipt */
+            receivedQty?: number;
+            /** @description The positive missing quantity recorded on the shortfall draft, when any */
+            shortfallQty?: number;
         };
         MovementResponse: {
             /** Format: uuid */
@@ -737,6 +845,8 @@ export interface components {
         };
         PickResponse: {
             /** Format: uuid */
+            pickLineId: string;
+            /** Format: uuid */
             deliveryLineId: string;
             /** Format: uuid */
             skuId: string;
@@ -751,12 +861,67 @@ export interface components {
             batchId?: string;
             qty: number;
         };
+        OverridePickRequest: {
+            /** Format: uuid */
+            replacementStockLotId: string;
+            reason: string;
+        };
+        PickReplacementCandidateResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            availableQty: number;
+        };
+        BulkImportStockRequest: {
+            /** Format: uuid */
+            locationId: string;
+            sheet?: string;
+            lines?: components["schemas"]["StockRowRequest"][];
+        };
+        StockRowRequest: {
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** Format: uuid */
+            batchId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            qty?: number;
+            unitCost?: number;
+        };
+        BulkStockReport: {
+            /** Format: uuid */
+            importId: string;
+            /** Format: uuid */
+            openingBalanceId: string;
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED" | "EMPTY";
+            totalRows: number;
+            importedLines: number;
+            problems?: components["schemas"]["StockProblem"][];
+        };
+        StockProblem: {
+            line: number;
+            sku?: string;
+            message: string;
+        };
         PrepareOpeningBalanceRequest: {
             /** Format: uuid */
             locationId: string;
             lines: components["schemas"]["OpeningBalanceLineRequest"][];
         };
-        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires), which the prepare registers in M2 (M5-12). */
+        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires). The counted attributes remain on the signed line and the Federation countersign registers the batch in M2 in the posting transaction. */
         OpeningBalanceLineRequest: {
             /** Format: uuid */
             batchId?: string;
@@ -794,9 +959,13 @@ export interface components {
         OpeningBalanceLineResponse: {
             lineNo: number;
             /** Format: uuid */
-            batchId: string;
+            batchId?: string;
             /** Format: uuid */
             skuId: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
             /** @enum {string} */
             condition: "GOOD" | "DAMAGED";
             qty: number;
@@ -1276,6 +1445,59 @@ export interface operations {
             };
         };
     };
+    overridePick: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: string;
+                pickLineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverridePickRequest"];
+            };
+        };
+        responses: {
+            /** @description The replacement lot is now the effective reservation */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPickReplacementCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: string;
+                pickLineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Currently eligible replacement lots in FEFO order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickReplacementCandidateResponse"][];
+                };
+            };
+        };
+    };
     prepareOpeningBalance: {
         parameters: {
             query?: never;
@@ -1299,6 +1521,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkImportOpeningStock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportStockRequest"];
+            };
+        };
+        responses: {
+            /** @description Opening stock imported and converted into opening balance awaiting signatures */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkStockReport"];
                 };
             };
             400: components["responses"]["RequestProblem"];
@@ -1505,7 +1756,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReceiveTransferRequest"];
+            };
+        };
         responses: {
             /** @description Received */
             200: {
@@ -1516,6 +1771,38 @@ export interface operations {
                     "application/json": components["schemas"]["TransferResponse"];
                 };
             };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    cancelTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };

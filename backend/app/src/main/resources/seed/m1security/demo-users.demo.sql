@@ -38,9 +38,10 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- the shop staff of Pannala and Point Pedro (29 Sep 2026): each counts and signs its shop's
-    -- opening stock, which the society manager countersigns (DemoShopStock)
-    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BACK_OFFICE', 'ACTIVE', NULL),
-    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BACK_OFFICE', 'ACTIVE', NULL)
+    -- opening stock, which the society manager countersigns (DemoShopStock). They are BOTH users
+    -- with the demo Cashier PIN (1234), so each shop has a real active operator before activation.
+    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BOTH', 'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o'),
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BOTH', 'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o')
 ON CONFLICT (user_id) DO UPDATE SET user_kind = EXCLUDED.user_kind, pin_hash = EXCLUDED.pin_hash;
 
 INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
@@ -96,7 +97,7 @@ WITH job (role_id, codes) AS (
         -- of the terms with bil.creditlimit.change), and the second signature on the opening balance
         ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.creditnote.issue', 'bil.debitnote.issue',
-            'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
+            'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'prt.relationship.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
@@ -130,13 +131,13 @@ WITH job (role_id, codes) AS (
         -- distributor accounts
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
-            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate', 'prt.relationship.view',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
-            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate', 'prt.relationship.view',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
@@ -157,8 +158,8 @@ WITH job (role_id, codes) AS (
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
-            'pos.receipt.view', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
+            'pos.receipt.view', 'pos.receipt.margin', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
             'cat.sku.create_local']),
         -- the society managers of M102 and M103 also order from their distributor and receive
         -- at the shop (DEMO-02: the second tier of the demo history)
@@ -168,14 +169,14 @@ WITH job (role_id, codes) AS (
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view', 'pos.receipt.margin']),
         ('0190f0de-0000-7000-8000-000000000352'::uuid, ARRAY[
             'ord.order.draft', 'ord.order.submit', 'shop.grn.confirm', 'prc.pricelist.view', 'prt.relationship.view',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view', 'pos.receipt.margin']),
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
@@ -236,7 +237,10 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL),
     ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-000000000343', '0190f0de-0000-7000-8000-0000000000e4', '0190f0de-0000-7000-8000-000000000142'),
-    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-000000000353', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152')
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-000000000353', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152'),
+    -- Pannala and Point Pedro staff also operate their tills; keep their back-office shop role above.
+    ('0190f0de-0000-7000-8000-000000000243', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f0de-0000-7000-8000-0000000000e4', '0190f0de-0000-7000-8000-000000000142'),
+    ('0190f0de-0000-7000-8000-000000000253', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152')
 ON CONFLICT DO NOTHING;
 
 -- M7, the credit book's remainders and the privacy requests (29 September 2026, branch

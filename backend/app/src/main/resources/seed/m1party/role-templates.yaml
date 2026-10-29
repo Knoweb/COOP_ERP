@@ -5,6 +5,8 @@ templates:
     permissions:
       - "rpt.report.run"
       - "rpt.target.view"
+      - "rpt.profit_center.view"
+      - "rpt.asset.view"
       - "gov.entity.view"
       - "prt.relationship.view"
       - "prt.location.view"
@@ -13,6 +15,7 @@ templates:
       - "inv.stock.view"
       - "prc.pricelist.view"
       - "prc.review.view"
+      - "pos.receipt.margin"
   - role_id: "01921319-948f-78cc-b6fb-c603b1ab0474"
     name_en: "Regulator"
     role_class: "EXTERNAL_TIMEBOXED"
@@ -29,6 +32,10 @@ templates:
       - "rpt.export.run"
       - "rpt.target.view"
       - "rpt.target.manage"
+      - "rpt.profit_center.view"
+      - "rpt.profit_center.manage"
+      - "rpt.asset.view"
+      - "rpt.asset.manage"
       - "gov.entity.view"
       - "gov.user.manage"
       - "gov.user.view"
@@ -77,6 +84,7 @@ templates:
       - "shop.grn.confirm"
       - "shop.count.record"
       - "inv.writeoff.request"
+      - "pos.receipt.margin"
   # The Federation's catalogue team (22A section 3.1): the shared path (cat.sku.create with the
   # guard FederationCaller of M2), promotion, its own drafts and deactivations, and the governed tags
   # (cat.tag.govern, CR-22A-3). Assigned at the Federation entity; cat.sku.create,

@@ -53,3 +53,15 @@ dl.pos-totals > div {
 .pos-more {
   margin-top: var(--space-2);
 }
+
+.pos-profit-card {
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-subtle);
+}
+
+.pos-profit-pending {
+  color: var(--color-text-muted);
+  font-style: italic;
+}

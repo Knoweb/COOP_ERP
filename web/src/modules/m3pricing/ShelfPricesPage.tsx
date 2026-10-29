@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
+import type { PriceList } from "./pricingApi";
 import { chipOf, errorText } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
@@ -17,6 +18,7 @@ import "./pricing.css";
  * The society's shelf price list (23A section 8, "Shelf price list"; doc 23 section 3.1: one RETAIL
  * list per society for all its shops, no per-shop deviation): its versions, and the form that
  * starts it when the society has none. The Federation sees its ADVISORY lists here, and starts one.
+ * An entity may also author a COMMERCIAL price list (M1-03) without altering stock valuation.
  */
 export function ShelfPricesPage() {
   const t = useT();
@@ -27,13 +29,28 @@ export function ShelfPricesPage() {
   const idempotencyKey = useIdempotencyKey();
   const canAuthor = useHasPermission("prc.pricelist.author");
   const [name, setName] = useState("");
-  const [kind, setKind] = useState<"RETAIL" | "ADVISORY">("RETAIL");
+  const [kind, setKind] = useState<PriceList["kind"]>("RETAIL");
 
   const retail = useQuery({ queryKey: ["pricing", "priceLists", "RETAIL"], queryFn: () => api.listPriceLists("RETAIL") });
+  const commercial = useQuery({
+    queryKey: ["pricing", "priceLists", "COMMERCIAL"],
+    queryFn: () => api.listPriceLists("COMMERCIAL")
+  });
   const advisory = useQuery({
     queryKey: ["pricing", "priceLists", "ADVISORY"],
     queryFn: () => api.listPriceLists("ADVISORY")
   });
+
+  const lists = [...(retail.data ?? []), ...(commercial.data ?? []), ...(advisory.data ?? [])];
+  const hasRetail = (retail.data ?? []).length > 0;
+  const hasCommercial = (commercial.data ?? []).length > 0;
+  const canCreate = canAuthor && (!hasRetail || !hasCommercial);
+
+  useEffect(() => {
+    if (hasRetail && kind === "RETAIL" && !hasCommercial) {
+      setKind("COMMERCIAL");
+    }
+  }, [hasRetail, hasCommercial, kind]);
 
   const create = useMutation({
     mutationFn: () => api.createPriceList(name.trim(), idempotencyKey.current(), kind),
@@ -54,21 +71,19 @@ export function ShelfPricesPage() {
     create.mutate();
   };
 
-  const lists = [...(retail.data ?? []), ...(advisory.data ?? [])];
-  const hasRetail = (retail.data ?? []).length > 0;
-
   return (
     <main className="shell-page">
       <h1>{t("pricing.shelf.title").text}</h1>
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.shelf.intro").text}</p>
 
-      {canAuthor && !hasRetail && (
+      {canCreate && (
         <form onSubmit={submit} className="pricing-filter-bar">
           <label className="modern-field">
             <span className="modern-field__label pricing-filter-label">{t("pricing.shelf.field.kind").text}</span>
-            <select value={kind} onChange={(event) => setKind(event.target.value as "RETAIL" | "ADVISORY")}>
-              <option value="RETAIL">{t("pricing.kind.retail").text}</option>
+            <select value={kind} onChange={(event) => setKind(event.target.value as PriceList["kind"])}>
+              {!hasRetail && <option value="RETAIL">{t("pricing.kind.retail").text}</option>}
+              {!hasCommercial && <option value="COMMERCIAL">{t("pricing.kind.commercial").text}</option>}
               <option value="ADVISORY">{t("pricing.kind.advisory").text}</option>
             </select>
           </label>
@@ -84,9 +99,12 @@ export function ShelfPricesPage() {
       )}
 
       <section>
-        {(retail.isLoading || advisory.isLoading) && <p>{t("pricing.list.loading").text}</p>}
+        {(retail.isLoading || commercial.isLoading || advisory.isLoading) && <p>{t("pricing.list.loading").text}</p>}
         {retail.isError && <p role="alert">{errorText(retail.error, t("pricing.error.generic").text)}</p>}
-        {!retail.isLoading && lists.length === 0 && <div className="modern-empty-state">{t("pricing.shelf.empty").text}</div>}
+        {commercial.isError && <p role="alert">{errorText(commercial.error, t("pricing.error.generic").text)}</p>}
+        {!retail.isLoading && !commercial.isLoading && lists.length === 0 && (
+          <div className="modern-empty-state">{t("pricing.shelf.empty").text}</div>
+        )}
         {lists.length > 0 && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">

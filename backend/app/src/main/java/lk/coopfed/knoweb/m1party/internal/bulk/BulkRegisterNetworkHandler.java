@@ -188,7 +188,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                 .toList();
 
         if (!usersWithPin.isEmpty()) {
-            int concurrency = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), 4));
+            int concurrency = Math.max(4, Math.min(Runtime.getRuntime().availableProcessors() * 2, 8));
             ThreadFactory threadFactory = r -> {
                 Thread t = new Thread(r, "bulk-pin-hasher");
                 t.setDaemon(true);

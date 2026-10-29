@@ -29,28 +29,37 @@ export function SkuPicker({ onPick }: { onPick: (sku: Sku) => void }) {
   };
 
   return (
-    <form onSubmit={search} className="pricing-search-form">
-      <label className="pricing-form-field">
-        {t("pricing.field.find_item").text}
-        <input type="search" value={q} onChange={(event) => setQ(event.target.value)} />
-      </label>
-      <div>
-        <button type="submit" disabled={!q.trim()}>
-          {t("pricing.find").text}
-        </button>
-      </div>
-      {found?.length === 0 && <p>{t("pricing.find.none").text}</p>}
-      {found && found.length > 0 && (
-        <ul className="pricing-list">
-          {found.map((sku) => (
-            <li key={sku.skuId}>
-              <button type="button" onClick={() => onPick(sku)}>
-                {t("pricing.add_item", undefined, { code: sku.skuCode, name: inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa) }).text}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </form>
+    <div className="pricing-card pricing-sku-picker-card">
+      <form onSubmit={search} className="pricing-search-form">
+        <label className="modern-field" htmlFor="pricing-sku-search-input">
+          <span className="modern-field__label pricing-filter-label">{t("pricing.field.find_item").text}</span>
+        </label>
+        <div className="pricing-search-input-group">
+          <input
+            id="pricing-sku-search-input"
+            type="search"
+            aria-label={t("pricing.field.find_item").text}
+            className="pricing-input pricing-search-input"
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+          />
+          <button type="submit" className="modern-btn" disabled={!q.trim()}>
+            {t("pricing.find").text}
+          </button>
+        </div>
+        {found?.length === 0 && <p className="pricing-muted">{t("pricing.find.none").text}</p>}
+        {found && found.length > 0 && (
+          <ul className="pricing-sku-results">
+            {found.map((sku) => (
+              <li key={sku.skuId} className="pricing-sku-result-item">
+                <button type="button" className="pricing-sku-add-btn" onClick={() => onPick(sku)}>
+                  {t("pricing.add_item", undefined, { code: sku.skuCode, name: inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa) }).text}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </form>
+    </div>
   );
 }

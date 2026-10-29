@@ -14,8 +14,12 @@ export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
+export type PickList = components["schemas"]["PickListResponse"];
+export type PickReplacementCandidate = components["schemas"]["PickReplacementCandidateResponse"];
+export type OverridePickRequest = components["schemas"]["OverridePickRequest"];
 export type Transfer =components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
+export type ReceiveTransferRequest = components["schemas"]["ReceiveTransferRequest"];
 export type Count = components["schemas"]["CountResponse"];
 export type ScheduleCountRequest = components["schemas"]["ScheduleCountRequest"];
 export type CountLineRequest = components["schemas"]["CountLineRequest"];
@@ -28,6 +32,7 @@ export type Repack = components["schemas"]["RepackResponse"];
 export type ExecuteRepackRequest = components["schemas"]["ExecuteRepackRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
+export type Batch = catalogueComponents["schemas"]["BatchResponse"];
 export type TransferRequest = tradingComponents["schemas"]["TransferRequestResponse"];
 export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
 
@@ -71,6 +76,13 @@ export function useInventoryApi() {
         return data ?? null;
       },
 
+      async batch(batchId: string): Promise<Batch | null> {
+        const { data } = await catalogue.GET("/v1/catalogue/batches/{batchId}", {
+          params: { path: { batchId } }
+        });
+        return data ?? null;
+      },
+
       async openingBalance(id: string): Promise<OpeningBalance> {
         const { data } = await api.GET("/v1/inventory/opening-balances/{openingBalanceId}", {
           params: { path: { openingBalanceId: id } }
@@ -101,6 +113,39 @@ export function useInventoryApi() {
         return data ?? [];
       },
 
+      async pickList(deliveryNoteId: string): Promise<PickList> {
+        const { data } = await api.GET("/v1/inventory/pick-lists/{deliveryNoteId}", {
+          params: { path: { deliveryNoteId } }
+        });
+        return data!;
+      },
+
+      async pickReplacementCandidates(
+        deliveryNoteId: string,
+        pickLineId: string
+      ): Promise<PickReplacementCandidate[]> {
+        const { data } = await api.GET(
+          "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates",
+          { params: { path: { deliveryNoteId, pickLineId } } }
+        );
+        return data ?? [];
+      },
+
+      async overridePick(
+        deliveryNoteId: string,
+        pickLineId: string,
+        request: OverridePickRequest,
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.POST("/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override", {
+          params: {
+            path: { deliveryNoteId, pickLineId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: request
+        });
+      },
+
       async transfers(locationId: string): Promise<Transfer[]> {
         const { data } = await api.GET("/v1/inventory/transfers", { params: { query: { locationId } } });
         return data ?? [];
@@ -114,9 +159,14 @@ export function useInventoryApi() {
         return data!;
       },
 
-      async receiveTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
+      async receiveTransfer(
+        transferId: string,
+        idempotencyKey: string,
+        request?: ReceiveTransferRequest
+      ): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
-          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
         });
         return data!;
       },

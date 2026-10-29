@@ -46,6 +46,7 @@
   "m3.rule.priority_invalid": "The priority is a whole number from 0 to 32767",
   "m3.price_list.retail_mpcs_only": "Only a cooperative society keeps a shelf price list",
   "m3.price_list.retail_exists": "The society already has a shelf price list; draft a new version of it instead",
+  "m3.price_list.commercial_exists": "The entity already has a commercial price list; draft a new version of it instead",
   "m3.price_list.advisory_federation_only": "Only the Federation publishes advisory prices",
   "m3.price_list.line.above_control_price": "The price is above the gazetted control price; lower it to publish",
   "m3.price_list.line.above_shelf_mrp": "The price is above the lowest printed MRP of the stock at the society’s locations; lower it to publish",

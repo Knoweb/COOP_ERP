@@ -34,7 +34,7 @@
     "pricing.status.withdrawn": "Withdrawn",
     "pricing.version": "Version {version}",
     "pricing.applies_from": "applies from {date}",
-    "pricing.back": "Back to the price lists",
+    "pricing.back": "Back to Price Lists",
     "pricing.lines.empty": "No lines yet.",
     "pricing.field.find_item": "Find an item by code or name",
     "pricing.find": "Find",
@@ -69,6 +69,7 @@
     "pricing.tab.mrp_policy": "MRP policy",
     "pricing.kind.trade": "Trade",
     "pricing.kind.retail": "Shelf prices",
+    "pricing.kind.commercial": "Commercial prices",
     "pricing.kind.advisory": "Advisory prices",
     "pricing.column.kind": "Kind",
     "pricing.shelf.title": "Shelf prices",
@@ -241,7 +242,15 @@
     "pricing.markdown.column.applicable_rule": "Applicable markdown rule",
     "pricing.markdown.expired": "Expired",
     "pricing.markdown.no_rule": "No rule active",
-    "pricing.markdown.author_rule": "Author rule"
+    "pricing.markdown.author_rule": "Author rule",
+    "pricing.markdown.search_placeholder": "Search Markdown Queue...",
+    "pricing.markdown.search_label": "Search queue",
+    "pricing.markdown.no_match": "No matching markdown queue items found.",
+    "pricing.tradelist.search_placeholder": "Search SKU Code...",
+    "pricing.tradelist.no_match": "No matching records found",
+    "pricing.gazette.search_placeholder": "Search Gazette...",
+    "pricing.gazette.no_match": "No matching records found",
+    "pricing.search.clear": "Clear search"
   },
   "si": {
     "pricing.labels.title": "රාක්ක ලේබල් මුද්‍රණය",
@@ -313,6 +322,7 @@
     "pricing.tab.mrp_policy": "MRP ප්‍රතිපත්තිය",
     "pricing.kind.trade": "වෙළඳ",
     "pricing.kind.retail": "රාක්ක මිල",
+    "pricing.kind.commercial": "වාණිජ මිල",
     "pricing.kind.advisory": "උපදේශක මිල",
     "pricing.column.kind": "වර්ගය",
     "pricing.shelf.title": "රාක්ක මිල",
@@ -485,7 +495,15 @@
     "pricing.markdown.column.applicable_rule": "අදාළ මිල අඩු කිරීමේ නීතිය",
     "pricing.markdown.expired": "කල් ඉකුත් වී ඇත",
     "pricing.markdown.no_rule": "සක්‍රිය නීතියක් නැත",
-    "pricing.markdown.author_rule": "නීතියක් සකසන්න"
+    "pricing.markdown.author_rule": "නීතියක් සකසන්න",
+    "pricing.markdown.search_placeholder": "මිල අඩු කිරීමේ පෝලිම සොයන්න...",
+    "pricing.markdown.search_label": "පෝලිම සොයන්න",
+    "pricing.markdown.no_match": "ගැළපෙන අයිතම හමු නොවීය.",
+    "pricing.tradelist.search_placeholder": "SKU කේතය සොයන්න...",
+    "pricing.tradelist.no_match": "ගැළපෙන වාර්තා හමු නොවීය",
+    "pricing.gazette.search_placeholder": "ගැසට් සොයන්න...",
+    "pricing.gazette.no_match": "ගැළපෙන වාර්තා හමු නොවීය",
+    "pricing.search.clear": "සෙවීම හිස් කරන්න"
   },
   "ta": {
     "pricing.labels.title": "அலமாரி லேபிள் அச்சிடுதல்",
@@ -557,6 +575,7 @@
     "pricing.tab.mrp_policy": "MRP கொள்கை",
     "pricing.kind.trade": "வர்த்தகம்",
     "pricing.kind.retail": "அலமாரி விலைகள்",
+    "pricing.kind.commercial": "வணிக விலைகள்",
     "pricing.kind.advisory": "ஆலோசனை விலைகள்",
     "pricing.column.kind": "வகை",
     "pricing.shelf.title": "அலமாரி விலைகள்",
@@ -729,6 +748,14 @@
     "pricing.markdown.column.applicable_rule": "பொருந்தும் விலைக் குறைப்பு விதி",
     "pricing.markdown.expired": "காலாவதியானது",
     "pricing.markdown.no_rule": "விதி எதுவும் செயலில் இல்லை",
-    "pricing.markdown.author_rule": "விதியை உருவாக்கு"
+    "pricing.markdown.author_rule": "விதியை உருவாக்கு",
+    "pricing.markdown.search_placeholder": "விலைக் குறைப்பு வரிசையைத் தேடுங்கள்...",
+    "pricing.markdown.search_label": "வரிசையைத் தேடுங்கள்",
+    "pricing.markdown.no_match": "பொருந்தும் பொருட்கள் எதுவும் கிடைக்கவில்லை.",
+    "pricing.tradelist.search_placeholder": "SKU குறியீட்டைத் தேடுங்கள்...",
+    "pricing.tradelist.no_match": "பொருந்தும் பதிவுகள் எதுவும் கிடைக்கவில்லை",
+    "pricing.gazette.search_placeholder": "வர்த்தமானியைத் தேடுங்கள்...",
+    "pricing.gazette.no_match": "பொருந்தும் பதிவுகள் எதுவும் கிடைக்கவில்லை",
+    "pricing.search.clear": "தேடலை அழிக்கவும்"
   }
 }

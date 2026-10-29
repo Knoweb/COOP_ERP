@@ -19,11 +19,14 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.NumberingService;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.SeriesRegistration;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.query.EntityView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m2catalogue.api.BatchRegistration;
+import lk.coopfed.knoweb.m2catalogue.api.RegisterBatch;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.Movement;
@@ -39,8 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
  * CountersignOpeningBalance (doc 25 section 4.7, SIGNED_ENTITY to POSTED: "Federation onboarding
  * officer; MFA; issuance (ENTITY series); OPENING_BALANCE movements"; flow 6.9).
  *
- * <p>Guards, in order: an OWN user ({@code m5.opening.user_required}); the balance visible to the
- * scope ({@code m5.opening.not_found}); signed by the entity ({@code m5.opening.not_signed}); a
+ * <p>Guards, in order: a Federation officer in the Federation's entity-wide OWN scope
+ * ({@code m5.opening.federation_required}); the balance visible to that administration scope
+ * ({@code m5.opening.not_found}); signed by the entity ({@code m5.opening.not_signed}); a
  * countersigner who is not the signer ({@code m5.opening.countersigner_is_signer}: two people, two
  * signatures); still no stock moved at the location ({@code m5.opening.location_has_stock}).
  *
@@ -51,11 +55,10 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code opening_balance.posted.v1} (and the kernel's {@code document.issued.v1}, the ledger's
  * {@code stock.moved.v1}).
  *
- * <p>Demo scope (README): the countersignature is given in the entity's own scope, by a user who
- * holds {@code inv.opening.countersign} there (the Federation's officer at the entity, or the
- * Federation for its own warehouses). A Federation officer countersigning from the Federation's
- * scope needs a Federation-administers policy on the balance and the posting in the owner's scope;
- * deferred.
+ * <p>The command remains authorized and attributed to the Federation officer. After locking and
+ * validating the MPCS row through its narrow federation-admin policy, its batch, document and
+ * stock mutations run in the balance owner's scope so every resulting row retains the MPCS as
+ * owner. The derived scope preserves the officer, MFA instant and correlation id.
  */
 @Service
 @CommandHandler(permission = "inv.opening.countersign", requiresMfa = true)
@@ -65,6 +68,7 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
 
     private final OpeningBalanceStore store;
     private final PartyQueries party;
+    private final BatchRegistration registration;
     private final NumberingService numbering;
     private final DocumentIssuance documents;
     private final StockLedger ledger;
@@ -76,6 +80,7 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
     CountersignOpeningBalanceHandler(
             OpeningBalanceStore store,
             PartyQueries party,
+            BatchRegistration registration,
             NumberingService numbering,
             DocumentIssuance documents,
             StockLedger ledger,
@@ -85,6 +90,7 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
             Clock clock) {
         this.store = store;
         this.party = party;
+        this.registration = registration;
         this.numbering = numbering;
         this.documents = documents;
         this.ledger = ledger;
@@ -97,7 +103,7 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
     @Override
     @Transactional
     public UUID handle(CountersignOpeningBalance command, ScopeContext scope) {
-        OpeningBalanceGuards.requireUser(scope);
+        OpeningBalanceGuards.requireFederation(scope, jdbc);
         OpeningBalanceStore.Header balance = store.lock(command.openingBalanceId())
                 .orElseThrow(() -> new ProblemException(
                         "m5.opening.not_found",
@@ -108,18 +114,46 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
         if (scope.userId().equals(balance.signedEntityBy())) {
             throw new ProblemException("m5.opening.countersigner_is_signer");
         }
+        ScopeContext ownerScope = ownerScope(scope, balance.ownerEntityId());
+        String entityCode = party.getEntity(balance.ownerEntityId(), ownerScope)
+                .map(EntityView::entityCode)
+                .orElseThrow(() -> new ProblemException("m5.opening.entity_unknown"));
         if (store.locationHasMovements(balance.locationId())) {
             throw new ProblemException("m5.opening.location_has_stock", Map.of("locationId", balance.locationId()));
         }
         List<OpeningBalanceStore.Line> lines = store.lines(balance.openingBalanceId());
 
+        // The entity signed these retained attributes. Registration is deliberately postponed
+        // until this posting transaction, so an abandoned draft creates no permanent batch.
+        String originNo = "OPB-" + balance.openingBalanceId().toString().substring(0, 8);
+        for (OpeningBalanceStore.Line line : lines) {
+            if (line.batchId() == null) {
+                UUID registered = registration
+                        .register(
+                                new RegisterBatch(
+                                        line.skuId(),
+                                        null,
+                                        line.batchNo(),
+                                        null,
+                                        line.expiryDate(),
+                                        line.printedMrp(),
+                                        balance.openingBalanceId(),
+                                        originNo,
+                                        line.lineNo()),
+                                ownerScope)
+                        .batchId();
+                jdbc.update(
+                        "update inventory.opening_balance_line set batch_id = ? where line_id = ? and batch_id is null",
+                        registered,
+                        line.lineId());
+            }
+        }
+        lines = store.lines(balance.openingBalanceId());
+
         // 1. the OPB document, from the entity's series
-        String entityCode = party.getEntity(balance.ownerEntityId(), scope)
-                .map(EntityView::entityCode)
-                .orElseThrow(() -> new ProblemException("m5.opening.entity_unknown"));
         numbering.registerSeries(
                 SeriesRegistration.forEntity(OpeningBalanceDocumentType.OPB, balance.ownerEntityId(), entityCode),
-                scope);
+                ownerScope);
         UUID documentId = Ids.next();
         List<DocumentLineRecord> documentLines = new ArrayList<>();
         for (OpeningBalanceStore.Line line : lines) {
@@ -144,7 +178,7 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
                     null,
                     null));
         }
-        DocumentRecord issued = documents.issue(draft(documentId, balance, scope), documentLines, scope);
+        DocumentRecord issued = documents.issue(draft(documentId, balance, ownerScope), documentLines, ownerScope);
 
         // 2. the stock
         Instant now = clock.instant();
@@ -158,7 +192,7 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
                         line.unitCost(),
                         line.lineId()))
                 .toList();
-        ledger.post(new PostMovements(issued.id(), now, null, movements), scope);
+        ledger.post(new PostMovements(issued.id(), now, null, movements), ownerScope);
 
         jdbc.update(
                 """
@@ -180,10 +214,25 @@ class CountersignOpeningBalanceHandler implements Handles<CountersignOpeningBala
                         "countersignedBy", scope.userId(),
                         "documentId", issued.id(),
                         "document", String.valueOf(issued.docNumberDisplay())),
-                scope);
+                ownerScope);
         events.publish(new OpeningBalancePosted(
                 balance.openingBalanceId(), balance.ownerEntityId(), balance.locationId(), issued.id(), lines.size()));
         return issued.id();
+    }
+
+    private static ScopeContext ownerScope(ScopeContext federationScope, UUID ownerEntityId) {
+        Scope owner = new Scope(ownerEntityId, null);
+        return new ScopeContext(
+                federationScope.userId(),
+                federationScope.deviceId(),
+                federationScope.homeEntityId(),
+                List.of(owner),
+                owner,
+                federationScope.policyClass(),
+                federationScope.grantedEntities(),
+                federationScope.mfaAt(),
+                federationScope.locale(),
+                federationScope.correlationId());
     }
 
     private static DocumentRecord draft(UUID documentId, OpeningBalanceStore.Header balance, ScopeContext scope) {

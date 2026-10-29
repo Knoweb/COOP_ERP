@@ -26,6 +26,13 @@ export type MonthlyShopReport = components["schemas"]["MonthlyShopReportResponse
 export type MonthlyShopReportSummary = components["schemas"]["MonthlyShopReportSummary"];
 export type MonthlyDailyTrendItem = components["schemas"]["MonthlyDailyTrendItem"];
 export type MonthlyShopReportItem = components["schemas"]["MonthlyShopReportItem"];
+export type ProfitCenter = components["schemas"]["ProfitCenterResponse"];
+export type CreateProfitCenterRequest = components["schemas"]["CreateProfitCenterRequest"];
+export type ProfitCenterPnlItem = components["schemas"]["ProfitCenterPnlItem"];
+export type ProfitCenterPnlSummary = components["schemas"]["ProfitCenterPnlSummary"];
+export type MonthlyProfitCenterPnlReport = components["schemas"]["MonthlyProfitCenterPnlResponse"];
+export type Asset = components["schemas"]["AssetResponse"];
+export type RegisterAssetRequest = components["schemas"]["RegisterAssetRequest"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
 export type ReportQuery = { from?: string; to?: string; locationId?: string };
@@ -155,6 +162,61 @@ export function useReportingApi() {
       }): Promise<MonthlyShopReport> {
         const { data } = await api.GET("/v1/reporting/shop-reports/monthly", {
           params: { query }
+        });
+        return data!;
+      },
+
+      async listProfitCenters(): Promise<ProfitCenter[]> {
+        const { data } = await api.GET("/v1/reporting/profit-centers");
+        return data?.items ?? [];
+      },
+
+      async createProfitCenter(
+        body: CreateProfitCenterRequest,
+        idempotencyKey: string
+      ): Promise<ProfitCenter> {
+        const { data } = await api.POST("/v1/reporting/profit-centers", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async monthlyProfitCenterPnl(query?: {
+        month?: string;
+        profitCenterId?: string;
+      }): Promise<MonthlyProfitCenterPnlReport> {
+        const { data } = await api.GET("/v1/reporting/profit-centers/monthly-pnl", {
+          params: { query }
+        });
+        return data!;
+      },
+
+      async listAssets(query?: {
+        locationId?: string;
+        assetType?: string;
+        status?: string;
+      }): Promise<Asset[]> {
+        const { data } = await api.GET("/v1/reporting/assets", {
+          params: { query }
+        });
+        return data?.items ?? [];
+      },
+
+      async getAsset(assetId: string): Promise<Asset> {
+        const { data } = await api.GET("/v1/reporting/assets/{assetId}", {
+          params: { path: { assetId } }
+        });
+        return data!;
+      },
+
+      async registerAsset(
+        body: RegisterAssetRequest,
+        idempotencyKey: string
+      ): Promise<Asset> {
+        const { data } = await api.POST("/v1/reporting/assets", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
         });
         return data!;
       }

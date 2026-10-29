@@ -13,6 +13,8 @@ export type Receipt = components["schemas"]["ReceiptResponse"];
 export type TillSession = components["schemas"]["SessionResponse"];
 export type ReceiptPage = components["schemas"]["ReceiptPage"];
 export type SessionPage = components["schemas"]["SessionPage"];
+export type ReceiptProfit = components["schemas"]["ReceiptProfitResponse"];
+export type ReceiptLineProfit = components["schemas"]["ReceiptLineProfitResponse"];
 
 /** The receipts of one shop on one business day (yyyy-mm-dd), all or the flagged ones only. */
 export type ReceiptFilter = { locationId: string; businessDate: string; flaggedOnly: boolean };
@@ -28,6 +30,17 @@ export function usePosApi() {
 
   return useMemo(
     () => ({
+      /** Authoritative profit and cost breakdown; answers null when caller lacks pos.receipt.margin or not found. */
+      async receiptProfit(documentId: string): Promise<ReceiptProfit | null> {
+        const { data, error, response } = await api.GET("/v1/pos/receipts/{documentId}/profit", {
+          params: { path: { documentId } }
+        });
+        if (response.status === 403 || response.status === 404 || error) {
+          return null;
+        }
+        return data ?? null;
+      },
+
       async locations(): Promise<Location[]> {
         const { data } = await party.GET("/v1/party/locations", { params: { query: { limit: 100 } } });
         return data?.items ?? [];
