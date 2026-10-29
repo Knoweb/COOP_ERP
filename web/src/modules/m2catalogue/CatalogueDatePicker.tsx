@@ -64,9 +64,11 @@ export function CatalogueDatePicker({
 
   // Update view when value changes from outside
   useEffect(() => {
-    if (parsedDate) {
-      setViewYear(parsedDate.year);
-      setViewMonth(parsedDate.month);
+    if (!value) return;
+    const parts = value.split("-").map(Number);
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      setViewYear(parts[0]);
+      setViewMonth(parts[1] - 1);
     }
   }, [value]);
 

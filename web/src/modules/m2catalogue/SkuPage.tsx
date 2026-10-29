@@ -500,7 +500,7 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
                     </td>
                     <td>
                       <StateChip
-                        state={row.status === "ACTIVE" ? "issued" : "suspended"}
+                        state={row.status === "ACTIVE" ? "issued" : "void"}
                         label={t(`catalogue.barcode.status.${row.status}`).text}
                       />
                     </td>
