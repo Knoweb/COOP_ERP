@@ -203,7 +203,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m5inventory", 16)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5)
-                .containsEntry("m8reporting", 9);
+                .containsEntry("m8reporting", 10);
 
         // What the new numbers leave in place, read from the catalogue.
         List<String> functions = admin.queryForList(
@@ -254,12 +254,19 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
         // PRC-10: m4trading V0014 (order adjustments).
-        assertThat(after).containsEntry("m4trading", 14);
+        // CAT-12: m4trading V0015 (inter-entity receivable opening balances).
+        assertThat(after).containsEntry("m4trading", 15);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
                         String.class))
                 .contains("kernel.document_open_for_write(document_id)");
+        assertThat(admin.queryForObject("select to_regclass('trading.opening_receivable')::text", String.class))
+                .isEqualTo("trading.opening_receivable");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'trading.opening_receivable'::regclass",
+                        Boolean.class))
+                .isTrue();
 
         // Wave 2, PR 10: m5inventory V0008 over a database at V0007.
         assertThat(admin.queryForObject(
@@ -319,7 +326,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // could only do with the table's FORCE lifted for that statement, and FORCE is back.
         // POL-M1-01: m8reporting V0008 adds reporting.shop_target with 4-class RLS.
         // POL-M1-08: m8reporting V0009 adds reporting.profit_center with 4-class RLS.
-        assertThat(after).containsEntry("m8reporting", 9);
+        // PGL-M1-04: m8reporting V0010 adds reporting.asset with 4-class RLS.
+        assertThat(after).containsEntry("m8reporting", 10);
         assertThat(admin.queryForObject("select to_regclass('reporting.shop_target')::text", String.class))
                 .isEqualTo("reporting.shop_target");
         assertThat(admin.queryForObject(
@@ -330,6 +338,12 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isEqualTo("reporting.profit_center");
         assertThat(admin.queryForObject(
                         "select relforcerowsecurity from pg_class where oid = 'reporting.profit_center'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject("select to_regclass('reporting.asset')::text", String.class))
+                .isEqualTo("reporting.asset");
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'reporting.asset'::regclass",
                         Boolean.class))
                 .isTrue();
         assertThat(admin.queryForList(

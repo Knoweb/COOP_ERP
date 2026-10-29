@@ -189,6 +189,34 @@ paths:
           description: The replacement lot is now the effective reservation
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates:
+    get:
+      tags: [Inventory]
+      operationId: listPickReplacementCandidates
+      summary: Eligible replacement lots for one FEFO-suggested pick
+      description: >
+        Returns only in-date GOOD lots of the same SKU and source location with enough currently
+        unreserved stock for the whole pick line, excluding its original lot. The OverridePick
+        command locks and revalidates the selected lot because availability may change after this
+        read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+      x-permission: whs.pick
+      parameters:
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Currently eligible replacement lots in FEFO order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PickReplacementCandidateResponse' }
   /v1/inventory/opening-balances:
     post:
       tags: [Inventory]
@@ -1144,6 +1172,15 @@ components:
       properties:
         replacementStockLotId: { type: string, format: uuid }
         reason: { type: string, minLength: 1, maxLength: 500 }
+    PickReplacementCandidateResponse:
+      type: object
+      required: [stockLotId, batchId, availableQty]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        availableQty: { type: number }
     BulkImportStockRequest:
       type: object
       required: [locationId]

@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
+import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.EntityCost;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
@@ -28,6 +29,7 @@ import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
+import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.springframework.beans.factory.annotation.Value;
@@ -82,14 +84,17 @@ class InventoryQueriesImpl implements InventoryQueries {
 
     private final JdbcTemplate jdbc;
     private final BusinessDay businessDay;
+    private final ControlPolicy policy;
     private final ZoneId zone;
 
     InventoryQueriesImpl(
             JdbcTemplate jdbc,
             BusinessDay businessDay,
+            ControlPolicy policy,
             @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
+        this.policy = policy;
         this.zone = ZoneId.of(zone);
     }
 
@@ -335,6 +340,80 @@ class InventoryQueriesImpl implements InventoryQueries {
     }
 
     private record PickHead(UUID pickListId, String status) {}
+
+    @Override
+    public List<PickReplacementCandidate> pickReplacementCandidates(
+            UUID deliveryDocumentId, UUID pickLineId, ScopeContext scope) {
+        Optional<ReplacementLine> line = jdbc
+                .query(
+                        """
+                        select p.owner_entity_id, p.location_id, p.sku_id, p.stock_lot_id, p.qty
+                          from inventory.pick_list pl
+                          join inventory.pick_list_line p on p.pick_list_id = pl.pick_list_id
+                          left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                         where pl.delivery_document_id = ? and p.pick_line_id = ?
+                           and pl.status = 'OPEN' and p.stock_lot_id is not null
+                           and o.override_id is null
+                        """,
+                        (rs, n) -> new ReplacementLine(
+                                rs.getObject("owner_entity_id", UUID.class),
+                                rs.getObject("location_id", UUID.class),
+                                rs.getObject("sku_id", UUID.class),
+                                rs.getObject("stock_lot_id", UUID.class),
+                                rs.getBigDecimal("qty")),
+                        deliveryDocumentId,
+                        pickLineId)
+                .stream()
+                .findFirst();
+        if (line.isEmpty()) {
+            return List.of();
+        }
+
+        ReplacementLine selected = line.orElseThrow();
+        LocalDate expiresFrom = businessDay.today().plusDays(policy.dispatchMinShelfLifeDays(scope));
+        return jdbc.query(
+                """
+                select candidate.stock_lot_id, candidate.batch_id, candidate.expiry_date,
+                       candidate.available_qty
+                  from (
+                        select l.stock_lot_id, l.batch_id, l.expiry_date,
+                               l.qty_on_hand - coalesce((
+                                   select sum(other.qty)
+                                     from inventory.pick_list_line other
+                                     join inventory.pick_list other_list
+                                       on other_list.pick_list_id = other.pick_list_id
+                                     left join inventory.pick_override other_override
+                                       on other_override.pick_line_id = other.pick_line_id
+                                    where other_list.status = 'OPEN'
+                                      and other.pick_line_id <> ?
+                                      and coalesce(other_override.replacement_stock_lot_id,
+                                                   other.stock_lot_id) = l.stock_lot_id), 0)
+                                   as available_qty
+                          from inventory.stock_lot l
+                         where l.owner_entity_id = ? and l.location_id = ? and l.sku_id = ?
+                           and l.stock_lot_id <> ? and l.condition = 'GOOD'
+                           and l.qty_on_hand > 0
+                           and (l.expiry_date is null or l.expiry_date >= ?)
+                       ) candidate
+                 where candidate.available_qty >= ?
+                 order by candidate.expiry_date nulls last, candidate.stock_lot_id
+                """,
+                (rs, n) -> new PickReplacementCandidate(
+                        rs.getObject("stock_lot_id", UUID.class),
+                        rs.getObject("batch_id", UUID.class),
+                        rs.getObject("expiry_date", LocalDate.class),
+                        rs.getBigDecimal("available_qty")),
+                pickLineId,
+                selected.ownerEntityId(),
+                selected.locationId(),
+                selected.skuId(),
+                selected.originalStockLotId(),
+                Date.valueOf(expiresFrom),
+                selected.qty());
+    }
+
+    private record ReplacementLine(
+            UUID ownerEntityId, UUID locationId, UUID skuId, UUID originalStockLotId, BigDecimal qty) {}
 
     @Override
     public Optional<OpeningBalanceView> openingBalance(UUID openingBalanceId, ScopeContext scope) {

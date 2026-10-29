@@ -174,5 +174,12 @@
   "m4.adjustment.exceeds_max_amount": "The adjustment amount exceeds the allowed maximum",
   "m4.adjustment.exceeds_max_percent": "The adjustment discount exceeds the allowed maximum percentage",
   "m4.adjustment.already_recorded": "An adjustment of this type has already been recorded for this order",
-  "m4.adjustment.permission_denied": "You do not hold permission to record this adjustment type"
+  "m4.adjustment.permission_denied": "You do not hold permission to record this adjustment type",
+  "m4.receivable.lines_required": "At least one receivable opening balance line is required",
+  "m4.receivable.buyer_not_found": "The buyer entity could not be found",
+  "m4.receivable.amount_invalid": "The receivable amount must be greater than zero with at most two decimal places",
+  "m4.receivable.same_entity": "The seller and buyer cannot be the same entity",
+  "m4.receivable.no_relationship": "No active trading relationship exists between the seller and buyer",
+  "m4.receivable.buyer_signature_required": "Both seller and buyer signatures are required for opening balances",
+  "m4.receivable.not_found": "The opening receivable was not found"
 }

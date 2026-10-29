@@ -103,5 +103,15 @@
   "m8.profit_center.location_scope_mismatch": "The location does not belong to your organisation or scope",
   "m8.profit_center.duplicate_code": "A profit center with this code already exists in your organisation",
   "m8.profit_center.not_found": "The requested profit center was not found in your scope",
-  "m8.profit_center.month_invalid": "The month format is invalid, expected YYYY-MM"
+  "m8.profit_center.month_invalid": "The month format is invalid, expected YYYY-MM",
+  "m8.asset.own_required": "Fixed assets can only be managed by users acting for their own organisation",
+  "m8.asset.code_required": "Asset code is required",
+  "m8.asset.code_too_long": "Asset code must be at most 32 characters",
+  "m8.asset.name_required": "Asset name is required",
+  "m8.asset.type_invalid": "Asset type must be LAND, BUILDING, VEHICLE, EQUIPMENT, FURNITURE or OTHER",
+  "m8.asset.status_invalid": "Asset status must be ACTIVE, DISPOSED, MAINTENANCE or INACTIVE",
+  "m8.asset.location_unknown": "The branch or location was not found or is outside your organisation",
+  "m8.asset.location_scope_mismatch": "The location does not belong to your organisation or scope",
+  "m8.asset.duplicate_code": "An asset with this code already exists in your organisation",
+  "m8.asset.not_found": "The requested asset was not found in your scope"
 }

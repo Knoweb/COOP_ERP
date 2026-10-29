@@ -1691,10 +1691,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransferRequestResponse'
+  /v1/trading/opening-receivables/bulk:
+
+    post:
+      tags: [Billing]
+      operationId: bulkImportReceivables
+      summary: Bulk import inter-entity receivable opening balances from a sheet or rows
+      description: >
+        Parses inter-entity receivable opening balances and registers them as authorized two-party signed
+        invoices and opening receivable records.
+      x-permission: bil.invoice.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportReceivablesRequest'
+      responses:
+        '201':
+          description: Opening receivables imported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkReceivableReport'
         '400':
           $ref: 'common.yaml#/components/responses/RequestProblem'
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/opening-receivables/{id}:
+
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Billing]
+      operationId: getOpeningReceivable
+      summary: One opening receivable record with two-party signatures
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The opening receivable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpeningReceivableResponse'
+        '404':
+          description: Not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
 
   # @@PATHS@@ (later tickets add their operations above this line)
 
@@ -3397,5 +3452,147 @@ components:
           format: uuid
         qty:
           type: number
+
+    BulkImportReceivablesRequest:
+      type: object
+      properties:
+        sellerEntityId:
+          type: string
+          format: uuid
+        sheet:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceivableOpeningRowRequest'
+        simulateSignatures:
+          type: boolean
+          default: false
+
+    ReceivableOpeningRowRequest:
+      type: object
+      required: [amount]
+      properties:
+        sellerEntityId:
+          type: string
+          format: uuid
+        sellerCode:
+          type: string
+        buyerEntityId:
+          type: string
+          format: uuid
+        buyerCode:
+          type: string
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        dueDate:
+          type: string
+          format: date
+        asOfDate:
+          type: string
+          format: date
+        referenceNo:
+          type: string
+        sellerSignedBy:
+          type: string
+          format: uuid
+        sellerSigner:
+          type: string
+        buyerSignedBy:
+          type: string
+          format: uuid
+        buyerSigner:
+          type: string
+        notes:
+          type: string
+
+    BulkReceivableReport:
+      type: object
+      required: [importId, status, totalRows, importedCount, documentIds, problems]
+      properties:
+        importId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [IMPORTED, REJECTED]
+        totalRows:
+          type: integer
+        importedCount:
+          type: integer
+        documentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceivableProblemResponse'
+
+    ReceivableProblemResponse:
+      type: object
+      required: [row, code, message]
+      properties:
+        row:
+          type: integer
+        code:
+          type: string
+        message:
+          type: string
+
+    OpeningReceivableResponse:
+      type: object
+      required: [openingReceivableId, documentId, relationshipId, sellerEntityId, buyerEntityId, amount, sellerSignedBy, sellerSignedAt, buyerSignedBy, buyerSignedAt, createdAt]
+      properties:
+        openingReceivableId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        sellerCode:
+          type: string
+        sellerName:
+          type: string
+        buyerEntityId:
+          type: string
+          format: uuid
+        buyerCode:
+          type: string
+        buyerName:
+          type: string
+        amount:
+          type: number
+        referenceNo:
+          type: string
+        sellerSignedBy:
+          type: string
+          format: uuid
+        sellerSignerName:
+          type: string
+        sellerSignedAt:
+          type: string
+          format: date-time
+        buyerSignedBy:
+          type: string
+          format: uuid
+        buyerSignerName:
+          type: string
+        buyerSignedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
     # @@SCHEMAS@@
