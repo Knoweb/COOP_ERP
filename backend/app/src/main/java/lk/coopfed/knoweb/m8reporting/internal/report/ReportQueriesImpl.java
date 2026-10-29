@@ -30,6 +30,9 @@ import lk.coopfed.knoweb.m1party.query.LocationFilter;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.SkuView;
+import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
@@ -55,6 +58,8 @@ import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimatePlan;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimateResult;
 import lk.coopfed.knoweb.m8reporting.query.ShopPerformanceState;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
@@ -104,6 +109,7 @@ class ReportQueriesImpl implements ReportingQueries {
     private final Clock clock;
     private final ZoneId zone;
     private final InventoryQueries inventoryQueries;
+    private final PricingQueries pricing;
 
     /**
      * What a dashboard depends on: the caller's whole visibility, as the policies of M8 read it
@@ -140,7 +146,8 @@ class ReportQueriesImpl implements ReportingQueries {
             ConfigRegistry config,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String zone,
-            InventoryQueries inventoryQueries) {
+            InventoryQueries inventoryQueries,
+            PricingQueries pricing) {
         this.jdbc = jdbc;
         this.party = party;
         this.catalogue = catalogue;
@@ -153,6 +160,7 @@ class ReportQueriesImpl implements ReportingQueries {
         this.clock = clock;
         this.zone = ZoneId.of(zone);
         this.inventoryQueries = inventoryQueries;
+        this.pricing = pricing;
     }
 
     @Override
@@ -1259,5 +1267,152 @@ class ReportQueriesImpl implements ReportingQueries {
                 },
                 assetId);
         return found.isEmpty() ? Optional.empty() : Optional.of(found.get(0));
+    }
+
+    @Override
+    public RevenueEstimateResult estimateRevenue(RevenueEstimatePlan plan, ScopeContext scope) {
+        if (scope.policyClass() == PolicyClass.NONE) {
+            throw new ProblemException("permission.denied");
+        }
+        if (plan.targetRevenue() == null || plan.targetRevenue().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ProblemException("m8.estimator.target_revenue_invalid");
+        }
+        if (plan.items() == null || plan.items().isEmpty()) {
+            throw new ProblemException("m8.estimator.mix_empty");
+        }
+
+        Set<UUID> seenSkus = new HashSet<>();
+        for (RevenueEstimatePlan.MixItem item : plan.items()) {
+            if (item.skuId() == null || !seenSkus.add(item.skuId())) {
+                throw new ProblemException("m8.estimator.duplicate_sku");
+            }
+            if (item.mixPercent() == null || item.mixPercent().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ProblemException("m8.estimator.mix_must_equal_100");
+            }
+        }
+
+        BigDecimal totalMix = plan.items().stream()
+                .map(RevenueEstimatePlan.MixItem::mixPercent)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        if (totalMix.compareTo(new BigDecimal("100.00")) != 0) {
+            throw new ProblemException("m8.estimator.mix_must_equal_100");
+        }
+
+        UUID locationId = plan.locationId();
+        if (scope.locationId() != null) {
+            if (locationId != null && !scope.locationId().equals(locationId)) {
+                throw new ProblemException("m8.estimator.location_forbidden");
+            }
+            locationId = scope.locationId();
+        }
+        if (locationId == null) {
+            throw new ProblemException("m8.estimator.location_required");
+        }
+
+        Optional<LocationView> locOpt = party.getLocation(locationId, scope);
+        if (locOpt.isEmpty()) {
+            throw new ProblemException("m8.estimator.location_unknown");
+        }
+
+        LocalDate businessDate =
+                plan.businessDate() != null ? plan.businessDate() : LocalDate.now(clock.withZone(zone));
+        String priceType = "COMMERCIAL".equalsIgnoreCase(plan.priceType()) ? "COMMERCIAL" : "RETAIL";
+
+        List<RevenueEstimateResult.EstimatedItem> calculatedItems = new ArrayList<>();
+        BigDecimal totalEstimatedRevenue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        Names names = new Names(party, catalogue, scope);
+
+        for (RevenueEstimatePlan.MixItem item : plan.items()) {
+            Optional<SkuView> skuOpt = catalogue.getSku(item.skuId(), scope);
+            if (skuOpt.isEmpty() || "INACTIVE".equalsIgnoreCase(skuOpt.get().status())) {
+                throw new ProblemException(
+                        "m8.estimator.sku_not_found",
+                        Map.of("skuId", item.skuId().toString()));
+            }
+            SkuView sku = skuOpt.get();
+
+            Optional<RetailPrice> priceOpt;
+            if ("COMMERCIAL".equals(priceType)) {
+                priceOpt = pricing.resolveCommercialPrice(
+                        locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, businessDate, scope);
+            } else {
+                priceOpt = pricing.resolveRetailPrice(
+                        locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, businessDate, scope);
+            }
+
+            if (priceOpt.isEmpty()
+                    || !priceOpt.get().sellable()
+                    || priceOpt.get().unitPrice() == null
+                    || priceOpt.get().unitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ProblemException(
+                        "m8.estimator.unresolved_price",
+                        Map.of("skuId", item.skuId().toString(), "skuCode", sku.skuCode()));
+            }
+
+            RetailPrice resolved = priceOpt.get();
+            BigDecimal unitPrice = resolved.unitPrice().setScale(4, RoundingMode.HALF_UP);
+
+            BigDecimal targetShare = plan.targetRevenue()
+                    .multiply(item.mixPercent())
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+            BigDecimal rawQty = targetShare.divide(unitPrice, 4, RoundingMode.HALF_UP);
+
+            BigDecimal roundedQty;
+            if (sku.soldByWeight()) {
+                roundedQty = rawQty.setScale(3, RoundingMode.HALF_UP);
+            } else {
+                roundedQty = rawQty.setScale(0, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal estimatedRevenue = roundedQty.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal roundingVariance = estimatedRevenue.subtract(targetShare).setScale(2, RoundingMode.HALF_UP);
+
+            totalEstimatedRevenue = totalEstimatedRevenue.add(estimatedRevenue);
+
+            String skuName = names.skuName(sku.skuId());
+            String priceSource = resolved.capReason() != null ? resolved.capReason() : priceType;
+
+            calculatedItems.add(new RevenueEstimateResult.EstimatedItem(
+                    sku.skuId(),
+                    sku.skuCode(),
+                    skuName,
+                    sku.baseUomCode(),
+                    unitPrice,
+                    priceSource,
+                    item.mixPercent().setScale(2, RoundingMode.HALF_UP),
+                    targetShare,
+                    rawQty,
+                    roundedQty,
+                    estimatedRevenue,
+                    roundingVariance));
+        }
+
+        BigDecimal targetVariance =
+                totalEstimatedRevenue.subtract(plan.targetRevenue().setScale(2, RoundingMode.HALF_UP));
+
+        RevenueEstimateResult.Assumptions assumptions = new RevenueEstimateResult.Assumptions(
+                plan.targetRevenue().setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                locationId,
+                priceType,
+                businessDate.toString(),
+                "HALF_UP to unit precision (discrete items: integer, weighted items: 3 decimals)",
+                "COMMERCIAL".equals(priceType)
+                        ? "Commercial list in force with retail fallback, bounded by MRP and control price"
+                        : "Retail list in force, bounded by in-stock MRP and control price");
+
+        return new RevenueEstimateResult(
+                plan.targetRevenue().setScale(2, RoundingMode.HALF_UP),
+                totalEstimatedRevenue,
+                targetVariance,
+                totalMix,
+                "LKR",
+                locationId,
+                priceType,
+                businessDate,
+                calculatedItems,
+                assumptions);
     }
 }

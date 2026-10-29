@@ -113,5 +113,15 @@
   "m8.asset.location_unknown": "ශාඛාව හෝ ස්ථානය හමු නොවීය හෝ ඔබේ ආයතනයෙන් පිටත වේ",
   "m8.asset.location_scope_mismatch": "මෙම ස්ථානය ඔබගේ සංවිධානයට හෝ විෂය පථයට අයත් නොවේ",
   "m8.asset.duplicate_code": "මෙම කේතය සහිත වත්කමක් දැනටමත් ඔබේ ආයතනයේ පවතී",
-  "m8.asset.not_found": "ඉල්ලූ වත්කම ඔබේ විෂය පථය තුළ හමු නොවීය"
+  "m8.asset.not_found": "ඉල්ලූ වත්කම ඔබේ විෂය පථය තුළ හමු නොවීය",
+  "m8.estimator.target_revenue_invalid": "ඉලක්කගත ආදායම ශුන්‍යයට වඩා වැඩි විය යුතුය",
+  "m8.estimator.mix_empty": "සැලසුම් මිශ්‍රණයට අවම වශයෙන් එක් භාණ්ඩයක් ඇතුළත් විය යුතුය",
+  "m8.estimator.duplicate_sku": "සැලසුම් මිශ්‍රණයේ අනුපිටපත් භාණ්ඩ ඇතුළත් කිරීමට අවසර නැත",
+  "m8.estimator.mix_must_equal_100": "සැලසුම් මිශ්‍රණයේ ප්‍රතිශත එකතුව 100% විය යුතුය",
+  "m8.estimator.sku_not_found": "තෝරාගත් භාණ්ඩය හමු නොවීය හෝ අක්‍රියයි",
+  "m8.estimator.unresolved_price": "{skuCode} භාණ්ඩය සඳහා ක්‍රියාකාරී විකුණුම් මිලක් හමු නොවීය",
+  "m8.estimator.location_required": "විකුණුම් මිල ගණනය කිරීමට වෙළඳසැලක් හෝ ශාඛාවක් අවශ්‍ය වේ",
+  "m8.estimator.location_unknown": "ස්ථානය හමු නොවීය හෝ ඔබේ සංවිධානයෙන් පිටත පිහිටා ඇත",
+  "m8.estimator.location_forbidden": "වෙනත් වෙළඳසැලක් සඳහා සැලසුම් කිරීමට ඔබට අවසර නැත"
+
 }
