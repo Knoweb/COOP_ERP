@@ -7,12 +7,14 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { AuthorRuleRequest, Rule, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { errorText, ruleStatusChip } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
+import { PricingSelect } from "./PricingSelect";
 import "./pricing.css";
 
 type RuleKind = "TIME_LIMITED_PRICE" | "QUANTITY_BREAK" | "BILL_THRESHOLD" | "EXPIRY_MARKDOWN";
@@ -100,7 +102,7 @@ export function RulesPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("pricing.rules.title").text}</h1>
+      <PageHeader icon="rules" title={t("pricing.rules.title").text} />
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.rules.intro").text}</p>
 
@@ -122,32 +124,34 @@ export function RulesPage() {
         <div className="pricing-filter-bar">
           <label className="pricing-form-field">
             <span className="pricing-filter-label">{t("pricing.rules.filter_status").text}</span>
-            <select
+            <PricingSelect
               aria-label={t("pricing.rules.filter_status").text}
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">{t("pricing.rules.status.ALL").text}</option>
-              <option value="DRAFT">{t("pricing.rules.status.DRAFT").text}</option>
-              <option value="ACTIVE">{t("pricing.rules.status.ACTIVE").text}</option>
-              <option value="EXPIRED">{t("pricing.rules.status.EXPIRED").text}</option>
-              <option value="WITHDRAWN">{t("pricing.rules.status.WITHDRAWN").text}</option>
-            </select>
+              onChange={setStatusFilter}
+              options={[
+                { value: "ALL", label: t("pricing.rules.status.ALL").text },
+                { value: "DRAFT", label: t("pricing.rules.status.DRAFT").text },
+                { value: "ACTIVE", label: t("pricing.rules.status.ACTIVE").text },
+                { value: "EXPIRED", label: t("pricing.rules.status.EXPIRED").text },
+                { value: "WITHDRAWN", label: t("pricing.rules.status.WITHDRAWN").text }
+              ]}
+            />
           </label>
 
           <label className="pricing-form-field">
             <span className="pricing-filter-label">{t("pricing.rules.filter_kind").text}</span>
-            <select
+            <PricingSelect
               aria-label={t("pricing.rules.filter_kind").text}
               value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value)}
-            >
-              <option value="ALL">{t("pricing.rules.kind.ALL").text}</option>
-              <option value="TIME_LIMITED_PRICE">{t("pricing.rules.kind.TIME_LIMITED_PRICE").text}</option>
-              <option value="QUANTITY_BREAK">{t("pricing.rules.kind.QUANTITY_BREAK").text}</option>
-              <option value="BILL_THRESHOLD">{t("pricing.rules.kind.BILL_THRESHOLD").text}</option>
-              <option value="EXPIRY_MARKDOWN">{t("pricing.rules.kind.EXPIRY_MARKDOWN").text}</option>
-            </select>
+              onChange={setKindFilter}
+              options={[
+                { value: "ALL", label: t("pricing.rules.kind.ALL").text },
+                { value: "TIME_LIMITED_PRICE", label: t("pricing.rules.kind.TIME_LIMITED_PRICE").text },
+                { value: "QUANTITY_BREAK", label: t("pricing.rules.kind.QUANTITY_BREAK").text },
+                { value: "BILL_THRESHOLD", label: t("pricing.rules.kind.BILL_THRESHOLD").text },
+                { value: "EXPIRY_MARKDOWN", label: t("pricing.rules.kind.EXPIRY_MARKDOWN").text }
+              ]}
+            />
           </label>
         </div>
 
@@ -459,16 +463,17 @@ function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
 
         <label className="pricing-form-field">
           <span>{t("pricing.rules.field.kind").text}</span>
-          <select
+          <PricingSelect
             aria-label={t("pricing.rules.field.kind").text}
             value={kind}
-            onChange={(e) => handleKindChange(e.target.value as RuleKind)}
-          >
-            <option value="TIME_LIMITED_PRICE">{t("pricing.rules.kind.TIME_LIMITED_PRICE").text}</option>
-            <option value="QUANTITY_BREAK">{t("pricing.rules.kind.QUANTITY_BREAK").text}</option>
-            <option value="BILL_THRESHOLD">{t("pricing.rules.kind.BILL_THRESHOLD").text}</option>
-            <option value="EXPIRY_MARKDOWN">{t("pricing.rules.kind.EXPIRY_MARKDOWN").text}</option>
-          </select>
+            onChange={(nextKind) => handleKindChange(nextKind as RuleKind)}
+            options={[
+              { value: "TIME_LIMITED_PRICE", label: t("pricing.rules.kind.TIME_LIMITED_PRICE").text },
+              { value: "QUANTITY_BREAK", label: t("pricing.rules.kind.QUANTITY_BREAK").text },
+              { value: "BILL_THRESHOLD", label: t("pricing.rules.kind.BILL_THRESHOLD").text },
+              { value: "EXPIRY_MARKDOWN", label: t("pricing.rules.kind.EXPIRY_MARKDOWN").text }
+            ]}
+          />
         </label>
       </div>
 
@@ -548,17 +553,15 @@ function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
 
           <label className="pricing-form-field">
             <span>{t("pricing.rules.field.benefit_kind").text}</span>
-            <select
+            <PricingSelect
               aria-label={t("pricing.rules.field.benefit_kind").text}
               value={benefitKind}
-              onChange={(e) => setBenefitKind(e.target.value as BenefitKind)}
-            >
-              {ALLOWED_BENEFITS[kind].map((bk) => (
-                <option key={bk} value={bk}>
-                  {t(`pricing.rules.benefit_kind.${bk}`).text}
-                </option>
-              ))}
-            </select>
+              onChange={(nextBk) => setBenefitKind(nextBk as BenefitKind)}
+              options={ALLOWED_BENEFITS[kind].map((bk) => ({
+                value: bk,
+                label: t(`pricing.rules.benefit_kind.${bk}`).text
+              }))}
+            />
           </label>
 
           <label className="pricing-form-field">
