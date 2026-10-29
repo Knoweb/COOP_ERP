@@ -7,7 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
-import { type PickList, useInventoryApi } from "./inventoryApi";
+
 import { SkuLabel } from "./SkuLabel";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 import "./inventory.css";
