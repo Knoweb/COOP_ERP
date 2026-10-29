@@ -89,7 +89,7 @@ public class LowStockEvaluationHandler implements Handles<EvaluateLowStock, LowS
         UUID ownerEntityId = scope.entityId();
         Optional<ReorderStore.ReorderControlRecord> recordOpt =
                 store.findControlForUpdate(ownerEntityId, locationId, skuId);
-        if (recordOpt.isEmpty()) {
+        if (recordOpt.isEmpty() || !recordOpt.get().isActive()) {
             return new LowStockEvaluationResult(0, 0);
         }
         int alerts = evaluateRecord(recordOpt.get(), scope);

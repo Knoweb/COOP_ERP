@@ -257,13 +257,16 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID batch = fixture.batch(sku, MPCS, "B-EQ", EXPIRY);
         ScopeContext scope = at(MPCS, shop1);
 
-        // Configure: reorderLevel = 10.000
+        // Initial adequate stock = 30.000
+        postReceipt(shop1, batch, new BigDecimal("30.000"), MPCS);
+
+        // Configure: reorderLevel = 10.000 (currently healthy 30 > 10, alertTriggered = false)
         configureHandler.handle(
                 new ConfigureReorderControl(shop1, sku, new BigDecimal("10.000"), new BigDecimal("20.000"), null),
                 scope);
 
-        // Stock = exactly 10.000 (equal to reorder level)
-        postReceipt(shop1, batch, new BigDecimal("10.000"), MPCS);
+        // Stock drops to exactly 10.000 (equal to reorder level)
+        postSale(shop1, batch, "-20.000", MPCS);
         kernel.reset();
 
         LowStockEvaluationResult result = evaluateHandler.handle(new EvaluateLowStock(shop1, sku), scope);
@@ -276,8 +279,8 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
                     assertThat(a.subject().type()).isEqualTo("reorder_control");
                     @SuppressWarnings("unchecked")
                     Map<String, Object> after = (Map<String, Object>) a.after();
-                    assertThat(after.get("locationId")).isEqualTo(shop1.toString());
-                    assertThat(after.get("skuId")).isEqualTo(sku.toString());
+                    assertThat(after.get("locationId")).isEqualTo(shop1);
+                    assertThat(after.get("skuId")).isEqualTo(sku);
                     assertThat(after.get("availableQty")).isEqualTo(new BigDecimal("10.000"));
                     assertThat(after.get("reorderLevel")).isEqualTo(new BigDecimal("10.000"));
                 });
@@ -305,12 +308,16 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID batch = fixture.batch(sku, MPCS, "B-BELOW", EXPIRY);
         ScopeContext scope = at(MPCS, shop1);
 
+        // Initial adequate stock = 30.000
+        postReceipt(shop1, batch, new BigDecimal("30.000"), MPCS);
+
+        // Configure: reorderLevel = 15.000 (healthy 30 > 15, alertTriggered = false)
         configureHandler.handle(
                 new ConfigureReorderControl(shop1, sku, new BigDecimal("15.000"), new BigDecimal("30.000"), null),
                 scope);
 
-        // Stock = 5.000 (strictly below 15.000)
-        postReceipt(shop1, batch, new BigDecimal("5.000"), MPCS);
+        // Stock drops to 5.000 (strictly below 15.000)
+        postSale(shop1, batch, "-25.000", MPCS);
         kernel.reset();
 
         LowStockEvaluationResult result = evaluateHandler.handle(new EvaluateLowStock(shop1, sku), scope);
@@ -326,12 +333,18 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID batch = fixture.batch(sku, MPCS, "B-DEDUP", EXPIRY);
         ScopeContext scope = at(MPCS, shop1);
 
+        // Initial adequate stock = 20.000
+        postReceipt(shop1, batch, new BigDecimal("20.000"), MPCS);
+
+        // Configure: reorderLevel = 10.000 (healthy 20 > 10, alertTriggered = false)
         configureHandler.handle(
                 new ConfigureReorderControl(shop1, sku, new BigDecimal("10.000"), new BigDecimal("20.000"), null),
                 scope);
 
-        // 1. Initial breach: stock = 5.000
-        postReceipt(shop1, batch, new BigDecimal("5.000"), MPCS);
+        // 1. Initial breach: sell 15.000 -> stock drops to 5.000
+        postSale(shop1, batch, "-15.000", MPCS);
+        kernel.reset();
+
         LowStockEvaluationResult first = evaluateHandler.handle(new EvaluateLowStock(shop1, sku), scope);
         assertThat(first.alertsTriggeredCount()).isEqualTo(1);
         assertThat(events(LowStockDetected.class)).hasSize(1);
@@ -357,13 +370,20 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID batch = fixture.batch(sku, MPCS, "B-REARM", EXPIRY);
         ScopeContext scope = at(MPCS, shop1);
 
+        // Initial adequate stock = 20.000
+        postReceipt(shop1, batch, new BigDecimal("20.000"), MPCS);
+
+        // Configure: reorderLevel = 10.000 (healthy 20 > 10, alertTriggered = false)
         configureHandler.handle(
                 new ConfigureReorderControl(shop1, sku, new BigDecimal("10.000"), new BigDecimal("20.000"), null),
                 scope);
 
-        // 1. Initial breach: stock = 5.000 -> alertTriggered = true
-        postReceipt(shop1, batch, new BigDecimal("5.000"), MPCS);
-        evaluateHandler.handle(new EvaluateLowStock(shop1, sku), scope);
+        // 1. Initial breach: sell 15.000 -> stock drops to 5.000
+        postSale(shop1, batch, "-15.000", MPCS);
+        kernel.reset();
+
+        LowStockEvaluationResult initialBreach = evaluateHandler.handle(new EvaluateLowStock(shop1, sku), scope);
+        assertThat(initialBreach.alertsTriggeredCount()).isEqualTo(1);
         assertThat(events(LowStockDetected.class)).hasSize(1);
         kernel.reset();
 
@@ -396,12 +416,16 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID batch = fixture.batch(sku, MPCS, "B-CONS", EXPIRY);
         ScopeContext scope = at(MPCS, shop1);
 
+        // Initially 20.000 stock
+        postReceipt(shop1, batch, new BigDecimal("20.000"), MPCS);
+
+        // Configure: reorderLevel = 15.000 (healthy 20 > 15, alertTriggered = false)
         configureHandler.handle(
-                new ConfigureReorderControl(shop1, sku, new BigDecimal("10.000"), new BigDecimal("20.000"), null),
+                new ConfigureReorderControl(shop1, sku, new BigDecimal("15.000"), new BigDecimal("20.000"), null),
                 scope);
 
-        // Initially 12.000 stock (above reorder level 10.000)
-        postReceipt(shop1, batch, new BigDecimal("12.000"), MPCS);
+        // Stock movement drops available stock to 12.000 (<= 15.000 threshold breach)
+        postSale(shop1, batch, "-8.000", MPCS);
         kernel.reset();
 
         // 1. Test EventConsumer dispatching with JsonNode payload (supporting canonical camelCase)
@@ -455,10 +479,17 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID sku2 = fixture.sku(MPCS, "SKU_JOB_2");
         ScopeContext scope = at(MPCS, shop1);
 
-        // Low stock: level 10, stock 0 -> will trigger alert
+        // Initial adequate stock = 20.000 for sku1
+        UUID batch1 = fixture.batch(sku1, MPCS, "B-JOB-1", EXPIRY);
+        postReceipt(shop1, batch1, new BigDecimal("20.000"), MPCS);
+
+        // Configure sku1: level 10 (healthy 20 > 10, alertTriggered = false)
         configureHandler.handle(
                 new ConfigureReorderControl(shop1, sku1, new BigDecimal("10.000"), new BigDecimal("20.000"), null),
                 scope);
+
+        // Sell 15.000 -> sku1 available stock is now 5.000 (breached <= 10.000, not yet alerted)
+        postSale(shop1, batch1, "-15.000", MPCS);
 
         // High stock: level 10, stock 30 -> adequate
         UUID batch2 = fixture.batch(sku2, MPCS, "B-JOB-2", EXPIRY);
@@ -521,6 +552,7 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isInstanceOf(ProblemException.class);
 
         // 3. Re-configuring the control reactivates the record
+        kernel.reset();
         UUID reactivatedId = configureHandler.handle(
                 new ConfigureReorderControl(shop1, sku, new BigDecimal("12.000"), new BigDecimal("25.000"), null),
                 scope);

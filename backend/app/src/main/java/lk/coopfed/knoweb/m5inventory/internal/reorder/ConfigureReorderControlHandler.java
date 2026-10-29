@@ -170,19 +170,20 @@ public class ConfigureReorderControlHandler implements Handles<ConfigureReorderC
                 Timestamp.from(now));
 
         // ---- audit -------------------------------------------------------------------------
+        Map<String, Object> configuredPayload = new java.util.LinkedHashMap<>();
+        configuredPayload.put("locationId", command.locationId());
+        configuredPayload.put("skuId", command.skuId());
+        configuredPayload.put("reorderLevel", reorderLevel);
+        configuredPayload.put("reorderQty", reorderQty);
+        if (maxQty != null) {
+            configuredPayload.put("maxQty", maxQty);
+        }
+
         audit.record(
                 AUDIT_CONFIGURED,
                 Subject.of("reorder_control", reorderControlId),
                 null,
-                Map.of(
-                        "locationId",
-                        command.locationId(),
-                        "skuId",
-                        command.skuId(),
-                        "reorderLevel",
-                        reorderLevel,
-                        "reorderQty",
-                        reorderQty),
+                configuredPayload,
                 scope);
 
         if (shouldAlert) {
