@@ -24,7 +24,7 @@ Versions are pinned in `backend/gradle/libs.versions.toml`, `web/package.json` a
 - PostgreSQL 16
 - Flyway 11.x
 - React 18 + TypeScript + Vite
-- Kotlin / Android / Jetpack Compose
+- Kotlin Multiplatform + Compose Multiplatform (Android, Windows and Linux)
 - RabbitMQ
 - MinIO
 - Keycloak
@@ -34,7 +34,7 @@ Versions are pinned in `backend/gradle/libs.versions.toml`, `web/package.json` a
 - `backend/app` — Spring Boot modular monolith
 - `backend/shared-engine` — shared Kotlin engine
 - `web` — React back office
-- `till` — native Android POS
+- `till` — Kotlin Multiplatform POS for Android, Windows and Linux
 - `infra/compose` — local development stack
 - `infra/deploy` — deployment definitions
 - `tools` — development/build scripts
@@ -57,7 +57,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `fed-officer`, `mpcs
 | Command | What it does |
 |---|---|
 | `make up` | Start the stack, migrate, seed, print the addresses and the dev logins |
-| `make build` | Build the backend and the web client on the host, without tests |
+| `make build` | Build the backend, the web client and the Till application on the host |
 | `make up-2` | The same with two backend instances behind nginx, to catch bugs that depend on one instance answering every request |
 | `make image` | Build the backend container image with Jib; `make up`, `make up-2` and `make migrate` do this first |
 | `make down` | Stop the stack and keep its data |
