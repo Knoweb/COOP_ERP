@@ -466,6 +466,37 @@ paths:
           description: Scope forbidden
         '404':
           description: Asset not found in caller's permitted scope
+  /v1/reporting/revenue-estimates:
+    post:
+      tags: [Reporting]
+      operationId: estimateRevenue
+      summary: Calculate required stock quantities and revenue estimates for a target sales mix
+      description: >
+        Estimates required product quantities needed to achieve a target revenue amount using
+        a specified product/SKU mix and current effective/commercial selling prices resolved
+        from the pricing subsystem.
+        Codes this operation can answer with 422: m8.estimator.target_revenue_invalid,
+        m8.estimator.mix_empty, m8.estimator.duplicate_sku, m8.estimator.mix_must_equal_100,
+        m8.estimator.sku_not_found, m8.estimator.unresolved_price,
+        m8.estimator.location_required, m8.estimator.location_unknown.
+      x-permission: rpt.target.view
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevenueEstimateRequest' }
+      responses:
+        '200':
+          description: Revenue estimate and sales mix plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RevenueEstimateResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope or location forbidden
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     ReportId:
@@ -925,3 +956,109 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/AssetResponse' }
+    RevenueEstimateItemRequest:
+      type: object
+      required: [skuId, mixPercent]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        mixPercent:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+          description: Percentage share of revenue (e.g. 40.00)
+    RevenueEstimateRequest:
+      type: object
+      required: [targetRevenue, items]
+      properties:
+        targetRevenue:
+          type: string
+          pattern: '^-?[0-9]+(\.[0-9]{1,2})?$'
+          description: Target revenue in LKR
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Shop or location where prices are resolved
+        priceType:
+          type: string
+          enum: [RETAIL, COMMERCIAL]
+          default: RETAIL
+          nullable: true
+          description: Price resolution basis
+        businessDate:
+          type: string
+          format: date
+          nullable: true
+          description: Effective date for price resolution
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RevenueEstimateItemRequest' }
+    RevenueEstimateItemResponse:
+      type: object
+      required:
+        - skuId
+        - skuCode
+        - skuName
+        - uomCode
+        - unitPrice
+        - priceSource
+        - mixPercent
+        - targetShare
+        - rawQuantity
+        - roundedQuantity
+        - estimatedRevenue
+        - roundingVariance
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuName: { type: string }
+        uomCode: { type: string }
+        unitPrice: { type: string }
+        priceSource: { type: string }
+        mixPercent: { type: string }
+        targetShare: { type: string }
+        rawQuantity: { type: string }
+        roundedQuantity: { type: string }
+        estimatedRevenue: { type: string }
+        roundingVariance: { type: string }
+    RevenueEstimateAssumptions:
+      type: object
+      required:
+        - targetRevenue
+        - priceType
+        - businessDate
+        - roundingMethod
+        - priceResolutionPolicy
+      properties:
+        targetRevenue: { type: string }
+        locationId: { type: string, format: uuid, nullable: true }
+        priceType: { type: string }
+        businessDate: { type: string, format: date }
+        roundingMethod: { type: string }
+        priceResolutionPolicy: { type: string }
+    RevenueEstimateResponse:
+      type: object
+      required:
+        - targetRevenue
+        - totalEstimatedRevenue
+        - targetVariance
+        - totalMixPercent
+        - currency
+        - priceType
+        - businessDate
+        - items
+        - assumptions
+      properties:
+        targetRevenue: { type: string }
+        totalEstimatedRevenue: { type: string }
+        targetVariance: { type: string }
+        totalMixPercent: { type: string }
+        currency: { type: string }
+        locationId: { type: string, format: uuid, nullable: true }
+        priceType: { type: string }
+        businessDate: { type: string, format: date }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RevenueEstimateItemResponse' }
+        assumptions: { $ref: '#/components/schemas/RevenueEstimateAssumptions' }

@@ -113,5 +113,14 @@
   "m8.asset.location_unknown": "The branch or location was not found or is outside your organisation",
   "m8.asset.location_scope_mismatch": "The location does not belong to your organisation or scope",
   "m8.asset.duplicate_code": "An asset with this code already exists in your organisation",
-  "m8.asset.not_found": "The requested asset was not found in your scope"
+  "m8.asset.not_found": "The requested asset was not found in your scope",
+  "m8.estimator.target_revenue_invalid": "Target revenue must be greater than zero",
+  "m8.estimator.mix_empty": "At least one product must be included in the planning mix",
+  "m8.estimator.duplicate_sku": "Duplicate SKU entries are not permitted in the planning mix",
+  "m8.estimator.mix_must_equal_100": "Planning mix percentages must sum to 100%",
+  "m8.estimator.sku_not_found": "The selected product was not found or is inactive",
+  "m8.estimator.unresolved_price": "No active selling price found for product {skuCode}",
+  "m8.estimator.location_required": "A shop or branch location is required to resolve selling prices",
+  "m8.estimator.location_unknown": "The location was not found or is outside your organisation",
+  "m8.estimator.location_forbidden": "You are not permitted to plan for another shop"
 }

@@ -162,3 +162,141 @@
   font-weight: var(--font-weight-strong);
   border-top: var(--border-width-strong) solid var(--color-border);
 }
+
+/* Revenue Estimator Planner styles */
+.estimator-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--reporting-key-column-min), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.estimator-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.estimator-field label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+}
+
+.estimator-mix-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.estimator-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+}
+
+.estimator-badge-valid {
+  background: var(--color-issued-bg);
+  color: var(--color-issued-text);
+  border: var(--border-width) solid var(--color-issued-text);
+}
+
+.estimator-badge-invalid {
+  background: var(--color-alert-bg);
+  color: var(--color-alert-text);
+  border: var(--border-width) solid var(--color-alert-text);
+}
+
+.estimator-sku-add-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.estimator-sku-add-bar select {
+  flex: 1;
+  min-width: var(--reporting-key-column-min);
+}
+
+.estimator-sku-search-input {
+  max-width: var(--reporting-key-column-max);
+}
+
+.estimator-sku-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-3);
+}
+
+.estimator-sku-table th,
+.estimator-sku-table td {
+  padding: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: left;
+}
+
+.estimator-sku-table th {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+}
+
+.estimator-col-mix {
+  width: var(--reporting-cell-min);
+}
+
+.estimator-col-actions {
+  width: var(--reporting-cell-min);
+}
+
+.estimator-mix-input {
+  width: var(--reporting-cell-min);
+  padding: var(--space-1);
+}
+
+.estimator-warning-margin {
+  margin-top: var(--space-2);
+}
+
+.estimator-calculate-bar {
+  margin-top: var(--space-3);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.estimator-variance-card {
+  margin-top: var(--space-3);
+}
+
+.estimator-error-banner {
+  background: var(--color-alert-bg);
+  border-left: var(--space-half) solid var(--color-alert-text);
+  color: var(--color-alert-text);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}
+
+.estimator-assumptions-box {
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.estimator-results-table th:nth-child(n+2),
+.estimator-results-table td:nth-child(n+2) {
+  text-align: right;
+}
