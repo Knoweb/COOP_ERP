@@ -41,6 +41,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pos/receipts/{documentId}/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The authoritative cost, gross profit and margin of one receipt
+         * @description Available only to authorized management and accounting staff (pos.receipt.margin). Computes line-level and receipt-level gross profit based on authoritative net sales revenue and authoritative inventory cost allocated from M5 stock movements at the moment of sale. If any line has pending cost (e.g. oversold before inventory intake), costPending is true and overall profit is not calculated as fake zero cost.
+         */
+        get: operations["getReceiptProfit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pos/sessions": {
         parameters: {
             query?: never;
@@ -198,6 +218,33 @@ export interface components {
             /** @description What central found odd (e.g. LOCATION_MISMATCH, SESSION_UNKNOWN, SESSION_CLOSED) */
             flags?: string[];
         };
+        ReceiptProfitResponse: {
+            /** Format: uuid */
+            documentId: string;
+            /** Format: uuid */
+            locationId: string;
+            netSales: number;
+            totalCost?: number | null;
+            grossProfit?: number | null;
+            marginPercent?: number | null;
+            costPending: boolean;
+            currency: string;
+            lines: components["schemas"]["ReceiptLineProfitResponse"][];
+        };
+        ReceiptLineProfitResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            qty: number;
+            unitPrice: number;
+            lineTotal: number;
+            lineNet: number;
+            unitCost?: number | null;
+            lineCost?: number | null;
+            lineProfit?: number | null;
+            marginPercent?: number | null;
+            costPending: boolean;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -286,6 +333,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description No such receipt, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getReceiptProfit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt profit breakdown */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptProfitResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

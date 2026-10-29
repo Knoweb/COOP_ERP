@@ -1,7 +1,9 @@
 package lk.coopfed.knoweb.m5inventory.query;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -67,6 +69,14 @@ public interface InventoryQueries {
     /** GetPickList(dn): the pick list of a delivery note of the caller's. */
     Optional<PickListView> pickList(UUID deliveryDocumentId, ScopeContext scope);
 
+    /**
+     * The currently eligible replacement lots for one OPEN, allocated pick line. Empty means the
+     * named list or line is not visible/overridable, or no replacement currently has enough free
+     * stock. OverridePick locks and revalidates the selected lot before changing the reservation.
+     */
+    List<PickReplacementCandidate> pickReplacementCandidates(
+            UUID deliveryDocumentId, UUID pickLineId, ScopeContext scope);
+
     /** An opening balance of the caller's with its lines. */
     Optional<OpeningBalanceView> openingBalance(UUID openingBalanceId, ScopeContext scope);
 
@@ -81,4 +91,11 @@ public interface InventoryQueries {
 
     /** The transfers leaving or arriving at a location, newest first, with their lines. */
     List<TransferView> transfers(UUID locationId, ScopeContext scope);
+
+    /**
+     * Authoritative Cost of Goods Sold (COGS) aggregated by location for SALE and SALE_REVERSAL movements
+     * within the date bounds [from, to] (inclusive, in the business timezone).
+     * If any SALE movement has an unresolved or non-positive unit cost, {@code costPending} is true.
+     */
+    Map<UUID, LocationSalesCost> locationsSalesCost(LocalDate from, LocalDate to, ScopeContext scope);
 }

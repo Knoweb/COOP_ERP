@@ -2,8 +2,8 @@
 // modules/registry.ts (that is where `make new-module` adds its line), and the shell turns
 // that list into routes and navigation (17A section 7).
 
-import { useState } from "react";
-import { createBrowserRouter, Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { createBrowserRouter, Outlet, useLocation } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 import { MODULES } from "./modules/registry";
 import { StepUpReplay } from "./shell/auth/StepUpReplay";
@@ -52,13 +52,20 @@ function SignOutSidebar() {
  */
 function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
   // Temporary source: a build flag. The real one is a later kernel/M6 concern (TrainingBadge.tsx).
-      const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("coop-sidebar-collapsed") === "true";
     } catch {
       return false;
     }
   });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const location = useLocation();
+  const t = useT();
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((current) => {
@@ -73,18 +80,28 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
       return next;
     });
   };
+
+  const closeMobileNav = () => {
+    setMobileNavOpen(false);
+  };
+
   const training = isTrainingMode();
   return (
     <ScopeProvider>
       <div className={training ? "shell shell--training" : "shell"}>
         <TrainingBadge active={training} />
         <div
-          className={`shell-layout${sidebarCollapsed ? " shell-layout--collapsed" : ""}`}
+          className={`shell-layout${sidebarCollapsed ? " shell-layout--collapsed" : ""}${mobileNavOpen ? " shell-layout--mobile-open" : ""}`}
         >
-          <aside className="shell-sidebar">
+          {mobileNavOpen && (
+            <div
+              className="shell-sidebar-backdrop"
+              onClick={closeMobileNav}
+              aria-hidden="true"
+            />
+          )}
+          <aside className={`shell-sidebar${mobileNavOpen ? " shell-sidebar--open" : ""}`}>
             <div className="shell-sidebar-brand">
-
-
               <span className="brand-logo">
                 <img src={coopLogo} alt="" aria-hidden="true" />
               </span>
@@ -92,7 +109,13 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
               <button
                 type="button"
                 className="shell-sidebar-toggle"
-                onClick={toggleSidebar}
+                onClick={() => {
+                  if (mobileNavOpen) {
+                    closeMobileNav();
+                  } else {
+                    toggleSidebar();
+                  }
+                }}
                 aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 aria-expanded={!sidebarCollapsed}
                 aria-controls="coop-sidebar-navigation"
@@ -116,8 +139,6 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
               </button>
             </div>
             <div id="coop-sidebar-navigation" className="shell-sidebar-nav">
-
-
               <Navigation modules={modules} />
             </div>
             <div className="shell-sidebar-footer">
@@ -127,6 +148,31 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
           <div className="shell-main">
             <header className="shell-topbar">
               <div className="shell-topbar-left">
+                <button
+                  type="button"
+                  className="shell-mobile-toggle"
+                  onClick={() => setMobileNavOpen((open) => !open)}
+                  aria-label={t("shell.nav.label").text}
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="coop-sidebar-navigation"
+                  title={t("shell.nav.label").text}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
+                </button>
                 <ScopeBanner />
               </div>
               <div className="shell-topbar-right">

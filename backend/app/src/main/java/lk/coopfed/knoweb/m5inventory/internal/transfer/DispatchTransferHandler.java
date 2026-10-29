@@ -30,12 +30,19 @@ class DispatchTransferHandler implements Handles<DispatchTransfer, UUID> {
     static final String AUDIT_DISPATCHED = "TRANSFER_DISPATCHED";
 
     private final TransferStore store;
+    private final TransferLifecycleLock lifecycleLock;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
-    DispatchTransferHandler(TransferStore store, JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+    DispatchTransferHandler(
+            TransferStore store,
+            TransferLifecycleLock lifecycleLock,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
         this.store = store;
+        this.lifecycleLock = lifecycleLock;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -47,11 +54,15 @@ class DispatchTransferHandler implements Handles<DispatchTransfer, UUID> {
         if (scope == null || scope.policyClass() != PolicyClass.OWN || scope.entityId() == null) {
             throw new ProblemException("m5.scope.own_required");
         }
+        lifecycleLock.acquire(command.transferId());
         TransferStore.Header transfer = store.find(command.transferId())
                 .orElseThrow(() -> new ProblemException(
                         "m5.transfer.not_found", Map.of("transferId", String.valueOf(command.transferId()))));
         if (scope.locationId() != null && !scope.locationId().equals(transfer.fromLocationId())) {
             throw new ProblemException("m5.transfer.not_source");
+        }
+        if (store.cancelled(transfer.transferId())) {
+            throw new ProblemException("m5.transfer.already_cancelled");
         }
         if (store.received(transfer.transferId())) {
             throw new ProblemException("m5.transfer.already_received");

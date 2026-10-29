@@ -183,9 +183,13 @@ class TransferOverdueJobPostgresIntegrationTest extends PostgresIntegrationTest 
     }
 
     @Test
-    void receivedTransferIsIgnoredAndStaleCandidateIsRevalidated() {
+    void receivedAndCancelledTransfersAreIgnoredAndStaleCandidatesAreRevalidated() {
         UUID alreadyReceived = dispatchedTransfer(MPCS, source, destination, daysAgo(4));
         receive(alreadyReceived, MPCS, source, destination);
+        assertThat(job.review(execution())).isZero();
+
+        UUID cancelled = dispatchedTransfer(MPCS, source, destination, daysAgo(4));
+        cancel(cancelled, MPCS, source, destination);
         assertThat(job.review(execution())).isZero();
 
         UUID stale = dispatchedTransfer(MPCS, source, destination, daysAgo(4));
@@ -259,6 +263,20 @@ class TransferOverdueJobPostgresIntegrationTest extends PostgresIntegrationTest 
                         entity,
                         toLocation,
                         fromLocation);
+    }
+
+    private void cancel(UUID transfer, UUID entity, UUID fromLocation, UUID toLocation) {
+        superuserJdbc()
+                .update(
+                        "insert into inventory.transfer_cancellation"
+                                + " (transfer_id, owner_entity_id, location_id, to_location_id, reason,"
+                                + " cancelled_from_status, physical_return_verified_by, physical_return_verified_at)"
+                                + " values (?, ?, ?, ?, 'Returned', 'IN_TRANSIT', ?, now())",
+                        transfer,
+                        entity,
+                        fromLocation,
+                        toLocation,
+                        InventoryFixture.USER);
     }
 
     private long count(String table) {

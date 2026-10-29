@@ -21,6 +21,11 @@ audit_event_types:
     offline_capturable: false
     description_en: A customer was deactivated
 
+  - code: CUSTOMER_REACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer was reactivated
+
   - code: ACCOUNT_OPENED
     severity: INFO
     offline_capturable: false
@@ -152,3 +157,8 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The export of a customer's fulfilled access request was handed over by the responsible officer
+
+  - code: MEMBERS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Members were imported in bulk from a sheet or payload

@@ -148,3 +148,17 @@
 .targets-actions-cell {
   white-space: nowrap;
 }
+
+.pnl-pending-banner {
+  background: var(--color-surface-subtle);
+  border-left: var(--space-half) solid var(--color-alert-border);
+  padding: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}
+
+.pnl-total-row {
+  font-weight: var(--font-weight-strong);
+  border-top: var(--border-width-strong) solid var(--color-border);
+}

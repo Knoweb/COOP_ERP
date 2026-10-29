@@ -619,6 +619,34 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                         list);
     }
 
+    @Test
+    void commercialPriceListCreationAndPublishing() {
+        UUID commercialList = create.handle(new CreatePriceList("COMMERCIAL", "Commercial list"), own(FEDERATION));
+        assertThat(commercialList).isNotNull();
+        assertThat(audit("PRICELIST_DRAFTED")).hasSize(1);
+        assertThat(events(PriceListDrafted.class))
+                .containsExactly(new PriceListDrafted(commercialList, commercialList, FEDERATION, "COMMERCIAL", 1));
+        kernel.reset();
+
+        SetLinesResult result = setLines.handle(
+                new SetLines(commercialList, List.of(line(rice, "0", "120.00"), line(sugar, "0", "150.00"))),
+                own(FEDERATION));
+        assertThat(result.saved()).isTrue();
+        kernel.reset();
+
+        publish.handle(new PublishPriceList(commercialList, today), own(FEDERATION));
+        assertThat(queries.getPriceList(commercialList, own(FEDERATION))).get().satisfies(view -> {
+            assertThat(view.status()).isEqualTo("PUBLISHED");
+            assertThat(view.kind()).isEqualTo("COMMERCIAL");
+            assertThat(view.applyFrom()).isEqualTo(today);
+        });
+
+        // Creating a second commercial price list draft for the same entity fails
+        refused(
+                () -> create.handle(new CreatePriceList("COMMERCIAL", "Another list"), own(FEDERATION)),
+                "m3.price_list.commercial_exists");
+    }
+
     private static SetLines.Line line(UUID sku, String tier, String price) {
         return new SetLines.Line(sku, "EA", new BigDecimal(tier), new BigDecimal(price));
     }

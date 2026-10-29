@@ -151,4 +151,23 @@ final class CustomerResponses {
                 .exportSha256(view.exportSha256())
                 .refusalGround(view.refusalGround());
     }
+
+    static lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport bulkReport(
+            lk.coopfed.knoweb.m7customers.api.BulkMemberReport report) {
+        return new lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport()
+                .importId(report.importId())
+                .status(lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport.StatusEnum.fromValue(
+                        report.status()))
+                .totalRows(report.totalRows())
+                .registeredCount(report.registeredCount())
+                .updatedCount(report.updatedCount())
+                .failedCount(report.failedCount())
+                .problems(report.problems().stream()
+                        .map(p -> new lk.coopfed.knoweb.m7customers.web.generated.MemberProblem()
+                                .rowNumber(p.rowNumber())
+                                .nameOrPhone(p.nameOrPhone())
+                                .field(p.field())
+                                .reason(p.reason()))
+                        .toList());
+    }
 }

@@ -15,5 +15,11 @@ public record PickListView(UUID pickListId, UUID deliveryDocumentId, String stat
      * stock did not cover.
      */
     public record Pick(
-            UUID deliveryLineId, UUID skuId, UUID locationId, UUID stockLotId, UUID batchId, BigDecimal qty) {}
+            UUID pickLineId,
+            UUID deliveryLineId,
+            UUID skuId,
+            UUID locationId,
+            UUID stockLotId,
+            UUID batchId,
+            BigDecimal qty) {}
 }

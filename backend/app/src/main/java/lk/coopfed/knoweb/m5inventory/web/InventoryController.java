@@ -11,11 +11,16 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
+import lk.coopfed.knoweb.m5inventory.api.BulkImportOpeningStock;
+import lk.coopfed.knoweb.m5inventory.api.BulkOpeningStockReport;
+import lk.coopfed.knoweb.m5inventory.api.CancelTransfer;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
+import lk.coopfed.knoweb.m5inventory.api.OpeningStockRow;
+import lk.coopfed.knoweb.m5inventory.api.OverridePick;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
@@ -24,18 +29,26 @@ import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
+import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.BulkImportStockRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.BulkStockReport;
+import lk.coopfed.knoweb.m5inventory.web.generated.CancelTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.InventoryApi;
 import lk.coopfed.knoweb.m5inventory.web.generated.IssueTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.LotBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.MovementResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.OverridePickRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.PickReplacementCandidateResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockProblem;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
 import org.springframework.http.ResponseEntity;
@@ -56,31 +69,40 @@ class InventoryController implements InventoryApi {
     private final BatchQueries batches;
     private final CurrentScope currentScope;
     private final Handles<PrepareOpeningBalance, UUID> prepare;
+    private final Handles<BulkImportOpeningStock, BulkOpeningStockReport> bulkImport;
     private final Handles<SignOpeningBalance, UUID> sign;
     private final Handles<CountersignOpeningBalance, UUID> countersign;
     private final Handles<IssueTransfer, UUID> issueTransfer;
     private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
+    private final Handles<CancelTransfer, UUID> cancelTransfer;
+    private final Handles<OverridePick, UUID> overridePick;
 
     InventoryController(
             InventoryQueries queries,
             BatchQueries batches,
             CurrentScope currentScope,
             Handles<PrepareOpeningBalance, UUID> prepare,
+            Handles<BulkImportOpeningStock, BulkOpeningStockReport> bulkImport,
             Handles<SignOpeningBalance, UUID> sign,
             Handles<CountersignOpeningBalance, UUID> countersign,
             Handles<IssueTransfer, UUID> issueTransfer,
             Handles<DispatchTransfer, UUID> dispatchTransfer,
-            Handles<ReceiveTransfer, UUID> receiveTransfer) {
+            Handles<ReceiveTransfer, UUID> receiveTransfer,
+            Handles<CancelTransfer, UUID> cancelTransfer,
+            Handles<OverridePick, UUID> overridePick) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
         this.prepare = prepare;
+        this.bulkImport = bulkImport;
         this.sign = sign;
         this.countersign = countersign;
         this.issueTransfer = issueTransfer;
         this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
+        this.cancelTransfer = cancelTransfer;
+        this.overridePick = overridePick;
     }
 
     // ---- transfers (M5-09) ----------------------------------------------------------------
@@ -123,9 +145,30 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
-    public ResponseEntity<TransferResponse> receiveTransfer(String idempotencyKey, UUID transferId) {
+    public ResponseEntity<TransferResponse> receiveTransfer(
+            String idempotencyKey, UUID transferId, ReceiveTransferRequest request) {
         ScopeContext scope = currentScope.get();
-        receiveTransfer.handle(new ReceiveTransfer(transferId), scope);
+        ReceiveTransfer command = request == null
+                ? new ReceiveTransfer(transferId)
+                : new ReceiveTransfer(
+                        transferId,
+                        request.getLines().stream()
+                                .map(line -> line == null
+                                        ? null
+                                        : new ReceiveTransfer.Line(line.getTransferLineId(), line.getReceivedQty()))
+                                .toList());
+        receiveTransfer.handle(command, scope);
+        return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<TransferResponse> cancelTransfer(
+            String idempotencyKey, UUID transferId, CancelTransferRequest request) {
+        ScopeContext scope = currentScope.get();
+        cancelTransfer.handle(
+                new CancelTransfer(
+                        transferId, request.getReason(), Boolean.TRUE.equals(request.getPhysicalReturnVerified())),
+                scope);
         return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
     }
 
@@ -136,7 +179,10 @@ class InventoryController implements InventoryApi {
                         t.toLocationId(),
                         TransferResponse.StatusEnum.fromValue(t.status()),
                         t.lines().stream()
-                                .map(l -> new TransferLineResponse(l.lineNo(), l.batchId(), l.skuId(), l.qty()))
+                                .map(l -> new TransferLineResponse(
+                                                l.transferLineId(), l.lineNo(), l.batchId(), l.skuId(), l.qty())
+                                        .receivedQty(l.receivedQty())
+                                        .shortfallQty(l.shortfallQty()))
                                 .toList())
                 .issuedBy(t.issuedBy())
                 .issuedAt(t.issuedAt())
@@ -144,7 +190,16 @@ class InventoryController implements InventoryApi {
                 .dispatchedBy(t.dispatchedBy())
                 .dispatchedAt(t.dispatchedAt())
                 .receivedBy(t.receivedBy())
-                .receivedAt(t.receivedAt());
+                .receivedAt(t.receivedAt())
+                .shortfallId(t.shortfallId())
+                .shortfallStatus(
+                        t.shortfallStatus() == null
+                                ? null
+                                : TransferResponse.ShortfallStatusEnum.fromValue(t.shortfallStatus()))
+                .shortfallCategory(
+                        t.shortfallCategory() == null
+                                ? null
+                                : TransferResponse.ShortfallCategoryEnum.fromValue(t.shortfallCategory()));
     }
 
     // ---- reads ----------------------------------------------------------------------------
@@ -198,6 +253,26 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
+    public ResponseEntity<List<PickReplacementCandidateResponse>> listPickReplacementCandidates(
+            UUID deliveryNoteId, UUID pickLineId) {
+        ScopeContext scope = currentScope.get();
+        Map<UUID, String> batchNumbers = new HashMap<>();
+        return ResponseEntity.ok(queries.pickReplacementCandidates(deliveryNoteId, pickLineId, scope).stream()
+                .map(candidate -> toResponse(candidate, batchNo(batchNumbers, candidate.batchId(), scope)))
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<Void> overridePick(
+            String idempotencyKey, UUID deliveryNoteId, UUID pickLineId, OverridePickRequest request) {
+        ScopeContext scope = currentScope.get();
+        overridePick.handle(
+                new OverridePick(deliveryNoteId, pickLineId, request.getReplacementStockLotId(), request.getReason()),
+                scope);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
     public ResponseEntity<OpeningBalanceResponse> getOpeningBalance(UUID openingBalanceId) {
         return queries.openingBalance(openingBalanceId, currentScope.get())
                 .map(InventoryController::toResponse)
@@ -227,6 +302,47 @@ class InventoryController implements InventoryApi {
         UUID id = prepare.handle(new PrepareOpeningBalance(request.getLocationId(), lines), scope);
         return ResponseEntity.created(URI.create("/v1/inventory/opening-balances/" + id))
                 .body(toResponse(queries.openingBalance(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<BulkStockReport> bulkImportOpeningStock(
+            String idempotencyKey, BulkImportStockRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<OpeningStockRow> rows = request.getLines() == null
+                ? List.of()
+                : request.getLines().stream()
+                        .map(line -> new OpeningStockRow(
+                                line.getSku(),
+                                line.getSkuId(),
+                                line.getBatchId(),
+                                line.getBatchNo(),
+                                line.getExpiryDate(),
+                                line.getPrintedMrp(),
+                                line.getCondition() == null
+                                        ? LotCondition.GOOD
+                                        : LotCondition.valueOf(
+                                                line.getCondition().getValue()),
+                                line.getQty(),
+                                line.getUnitCost()))
+                        .toList();
+
+        BulkOpeningStockReport report =
+                bulkImport.handle(new BulkImportOpeningStock(request.getLocationId(), request.getSheet(), rows), scope);
+
+        BulkStockReport response = new BulkStockReport(
+                report.importId(),
+                report.openingBalanceId(),
+                BulkStockReport.StatusEnum.fromValue(report.status()),
+                report.totalRows(),
+                report.importedLines());
+        if (report.problems() != null && !report.problems().isEmpty()) {
+            response.setProblems(report.problems().stream()
+                    .map(p -> new StockProblem(p.line(), p.message()).sku(p.sku()))
+                    .toList());
+        }
+
+        return ResponseEntity.created(URI.create("/v1/inventory/opening-balances/" + report.openingBalanceId()))
+                .body(response);
     }
 
     @Override
@@ -296,11 +412,18 @@ class InventoryController implements InventoryApi {
                 list.deliveryDocumentId(),
                 PickListResponse.StatusEnum.fromValue(list.status()),
                 list.lines().stream()
-                        .map(p -> new PickResponse(p.deliveryLineId(), p.skuId(), p.qty())
+                        .map(p -> new PickResponse(p.pickLineId(), p.deliveryLineId(), p.skuId(), p.qty())
                                 .locationId(p.locationId())
                                 .stockLotId(p.stockLotId())
                                 .batchId(p.batchId()))
                         .toList());
+    }
+
+    private static PickReplacementCandidateResponse toResponse(PickReplacementCandidate candidate, String batchNo) {
+        return new PickReplacementCandidateResponse(
+                        candidate.stockLotId(), candidate.batchId(), candidate.availableQty())
+                .batchNo(batchNo)
+                .expiryDate(candidate.expiryDate());
     }
 
     private static OpeningBalanceResponse toResponse(OpeningBalanceView balance) {
@@ -310,12 +433,15 @@ class InventoryController implements InventoryApi {
                         OpeningBalanceResponse.StatusEnum.fromValue(balance.status()),
                         balance.lines().stream()
                                 .map(l -> new OpeningBalanceLineResponse(
-                                        l.lineNo(),
-                                        l.batchId(),
-                                        l.skuId(),
-                                        OpeningBalanceLineResponse.ConditionEnum.fromValue(l.condition()),
-                                        l.qty(),
-                                        l.unitCost()))
+                                                l.lineNo(),
+                                                l.skuId(),
+                                                OpeningBalanceLineResponse.ConditionEnum.fromValue(l.condition()),
+                                                l.qty(),
+                                                l.unitCost())
+                                        .batchId(l.batchId())
+                                        .batchNo(l.batchNo())
+                                        .expiryDate(l.expiryDate())
+                                        .printedMrp(l.printedMrp()))
                                 .toList())
                 .preparedBy(balance.preparedBy())
                 .signedEntityBy(balance.signedEntityBy())

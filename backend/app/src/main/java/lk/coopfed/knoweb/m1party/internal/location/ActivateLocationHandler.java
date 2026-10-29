@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m1party.internal.location;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
@@ -11,6 +12,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.ActivateLocation;
 import lk.coopfed.knoweb.m1party.api.LocationActivated;
+import lk.coopfed.knoweb.m1party.api.LocationActivationPrerequisite;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,13 +30,19 @@ class ActivateLocationHandler implements Handles<ActivateLocation, UUID> {
 
     private final LocationRepository locations;
     private final LocationFacts facts;
+    private final List<LocationActivationPrerequisite> activationPrerequisites;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     ActivateLocationHandler(
-            LocationRepository locations, LocationFacts facts, AuditFacade audit, EventPublisher events) {
+            LocationRepository locations,
+            LocationFacts facts,
+            List<LocationActivationPrerequisite> activationPrerequisites,
+            AuditFacade audit,
+            EventPublisher events) {
         this.locations = locations;
         this.facts = facts;
+        this.activationPrerequisites = List.copyOf(activationPrerequisites);
         this.audit = audit;
         this.events = events;
     }
@@ -54,6 +62,9 @@ class ActivateLocationHandler implements Handles<ActivateLocation, UUID> {
         }
         if (location.isShop() && !facts.hasOperator(location.ownerEntityId(), location.getId())) {
             throw new ProblemException("m1.location.operator_required", Map.of("locationId", location.getId()));
+        }
+        for (LocationActivationPrerequisite prerequisite : activationPrerequisites) {
+            prerequisite.requireSatisfied(location.ownerEntityId(), location.getId(), location.locationType());
         }
 
         Map<String, Object> before = location.auditState();

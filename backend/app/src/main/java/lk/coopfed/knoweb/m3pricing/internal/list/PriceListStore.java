@@ -22,12 +22,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class PriceListStore {
 
-    static final String TRADE = "TRADE";
-    static final String RETAIL = "RETAIL";
-    static final String ADVISORY = "ADVISORY";
-    static final String DRAFT = "DRAFT";
-    static final String PUBLISHED = "PUBLISHED";
-    static final String SUPERSEDED = "SUPERSEDED";
+    public static final String TRADE = "TRADE";
+    public static final String RETAIL = "RETAIL";
+    public static final String COMMERCIAL = "COMMERCIAL";
+    public static final String ADVISORY = "ADVISORY";
+    public static final String DRAFT = "DRAFT";
+    public static final String PUBLISHED = "PUBLISHED";
+    public static final String SUPERSEDED = "SUPERSEDED";
 
     private static final String LIST_COLUMNS = "price_list_id, root_price_list_id, owner_entity_id, kind, name,"
             + " version, source_version_id, status, apply_from, published_at, created_at";

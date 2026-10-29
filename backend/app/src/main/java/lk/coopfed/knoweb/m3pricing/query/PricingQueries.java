@@ -88,6 +88,14 @@ public interface PricingQueries {
             UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
 
     /**
+     * ResolveCommercialPrice: commercial/institutional selling price of a SKU at a shop on a date,
+     * prioritizing the society's published COMMERCIAL list in force, falling back to RETAIL, bounded
+     * by in-stock batch MRP and the control price.
+     */
+    Optional<RetailPrice> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
+
+    /**
      * ResolveBasket(location, date, tenderKind, lines) of doc 23 section 5.2.
      */
     Optional<lk.coopfed.knoweb.engine.BasketResult> resolveBasket(
