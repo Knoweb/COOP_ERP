@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
@@ -41,6 +41,20 @@ export function NotificationsPage() {
 
   const [status, setStatus] = useState<LogStatus | "">("");
   const [message, setMessage] = useState<string | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [dropdownOpen]);
 
   const rules = useQuery({ queryKey: ["integration", "rules"], queryFn: () => api.rules() });
   const templates = useQuery({ queryKey: ["integration", "templates"], queryFn: () => api.templates() });
@@ -90,13 +104,13 @@ export function NotificationsPage() {
       <h1>{t("integration.notify.title").text}</h1>
       {message && <p role="alert">{message}</p>}
 
-      <section>
+      <section className="notifications-section">
         <h2>{t("integration.rules.title").text}</h2>
         {rules.isLoading && <p>{t("integration.loading").text}</p>}
         {rules.isError && <p role="alert">{errorText(rules.error, t("integration.error.generic").text)}</p>}
         {rules.data && (
           <div className="modern-table-card">
-            <div className="modern-table-scroll">
+            <div className="modern-table-scroll notification-rules-scroll">
               <table className="modern-table notification-rules-table">
                 <thead>
                   <tr>
@@ -130,7 +144,7 @@ export function NotificationsPage() {
                           {rule.federationWide && (
                             <button
                               type="button"
-                              className="modern-btn"
+                              className="modern-btn notification-rule-btn"
                               aria-label={t(
                                 rule.status === "ACTIVE" ? "integration.rules.retire.label" : "integration.rules.activate.label",
                                 undefined,
@@ -154,7 +168,7 @@ export function NotificationsPage() {
         )}
       </section>
 
-      <section>
+      <section className="notifications-section">
         <h2>{t("integration.templates.title").text}</h2>
         {templates.isLoading && <p>{t("integration.loading").text}</p>}
         {templates.data && (
@@ -164,16 +178,21 @@ export function NotificationsPage() {
               const body = templateText(template.bodyEn, template.bodySi, template.bodyTa, language);
               return (
                 <li key={template.templateId} className="modern-table-card integration-template">
-                  <h3>
-                    {template.templateId} <span className="integration-muted">({template.channel})</span>
-                  </h3>
-                  {subject.text && <p className="integration-subject">{subject.text}</p>}
-                  <p>
+                  <div className="integration-template__header">
+                    <div className="integration-template__identity">
+                      <h3 className="integration-template__title">{template.templateId}</h3>
+                      <span className="integration-template__channel">{template.channel}</span>
+                      {subject.text && <span className="integration-subject">{subject.text}</span>}
+                    </div>
+                    <div className="integration-placeholders">
+                      <span className="integration-muted">
+                        {t("integration.templates.placeholders", undefined, { names: template.placeholders.join(", ") }).text}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="integration-template__body">
                     {body.text}
                     {body.fallback && <LangFallbackTag />}
-                  </p>
-                  <p className="integration-muted">
-                    {t("integration.templates.placeholders", undefined, { names: template.placeholders.join(", ") }).text}
                   </p>
                 </li>
               );
@@ -182,16 +201,102 @@ export function NotificationsPage() {
         )}
       </section>
 
-      <section>
+      <section className="notifications-section">
         <h2>{t("integration.log.title").text}</h2>
-        <div className="modern-filter-panel integration-bar">
-          <label className="modern-field">
-            <span className="modern-field__label integration-label">{t("integration.log.filter").text}</span>
-            <div className="modern-select">
+        <div className="modern-filter-panel modern-filter-panel--notifications">
+          <div className="modern-field modern-field--select" ref={dropdownRef}>
+            <span className="modern-field__label">
+              {t("integration.log.filter").text}
+            </span>
+            <div className="integration-custom-dropdown">
+              <button
+                type="button"
+                className={`integration-dropdown-trigger ${dropdownOpen ? "integration-dropdown-trigger--open" : ""}`}
+                aria-haspopup="listbox"
+                aria-expanded={dropdownOpen}
+                aria-label={t("integration.log.filter").text}
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+              >
+                <span>
+                  {status === ""
+                    ? t("integration.log.filter.all").text
+                    : t(`integration.log.status.${status}`).text}
+                </span>
+                <svg
+                  className={`integration-dropdown-arrow ${dropdownOpen ? "integration-dropdown-arrow--open" : ""}`}
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="m7 9 5 5 5-5" />
+                </svg>
+              </button>
+
+              {dropdownOpen && (
+                <ul className="integration-dropdown-menu" role="listbox" aria-label={t("integration.log.filter").text}>
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={status === ""}
+                      className={`integration-dropdown-item ${status === "" ? "integration-dropdown-item--selected" : ""}`}
+                      onClick={() => {
+                        setStatus("");
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      {status === "" ? (
+                        <span className="integration-dropdown-item__bar" aria-hidden="true" />
+                      ) : (
+                        <span className="integration-dropdown-item__spacer" aria-hidden="true" />
+                      )}
+                      <span className="integration-dropdown-item__label">{t("integration.log.filter.all").text}</span>
+                      {status === "" && (
+                        <svg className="integration-dropdown-item__check" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      )}
+                    </button>
+                  </li>
+                  {LOG_STATUSES.map((s) => {
+                    const isSelected = status === s;
+                    return (
+                      <li key={s} role="none">
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          className={`integration-dropdown-item ${isSelected ? "integration-dropdown-item--selected" : ""}`}
+                          onClick={() => {
+                            setStatus(s);
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          {isSelected ? (
+                            <span className="integration-dropdown-item__bar" aria-hidden="true" />
+                          ) : (
+                            <span className="integration-dropdown-item__spacer" aria-hidden="true" />
+                          )}
+                          <span className="integration-dropdown-item__label">{t(`integration.log.status.${s}`).text}</span>
+                          {isSelected && (
+                            <svg className="integration-dropdown-item__check" viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {/* Accessible hidden select for screen readers and automated test queries */}
               <select
                 aria-label={t("integration.log.filter").text}
                 value={status}
-                onChange={(event) => setStatus(event.target.value as LogStatus | "")}
+                onChange={(e) => setStatus(e.target.value as LogStatus | "")}
+                className="visually-hidden"
+                tabIndex={-1}
+                aria-hidden="true"
               >
                 <option value="">{t("integration.log.filter.all").text}</option>
                 {LOG_STATUSES.map((s) => (
@@ -200,18 +305,19 @@ export function NotificationsPage() {
                   </option>
                 ))}
               </select>
-              <svg className="modern-select__arrow" viewBox="0 0 24 24">
-                <path d="m7 9 5 5 5-5" />
-              </svg>
             </div>
-          </label>
+          </div>
         </div>
         {log.isLoading && <p>{t("integration.loading").text}</p>}
         {log.isError && <p role="alert">{errorText(log.error, t("integration.error.generic").text)}</p>}
-        {log.data && log.data.length === 0 && <p>{t("integration.log.empty").text}</p>}
+        {log.data && log.data.length === 0 && (
+          <div className="modern-table-card integration-empty-card">
+            <p>{t("integration.log.empty").text}</p>
+          </div>
+        )}
         {log.data && log.data.length > 0 && (
           <div className="modern-table-card">
-            <div className="modern-table-scroll">
+            <div className="notification-log-scroll">
               <table className="modern-table notification-log-table">
                 <thead>
                   <tr>
