@@ -18,7 +18,7 @@ the discrepancy rather than copying the older design into a new feature.
 | Scope and identity | `Scope`, `ScopeContext`, `CurrentScope`, `PolicyClass`, `IdentityProviderClient` | The JWT filter resolves user scopes from M1 at request time. `ScopeSession` writes transaction-local PostgreSQL settings. The system entity is named by `kernel.system_identity` and `kernel.system_entity()`. |
 | Commands and permissions | `CommandHandler`, `PermissionResolver`, `IdempotencyStore`, `PinHasher`, `Sod` | `CommandInterceptor` checks authentication, active scope, permission, MFA, separation of duties and the idempotency key before a handler runs. `kernel.idempotency_key` is partitioned by UTC day. |
 | Audit | `AuditFacade`, `AuditReviewReader` | `kernel.audit_event` is an append-only, monthly partitioned ledger. Event types come from `seed/kernel/audit-event-types.yaml`. REVIEW reads use narrow security-definer functions owned by the NOLOGIN `kernel_audit_reader` role. |
-| Events | `DomainEvent`, `EventPublisher`, `EventConsumer` | Publishing inserts into `kernel.event_outbox` in the caller transaction. `coop_relay`, on a separate data source, publishes through `BrokerAdapter`; consumers claim `kernel.event_inbox` in their business transaction. RabbitMQ is the implemented broker. |
+| Events | `DomainEvent`, `EventPublisher`, `EventConsumer` | Publishing inserts into `kernel.event_outbox` in the caller transaction. `coop_relay`, on a separate data source, publishes through `BrokerAdapter`; consumers claim `kernel.event_inbox` in their business transaction. RabbitMQ is the implemented and active broker; `NatsBrokerAdapter` is a dependency-free, non-Spring compile-time stub. |
 | Messages and formats | `Messages`, `Formats`, `TextNormaliser`, `HistoricalTime` | ICU catalogues are file based under `i18n/<module>/{en,si,ta}.json`. Every `String` request value is NFC-normalised. English field-level fallback is explicit in `Messages.Text.fallback`. |
 | Documents and numbering | `DocumentIssuance`, `DocumentRepository`, `DocumentLinks`, `DocumentStates`, `DocumentTypeHandler`, `NumberingService` | Kernel document headers, lines, links, state history and series live in `kernel.document*` and `kernel.numbering_series`. Issuance hashes immutable content and consumes a number in one transaction. Device-held numbers raise the central high-water mark through `observeDeviceNumber`. |
 | Configuration | `ConfigRegistry`, `ConfigSeeder` | Registered items come from `seed/kernel/config-items.yaml`; values are append-only in `kernel.config_value`. Resolution is location, entity, federation, default. A per-instance 30-second cache is invalidated locally after commit and across instances by `config.changed.v1`. |
@@ -201,8 +201,6 @@ not listed as current gaps.
 
 - **QA-15:** production request/idempotency/problem classes still live in
   `kernel.internal.stub`; renaming that package is a separate roadmap task.
-- **QA-17:** RabbitMQ is behind `BrokerAdapter`, but the requested
-  `NatsBrokerAdapter` compile-time stub and its test are not implemented.
 - **K-08-F2:** full snapshots are not yet pre-built resumable objects, as recorded above.
 - **K-06b follow-ups:** rendered-report retention/ledger, a web render queue and pixel-golden
   proof are deferred. Worker-image packaging is implemented.
