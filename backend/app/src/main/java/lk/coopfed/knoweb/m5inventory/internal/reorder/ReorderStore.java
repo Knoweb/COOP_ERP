@@ -14,7 +14,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Read-only database operations for reorder controls and stock balance queries (PGL-M2-01).
+ * Database operations for reorder controls and stock balance queries (PGL-M2-01).
+ *
+ * <p>In accordance with repository invariants (AGENTS.md), reorder controls are never
+ * physically deleted; active queries filter on {@code status = 'ACTIVE'}.
  */
 @Repository
 public class ReorderStore {
@@ -57,6 +60,7 @@ public class ReorderStore {
                   ) stock on true
                  where rc.location_id = ?
                    and (?::uuid is null or rc.sku_id = ?::uuid)
+                   and rc.status = 'ACTIVE'
                  order by rc.created_at desc
                 """,
                 (rs, rowNum) -> new ReorderControlView(
@@ -114,7 +118,7 @@ public class ReorderStore {
         List<ReorderControlRecord> list = jdbc.query(
                 """
                 select reorder_control_id, owner_entity_id, location_id, sku_id,
-                       reorder_level, reorder_qty, max_qty, alert_triggered, last_alerted_at, last_alert_qty
+                       reorder_level, reorder_qty, max_qty, alert_triggered, last_alerted_at, last_alert_qty, status
                   from inventory.reorder_control
                  where owner_entity_id = ? and location_id = ? and sku_id = ?
                    for update
@@ -129,7 +133,8 @@ public class ReorderStore {
                         rs.getBigDecimal("max_qty"),
                         rs.getBoolean("alert_triggered"),
                         toInstant(rs.getTimestamp("last_alerted_at")),
-                        rs.getBigDecimal("last_alert_qty")),
+                        rs.getBigDecimal("last_alert_qty"),
+                        rs.getString("status")),
                 ownerEntityId,
                 locationId,
                 skuId);
@@ -140,9 +145,9 @@ public class ReorderStore {
         return jdbc.query(
                 """
                 select reorder_control_id, owner_entity_id, location_id, sku_id,
-                       reorder_level, reorder_qty, max_qty, alert_triggered, last_alerted_at, last_alert_qty
+                       reorder_level, reorder_qty, max_qty, alert_triggered, last_alerted_at, last_alert_qty, status
                   from inventory.reorder_control
-                 where owner_entity_id = ? and location_id = ?
+                 where owner_entity_id = ? and location_id = ? and status = 'ACTIVE'
                    for update
                 """,
                 (rs, rowNum) -> new ReorderControlRecord(
@@ -155,7 +160,8 @@ public class ReorderStore {
                         rs.getBigDecimal("max_qty"),
                         rs.getBoolean("alert_triggered"),
                         toInstant(rs.getTimestamp("last_alerted_at")),
-                        rs.getBigDecimal("last_alert_qty")),
+                        rs.getBigDecimal("last_alert_qty"),
+                        rs.getString("status")),
                 ownerEntityId,
                 locationId);
     }
@@ -165,6 +171,7 @@ public class ReorderStore {
                 """
                 select distinct owner_entity_id, location_id
                   from inventory.reorder_control
+                 where status = 'ACTIVE'
                  order by owner_entity_id, location_id
                 """,
                 (rs, rowNum) -> new LocationEntityKey(
@@ -189,5 +196,10 @@ public class ReorderStore {
             BigDecimal maxQty,
             boolean alertTriggered,
             Instant lastAlertedAt,
-            BigDecimal lastAlertQty) {}
+            BigDecimal lastAlertQty,
+            String status) {
+        public boolean isActive() {
+            return "ACTIVE".equals(status);
+        }
+    }
 }

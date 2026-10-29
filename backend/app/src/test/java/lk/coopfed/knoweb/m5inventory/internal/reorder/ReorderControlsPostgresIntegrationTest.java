@@ -101,7 +101,12 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void configureReorderControlInsertsAndUpdates() {
         UUID sku = fixture.sku(MPCS, "SKU_CONF_1");
+        UUID batch = fixture.batch(sku, MPCS, "B-CONF-1", EXPIRY);
         ScopeContext scope = at(MPCS, shop1);
+
+        // Post 100 stock so available is well above threshold 10
+        postReceipt(shop1, batch, new BigDecimal("100.000"), MPCS);
+        kernel.reset();
 
         // 1. Initial configuration (CREATE)
         ConfigureReorderControl cmd = new ConfigureReorderControl(
@@ -163,6 +168,41 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(v.reorderLevel()).isEqualByComparingTo("15.000");
             assertThat(v.reorderQty()).isEqualByComparingTo("30.000");
             assertThat(v.maxQty()).isEqualByComparingTo("60.000");
+        });
+    }
+
+    @Test
+    void configureReorderControlWhenStockIsLowEmitsInitialAlert() {
+        UUID sku = fixture.sku(MPCS, "SKU_CONF_LOW");
+        UUID batch = fixture.batch(sku, MPCS, "B-CONF-LOW", EXPIRY);
+        ScopeContext scope = at(MPCS, shop1);
+
+        // Stock = 5.000 (strictly below reorder level 10.000)
+        postReceipt(shop1, batch, new BigDecimal("5.000"), MPCS);
+        kernel.reset();
+
+        ConfigureReorderControl cmd = new ConfigureReorderControl(
+                shop1, sku, new BigDecimal("10.000"), new BigDecimal("20.000"), new BigDecimal("50.000"));
+
+        UUID controlId = configureHandler.handle(cmd, scope);
+        assertThat(controlId).isNotNull();
+
+        assertThat(audits(ConfigureReorderControlHandler.AUDIT_CONFIGURED)).hasSize(1);
+        assertThat(audits(LowStockEvaluationHandler.AUDIT_LOW_STOCK_DETECTED)).hasSize(1);
+        assertThat(events(ReorderControlConfigured.class)).hasSize(1);
+        assertThat(events(LowStockDetected.class)).singleElement().satisfies(e -> {
+            assertThat(e.reorderControlId()).isEqualTo(controlId);
+            assertThat(e.locationId()).isEqualTo(shop1);
+            assertThat(e.skuId()).isEqualTo(sku);
+            assertThat(e.availableQty()).isEqualByComparingTo("5.000");
+            assertThat(e.reorderLevel()).isEqualByComparingTo("10.000");
+        });
+
+        List<ReorderControlView> views = inventoryQueries.reorderControls(shop1, scope);
+        assertThat(views).singleElement().satisfies(v -> {
+            assertThat(v.alertTriggered()).isTrue();
+            assertThat(v.lastAlertedAt()).isNotNull();
+            assertThat(v.currentAvailableQty()).isEqualByComparingTo("5.000");
         });
     }
 
@@ -448,6 +488,7 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
 
         kernel.reset();
 
+        // 1. Delete logically retires the control
         deleteHandler.handle(new DeleteReorderControl(shop1, sku), scope);
 
         assertThat(audits(DeleteReorderControlHandler.AUDIT_DELETED))
@@ -464,7 +505,27 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(e.skuId()).isEqualTo(sku);
         });
 
+        // Active query returns empty
         assertThat(inventoryQueries.reorderControls(shop1, scope)).isEmpty();
+
+        // Database row physically retained with status RETIRED (no application DELETE)
+        String status = superuserJdbc()
+                .queryForObject(
+                        "select status from inventory.reorder_control where reorder_control_id = ?",
+                        String.class,
+                        controlId);
+        assertThat(status).isEqualTo("RETIRED");
+
+        // 2. Deleting an already-retired control throws ProblemException (m5.reorder.not_found)
+        assertThatThrownBy(() -> deleteHandler.handle(new DeleteReorderControl(shop1, sku), scope))
+                .isInstanceOf(ProblemException.class);
+
+        // 3. Re-configuring the control reactivates the record
+        UUID reactivatedId = configureHandler.handle(
+                new ConfigureReorderControl(shop1, sku, new BigDecimal("12.000"), new BigDecimal("25.000"), null),
+                scope);
+        assertThat(reactivatedId).isEqualTo(controlId);
+        assertThat(inventoryQueries.reorderControls(shop1, scope)).hasSize(1);
     }
 
     @Test
