@@ -396,6 +396,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-sm);
+  border: var(--border-width) solid var(--color-polish-6);
 }
 
 .import-table th {
@@ -404,13 +405,18 @@
   text-align: left;
   font-weight: 600;
   color: var(--color-text-muted);
-  border-bottom: var(--border-width) solid var(--color-border);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
 }
 
 .import-table td {
   padding: var(--space-2) var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-polish-18);
   vertical-align: middle;
+}
+
+.import-table th:not(:last-child),
+.import-table td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-18);
 }
 
 .import-table tr:last-child td {

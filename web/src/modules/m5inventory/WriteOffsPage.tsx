@@ -83,14 +83,13 @@ export function WriteOffsPage() {
 
   return (
     <main className="shell-page">
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <PageHeader
         icon="stock"
         title={t("inventory.title").text}
-        actions={
-          <Link className="action-link" to="/inventory">
-            <span>{t("inventory.back").text}</span>
-          </Link>
-        }
       />
 
       <div className="inventory-control-links">
@@ -124,32 +123,32 @@ export function WriteOffsPage() {
           <div className="modern-table-scroll">
             <table className="modern-table stock-table">
               <thead>
-            <tr>
-              <th>{t("inventory.writeoff.document").text}</th>
-              <th>{t("inventory.writeoff.category").text}</th>
-              <th>{t("inventory.writeoff.value").text}</th>
-              <th>{t("inventory.repack.column.status").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {writeOffs.data.map((writeOff) => (
-              <tr key={writeOff.writeOffId}>
-                <td>{writeOff.documentNo ?? (writeOff.requestedAt ? formatInstant(writeOff.requestedAt) : "")}</td>
-                <td>{t(`inventory.writeoff.category.${writeOff.category}`).text}</td>
-                <td className="numeric-cell">{writeOff.value == null ? "" : <MoneyDisplay amount={writeOff.value} />}</td>
-                <td>
-                  <StateChip
-                    state={writeOffChip(writeOff.status)}
-                    label={t(`inventory.writeoff.status.${writeOff.status}`).text}
-                  />
-                </td>
-                <td>
-                  <Link to={`/inventory/write-offs/${writeOff.writeOffId}`}>{t("inventory.writeoff.open").text}</Link>
-                </td>
-              </tr>
-            ))}
-            </tbody>
+                <tr>
+                  <th>{t("inventory.writeoff.document").text}</th>
+                  <th>{t("inventory.writeoff.category").text}</th>
+                  <th>{t("inventory.writeoff.value").text}</th>
+                  <th>{t("inventory.repack.column.status").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {writeOffs.data.map((writeOff) => (
+                  <tr key={writeOff.writeOffId}>
+                    <td>{writeOff.documentNo ?? (writeOff.requestedAt ? formatInstant(writeOff.requestedAt) : "")}</td>
+                    <td>{t(`inventory.writeoff.category.${writeOff.category}`).text}</td>
+                    <td className="numeric-cell">{writeOff.value == null ? "" : <MoneyDisplay amount={writeOff.value} />}</td>
+                    <td>
+                      <StateChip
+                        state={writeOffChip(writeOff.status)}
+                        label={t(`inventory.writeoff.status.${writeOff.status}`).text}
+                      />
+                    </td>
+                    <td>
+                      <Link to={`/inventory/write-offs/${writeOff.writeOffId}`}>{t("inventory.writeoff.open").text}</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         )}
@@ -178,45 +177,45 @@ export function WriteOffsPage() {
             <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
               <table className="modern-table stock-table">
                 <thead>
-                <tr>
-                  <th>{t("inventory.column.item").text}</th>
-                  <th>{t("inventory.column.batch").text}</th>
-                  <th>{t("inventory.column.expiry").text}</th>
-                  <th>{t("inventory.column.condition").text}</th>
-                  <th>{t("inventory.column.on_hand").text}</th>
-                  <th>{t("inventory.writeoff.qty").text}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {available.map((lot) => {
-                  const key = lotKey(lot.batchId, lot.condition);
-                  const batch = isSyntheticBatchNo(lot.batchNo)
-                    ? t("inventory.field.batch_not_tracked").text
-                    : (lot.batchNo ?? "");
-                  return (
-                    <tr key={lot.stockLotId}>
-                      <td>
-                        <SkuLabel skuId={lot.skuId} />
-                      </td>
-                      <td>{batch}</td>
-                      <td>{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
-                      <td>{t(`inventory.condition.${lot.condition}`).text}</td>
-                      <td className="numeric-cell">{lot.qtyOnHand}</td>
-                      <td>
-                        <input
-                          inputMode="decimal"
-                          aria-label={
-                            t("inventory.writeoff.qty_for", undefined, {
-                              batch: `${batch} ${t(`inventory.condition.${lot.condition}`).text}`
-                            }).text
-                          }
-                          value={quantities[key] ?? ""}
-                          onChange={(event) => setQuantities({ ...quantities, [key]: event.target.value })}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
+                  <tr>
+                    <th>{t("inventory.column.item").text}</th>
+                    <th>{t("inventory.column.batch").text}</th>
+                    <th>{t("inventory.column.expiry").text}</th>
+                    <th>{t("inventory.column.condition").text}</th>
+                    <th>{t("inventory.column.on_hand").text}</th>
+                    <th>{t("inventory.writeoff.qty").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {available.map((lot) => {
+                    const key = lotKey(lot.batchId, lot.condition);
+                    const batch = isSyntheticBatchNo(lot.batchNo)
+                      ? t("inventory.field.batch_not_tracked").text
+                      : (lot.batchNo ?? "");
+                    return (
+                      <tr key={lot.stockLotId}>
+                        <td>
+                          <SkuLabel skuId={lot.skuId} />
+                        </td>
+                        <td>{batch}</td>
+                        <td>{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
+                        <td>{t(`inventory.condition.${lot.condition}`).text}</td>
+                        <td className="numeric-cell">{lot.qtyOnHand}</td>
+                        <td>
+                          <input
+                            inputMode="decimal"
+                            aria-label={
+                              t("inventory.writeoff.qty_for", undefined, {
+                                batch: `${batch} ${t(`inventory.condition.${lot.condition}`).text}`
+                              }).text
+                            }
+                            value={quantities[key] ?? ""}
+                            onChange={(event) => setQuantities({ ...quantities, [key]: event.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
