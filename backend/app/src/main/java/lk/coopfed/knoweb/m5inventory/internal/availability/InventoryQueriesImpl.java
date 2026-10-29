@@ -21,6 +21,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
+import lk.coopfed.knoweb.m5inventory.internal.reorder.ReorderStore;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.EntityCost;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
@@ -30,6 +31,7 @@ import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
+import lk.coopfed.knoweb.m5inventory.query.ReorderControlView;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.springframework.beans.factory.annotation.Value;
@@ -86,16 +88,19 @@ class InventoryQueriesImpl implements InventoryQueries {
     private final BusinessDay businessDay;
     private final ControlPolicy policy;
     private final ZoneId zone;
+    private final ReorderStore reorderStore;
 
     InventoryQueriesImpl(
             JdbcTemplate jdbc,
             BusinessDay businessDay,
             ControlPolicy policy,
+            ReorderStore reorderStore,
             @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
         this.policy = policy;
         this.zone = ZoneId.of(zone);
+        this.reorderStore = reorderStore;
     }
 
     @Override
@@ -640,5 +645,10 @@ class InventoryQueriesImpl implements InventoryQueries {
                 Timestamp.from(start),
                 Timestamp.from(end));
         return result;
+    }
+
+    @Override
+    public List<ReorderControlView> reorderControls(UUID locationId, UUID skuId, ScopeContext scope) {
+        return reorderStore.findControls(locationId, skuId, scope);
     }
 }

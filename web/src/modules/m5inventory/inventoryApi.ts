@@ -35,6 +35,9 @@ export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type Batch = catalogueComponents["schemas"]["BatchResponse"];
 export type TransferRequest = tradingComponents["schemas"]["TransferRequestResponse"];
 export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
+export type ReorderControl = components["schemas"]["ReorderControlResponse"];
+export type ConfigureReorderControlRequest = components["schemas"]["ConfigureReorderControlRequest"];
+export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockResponse"];
 
 export function useInventoryApi() {
   const api = useApiClient<paths>();
@@ -373,6 +376,40 @@ export function useInventoryApi() {
       async countersign(id: string, idempotencyKey: string): Promise<OpeningBalance> {
         const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/countersign", {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async listReorderControls(locationId: string, skuId?: string): Promise<ReorderControl[]> {
+        const { data } = await api.GET("/v1/inventory/reorder-controls", {
+          params: { query: { locationId, skuId } }
+        });
+        return data ?? [];
+      },
+
+      async configureReorderControl(request: ConfigureReorderControlRequest, idempotencyKey: string): Promise<ReorderControl> {
+        const { data } = await api.PUT("/v1/inventory/reorder-controls", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async deleteReorderControl(locationId: string, skuId: string, idempotencyKey: string): Promise<void> {
+        await api.DELETE("/v1/inventory/reorder-controls", {
+          params: {
+            header: { "Idempotency-Key": idempotencyKey },
+            query: { locationId, skuId }
+          }
+        });
+      },
+
+      async evaluateLowStock(locationId: string, skuId: string | undefined, idempotencyKey: string): Promise<EvaluateLowStockResponse> {
+        const { data } = await api.POST("/v1/inventory/reorder-controls/evaluate", {
+          params: {
+            header: { "Idempotency-Key": idempotencyKey },
+            query: { locationId, skuId }
+          }
         });
         return data!;
       }

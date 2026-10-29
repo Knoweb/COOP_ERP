@@ -21,6 +21,7 @@ import { PickListPage } from "./PickListPage";
 import { ExpiryListPage } from "./ExpiryListPage";
 import { LossShrinkagePage } from "./LossShrinkagePage";
 import { InventoryPoliciesPage } from "./InventoryPoliciesPage";
+import { ReorderControlsPage } from "./ReorderControlsPage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -64,6 +65,14 @@ export const inventoryModule: ModuleDefinition = {
     {
       path: "inventory/policies",
       element: <RequirePermission anyOf={["inv.stock.view"]}><InventoryPoliciesPage /></RequirePermission>
+    },
+    {
+      path: "inventory/reorder-controls",
+      element: (
+        <RequirePermission anyOf={["inv.stock.view", "inv.reorder.manage"]}>
+          <ReorderControlsPage />
+        </RequirePermission>
+      )
     }
   ],
 
@@ -87,6 +96,7 @@ export const inventoryModule: ModuleDefinition = {
     "inv.recipe.manage",
     "inv.repack.execute",
     "inv.repack.reverse",
-    "whs.pick"
+    "whs.pick",
+    "inv.reorder.manage"
   ]
 };

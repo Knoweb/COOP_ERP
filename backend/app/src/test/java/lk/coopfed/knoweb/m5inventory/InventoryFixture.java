@@ -203,7 +203,7 @@ public final class InventoryFixture {
                 + " inventory.transfer_receipt, inventory.transfer_dispatch,"
                 + " inventory.transfer_line, inventory.transfer, inventory.count_line, inventory.count_expectation,"
                 + " inventory.count_task, inventory.expiry_task, inventory.write_off_photo, inventory.write_off_line, inventory.write_off,"
-                + " inventory.repack_reversal, inventory.repack, inventory.repack_recipe");
+                + " inventory.repack_reversal, inventory.repack, inventory.repack_recipe, inventory.reorder_control");
         for (UUID batch : batches) {
             admin.update("delete from catalogue.batch_key where batch_id = ?", batch);
             admin.update("delete from catalogue.batch where batch_id = ?", batch);

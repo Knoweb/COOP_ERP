@@ -339,6 +339,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/reorder-controls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List reorder controls for a location */
+        get: operations["listReorderControls"];
+        /** Set or update reorder level, reorder quantity and max quantity for an SKU at a location */
+        put: operations["configureReorderControl"];
+        post?: never;
+        /** Delete reorder control for an SKU at a location */
+        delete: operations["deleteReorderControl"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/reorder-controls/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger low stock evaluation for a location */
+        post: operations["evaluateLowStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/counts": {
         parameters: {
             query?: never;
@@ -1261,6 +1297,38 @@ export interface components {
             /** Format: date-time */
             reversedAt?: string;
         };
+        ConfigureReorderControlRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            reorderLevel: number;
+            reorderQty: number;
+            maxQty?: number;
+        };
+        ReorderControlResponse: {
+            /** Format: uuid */
+            reorderControlId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            reorderLevel: number;
+            reorderQty: number;
+            maxQty?: number;
+            alertTriggered: boolean;
+            /** Format: date-time */
+            lastAlertedAt?: string;
+            lastAlertQty?: number;
+            currentOnHandQty?: number;
+            currentAvailableQty?: number;
+        };
+        EvaluateLowStockResponse: {
+            evaluatedCount: number;
+            alertsTriggeredCount: number;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1800,6 +1868,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listReorderControls: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reorder control settings for the location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderControlResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    configureReorderControl: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureReorderControlRequest"];
+            };
+        };
+        responses: {
+            /** @description Reorder control configured */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderControlResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    deleteReorderControl: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId: string;
+            };
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reorder control deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    evaluateLowStock: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+            };
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Number of low stock items detected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluateLowStockResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
