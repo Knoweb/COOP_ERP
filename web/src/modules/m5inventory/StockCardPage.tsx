@@ -6,6 +6,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useInventoryApi } from "./inventoryApi";
 import { SkuLabel } from "./SkuLabel";
 import { errorText } from "./stockView";
+import "./inventory.css";
 
 /**
  * The stock card of one item at one location (25A section 8, "Stock card"; doc 30 section 5.5):
@@ -26,46 +27,77 @@ export function StockCardPage() {
 
   return (
     <main className="shell-page">
-      <p>
-        <Link className="back-link" to="/inventory">
+      <Link className="back-link" to="/inventory">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("inventory.back").text}
       </Link>
-      </p>
-      <h1>{t("inventory.card.title").text}</h1>
-      <p>
-        <SkuLabel skuId={skuId} />
-      </p>
+
+      <header className="stock-card-header">
+        <h1>{t("inventory.card.title").text}</h1>
+        <div className="stock-card-sku">
+          <SkuLabel skuId={skuId} />
+        </div>
+      </header>
 
       {card.isLoading && <p>{t("inventory.loading").text}</p>}
       {card.isError && <p role="alert">{errorText(card.error, t("inventory.error.generic").text)}</p>}
-      {card.data?.length === 0 && <p>{t("inventory.card.empty").text}</p>}
-      {card.data && card.data.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t("inventory.card.column.when").text}</th>
-              <th>{t("inventory.card.column.movement").text}</th>
-              <th>{t("inventory.column.condition").text}</th>
-              <th>{t("inventory.card.column.qty").text}</th>
-              <th>{t("inventory.card.column.balance").text}</th>
-              <th>{t("inventory.column.unit_cost").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {card.data.map(({ movement, balanceAfter }) => (
-              <tr key={movement.movementId}>
-                <td>{movement.occurredAt ? formatInstant(movement.occurredAt) : ""}</td>
-                <td>{t(`inventory.movement.${movement.movementType}`).text}</td>
-                <td>{t(`inventory.condition.${movement.condition}`).text}</td>
-                <td>{movement.qtyDelta > 0 ? `+${movement.qtyDelta}` : movement.qtyDelta}</td>
-                <td>{balanceAfter}</td>
-                <td>{movement.unitCostAtMovement == null ? "" : <MoneyDisplay amount={movement.unitCostAtMovement} />}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {card.data && (
+        <section className="modern-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table stock-card-table">
+              <colgroup>
+                <col className="col-when" />
+                <col className="col-movement" />
+                <col className="col-condition" />
+                <col className="col-qty" />
+                <col className="col-balance" />
+                <col className="col-unit-cost" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{t("inventory.card.column.when").text}</th>
+                  <th>{t("inventory.card.column.movement").text}</th>
+                  <th>{t("inventory.column.condition").text}</th>
+                  <th className="numeric-cell">{t("inventory.card.column.qty").text}</th>
+                  <th className="numeric-cell">{t("inventory.card.column.balance").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.unit_cost").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {card.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="empty-table-cell">
+                      {t("inventory.card.empty").text}
+                    </td>
+                  </tr>
+                ) : (
+                  card.data.map(({ movement, balanceAfter }) => (
+                    <tr key={movement.movementId}>
+                      <td className="cell-when">{movement.occurredAt ? formatInstant(movement.occurredAt) : ""}</td>
+                      <td>
+                        <span className="movement-chip">{t(`inventory.movement.${movement.movementType}`).text}</span>
+                      </td>
+                      <td>
+                        <span className="condition-chip">
+                          {t(`inventory.condition.${movement.condition}`).text}
+                        </span>
+                      </td>
+                      <td className={`numeric-cell ${movement.qtyDelta > 0 ? "qty--positive" : movement.qtyDelta < 0 ? "qty--negative" : ""}`}>
+                        {movement.qtyDelta > 0 ? `+${movement.qtyDelta}` : movement.qtyDelta}
+                      </td>
+                      <td className="numeric-cell numeric-cell--strong">{balanceAfter}</td>
+                      <td className="numeric-cell">
+                        {movement.unitCostAtMovement == null ? "" : <MoneyDisplay amount={movement.unitCostAtMovement} />}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
     </main>
   );
 }
+

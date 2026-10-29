@@ -1,8 +1,8 @@
 // What the inventory module (M5) tells the shell about itself (17A section 7). It is listed once
 // in ../registry.ts; the shell builds the router and the navigation from there.
 //
-// M5-12 (doc 30 section 5.5; 25A section 8): stock and stock-control workflows, plus the
-// warehouse pick, expiry, loss and policy views added by INV-10.
+// M5-12 (demo scope, doc 30 section 5.5): the stock position of a location and the opening
+// balance (prepare, sign, countersign). The other screens of 25A section 8 follow after the demo.
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
@@ -51,20 +51,15 @@ export const inventoryModule: ModuleDefinition = {
     { path: "inventory/repacks", element: <RepacksPage /> },
     {
       path: "inventory/pick-lists",
-      element: <RequirePermission anyOf={["whs.pick"]}><PickListPage /></RequirePermission>
+      element: (
+        <RequirePermission anyOf={["whs.pick"]}>
+          <PickListPage />
+        </RequirePermission>
+      )
     },
-    {
-      path: "inventory/expiry",
-      element: <RequirePermission anyOf={["inv.stock.view"]}><ExpiryListPage /></RequirePermission>
-    },
-    {
-      path: "inventory/losses",
-      element: <RequirePermission anyOf={["inv.stock.view"]}><LossShrinkagePage /></RequirePermission>
-    },
-    {
-      path: "inventory/policies",
-      element: <RequirePermission anyOf={["inv.stock.view"]}><InventoryPoliciesPage /></RequirePermission>
-    }
+    { path: "inventory/expiry", element: <ExpiryListPage /> },
+    { path: "inventory/losses", element: <LossShrinkagePage /> },
+    { path: "inventory/policies", element: <InventoryPoliciesPage /> }
   ],
 
   // The label is a message id of inventory.messages.json, never literal text.
@@ -80,13 +75,6 @@ export const inventoryModule: ModuleDefinition = {
     "shop.transfer.receive",
     "shop.transfer.request",
     "mpcs.transfer.approve",
-    "inv.count.schedule",
-    "inv.writeoff.request",
-    "inv.writeoff.witness",
-    "inv.writeoff.approve",
-    "inv.recipe.manage",
-    "inv.repack.execute",
-    "inv.repack.reverse",
     "whs.pick"
   ]
 };
