@@ -22,11 +22,28 @@
 .reporting-data-table {
   width: 100%;
   min-width: max-content;
+  border-collapse: collapse;
+  border: var(--border-width) solid var(--color-polish-6);
+}
+
+.reporting-data-table th {
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
+  background: var(--color-surface-subtle);
+}
+
+.reporting-data-table td {
+  border-bottom: var(--border-width) solid var(--color-polish-18);
+}
+
+.reporting-data-table th:not(:last-child),
+.reporting-data-table td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-18);
 }
 
 .reporting-data-table th,
 .reporting-data-table td {
   min-width: var(--reporting-cell-min);
+  padding: var(--space-1) var(--space-2);
 }
 
 .reporting-data-table th:nth-child(1),

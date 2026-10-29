@@ -85,14 +85,13 @@ export function TransfersPage() {
 
   return (
     <main className="shell-page">
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <PageHeader
         icon="stock"
         title={t("inventory.transfer.title").text}
-        actions={
-          <Link className="action-link" to="/inventory">
-            <span>{t("inventory.back").text}</span>
-          </Link>
-        }
       />
       <section className="modern-filter-panel modern-filter-panel--stock">
         <div className="modern-location-picker">
@@ -125,10 +124,10 @@ export function TransfersPage() {
             <tbody>
               {transfer.lines.map((line) => (
                 <tr key={line.lineNo}>
-                  <td>
+                  <td className="col-item" data-label={t("inventory.column.item").text}>
                     <SkuLabel skuId={line.skuId} />
                   </td>
-                  <td>{line.qty}</td>
+                  <td className="numeric-cell" data-label={t("inventory.column.qty").text}>{line.qty}</td>
                 </tr>
               ))}
             </tbody>

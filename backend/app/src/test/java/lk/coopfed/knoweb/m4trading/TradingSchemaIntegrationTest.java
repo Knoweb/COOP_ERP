@@ -47,6 +47,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_discrepancy", FOLLOWS_HEADER),
             Map.entry("doc_discrepancy_line", FOLLOWS_HEADER),
             Map.entry("doc_invoice", FOLLOWS_HEADER_UPDATED),
+            Map.entry("opening_receivable", FOLLOWS_HEADER),
             Map.entry("doc_credit_note", FOLLOWS_HEADER_UPDATED),
             Map.entry("doc_debit_note", FOLLOWS_HEADER_UPDATED),
             Map.entry("invoice_dispute", TEMPLATE_WITH_PARTY),
