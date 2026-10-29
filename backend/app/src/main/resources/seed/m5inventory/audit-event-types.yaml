@@ -43,6 +43,11 @@ audit_event_types:
     offline_capturable: false
     description_en: An opening stock balance was prepared
 
+  - code: STOCK_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Opening stock was imported in bulk for a location
+
   - code: OPB_SIGNED_ENTITY
     severity: INFO
     offline_capturable: false

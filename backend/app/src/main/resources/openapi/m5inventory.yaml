@@ -189,6 +189,34 @@ paths:
           description: The replacement lot is now the effective reservation
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates:
+    get:
+      tags: [Inventory]
+      operationId: listPickReplacementCandidates
+      summary: Eligible replacement lots for one FEFO-suggested pick
+      description: >
+        Returns only in-date GOOD lots of the same SKU and source location with enough currently
+        unreserved stock for the whole pick line, excluding its original lot. The OverridePick
+        command locks and revalidates the selected lot because availability may change after this
+        read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+      x-permission: whs.pick
+      parameters:
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Currently eligible replacement lots in FEFO order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PickReplacementCandidateResponse' }
   /v1/inventory/opening-balances:
     post:
       tags: [Inventory]
@@ -212,6 +240,33 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/bulk:
+    post:
+      tags: [Inventory]
+      operationId: bulkImportOpeningStock
+      summary: Import opening stock in bulk from a sheet or rows
+      description: >
+        Parses opening stock data and registers it as an opening balance in status DRAFT,
+        awaiting signatures before becoming active. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding,
+        m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required,
+        m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+      x-permission: inv.opening.prepare
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkImportStockRequest' }
+      responses:
+        '201':
+          description: Opening stock imported and converted into opening balance awaiting signatures
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkStockReport' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/inventory/opening-balances/{openingBalanceId}:
@@ -1117,6 +1172,55 @@ components:
       properties:
         replacementStockLotId: { type: string, format: uuid }
         reason: { type: string, minLength: 1, maxLength: 500 }
+    PickReplacementCandidateResponse:
+      type: object
+      required: [stockLotId, batchId, availableQty]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        availableQty: { type: number }
+    BulkImportStockRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+        sheet: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowRequest' }
+    StockRowRequest:
+      type: object
+      properties:
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string, maxLength: 40 }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        qty: { type: number, exclusiveMinimum: 0 }
+        unitCost: { type: number, minimum: 0 }
+    BulkStockReport:
+      type: object
+      required: [importId, openingBalanceId, status, totalRows, importedLines]
+      properties:
+        importId: { type: string, format: uuid }
+        openingBalanceId: { type: string, format: uuid }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY] }
+        totalRows: { type: integer }
+        importedLines: { type: integer }
+        problems:
+          type: array
+          items: { $ref: '#/components/schemas/StockProblem' }
+    StockProblem:
+      type: object
+      required: [line, message]
+      properties:
+        line: { type: integer }
+        sku: { type: string }
+        message: { type: string }
     PrepareOpeningBalanceRequest:
       type: object
       required: [locationId, lines]

@@ -69,6 +69,14 @@ public interface InventoryQueries {
     /** GetPickList(dn): the pick list of a delivery note of the caller's. */
     Optional<PickListView> pickList(UUID deliveryDocumentId, ScopeContext scope);
 
+    /**
+     * The currently eligible replacement lots for one OPEN, allocated pick line. Empty means the
+     * named list or line is not visible/overridable, or no replacement currently has enough free
+     * stock. OverridePick locks and revalidates the selected lot before changing the reservation.
+     */
+    List<PickReplacementCandidate> pickReplacementCandidates(
+            UUID deliveryDocumentId, UUID pickLineId, ScopeContext scope);
+
     /** An opening balance of the caller's with its lines. */
     Optional<OpeningBalanceView> openingBalance(UUID openingBalanceId, ScopeContext scope);
 

@@ -103,5 +103,15 @@
   "m8.profit_center.location_scope_mismatch": "இந்த இடம் உங்கள் நிறுவனத்திற்கோ அல்லது எல்லைக்கோ உரியதல்ல",
   "m8.profit_center.duplicate_code": "இந்தக் குறியீட்டுடன் கூடிய இலாப மையம் ஏற்கனவே உங்கள் நிறுவனத்தில் உள்ளது",
   "m8.profit_center.not_found": "கோரப்பட்ட இலாப மையம் உங்கள் எல்லைக்குள் காணப்படவில்லை",
-  "m8.profit_center.month_invalid": "அறிக்கை மாத வடிவம் தவறானது, YYYY-MM எதிர்பார்க்கப்படுகிறது"
+  "m8.profit_center.month_invalid": "அறிக்கை மாத வடிவம் தவறானது, YYYY-MM எதிர்பார்க்கப்படுகிறது",
+  "m8.asset.own_required": "நிலையான சொத்துக்களைத் தங்கள் சொந்த நிறுவனத்திற்காகச் செயல்படும் பயனர்கள் மட்டுமே நிர்வகிக்க முடியும்",
+  "m8.asset.code_required": "சொத்துக் குறியீடு தேவை",
+  "m8.asset.code_too_long": "சொத்துக் குறியீடு அதிகபட்சம் 32 எழுத்துகளாக இருக்க வேண்டும்",
+  "m8.asset.name_required": "சொத்தின் பெயர் தேவை",
+  "m8.asset.type_invalid": "சொத்து வகை LAND, BUILDING, VEHICLE, EQUIPMENT, FURNITURE அல்லது OTHER ஆக இருக்க வேண்டும்",
+  "m8.asset.status_invalid": "சொத்து நிலை ACTIVE, DISPOSED, MAINTENANCE அல்லது INACTIVE ஆக இருக்க வேண்டும்",
+  "m8.asset.location_unknown": "கிளை அல்லது இடம் காணப்படவில்லை அல்லது உங்கள் நிறுவனத்திற்கு வெளியே உள்ளது",
+  "m8.asset.location_scope_mismatch": "இந்த இடம் உங்கள் நிறுவனத்திற்கோ அல்லது எல்லைக்கோ உரியதல்ல",
+  "m8.asset.duplicate_code": "இந்தக் குறியீட்டுடன் கூடிய சொத்து ஏற்கனவே உங்கள் நிறுவனத்தில் உள்ளது",
+  "m8.asset.not_found": "கோரப்பட்ட சொத்து உங்கள் எல்லைக்குள் காணப்படவில்லை"
 }

@@ -35,6 +35,8 @@ import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
 import lk.coopfed.knoweb.m8reporting.internal.report.ReportCatalogue.Definition;
 import lk.coopfed.knoweb.m8reporting.internal.report.TileCatalogue.TileDefinition;
+import lk.coopfed.knoweb.m8reporting.query.AssetFilter;
+import lk.coopfed.knoweb.m8reporting.query.AssetView;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReportSummary;
@@ -1172,5 +1174,90 @@ class ReportQueriesImpl implements ReportingQueries {
                 totalRevenue, totalCost, grossProfit, marginPercent, totalCostPending);
 
         return new MonthlyProfitCenterPnlReport(ym.toString(), "LKR", summary, items, unallocated);
+    }
+
+    @Override
+    public List<AssetView> listAssets(AssetFilter filter, ScopeContext scope) {
+        Names names = new Names(party, catalogue, scope);
+        StringBuilder sql = new StringBuilder(
+                """
+                select asset_id, owner_entity_id, asset_code, name, description, asset_type,
+                       location_id, acquisition_date, acquisition_cost, status, created_at
+                  from reporting.asset
+                 where 1=1
+                """);
+        List<Object> params = new ArrayList<>();
+        if (filter != null) {
+            if (filter.locationId() != null) {
+                sql.append(" and location_id = ?");
+                params.add(filter.locationId());
+            }
+            if (filter.assetType() != null && !filter.assetType().isBlank()) {
+                sql.append(" and asset_type = ?");
+                params.add(filter.assetType().toUpperCase());
+            }
+            if (filter.status() != null && !filter.status().isBlank()) {
+                sql.append(" and status = ?");
+                params.add(filter.status().toUpperCase());
+            }
+        }
+        sql.append(" order by asset_code");
+
+        return jdbc.query(
+                sql.toString(),
+                (rs, n) -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    String locName = locId != null ? names.location(locId) : null;
+                    Date acqDate = rs.getDate("acquisition_date");
+                    return new AssetView(
+                            rs.getObject("asset_id", UUID.class),
+                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getString("asset_code"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("asset_type"),
+                            locId,
+                            locName,
+                            acqDate != null ? acqDate.toLocalDate() : null,
+                            rs.getBigDecimal("acquisition_cost"),
+                            rs.getString("status"),
+                            rs.getTimestamp("created_at").toInstant());
+                },
+                params.toArray());
+    }
+
+    @Override
+    public Optional<AssetView> getAsset(UUID assetId, ScopeContext scope) {
+        if (assetId == null) {
+            return Optional.empty();
+        }
+        Names names = new Names(party, catalogue, scope);
+        List<AssetView> found = jdbc.query(
+                """
+                select asset_id, owner_entity_id, asset_code, name, description, asset_type,
+                       location_id, acquisition_date, acquisition_cost, status, created_at
+                  from reporting.asset
+                 where asset_id = ?
+                """,
+                (rs, n) -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    String locName = locId != null ? names.location(locId) : null;
+                    Date acqDate = rs.getDate("acquisition_date");
+                    return new AssetView(
+                            rs.getObject("asset_id", UUID.class),
+                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getString("asset_code"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("asset_type"),
+                            locId,
+                            locName,
+                            acqDate != null ? acqDate.toLocalDate() : null,
+                            rs.getBigDecimal("acquisition_cost"),
+                            rs.getString("status"),
+                            rs.getTimestamp("created_at").toInstant());
+                },
+                assetId);
+        return found.isEmpty() ? Optional.empty() : Optional.of(found.get(0));
     }
 }
