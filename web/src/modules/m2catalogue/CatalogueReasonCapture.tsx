@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { useT } from "../../shell/i18n/useT";
 import { CatalogueDropdown } from "./CatalogueDropdown";
-import "./catalogue.css";
+
 
 export type ReasonCode = {
   code: string;

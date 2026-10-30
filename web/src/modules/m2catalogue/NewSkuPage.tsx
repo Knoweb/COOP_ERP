@@ -7,7 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useCatalogueApi } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
-import "./catalogue.css";
+
 import { EMPTY_FORM, errorText, requestOf, type SkuForm } from "./skuView";
 
 /** A new item, created as a DRAFT of the caller's entity (22A section 6, CreateSku); its card follows. */

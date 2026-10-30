@@ -8,7 +8,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi } from "./catalogueApi";
 import { errorText } from "./skuView";
-import "./catalogue.css";
+
 
 type FilterStatus = "OPEN" | "MERGED" | "DISMISSED";
 

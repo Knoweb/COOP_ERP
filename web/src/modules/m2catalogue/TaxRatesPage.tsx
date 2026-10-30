@@ -12,7 +12,7 @@ import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { useCatalogueApi, type TaxCategory, type TaxRate } from "./catalogueApi";
 import { errorText } from "./skuView";
 import { CatalogueDropdown } from "./CatalogueDropdown";
-import "./catalogue.css";
+
 
 export function TaxRatesPage() {
   const t = useT();
@@ -353,7 +353,7 @@ export function TaxRatesPage() {
             </p>
           </div>
 
-          <div style={{ minWidth: "220px" }}>
+          <div className="tax-filter-dropdown-wrap">
             <CatalogueDropdown
               value={selectedCategoryId}
               placeholder={t("catalogue.tax.filter.all_categories").text}

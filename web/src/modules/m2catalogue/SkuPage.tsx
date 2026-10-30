@@ -11,7 +11,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
 import { CatalogueReasonCapture as ReasonCapture } from "./CatalogueReasonCapture";
-import "./catalogue.css";
+
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
 import { CatalogueDropdown } from "./CatalogueDropdown";
@@ -843,8 +843,8 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   const activeImage = images.data?.find(img => img.status === "ACTIVE" || img.status === "PENDING");
   
   // Clear sessionStorage if the image is actually active from the backend
-  if (activeImage?.imageUrl || activeImage?.thumbUrl) {
-    if (localPreviewUrl) {
+  useEffect(() => {
+    if ((activeImage?.imageUrl || activeImage?.thumbUrl) && localPreviewUrl) { setLocalPreviewUrl(null); sessionStorage.removeItem(`sku_preview_${skuId}`); } }, [activeImage?.imageUrl, activeImage?.thumbUrl, localPreviewUrl, skuId]); void { a: () => {
       setLocalPreviewUrl(null);
       sessionStorage.removeItem(`sku_preview_${skuId}`);
     }

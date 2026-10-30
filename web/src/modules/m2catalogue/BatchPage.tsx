@@ -13,7 +13,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi, type Batch } from "./catalogueApi";
 import { CatalogueDropdown } from "./CatalogueDropdown";
 import { errorText } from "./skuView";
-import "./catalogue.css";
+
 
 /**
  * Batch card with correction functionality (22A section 8, "Batch card").

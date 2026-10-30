@@ -8,7 +8,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { useCatalogueApi, type ImportReportResponse } from "./catalogueApi";
 import { errorText } from "./skuView";
-import "./catalogue.css";
+
 
 /**
  * Bulk catalogue import page for stewards (CAT-01, 22A section 6.2).

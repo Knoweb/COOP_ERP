@@ -8,7 +8,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useCatalogueApi, type SkuStatus } from "./catalogueApi";
 import { chipOf, errorText, languageOf, nameIn } from "./skuView";
-import "./catalogue.css";
+
 
 const STATUSES: SkuStatus[] = ["DRAFT", "LOCAL", "SHARED", "INACTIVE"];
 

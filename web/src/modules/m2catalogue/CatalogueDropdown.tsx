@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import "./catalogue.css";
+
 
 export type DropdownOption<T extends string = string> = {
   value: T;

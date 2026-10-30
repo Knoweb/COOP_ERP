@@ -1,7 +1,7 @@
 import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import "./catalogue.css";
+
 import { useCatalogueApi } from "./catalogueApi";
 import { languageOf, nameIn, type SkuForm } from "./skuView";
 import { CatalogueDropdown } from "./CatalogueDropdown";

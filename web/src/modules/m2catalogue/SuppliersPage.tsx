@@ -10,7 +10,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi } from "./catalogueApi";
 import { errorText } from "./skuView";
-import "./catalogue.css";
+
 
 /**
  * Suppliers management page (22A section 8, Suppliers).
