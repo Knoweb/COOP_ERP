@@ -28,6 +28,7 @@ export type ReviewItem = components["schemas"]["ReviewItem"];
 export type LabelJob = components["schemas"]["LabelJobResponse"];
 export type LotBalance = inventoryComponents["schemas"]["LotBalanceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
+export type SkuConversion = catalogueComponents["schemas"]["ConversionResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Relationship = partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
@@ -51,6 +52,13 @@ export function usePricingApi() {
       async getSku(skuId: string): Promise<Sku | null> {
         const { data } = await catalogue.GET("/v1/catalogue/skus/{skuId}", { params: { path: { skuId } } });
         return data ?? null;
+      },
+
+      async skuConversions(skuId: string): Promise<SkuConversion[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/skus/{skuId}/conversions", {
+          params: { path: { skuId } }
+        });
+        return data ?? [];
       },
 
       async locations(): Promise<Location[]> {
