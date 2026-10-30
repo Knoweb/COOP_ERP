@@ -178,6 +178,28 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
         return ScopeContext.dev(userId, entityId, locationId);
     }
 
+    private <T> T inScope(ScopeContext scope, Supplier<T> work) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.queryForList(
+                    "select set_config('app.user_id', ?, true), set_config('app.correlation_id', ?, true),"
+                            + " set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', ?, true),"
+                            + " set_config('app.scope_class', 'OWN', true), set_config('app.granted_entities', '{}', true)",
+                    scope.userId() == null ? "" : scope.userId().toString(),
+                    Ids.next().toString(),
+                    scope.entityId() == null ? "" : scope.entityId().toString(),
+                    scope.locationId() == null ? "" : scope.locationId().toString());
+            return work.get();
+        });
+    }
+
+    private Set<String> resolveInScope(ScopeContext ctx) {
+        return inScope(ctx, () -> resolver.resolve(ctx));
+    }
+
+    private boolean allowsInScope(ScopeContext ctx, String permission) {
+        return inScope(ctx, () -> resolver.allows(ctx, permission));
+    }
+
     private <T> T inScopeAt(UUID entityId, UUID locationId, String policyClass, Supplier<T> work) {
         return new TransactionTemplate(transactionManager).execute(status -> {
             jdbc.queryForList(
@@ -241,7 +263,7 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
                     MARKETING_MANAGER_TEMPLATE_ID);
             assertThat(marketingRow.get("name_en")).isEqualTo("Marketing Manager");
             assertThat(marketingRow.get("name_si")).isEqualTo("අලෙවි කළමනාකරු");
-            assertThat(marketingRow.get("name_ta")).isEqualTo("සந்தைப்படுத்தல் முகாமையாளர்");
+            assertThat(marketingRow.get("name_ta")).isEqualTo("சந்தைப்படுத்தல் முகாமையாளர்");
             assertThat(marketingRow.get("role_class")).isEqualTo("OWN");
             assertThat(marketingRow.get("is_template")).isEqualTo(true);
 
@@ -287,70 +309,69 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
                     .hasSize(2);
 
             ScopeContext managerMainScope = scope(shopManagerUser, mpcs, mainBranch);
-            Set<String> managerResolved = resolver.resolve(managerMainScope);
+            Set<String> managerResolved = resolveInScope(managerMainScope);
 
             assertThat(managerResolved).containsAll(SHOP_MANAGER_PERMISSIONS);
-            assertThat(resolver.allows(managerMainScope, "pos.session.manage")).isTrue();
-            assertThat(resolver.allows(managerMainScope, "pos.receipt.void")).isTrue();
-            assertThat(resolver.allows(managerMainScope, "pos.refund.same_session"))
+            assertThat(allowsInScope(managerMainScope, "pos.session.manage")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "pos.receipt.void")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "pos.refund.same_session"))
                     .isTrue();
-            assertThat(resolver.allows(managerMainScope, "shop.grn.confirm")).isTrue();
-            assertThat(resolver.allows(managerMainScope, "shop.count.record")).isTrue();
-            assertThat(resolver.allows(managerMainScope, "inv.writeoff.request"))
-                    .isTrue();
-            assertThat(resolver.allows(managerMainScope, "pos.receipt.margin")).isTrue();
-            assertThat(resolver.allows(managerMainScope, "rpt.target.view")).isTrue();
-            assertThat(resolver.allows(managerMainScope, "rpt.report.run")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "shop.grn.confirm")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "shop.count.record")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "inv.writeoff.request")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "pos.receipt.margin")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "rpt.target.view")).isTrue();
+            assertThat(allowsInScope(managerMainScope, "rpt.report.run")).isTrue();
 
             ScopeContext assistantMainScope = scope(shopAssistantUser, mpcs, mainBranch);
-            Set<String> assistantResolved = resolver.resolve(assistantMainScope);
+            Set<String> assistantResolved = resolveInScope(assistantMainScope);
 
             assertThat(assistantResolved).containsExactlyInAnyOrderElementsOf(SHOP_ASSISTANT_PERMISSIONS);
-            assertThat(resolver.allows(assistantMainScope, "pos.receipt.issue")).isTrue();
-            assertThat(resolver.allows(assistantMainScope, "pos.mrp.pick")).isTrue();
-            assertThat(resolver.allows(assistantMainScope, "cat.sku.view")).isTrue();
-            assertThat(resolver.allows(assistantMainScope, "inv.stock.view")).isTrue();
+            assertThat(allowsInScope(assistantMainScope, "pos.receipt.issue")).isTrue();
+            assertThat(allowsInScope(assistantMainScope, "pos.mrp.pick")).isTrue();
+            assertThat(allowsInScope(assistantMainScope, "cat.sku.view")).isTrue();
+            assertThat(allowsInScope(assistantMainScope, "inv.stock.view")).isTrue();
 
-            assertThat(resolver.allows(assistantMainScope, "pos.session.manage"))
+            assertThat(allowsInScope(assistantMainScope, "pos.session.manage"))
                     .as("Shop Assistant cannot manage till sessions")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "pos.receipt.void"))
+            assertThat(allowsInScope(assistantMainScope, "pos.receipt.void"))
                     .as("Shop Assistant cannot void receipts")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "pos.refund.same_session"))
+            assertThat(allowsInScope(assistantMainScope, "pos.refund.same_session"))
                     .as("Shop Assistant cannot refund receipts")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "shop.grn.confirm"))
+            assertThat(allowsInScope(assistantMainScope, "shop.grn.confirm"))
                     .as("Shop Assistant cannot confirm shop GRN")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "shop.count.record"))
+            assertThat(allowsInScope(assistantMainScope, "shop.count.record"))
                     .as("Shop Assistant cannot record stock counts")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "inv.writeoff.request"))
+            assertThat(allowsInScope(assistantMainScope, "inv.writeoff.request"))
                     .as("Shop Assistant cannot request inventory write-offs")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "pos.receipt.margin"))
+            assertThat(allowsInScope(assistantMainScope, "pos.receipt.margin"))
                     .as("Shop Assistant cannot view margin on receipts")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "rpt.target.view"))
+            assertThat(allowsInScope(assistantMainScope, "rpt.target.view"))
                     .as("Shop Assistant cannot view sales targets")
                     .isFalse();
-            assertThat(resolver.allows(assistantMainScope, "rpt.report.run"))
+            assertThat(allowsInScope(assistantMainScope, "rpt.report.run"))
                     .as("Shop Assistant cannot run reports")
                     .isFalse();
 
             ScopeContext managerSubScope = scope(shopManagerUser, mpcs, subBranch1);
-            assertThat(resolver.resolve(managerSubScope))
+            assertThat(resolveInScope(managerSubScope))
                     .as("Shop Manager has zero permissions at unapproved sub-branch")
                     .isEmpty();
-            assertThat(resolver.allows(managerSubScope, "shop.grn.confirm")).isFalse();
-            assertThat(resolver.allows(managerSubScope, "pos.session.manage")).isFalse();
+            assertThat(allowsInScope(managerSubScope, "shop.grn.confirm")).isFalse();
+            assertThat(allowsInScope(managerSubScope, "pos.session.manage")).isFalse();
 
             ScopeContext assistantSubScope = scope(shopAssistantUser, mpcs, subBranch1);
-            assertThat(resolver.resolve(assistantSubScope))
+            assertThat(resolveInScope(assistantSubScope))
                     .as("Shop Assistant has zero permissions at unapproved sub-branch")
                     .isEmpty();
-            assertThat(resolver.allows(assistantSubScope, "pos.receipt.issue")).isFalse();
+            assertThat(allowsInScope(assistantSubScope, "pos.receipt.issue")).isFalse();
         }
     }
 
@@ -373,42 +394,42 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(grantedScopes).doesNotContain(new Scope(mpcs, subBranch2));
 
             ScopeContext mainScope = scope(marketingManagerUser, mpcs, mainBranch);
-            assertThat(resolver.resolve(mainScope)).containsAll(MARKETING_MANAGER_PERMISSIONS);
-            assertThat(resolver.allows(mainScope, "prc.pricelist.view")).isTrue();
-            assertThat(resolver.allows(mainScope, "prc.review.view")).isTrue();
-            assertThat(resolver.allows(mainScope, "prc.label.print")).isTrue();
-            assertThat(resolver.allows(mainScope, "rpt.report.run")).isTrue();
-            assertThat(resolver.allows(mainScope, "rpt.target.view")).isTrue();
-            assertThat(resolver.allows(mainScope, "pos.receipt.margin")).isTrue();
-            assertThat(resolver.allows(mainScope, "cat.sku.view")).isTrue();
+            assertThat(resolveInScope(mainScope)).containsAll(MARKETING_MANAGER_PERMISSIONS);
+            assertThat(allowsInScope(mainScope, "prc.pricelist.view")).isTrue();
+            assertThat(allowsInScope(mainScope, "prc.review.view")).isTrue();
+            assertThat(allowsInScope(mainScope, "prc.label.print")).isTrue();
+            assertThat(allowsInScope(mainScope, "rpt.report.run")).isTrue();
+            assertThat(allowsInScope(mainScope, "rpt.target.view")).isTrue();
+            assertThat(allowsInScope(mainScope, "pos.receipt.margin")).isTrue();
+            assertThat(allowsInScope(mainScope, "cat.sku.view")).isTrue();
 
             ScopeContext sub1Scope = scope(marketingManagerUser, mpcs, subBranch1);
-            assertThat(resolver.resolve(sub1Scope)).containsAll(MARKETING_MANAGER_PERMISSIONS);
-            assertThat(resolver.allows(sub1Scope, "prc.pricelist.view")).isTrue();
-            assertThat(resolver.allows(sub1Scope, "prc.label.print")).isTrue();
-            assertThat(resolver.allows(sub1Scope, "rpt.report.run")).isTrue();
-            assertThat(resolver.allows(sub1Scope, "rpt.target.view")).isTrue();
-            assertThat(resolver.allows(sub1Scope, "pos.receipt.margin")).isTrue();
+            assertThat(resolveInScope(sub1Scope)).containsAll(MARKETING_MANAGER_PERMISSIONS);
+            assertThat(allowsInScope(sub1Scope, "prc.pricelist.view")).isTrue();
+            assertThat(allowsInScope(sub1Scope, "prc.label.print")).isTrue();
+            assertThat(allowsInScope(sub1Scope, "rpt.report.run")).isTrue();
+            assertThat(allowsInScope(sub1Scope, "rpt.target.view")).isTrue();
+            assertThat(allowsInScope(sub1Scope, "pos.receipt.margin")).isTrue();
 
             ScopeContext unapprovedScope = scope(marketingManagerUser, mpcs, subBranch2);
-            assertThat(resolver.resolve(unapprovedScope))
+            assertThat(resolveInScope(unapprovedScope))
                     .as("Marketing Manager has no access at unapproved sub-branch 2")
                     .isEmpty();
-            assertThat(resolver.allows(unapprovedScope, "prc.pricelist.view")).isFalse();
-            assertThat(resolver.allows(unapprovedScope, "rpt.report.run")).isFalse();
-            assertThat(resolver.allows(unapprovedScope, "pos.receipt.margin")).isFalse();
+            assertThat(allowsInScope(unapprovedScope, "prc.pricelist.view")).isFalse();
+            assertThat(allowsInScope(unapprovedScope, "rpt.report.run")).isFalse();
+            assertThat(allowsInScope(unapprovedScope, "pos.receipt.margin")).isFalse();
 
             for (ScopeContext activeScope : List.of(mainScope, sub1Scope)) {
-                assertThat(resolver.allows(activeScope, "shop.count.record"))
+                assertThat(allowsInScope(activeScope, "shop.count.record"))
                         .as("Marketing Manager cannot record stock counts")
                         .isFalse();
-                assertThat(resolver.allows(activeScope, "shop.grn.confirm"))
+                assertThat(allowsInScope(activeScope, "shop.grn.confirm"))
                         .as("Marketing Manager cannot confirm GRNs")
                         .isFalse();
-                assertThat(resolver.allows(activeScope, "inv.writeoff.request"))
+                assertThat(allowsInScope(activeScope, "inv.writeoff.request"))
                         .as("Marketing Manager cannot request stock write-offs")
                         .isFalse();
-                assertThat(resolver.allows(activeScope, "pos.receipt.issue"))
+                assertThat(allowsInScope(activeScope, "pos.receipt.issue"))
                         .as("Marketing Manager cannot issue till sale receipts")
                         .isFalse();
             }
@@ -428,46 +449,45 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(scopes).containsExactly(new Scope(mpcs, subBranch1));
 
             ScopeContext approvedSubScope = scope(stockKeeperUser, mpcs, subBranch1);
-            Set<String> subPermissions = resolver.resolve(approvedSubScope);
+            Set<String> subPermissions = resolveInScope(approvedSubScope);
 
             assertThat(subPermissions).containsExactlyInAnyOrderElementsOf(STOCK_KEEPER_PERMISSIONS);
-            assertThat(resolver.allows(approvedSubScope, "inv.stock.view")).isTrue();
-            assertThat(resolver.allows(approvedSubScope, "shop.count.record")).isTrue();
-            assertThat(resolver.allows(approvedSubScope, "shop.grn.confirm")).isTrue();
-            assertThat(resolver.allows(approvedSubScope, "inv.writeoff.request"))
-                    .isTrue();
-            assertThat(resolver.allows(approvedSubScope, "prt.location.view")).isTrue();
-            assertThat(resolver.allows(approvedSubScope, "cat.sku.view")).isTrue();
+            assertThat(allowsInScope(approvedSubScope, "inv.stock.view")).isTrue();
+            assertThat(allowsInScope(approvedSubScope, "shop.count.record")).isTrue();
+            assertThat(allowsInScope(approvedSubScope, "shop.grn.confirm")).isTrue();
+            assertThat(allowsInScope(approvedSubScope, "inv.writeoff.request")).isTrue();
+            assertThat(allowsInScope(approvedSubScope, "prt.location.view")).isTrue();
+            assertThat(allowsInScope(approvedSubScope, "cat.sku.view")).isTrue();
 
-            assertThat(resolver.allows(approvedSubScope, "pos.receipt.issue"))
+            assertThat(allowsInScope(approvedSubScope, "pos.receipt.issue"))
                     .as("Stock Keeper cannot issue sale receipts")
                     .isFalse();
-            assertThat(resolver.allows(approvedSubScope, "pos.session.manage"))
+            assertThat(allowsInScope(approvedSubScope, "pos.session.manage"))
                     .as("Stock Keeper cannot manage POS sessions")
                     .isFalse();
-            assertThat(resolver.allows(approvedSubScope, "pos.receipt.void"))
+            assertThat(allowsInScope(approvedSubScope, "pos.receipt.void"))
                     .as("Stock Keeper cannot void receipts")
                     .isFalse();
-            assertThat(resolver.allows(approvedSubScope, "prc.label.print"))
+            assertThat(allowsInScope(approvedSubScope, "prc.label.print"))
                     .as("Stock Keeper cannot print price labels")
                     .isFalse();
-            assertThat(resolver.allows(approvedSubScope, "rpt.target.manage"))
+            assertThat(allowsInScope(approvedSubScope, "rpt.target.manage"))
                     .as("Stock Keeper cannot manage sales targets")
                     .isFalse();
 
             ScopeContext mainBranchScope = scope(stockKeeperUser, mpcs, mainBranch);
-            assertThat(resolver.resolve(mainBranchScope))
+            assertThat(resolveInScope(mainBranchScope))
                     .as("Stock Keeper is denied at unapproved main branch")
                     .isEmpty();
-            assertThat(resolver.allows(mainBranchScope, "shop.count.record")).isFalse();
-            assertThat(resolver.allows(mainBranchScope, "shop.grn.confirm")).isFalse();
-            assertThat(resolver.allows(mainBranchScope, "inv.writeoff.request")).isFalse();
+            assertThat(allowsInScope(mainBranchScope, "shop.count.record")).isFalse();
+            assertThat(allowsInScope(mainBranchScope, "shop.grn.confirm")).isFalse();
+            assertThat(allowsInScope(mainBranchScope, "inv.writeoff.request")).isFalse();
 
             ScopeContext unapprovedSubScope = scope(stockKeeperUser, mpcs, subBranch2);
-            assertThat(resolver.resolve(unapprovedSubScope))
+            assertThat(resolveInScope(unapprovedSubScope))
                     .as("Stock Keeper is denied at unapproved sub branch 2")
                     .isEmpty();
-            assertThat(resolver.allows(unapprovedSubScope, "shop.count.record")).isFalse();
+            assertThat(allowsInScope(unapprovedSubScope, "shop.count.record")).isFalse();
         }
     }
 
@@ -548,6 +568,7 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
                     }))
                     .as("PostgreSQL RLS WITH CHECK policy refuses insertion at unapproved location")
                     .isInstanceOf(DataAccessException.class)
+                    .rootCause()
                     .hasMessageContaining("row-level security");
 
             assertThatThrownBy(() -> inScopeAt(mpcs, subBranch1, "OWN", () -> {
@@ -561,6 +582,7 @@ class BranchRoleAccessPostgresIntegrationTest extends PostgresIntegrationTest {
                     }))
                     .as("PostgreSQL RLS refuses insertion across tenant entity boundaries")
                     .isInstanceOf(DataAccessException.class)
+                    .rootCause()
                     .hasMessageContaining("row-level security");
 
             adminDb.update(
