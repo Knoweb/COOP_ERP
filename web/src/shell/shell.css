@@ -6400,7 +6400,7 @@ textarea {
 .sku-section-divider {
   height: 1px;
   background: var(--color-border);
-  margin: var(--space-6) 0 var(--space-5) 0;
+  margin: var(--space-6) 0 var(--space-4) 0;
 }
 
 .sku-section-header {
