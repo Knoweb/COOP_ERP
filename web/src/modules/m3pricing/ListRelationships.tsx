@@ -43,30 +43,36 @@ export function ListRelationships({ list }: { list: PriceList }) {
     <section className="pricing-section" aria-labelledby="pricing-list-relationships">
       <h2 id="pricing-list-relationships">{t("pricing.relationships.title").text}</h2>
       {onThisList.length === 0 ? (
-        <p>{t("pricing.relationships.empty").text}</p>
+        <div className="pricing-card pricing-empty-card">
+          <p className="pricing-muted">{t("pricing.relationships.empty").text}</p>
+        </div>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>{t("pricing.relationships.buyer").text}</th>
-              <th>{t("pricing.relationships.status").text}</th>
-              <th>{t("pricing.relationships.from").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {onThisList.map((row) => (
-              <tr key={row.relationshipId}>
-                <td>
-                  <BuyerName entityId={row.buyerEntityId} />
-                </td>
-                <td>
-                  <StateChip state={STATUS_LOOK[row.status]} label={t(`pricing.relationships.status.${row.status}`).text} />
-                </td>
-                <td>{formatDate(row.effectiveFrom)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="modern-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th>{t("pricing.relationships.buyer").text}</th>
+                  <th>{t("pricing.relationships.status").text}</th>
+                  <th>{t("pricing.relationships.from").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {onThisList.map((row) => (
+                  <tr key={row.relationshipId}>
+                    <td className="pricing-cell-item">
+                      <BuyerName entityId={row.buyerEntityId} />
+                    </td>
+                    <td>
+                      <StateChip state={STATUS_LOOK[row.status]} label={t(`pricing.relationships.status.${row.status}`).text} />
+                    </td>
+                    <td className="pricing-cell-date">{formatDate(row.effectiveFrom)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </section>
   );

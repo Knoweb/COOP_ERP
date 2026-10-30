@@ -1,3 +1,8 @@
+/*
+ * Inventory module styling (M5).
+ * Follows design/tokens.css: tokens only, no literal lengths or colours.
+ */
+
 .inventory-section {
   margin-bottom: var(--space-3);
 }
@@ -9,8 +14,10 @@
 
 .inventory-action-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
+  width: 100%;
 }
 
 .inventory-form-row {
@@ -32,52 +39,699 @@
 .inventory-control-links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--target-gap);
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  width: 100%;
+}
+
+.shell-page .inventory-control-links .action-link,
+.inventory-control-links .action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding: var(--space-half) var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shell-page .inventory-control-links .action-link:hover,
+.inventory-control-links .action-link:hover {
+  transform: translateY(calc(var(--border-width) * -1));
+}
+
+.shell-page .inventory-control-links .action-link:focus,
+.shell-page .inventory-control-links .action-link:focus-visible,
+.shell-page .inventory-control-links .action-link:active,
+.inventory-control-links .action-link:focus,
+.inventory-control-links .action-link:focus-visible,
+.inventory-control-links .action-link:active {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ---------- Stock Navigation & Filter Controls ----------------------------- */
+
+.shell-page>.back-link,
+.shell-page .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--space-half) + var(--space-half) / 2);
+  min-height: calc(var(--space-3) + var(--space-half));
+  padding: calc(var(--space-half) / 2) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-polish-31);
+  border: var(--border-width) solid var(--color-polish-6);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  text-decoration: none;
+  margin-bottom: var(--space-2);
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shell-page>.back-link:hover,
+.shell-page .back-link:hover {
+  background: var(--color-polish-22);
+  border-color: var(--color-accent);
+  transform: translateX(calc(var(--space-half) * -1 / 2));
+}
+
+.shell-page>.back-link:focus,
+.shell-page>.back-link:focus-visible,
+.shell-page>.back-link:active,
+.shell-page .back-link:focus,
+.shell-page .back-link:focus-visible,
+.shell-page .back-link:active {
+  outline: none;
+  box-shadow: none;
+}
+
+.shell-page>.back-link:active,
+.shell-page .back-link:active {
+  transform: scale(0.98);
+}
+
+.shell-page>.back-link svg,
+.shell-page .back-link svg {
+  flex-shrink: 0;
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Stock Controls & Search Toolbar -------------------------------- */
+
+.stock-controls-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  width: 100%;
+}
+
+.stock-controls-toolbar .filter-toggle {
+  margin-bottom: 0;
+}
+
+.stock-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: calc(var(--space-8) * 3 + var(--space-4) + var(--space-1));
+  max-width: 100%;
+}
+
+.stock-search-control {
+  width: 100%;
+}
+
+.stock-search-control .modern-control__leading-icon {
+  left: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
+}
+
+.stock-search-input {
+  width: 100%;
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding-top: var(--space-half);
+  padding-bottom: var(--space-half);
+  padding-left: calc(var(--space-3) - var(--space-half) / 2);
+  padding-right: calc(var(--space-1) + var(--space-half) / 2);
+  border: var(--border-width) solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  color: var(--color-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stock-search-input:hover {
+  border-color: var(--color-accent);
+}
+
+.stock-search-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-18);
+}
+
+.stock-search-clear {
+  position: absolute;
+  right: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
+  border: none;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.stock-search-clear:hover {
+  background: var(--color-polish-22);
+  color: var(--color-text);
+}
+
+.stock-positions-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
   margin-bottom: var(--space-3);
 }
 
-.inventory-card-heading {
-  align-items: center;
+.stock-positions-filters .modern-location-picker,
+.modern-filter-panel--stock .modern-location-picker {
+  width: 100%;
+  max-width: calc(var(--space-8) * 4);
+}
+
+.stock-positions-filters .modern-location-picker select {
+  max-width: 100%;
+}
+
+.modern-filter-panel--stock .inventory-control-links,
+.stock-positions-filters .inventory-control-links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: space-between;
-  padding: var(--space-4);
-}
-
-.inventory-card-heading h2 {
-  margin: 0;
-}
-
-.inventory-metric-grid,
-.inventory-policy-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--reporting-key-column-min)), 1fr));
-  margin-bottom: var(--space-4);
-}
-
-.inventory-metric,
-.inventory-policy-card {
-  padding: var(--space-4);
-}
-
-.inventory-metric {
-  display: grid;
+  align-items: center;
   gap: var(--space-1);
+  margin-bottom: 0;
 }
 
-.inventory-metric strong {
-  font-size: var(--font-size-lg);
+/* ---------- Stock Card Header ---------------------------------------------- */
+
+.stock-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
 }
 
-.inventory-policy-card h2 {
-  font-size: var(--font-size-md);
-  margin-top: 0;
+.stock-card-header h1 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
 }
 
-.inventory-policy-notice {
-  border-inline-start: var(--border-width-marker) solid var(--color-brand-accent1);
+.stock-card-sku {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-half) calc(var(--space-1) + var(--space-half));
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  width: fit-content;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---------- Table Container & Scrolling ------------------------------------ */
+
+.modern-table-card {
+  border: var(--border-width-strong) solid var(--color-polish-21);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-8);
+  border-radius: calc(var(--radius) * 3);
+  overflow: hidden;
+  max-width: 100%;
+  width: 100%;
+  background: var(--color-surface);
+}
+
+.modern-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-polish-6) transparent;
+}
+
+.modern-table-scroll::-webkit-scrollbar {
+  height: var(--space-half);
+}
+
+.modern-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modern-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-polish-6);
+  border-radius: var(--radius-pill);
+}
+
+.modern-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* ---------- Common Table Styling (Main & Item Details) --------------------- */
+
+.stock-table {
+  border: var(--border-width) solid var(--color-polish-6);
+}
+
+.stock-table th {
+  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
+  background: var(--color-polish-27);
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+  line-height: var(--line-height-normal, 1.3);
+  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-1);
+}
+
+.stock-table td {
+  border-bottom: var(--border-width) solid var(--color-polish-18);
+  vertical-align: middle !important;
+  text-align: center !important;
+  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-1);
+  word-break: normal;
+}
+
+.stock-table th:not(:last-child),
+.stock-table td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-18);
+}
+
+.stock-table th.numeric-cell {
+  text-align: center !important;
+  vertical-align: middle !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+}
+
+.stock-table td.numeric-cell {
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-table td.numeric-cell--strong {
+  font-weight: var(--font-weight-strong);
+}
+
+/* Chips & Badges */
+.stock-table .condition-chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.stock-table .movement-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  white-space: nowrap;
+}
+
+.stock-table .qty--positive {
+  color: var(--color-issued-text);
+  font-weight: var(--font-weight-strong);
+}
+
+.stock-table .qty--negative {
+  color: var(--color-alert-text);
+  font-weight: var(--font-weight-strong);
+}
+
+.stock-table td .entity-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  word-break: break-word;
+  color: var(--color-polish-25);
+  font-weight: var(--font-weight-strong);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.stock-table td .entity-link:hover {
+  color: var(--color-polish-30);
+  text-decoration: underline;
+}
+
+.stock-table td .entity-link__icon svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
+}
+
+/* ---------- 1. Main Stock Positions Table ----------------------------------- */
+
+.modern-table-card.stock-positions-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.modern-table-scroll.stock-positions-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stock-table.stock-positions-table {
+  width: 100%;
+  min-width: calc(var(--space-8) * 14);
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.stock-positions-table th,
+.stock-positions-table td {
+  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-1);
+  vertical-align: middle;
+}
+
+.stock-positions-table th {
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  vertical-align: middle !important;
+  line-height: var(--line-height-normal, 1.3);
+}
+
+.stock-positions-table .col-item,
+.stock-positions-table col.col-item {
+  width: 23%;
+  min-width: calc(var(--space-8) * 2.8);
+}
+
+.stock-positions-table th.col-item,
+.stock-positions-table td.col-item {
+  text-align: center !important;
+}
+
+.stock-positions-table .col-batch,
+.stock-positions-table col.col-batch {
+  width: 13%;
+  min-width: calc(var(--space-8) * 1.7);
+}
+
+.stock-positions-table th.col-batch,
+.stock-positions-table td.col-batch {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+.stock-positions-table .col-expiry,
+.stock-positions-table col.col-expiry {
+  width: 10%;
+  min-width: calc(var(--space-8) * 1.5);
+}
+
+.stock-positions-table th.col-expiry,
+.stock-positions-table td.col-expiry {
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.stock-positions-table .col-condition,
+.stock-positions-table col.col-condition {
+  width: 11%;
+  min-width: calc(var(--space-8) * 1.7);
+}
+
+.stock-positions-table th.col-condition,
+.stock-positions-table td.col-condition {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+.stock-positions-table .col-on-hand,
+.stock-positions-table col.col-on-hand {
+  width: 10%;
+  min-width: calc(var(--space-8) * 1.4);
+}
+
+.stock-positions-table th.col-on-hand,
+.stock-positions-table td.col-on-hand {
+  text-align: center !important;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-positions-table .col-fefo,
+.stock-positions-table col.col-fefo {
+  width: 10%;
+  min-width: calc(var(--space-8) * 1.5);
+}
+
+.stock-positions-table th.col-fefo,
+.stock-positions-table td.col-fefo {
+  text-align: center !important;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-positions-table .col-available,
+.stock-positions-table col.col-available {
+  width: 11%;
+  min-width: calc(var(--space-8) * 1.7);
+}
+
+.stock-positions-table th.col-available,
+.stock-positions-table td.col-available {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-positions-table .col-unit-cost,
+.stock-positions-table col.col-unit-cost {
+  width: 12%;
+  min-width: calc(var(--space-8) * 1.7);
+}
+
+.stock-positions-table th.col-unit-cost,
+.stock-positions-table td.col-unit-cost {
+  text-align: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 2. Item Details (Stock Card) Table ------------------------------ */
+
+.stock-table.stock-card-table {
+  width: 100%;
+  min-width: calc(var(--space-8) * 9.2);
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.stock-card-table col.col-when {
+  width: 22%;
+  min-width: calc(var(--space-8) * 2);
+}
+
+.stock-card-table col.col-movement {
+  width: 18%;
+  min-width: calc(var(--space-8) * 1.7);
+}
+
+.stock-card-table col.col-condition {
+  width: 14%;
+  min-width: calc(var(--space-8) * 1.4);
+}
+
+.stock-card-table col.col-qty {
+  width: 15%;
+  min-width: calc(var(--space-8) * 1.3);
+}
+
+.stock-card-table col.col-balance {
+  width: 15%;
+  min-width: calc(var(--space-8) * 1.3);
+}
+
+.stock-card-table col.col-unit-cost {
+  width: 16%;
+  min-width: calc(var(--space-8) * 1.4);
+}
+
+.stock-card-table th,
+.stock-card-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.stock-card-table td.cell-when {
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: center !important;
+}
+
+/* ---------- 3. Opening Balance Table (Adding & Viewing Items) --------------- */
+
+.stock-table.opening-balance-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.stock-table.opening-balance-table--view {
+  min-width: calc(var(--space-8) * 7);
+}
+
+.opening-balance-table--view col.col-item {
+  width: 40%;
+  min-width: calc(var(--space-8) * 2.5);
+}
+
+.opening-balance-table--view col.col-condition {
+  width: 20%;
+  min-width: calc(var(--space-8) * 1.5);
+}
+
+.opening-balance-table--view col.col-qty {
+  width: 20%;
+  min-width: calc(var(--space-8) * 1.3);
+}
+
+.opening-balance-table--view col.col-unit-cost {
+  width: 20%;
+  min-width: calc(var(--space-8) * 1.5);
+}
+
+.opening-balance-table th,
+.opening-balance-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.stock-table td.empty-table-cell {
+  text-align: center !important;
+  color: var(--color-text-muted);
+  padding: var(--space-4) !important;
+  font-style: italic;
+}
+
+.opening-balance-table input,
+.opening-balance-table select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: calc(var(--space-1) + var(--space-half) / 2) var(--space-1);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  background: var(--color-polish-24);
+  color: var(--color-text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.opening-balance-table input:focus,
+.opening-balance-table select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--border-width) var(--color-polish-18);
+}
+
+.opening-balance-table td.numeric-cell input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.opening-balance-table .btn-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-half) var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-alert-text);
+  background: transparent;
+  border: var(--border-width) solid var(--color-alert-text);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.opening-balance-table .btn-remove:hover {
+  background: var(--color-alert-text);
+  color: var(--color-on-accent);
+}
+
+.stock-table .sku-link,
+.stock-table td a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+
+.stock-table .sku-link:hover,
+.stock-table td a:hover {
+  text-decoration-color: currentColor;
+}
+.inventory-pick-override {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--space-2);
   margin-block: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-4);
+}
+
+.inventory-pick-override h3,
+.inventory-pick-override p {
+  margin: 0;
 }

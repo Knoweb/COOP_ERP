@@ -15,7 +15,6 @@ import { usePricingApi } from "./pricingApi";
 import type { RetailPrice, SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { bindingCeiling, chipOf, errorText, incompleteLines, reasonMessageId } from "./priceListState";
-import { PricingTabs } from "./PricingTabs";
 import { ShelfLabelPrintAction } from "./ShelfLabelPrintAction";
 import "./pricing.css";
 
@@ -138,7 +137,11 @@ export function ShelfListPage() {
       <main className="shell-page">
         <p role="alert">{errorText(detail.error, t("pricing.error.not_found").text)}</p>
         <Link className="back-link" to="/pricing/shelf">
-          {t("pricing.shelf.back").text}
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M15 18l-6-6 6-6" />
+            <path d="M9 12h10" />
+          </svg>
+          <span>{t("pricing.shelf.back").text}</span>
         </Link>
       </main>
     );
@@ -169,16 +172,22 @@ export function ShelfListPage() {
   return (
     <main className="shell-page">
       <Link className="back-link" to="/pricing/shelf">
-        {t("pricing.shelf.back").text}
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+          <path d="M15 18l-6-6 6-6" />
+          <path d="M9 12h10" />
+        </svg>
+        <span>{t("pricing.shelf.back").text}</span>
       </Link>
-      <h1>{list.name}</h1>
-      <PricingTabs />
-      <p className="pricing-header-row">
-        <span>{t(`pricing.kind.${list.kind.toLowerCase()}`).text}</span>
-        <span>{t("pricing.version", undefined, { version: list.version }).text}</span>
-        <StateChip state={chipOf(list.status)} label={t(`pricing.status.${list.status.toLowerCase()}`).text} />
-        {list.applyFrom && <span>{t("pricing.applies_from", undefined, { date: formatDate(list.applyFrom) }).text}</span>}
-      </p>
+
+      <div className="pricing-header-card">
+        <h1>{list.name}</h1>
+        <div className="pricing-header-row">
+          <span className="pricing-meta-badge">{t(`pricing.kind.${list.kind.toLowerCase()}`).text}</span>
+          <span className="pricing-meta-badge">{t("pricing.version", undefined, { version: list.version }).text}</span>
+          <StateChip state={chipOf(list.status)} label={t(`pricing.status.${list.status.toLowerCase()}`).text} />
+          {list.applyFrom && <span className="pricing-meta-badge">{t("pricing.applies_from", undefined, { date: formatDate(list.applyFrom) }).text}</span>}
+        </div>
+      </div>
 
       {list.status === "SUPERSEDED" && canAuthor && (
         <p role="alert">{t("pricing.warning.superseded_source").text}</p>
@@ -194,8 +203,8 @@ export function ShelfListPage() {
               <tr>
                 <th>{t("pricing.column.item").text}</th>
                 <th>{t("pricing.column.unit").text}</th>
-                <th>{t("pricing.column.shelf_price").text}</th>
-                {retail && <th>{t("pricing.column.advisory").text}</th>}
+                <th className="pricing-cell-numeric">{t("pricing.column.shelf_price").text}</th>
+                {retail && <th className="pricing-cell-numeric">{t("pricing.column.advisory").text}</th>}
                 <th>{t("pricing.column.ceiling").text}</th>
                 {editable && <th>{t("pricing.column.outcome").text}</th>}
               </tr>
@@ -207,16 +216,17 @@ export function ShelfListPage() {
                 const advice = advisoryBySku.get(`${row.skuId}/${row.uomCode}`);
                 return (
                   <tr key={index}>
-                    <td>
+                    <td className="pricing-cell-item">
                       <SkuName skuId={row.skuId} />
                     </td>
                     <td>{row.uomCode}</td>
-                    <td>
+                    <td className="pricing-cell-numeric">
                       {editable ? (
                         <input
                           type="number"
                           min="0"
                           step="0.01"
+                          className="pricing-table-input"
                           aria-label={t("pricing.column.shelf_price").text}
                           value={row.price}
                           onChange={(event) => setRow(index, { price: event.target.value })}
@@ -225,10 +235,14 @@ export function ShelfListPage() {
                         <MoneyDisplay amount={row.price} />
                       )}
                     </td>
-                    {retail && <td>{advice == null ? "" : <MoneyDisplay amount={advice} />}</td>}
+                    {retail && (
+                      <td className="pricing-cell-numeric">
+                        {advice == null ? "" : <MoneyDisplay amount={advice} />}
+                      </td>
+                    )}
                     <td>
                       {ceiling && (
-                        <span>
+                        <span className="pricing-ceiling-badge">
                           {t(`pricing.ceiling.${ceiling.kind.toLowerCase()}`, undefined, { ref: ceiling.ref }).text}{" "}
                           <MoneyDisplay amount={ceiling.value} />
                         </span>
@@ -236,14 +250,20 @@ export function ShelfListPage() {
                     </td>
                     {editable && (
                       <td>
-                        {outcome && !outcome.ok && outcome.reason && (
-                          <span role="alert" className="pricing-alert-text">
-                            {t(reasonMessageId(outcome.reason)).text}
-                          </span>
-                        )}
-                        <button type="button" onClick={() => setRows((current) => current.filter((_, at) => at !== index))}>
-                          {t("pricing.remove").text}
-                        </button>
+                        <div className="pricing-outcome-cell">
+                          {outcome && !outcome.ok && outcome.reason && (
+                            <span role="alert" className="pricing-alert-pill">
+                              {t(reasonMessageId(outcome.reason)).text}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            className="pricing-btn-remove"
+                            onClick={() => setRows((current) => current.filter((_, at) => at !== index))}
+                          >
+                            {t("pricing.remove").text}
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -253,7 +273,11 @@ export function ShelfListPage() {
           </table>
         </div>
       </div>
-      {rows.length === 0 && <p>{t("pricing.lines.empty").text}</p>}
+      {rows.length === 0 && (
+        <div className="pricing-card pricing-empty-card">
+          <p className="pricing-muted">{t("pricing.lines.empty").text}</p>
+        </div>
+      )}
 
       {editable && (
         <section className="pricing-section">
@@ -266,43 +290,71 @@ export function ShelfListPage() {
               )
             }
           />
-          <div>
-            <button type="button" disabled={save.isPending || incomplete.length > 0} onClick={() => save.mutate()}>
-              {t("pricing.save").text}
-            </button>
-            {incomplete.length > 0 && <p role="alert">{t("pricing.shelf.incomplete", undefined, { rows: incomplete.join(", ") }).text}</p>}
-            {outcomes?.saved && <p role="status">{t("pricing.saved").text}</p>}
-            {outcomes && !outcomes.saved && (
-              <p role="alert">{t("pricing.shelf.not_saved", undefined, { count: refusedLines }).text}</p>
-            )}
-            {save.isError && <p role="alert">{errorText(save.error, t("pricing.error.generic").text)}</p>}
-          </div>
-          {canPublish && (
-            <form onSubmit={submitPublish} className="pricing-publish-form">
-              <label className="pricing-form-field">
-                {t("pricing.field.apply_from").text}
-                <input type="date" required value={applyFrom} onChange={(event) => setApplyFrom(event.target.value)} />
-              </label>
+          <div className="pricing-card pricing-actions-card">
+            <div className="pricing-actions-row">
               <button
-                type="submit"
-                disabled={publish.isPending || !applyFrom || rows.length === 0 || refusedLines > 0}
+                type="button"
+                className="modern-btn modern-btn--primary"
+                disabled={save.isPending || incomplete.length > 0}
+                onClick={() => save.mutate()}
               >
-                {t("pricing.publish").text}
+                {t("pricing.save").text}
               </button>
-              {refusedLines > 0 && <span className="pricing-muted">{t("pricing.shelf.fix_to_publish").text}</span>}
-              {publish.isError && <p role="alert">{errorText(publish.error, t("pricing.error.generic").text)}</p>}
-            </form>
-          )}
+              {incomplete.length > 0 && (
+                <span role="alert" className="pricing-alert-box pricing-alert-box--error">
+                  {t("pricing.shelf.incomplete", undefined, { rows: incomplete.join(", ") }).text}
+                </span>
+              )}
+              {outcomes?.saved && <span role="status" className="pricing-alert-box pricing-alert-box--success">{t("pricing.saved").text}</span>}
+              {outcomes && !outcomes.saved && (
+                <span role="alert" className="pricing-alert-box pricing-alert-box--error">
+                  {t("pricing.shelf.not_saved", undefined, { count: refusedLines }).text}
+                </span>
+              )}
+              {save.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(save.error, t("pricing.error.generic").text)}</span>}
+            </div>
+
+            {canPublish && (
+              <form onSubmit={submitPublish} className="pricing-publish-form">
+                <label className="modern-field">
+                  <span className="modern-field__label pricing-filter-label">{t("pricing.field.apply_from").text}</span>
+                  <input
+                    type="date"
+                    required
+                    className="pricing-input"
+                    value={applyFrom}
+                    onChange={(event) => setApplyFrom(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="modern-btn modern-btn--primary"
+                  disabled={publish.isPending || !applyFrom || rows.length === 0 || refusedLines > 0}
+                >
+                  {t("pricing.publish").text}
+                </button>
+                {refusedLines > 0 && <span className="pricing-muted">{t("pricing.shelf.fix_to_publish").text}</span>}
+                {publish.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(publish.error, t("pricing.error.generic").text)}</span>}
+              </form>
+            )}
+          </div>
         </section>
       )}
 
       {(list.status === "PUBLISHED" || list.status === "SUPERSEDED") && canAuthor && (
-        <p>
-          <button type="button" disabled={nextVersion.isPending} onClick={() => nextVersion.mutate()}>
-            {t("pricing.next_version").text}
-          </button>
-          {nextVersion.isError && <span role="alert">{errorText(nextVersion.error, t("pricing.error.generic").text)}</span>}
-        </p>
+        <div className="pricing-card pricing-actions-card">
+          <div className="pricing-actions-row">
+            <button
+              type="button"
+              className="modern-btn modern-btn--primary"
+              disabled={nextVersion.isPending}
+              onClick={() => nextVersion.mutate()}
+            >
+              {t("pricing.next_version").text}
+            </button>
+            {nextVersion.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(nextVersion.error, t("pricing.error.generic").text)}</span>}
+          </div>
+        </div>
       )}
 
       {list.status !== "DRAFT" && retail && rows.length > 0 && <PriceCheck rows={rows} />}
@@ -352,69 +404,122 @@ function PriceCheck({ rows }: { rows: Row[] }) {
   };
 
   return (
-    <section className="pricing-section" aria-labelledby="pricing-check-title">
+    <section className="pricing-card pricing-check-card" aria-labelledby="pricing-check-title">
       <h2 id="pricing-check-title">{t("pricing.check.title").text}</h2>
       <form onSubmit={submit} className="pricing-form-grid">
-        <label className="pricing-form-field">
-          {t("pricing.check.shop").text}
-          <select aria-label={t("pricing.check.shop").text} required value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-            <option value="">{t("pricing.check.choose").text}</option>
-            {shops.map((shop) => (
-              <option key={shop.locationId} value={shop.locationId}>
-                {inLocale(locale, shop.nameEn, shop.nameSi, shop.nameTa)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="pricing-form-field">
-          {t("pricing.column.item").text}
-          <select aria-label={t("pricing.column.item").text} required value={skuId} onChange={(event) => setSkuId(event.target.value)}>
-            <option value="">{t("pricing.check.choose").text}</option>
-            {rows.map((row, index) => {
-              const sku = skus[index]?.data;
-              return (
-                <option key={row.skuId} value={row.skuId}>
-                  {sku ? skuText(sku, locale) : row.skuId}
+        <label className="modern-field">
+          <span className="modern-field__label pricing-filter-label">{t("pricing.check.shop").text}</span>
+          <div className="modern-select">
+            <select
+              className="pricing-select"
+              aria-label={t("pricing.check.shop").text}
+              required
+              value={locationId}
+              onChange={(event) => setLocationId(event.target.value)}
+            >
+              <option value="">{t("pricing.check.choose").text}</option>
+              {shops.map((shop) => (
+                <option key={shop.locationId} value={shop.locationId}>
+                  {inLocale(locale, shop.nameEn, shop.nameSi, shop.nameTa)}
                 </option>
-              );
-            })}
-          </select>
+              ))}
+            </select>
+            <svg className="modern-select__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
         </label>
-        <label className="pricing-form-field">
-          {t("pricing.check.date").text}
-          <input type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
+        <label className="modern-field">
+          <span className="modern-field__label pricing-filter-label">{t("pricing.column.item").text}</span>
+          <div className="modern-select">
+            <select
+              className="pricing-select"
+              aria-label={t("pricing.column.item").text}
+              required
+              value={skuId}
+              onChange={(event) => setSkuId(event.target.value)}
+            >
+              <option value="">{t("pricing.check.choose").text}</option>
+              {rows.map((row, index) => {
+                const sku = skus[index]?.data;
+                return (
+                  <option key={row.skuId} value={row.skuId}>
+                    {sku ? skuText(sku, locale) : row.skuId}
+                  </option>
+                );
+              })}
+            </select>
+            <svg className="modern-select__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
         </label>
-        <button type="submit" disabled={check.isPending || !locationId || !skuId || !date}>
+        <label className="modern-field">
+          <span className="modern-field__label pricing-filter-label">{t("pricing.check.date").text}</span>
+          <input
+            type="date"
+            className="pricing-input"
+            required
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+        </label>
+        <button
+          type="submit"
+          className="modern-btn modern-btn--primary"
+          disabled={check.isPending || !locationId || !skuId || !date}
+        >
           {t("pricing.check.run").text}
         </button>
       </form>
-      {check.isError && <p role="alert">{errorText(check.error, t("pricing.error.generic").text)}</p>}
+      {check.isError && (
+        <p role="alert" className="pricing-alert-box pricing-alert-box--error pricing-alert-box--spaced">
+          {errorText(check.error, t("pricing.error.generic").text)}
+        </p>
+      )}
       {result && (
-        <dl className="pricing-section" aria-live="polite">
-          {result.sellable ? (
-            <>
-              <dt>{t("pricing.check.price").text}</dt>
-              <dd>
-                <MoneyDisplay amount={result.unitPrice ?? ""} />
+        <div className="pricing-check-result" aria-live="polite">
+          <dl className="pricing-check-highlight">
+            <div>
+              <dt className="pricing-check-highlight__label">{t("pricing.check.price").text}</dt>
+              <dd className="pricing-check-highlight__value">
+                {result.sellable ? (
+                  <MoneyDisplay amount={result.unitPrice ?? ""} />
+                ) : (
+                  <span>{t(`pricing.check.not_sellable.${result.reason === "price.needs_pick" ? "pick" : "no_line"}`).text}</span>
+                )}
               </dd>
-              <dt>{t("pricing.check.bound").text}</dt>
-              <dd>{t(`pricing.cap.${result.capReason.toLowerCase()}`).text}</dd>
-            </>
-          ) : (
-            <>
-              <dt>{t("pricing.check.price").text}</dt>
-              <dd>{t(`pricing.check.not_sellable.${result.reason === "price.needs_pick" ? "pick" : "no_line"}`).text}</dd>
-            </>
-          )}
-          <dt>{t("pricing.check.list_price").text}</dt>
-          <dd>{result.listPrice == null ? "" : <MoneyDisplay amount={result.listPrice} />}</dd>
-          <dt>{t("pricing.check.mrp").text}</dt>
-          <dd>{result.mrpApplied == null ? "" : <MoneyDisplay amount={result.mrpApplied} />}</dd>
-          <dt>{t("pricing.check.control").text}</dt>
-          <dd>{result.controlPrice == null ? "" : <MoneyDisplay amount={result.controlPrice} />}</dd>
-          <dt>{t("pricing.check.policy").text}</dt>
-          <dd>{t(`pricing.policy.${result.policy.toLowerCase()}`).text}</dd>
-        </dl>
+            </div>
+            {result.sellable && (
+              <span className="pricing-meta-badge">
+                {t("pricing.check.bound").text}: {t(`pricing.cap.${result.capReason.toLowerCase()}`).text}
+              </span>
+            )}
+          </dl>
+
+          <dl className="pricing-check-grid">
+            <div className="pricing-check-item">
+              <dt className="pricing-check-item__label">{t("pricing.check.list_price").text}</dt>
+              <dd className="pricing-check-item__value">
+                {result.listPrice == null ? "—" : <MoneyDisplay amount={result.listPrice} />}
+              </dd>
+            </div>
+            <div className="pricing-check-item">
+              <dt className="pricing-check-item__label">{t("pricing.check.mrp").text}</dt>
+              <dd className="pricing-check-item__value">
+                {result.mrpApplied == null ? "—" : <MoneyDisplay amount={result.mrpApplied} />}
+              </dd>
+            </div>
+            <div className="pricing-check-item">
+              <dt className="pricing-check-item__label">{t("pricing.check.control").text}</dt>
+              <dd className="pricing-check-item__value">
+                {result.controlPrice == null ? "—" : <MoneyDisplay amount={result.controlPrice} />}
+              </dd>
+            </div>
+            <div className="pricing-check-item">
+              <dt className="pricing-check-item__label">{t("pricing.check.policy").text}</dt>
+              <dd className="pricing-check-item__value">
+                {t(`pricing.policy.${result.policy.toLowerCase()}`).text}
+              </dd>
+            </div>
+          </dl>
+        </div>
       )}
     </section>
   );

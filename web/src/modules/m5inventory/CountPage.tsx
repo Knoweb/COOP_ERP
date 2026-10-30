@@ -97,21 +97,21 @@ export function CountPage() {
   const approvals: ApprovalAction[] =
     task.status === "VARIANCE_REVIEW" && canApprove
       ? [
-          {
-            id: "approve",
-            label: t("inventory.count.approve").text,
-            primary: true,
-            pending: approve.isPending,
-            disabledReason: ownCount ? t("inventory.count.sod").text : undefined,
-            onClick: () => approve.mutate()
-          },
-          {
-            id: "reject",
-            label: t("inventory.count.reject").text,
-            pending: reject.isPending,
-            onClick: () => setRejecting(true)
-          }
-        ]
+        {
+          id: "approve",
+          label: t("inventory.count.approve").text,
+          primary: true,
+          pending: approve.isPending,
+          disabledReason: ownCount ? t("inventory.count.sod").text : undefined,
+          onClick: () => approve.mutate()
+        },
+        {
+          id: "reject",
+          label: t("inventory.count.reject").text,
+          pending: reject.isPending,
+          onClick: () => setRejecting(true)
+        }
+      ]
       : [];
 
   return (

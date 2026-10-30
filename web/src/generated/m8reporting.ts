@@ -287,6 +287,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List society-owned fixed assets
+         * @description Returns all fixed assets for the caller's permitted scope, optionally filtered by location, type, or status.
+         */
+        get: operations["listAssets"];
+        put?: never;
+        /**
+         * Register a society-owned fixed asset
+         * @description Registers a new fixed/non-stock asset (land, building, vehicle, equipment, furniture, other). Codes this operation can answer with 422: m8.asset.own_required, m8.asset.code_required, m8.asset.code_too_long, m8.asset.name_required, m8.asset.type_invalid, m8.asset.location_unknown, m8.asset.location_scope_mismatch, m8.asset.duplicate_code.
+         */
+        post: operations["registerAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/assets/{assetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Details of a single fixed asset
+         * @description Returns a single fixed asset by ID in the caller's permitted scope.
+         */
+        get: operations["getAsset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/revenue-estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calculate required stock quantities and revenue estimates for a target sales mix
+         * @description Estimates required product quantities needed to achieve a target revenue amount using a specified product/SKU mix and current effective/commercial selling prices resolved from the pricing subsystem. Codes this operation can answer with 422: m8.estimator.target_revenue_invalid, m8.estimator.mix_empty, m8.estimator.duplicate_sku, m8.estimator.mix_must_equal_100, m8.estimator.sku_not_found, m8.estimator.unresolved_price, m8.estimator.location_required, m8.estimator.location_unknown.
+         */
+        post: operations["estimateRevenue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -622,6 +686,107 @@ export interface components {
             items: components["schemas"]["ProfitCenterPnlItem"][];
             unallocated?: components["schemas"]["ProfitCenterPnlItem"];
         };
+        RegisterAssetRequest: {
+            assetCode: string;
+            name: string;
+            description?: string | null;
+            /** @enum {string} */
+            assetType: "LAND" | "BUILDING" | "VEHICLE" | "EQUIPMENT" | "FURNITURE" | "OTHER";
+            /** Format: uuid */
+            locationId?: string | null;
+            /** Format: date */
+            acquisitionDate?: string | null;
+            /** @description Historical acquisition cost in LKR */
+            acquisitionCost?: string | null;
+        };
+        AssetResponse: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            assetCode: string;
+            name: string;
+            description?: string | null;
+            assetType: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            locationName?: string | null;
+            /** Format: date */
+            acquisitionDate?: string | null;
+            acquisitionCost?: string | null;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AssetListResponse: {
+            items: components["schemas"]["AssetResponse"][];
+        };
+        RevenueEstimateItemRequest: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Percentage share of revenue (e.g. 40.00) */
+            mixPercent: string;
+        };
+        RevenueEstimateRequest: {
+            /** @description Target revenue in LKR */
+            targetRevenue: string;
+            /**
+             * Format: uuid
+             * @description Shop or location where prices are resolved
+             */
+            locationId?: string | null;
+            /**
+             * @description Price resolution basis
+             * @default RETAIL
+             * @enum {string|null}
+             */
+            priceType: "RETAIL" | "COMMERCIAL" | null;
+            /**
+             * Format: date
+             * @description Effective date for price resolution
+             */
+            businessDate?: string | null;
+            items: components["schemas"]["RevenueEstimateItemRequest"][];
+        };
+        RevenueEstimateItemResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            uomCode: string;
+            unitPrice: string;
+            priceSource: string;
+            mixPercent: string;
+            targetShare: string;
+            rawQuantity: string;
+            roundedQuantity: string;
+            estimatedRevenue: string;
+            roundingVariance: string;
+        };
+        RevenueEstimateAssumptions: {
+            targetRevenue: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            priceType: string;
+            /** Format: date */
+            businessDate: string;
+            roundingMethod: string;
+            priceResolutionPolicy: string;
+        };
+        RevenueEstimateResponse: {
+            targetRevenue: string;
+            totalEstimatedRevenue: string;
+            targetVariance: string;
+            totalMixPercent: string;
+            currency: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            priceType: string;
+            /** Format: date */
+            businessDate: string;
+            items: components["schemas"]["RevenueEstimateItemResponse"][];
+            assumptions: components["schemas"]["RevenueEstimateAssumptions"];
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -675,6 +840,13 @@ export interface components {
         To: string;
         /** @description One location (the stock position); all the caller reads when absent */
         LocationId: string;
+        /** @description Filter assets by branch or location */
+        AssetLocationId: string;
+        /** @description Filter assets by type (LAND, BUILDING, VEHICLE, EQUIPMENT, FURNITURE, OTHER) */
+        AssetTypeParam: string;
+        /** @description Filter assets by status (ACTIVE, DISPOSED, MAINTENANCE, INACTIVE) */
+        AssetStatusParam: string;
+        AssetIdParam: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -1184,6 +1356,143 @@ export interface operations {
             };
             /** @description Profit center not found in caller's permitted scope */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listAssets: {
+        parameters: {
+            query?: {
+                /** @description Filter assets by branch or location */
+                locationId?: components["parameters"]["AssetLocationId"];
+                /** @description Filter assets by type (LAND, BUILDING, VEHICLE, EQUIPMENT, FURNITURE, OTHER) */
+                assetType?: components["parameters"]["AssetTypeParam"];
+                /** @description Filter assets by status (ACTIVE, DISPOSED, MAINTENANCE, INACTIVE) */
+                status?: components["parameters"]["AssetStatusParam"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of assets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    registerAsset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: components["parameters"]["AssetIdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Asset details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Asset not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    estimateRevenue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevenueEstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Revenue estimate and sales mix plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevenueEstimateResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope or location forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

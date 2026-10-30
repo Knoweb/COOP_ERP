@@ -5,18 +5,25 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import lk.coopfed.knoweb.kernel.api.PermissionResolver;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m8reporting.api.CreateProfitCenter;
 import lk.coopfed.knoweb.m8reporting.api.CreateShopTarget;
 import lk.coopfed.knoweb.m8reporting.api.ExportReportCsv;
+import lk.coopfed.knoweb.m8reporting.api.RegisterAsset;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.api.UpdateShopTarget;
+import lk.coopfed.knoweb.m8reporting.query.AssetFilter;
+import lk.coopfed.knoweb.m8reporting.query.AssetView;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
@@ -27,9 +34,13 @@ import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimatePlan;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimateResult;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
+import lk.coopfed.knoweb.m8reporting.web.generated.AssetListResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.AssetResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateProfitCenterRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateShopTargetRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportItem;
@@ -47,18 +58,24 @@ import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterListResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlSummary;
 import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.RegisterAssetRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportColumn;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDataResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDefinitionResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportRunResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportingApi;
 import lk.coopfed.knoweb.m8reporting.web.generated.RequestReportRunRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateAssumptions;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetPerformanceItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetPerformanceResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.TrendPoint;
 import lk.coopfed.knoweb.m8reporting.web.generated.UpdateShopTargetRequest;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -83,9 +100,12 @@ class ReportingController implements ReportingApi {
     private final Handles<CreateShopTarget, UUID> createTarget;
     private final Handles<UpdateShopTarget, Void> updateTarget;
     private final Handles<CreateProfitCenter, UUID> createProfitCenterHandler;
+    private final Handles<RegisterAsset, UUID> registerAssetHandler;
     private final Messages messages;
     private final ObjectProvider<A4Renderer> renderer;
     private final Clock clock;
+    private final PermissionResolver permissionResolver;
+    private final boolean enforcePermissions;
 
     ReportingController(
             ReportingQueries queries,
@@ -95,9 +115,12 @@ class ReportingController implements ReportingApi {
             Handles<CreateShopTarget, UUID> createTarget,
             Handles<UpdateShopTarget, Void> updateTarget,
             Handles<CreateProfitCenter, UUID> createProfitCenterHandler,
+            Handles<RegisterAsset, UUID> registerAssetHandler,
             Messages messages,
             ObjectProvider<A4Renderer> renderer,
-            Clock clock) {
+            Clock clock,
+            PermissionResolver permissionResolver,
+            @Value("${coop-erp.security.enforce-permissions:true}") boolean enforcePermissions) {
         this.queries = queries;
         this.currentScope = currentScope;
         this.requestRun = requestRun;
@@ -105,9 +128,12 @@ class ReportingController implements ReportingApi {
         this.createTarget = createTarget;
         this.updateTarget = updateTarget;
         this.createProfitCenterHandler = createProfitCenterHandler;
+        this.registerAssetHandler = registerAssetHandler;
         this.messages = messages;
         this.renderer = renderer;
         this.clock = clock;
+        this.permissionResolver = permissionResolver;
+        this.enforcePermissions = enforcePermissions;
     }
 
     @Override
@@ -610,5 +636,180 @@ class ReportingController implements ReportingApi {
             dto.setMarginPercent(item.marginPercent().toPlainString());
         }
         return dto;
+    }
+
+    @Override
+    public ResponseEntity<AssetResponse> registerAsset(String idempotencyKey, RegisterAssetRequest request) {
+        ScopeContext scope = currentScope.get();
+        final BigDecimal acquisitionCost = (request.getAcquisitionCost() != null
+                        && !request.getAcquisitionCost().isBlank())
+                ? new BigDecimal(request.getAcquisitionCost())
+                : null;
+        RegisterAsset command = new RegisterAsset(
+                request.getAssetCode(),
+                request.getName(),
+                request.getDescription(),
+                request.getAssetType() != null ? request.getAssetType().getValue() : null,
+                request.getLocationId(),
+                request.getAcquisitionDate(),
+                acquisitionCost);
+
+        UUID assetId = registerAssetHandler.handle(command, scope);
+
+        AssetView view = queries.getAsset(assetId, scope)
+                .orElseGet(() -> new AssetView(
+                        assetId,
+                        scope.entityId(),
+                        request.getAssetCode(),
+                        request.getName(),
+                        request.getDescription(),
+                        request.getAssetType() != null ? request.getAssetType().getValue() : "OTHER",
+                        request.getLocationId(),
+                        null,
+                        request.getAcquisitionDate(),
+                        acquisitionCost,
+                        "ACTIVE",
+                        clock.instant()));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(toAssetResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<AssetListResponse> listAssets(
+            @Nullable UUID locationId, @Nullable String assetType, @Nullable String status) {
+        ScopeContext scope = currentScope.get();
+        if (scope.locationId() != null
+                && locationId != null
+                && !scope.locationId().equals(locationId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : locationId;
+        AssetFilter filter = new AssetFilter(effectiveLocationId, assetType, status);
+        List<AssetView> assets = queries.listAssets(filter, scope);
+        List<AssetResponse> items =
+                assets.stream().map(ReportingController::toAssetResponse).toList();
+        return ResponseEntity.ok(new AssetListResponse(items));
+    }
+
+    @Override
+    public ResponseEntity<AssetResponse> getAsset(UUID assetId) {
+        ScopeContext scope = currentScope.get();
+        Optional<AssetView> asset = queries.getAsset(assetId, scope);
+        return asset.map(view -> ResponseEntity.ok(toAssetResponse(view)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private static AssetResponse toAssetResponse(AssetView view) {
+        AssetResponse response = new AssetResponse(
+                view.assetId(),
+                view.ownerEntityId(),
+                view.assetCode(),
+                view.name(),
+                view.assetType(),
+                view.status(),
+                view.createdAt());
+        response.setDescription(view.description());
+        response.setLocationId(view.locationId());
+        response.setLocationName(view.locationName());
+        response.setAcquisitionDate(view.acquisitionDate());
+        if (view.acquisitionCost() != null) {
+            response.setAcquisitionCost(view.acquisitionCost().toPlainString());
+        }
+        return response;
+    }
+
+    @Override
+    public ResponseEntity<RevenueEstimateResponse> estimateRevenue(
+            String idempotencyKey, RevenueEstimateRequest request) {
+        ScopeContext scope = currentScope.get();
+        if (scope.policyClass() != PolicyClass.OWN || scope.userId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        if (enforcePermissions && !permissionResolver.allows(scope, "rpt.target.view")) {
+            throw new ProblemException("permission.denied", Map.of("permission", "rpt.target.view"));
+        }
+        if (request == null) {
+            throw new ProblemException("m8.estimator.mix_empty");
+        }
+        if (scope.locationId() != null
+                && request.getLocationId() != null
+                && !scope.locationId().equals(request.getLocationId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : request.getLocationId();
+
+        BigDecimal targetRevenue;
+        try {
+            targetRevenue = request.getTargetRevenue() != null ? new BigDecimal(request.getTargetRevenue()) : null;
+        } catch (NumberFormatException e) {
+            throw new ProblemException("m8.estimator.target_revenue_invalid");
+        }
+
+        List<RevenueEstimatePlan.MixItem> items = request.getItems() == null
+                ? List.of()
+                : request.getItems().stream()
+                        .map(i -> {
+                            BigDecimal mix;
+                            try {
+                                mix = i.getMixPercent() != null ? new BigDecimal(i.getMixPercent()) : null;
+                            } catch (NumberFormatException e) {
+                                throw new ProblemException("m8.estimator.mix_must_equal_100");
+                            }
+                            return new RevenueEstimatePlan.MixItem(i.getSkuId(), mix);
+                        })
+                        .toList();
+
+        RevenueEstimatePlan plan = new RevenueEstimatePlan(
+                targetRevenue,
+                effectiveLocationId,
+                request.getPriceType() != null ? request.getPriceType().toString() : "RETAIL",
+                request.getBusinessDate(),
+                items);
+
+        RevenueEstimateResult result = queries.estimateRevenue(plan, scope);
+        return ResponseEntity.ok(toResponse(result));
+    }
+
+    private static RevenueEstimateResponse toResponse(RevenueEstimateResult result) {
+        RevenueEstimateResponse response = new RevenueEstimateResponse();
+        response.setTargetRevenue(result.targetRevenue().toPlainString());
+        response.setTotalEstimatedRevenue(result.totalEstimatedRevenue().toPlainString());
+        response.setTargetVariance(result.targetVariance().toPlainString());
+        response.setTotalMixPercent(result.totalMixPercent().toPlainString());
+        response.setCurrency(result.currency());
+        response.setLocationId(result.locationId());
+        response.setPriceType(result.priceType());
+        response.setBusinessDate(result.businessDate());
+
+        List<RevenueEstimateItemResponse> itemDtos = result.items().stream()
+                .map(item -> {
+                    RevenueEstimateItemResponse dto = new RevenueEstimateItemResponse();
+                    dto.setSkuId(item.skuId());
+                    dto.setSkuCode(item.skuCode());
+                    dto.setSkuName(item.skuName());
+                    dto.setUomCode(item.uomCode());
+                    dto.setUnitPrice(item.unitPrice().toPlainString());
+                    dto.setPriceSource(item.priceSource());
+                    dto.setMixPercent(item.mixPercent().toPlainString());
+                    dto.setTargetShare(item.targetShare().toPlainString());
+                    dto.setRawQuantity(item.rawQuantity().toPlainString());
+                    dto.setRoundedQuantity(item.roundedQuantity().toPlainString());
+                    dto.setEstimatedRevenue(item.estimatedRevenue().toPlainString());
+                    dto.setRoundingVariance(item.roundingVariance().toPlainString());
+                    return dto;
+                })
+                .toList();
+        response.setItems(itemDtos);
+
+        RevenueEstimateAssumptions assumptionsDto = new RevenueEstimateAssumptions();
+        assumptionsDto.setTargetRevenue(result.assumptions().targetRevenue());
+        assumptionsDto.setLocationId(result.assumptions().locationId());
+        assumptionsDto.setPriceType(result.assumptions().priceType());
+        assumptionsDto.setBusinessDate(result.businessDate());
+        assumptionsDto.setRoundingMethod(result.assumptions().roundingMethod());
+        assumptionsDto.setPriceResolutionPolicy(result.assumptions().priceResolutionPolicy());
+        response.setAssumptions(assumptionsDto);
+
+        return response;
     }
 }

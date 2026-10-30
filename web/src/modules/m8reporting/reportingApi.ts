@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { useApiClient } from "../../shell/api/client";
 import type { components, paths } from "../../generated/m8reporting";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
+import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
 
 export type Dashboard = components["schemas"]["DashboardResponse"];
 export type Tile = components["schemas"]["DashboardTile"];
@@ -31,6 +32,13 @@ export type CreateProfitCenterRequest = components["schemas"]["CreateProfitCente
 export type ProfitCenterPnlItem = components["schemas"]["ProfitCenterPnlItem"];
 export type ProfitCenterPnlSummary = components["schemas"]["ProfitCenterPnlSummary"];
 export type MonthlyProfitCenterPnlReport = components["schemas"]["MonthlyProfitCenterPnlResponse"];
+export type Asset = components["schemas"]["AssetResponse"];
+export type RegisterAssetRequest = components["schemas"]["RegisterAssetRequest"];
+export type RevenueEstimateRequest = components["schemas"]["RevenueEstimateRequest"];
+export type RevenueEstimateResponse = components["schemas"]["RevenueEstimateResponse"];
+export type RevenueEstimateItemResponse = components["schemas"]["RevenueEstimateItemResponse"];
+export type RevenueEstimateAssumptions = components["schemas"]["RevenueEstimateAssumptions"];
+export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
 export type ReportQuery = { from?: string; to?: string; locationId?: string };
@@ -38,6 +46,7 @@ export type ReportQuery = { from?: string; to?: string; locationId?: string };
 export function useReportingApi() {
   const api = useApiClient<paths>();
   const party = useApiClient<partyPaths>();
+  const catalogue = useApiClient<cataloguePaths>();
 
   return useMemo(
     () => ({
@@ -188,8 +197,55 @@ export function useReportingApi() {
           params: { query }
         });
         return data!;
+      },
+
+      async listAssets(query?: {
+        locationId?: string;
+        assetType?: string;
+        status?: string;
+      }): Promise<Asset[]> {
+        const { data } = await api.GET("/v1/reporting/assets", {
+          params: { query }
+        });
+        return data?.items ?? [];
+      },
+
+      async getAsset(assetId: string): Promise<Asset> {
+        const { data } = await api.GET("/v1/reporting/assets/{assetId}", {
+          params: { path: { assetId } }
+        });
+        return data!;
+      },
+
+      async registerAsset(
+        body: RegisterAssetRequest,
+        idempotencyKey: string
+      ): Promise<Asset> {
+        const { data } = await api.POST("/v1/reporting/assets", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async searchSkus(q?: string): Promise<Sku[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/skus", {
+          params: { query: { q: q || undefined, limit: 50 } }
+        });
+        return data?.items ?? [];
+      },
+
+      async estimateRevenue(
+        body: RevenueEstimateRequest,
+        idempotencyKey: string
+      ): Promise<RevenueEstimateResponse> {
+        const { data } = await api.POST("/v1/reporting/revenue-estimates", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
       }
     }),
-    [api, party]
+    [api, party, catalogue]
   );
 }

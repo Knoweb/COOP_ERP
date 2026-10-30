@@ -9,6 +9,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi } from "./inventoryApi";
 import { SkuLabel } from "./SkuLabel";
 import { chipOf, errorText } from "./stockView";
+import "./inventory.css";
 
 /**
  * One opening balance (doc 25 section 4.7, flow 6.9): its counted lines and state. A DRAFT is
@@ -60,9 +61,9 @@ export function OpeningBalancePage() {
       <main className="shell-page">
         <p role="alert">{errorText(balance.error, t("inventory.error.not_found").text)}</p>
         <Link className="back-link" to="/inventory">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("inventory.back").text}
-      </Link>
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+          {t("inventory.back").text}
+        </Link>
       </main>
     );
   }
@@ -79,30 +80,42 @@ export function OpeningBalancePage() {
         <StateChip state={chipOf(ob.status)} label={t(`inventory.opening.status.${ob.status}`).text} />
       </p>
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("inventory.column.item").text}</th>
-            <th>{t("inventory.column.condition").text}</th>
-            <th>{t("inventory.column.qty").text}</th>
-            <th>{t("inventory.column.unit_cost").text}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ob.lines.map((line) => (
-            <tr key={line.lineNo}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{t(`inventory.condition.${line.condition}`).text}</td>
-              <td>{line.qty}</td>
-              <td>
-                <MoneyDisplay amount={line.unitCost} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="modern-table-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table stock-table opening-balance-table opening-balance-table--view">
+            <colgroup>
+              <col className="col-item" />
+              <col className="col-condition" />
+              <col className="col-qty" />
+              <col className="col-unit-cost" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>{t("inventory.column.item").text}</th>
+                <th>{t("inventory.column.condition").text}</th>
+                <th className="numeric-cell">{t("inventory.column.qty").text}</th>
+                <th className="numeric-cell">{t("inventory.column.unit_cost").text}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ob.lines.map((line) => (
+                <tr key={line.lineNo}>
+                  <td>
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>
+                    <span className="condition-chip">{t(`inventory.condition.${line.condition}`).text}</span>
+                  </td>
+                  <td className="numeric-cell">{line.qty}</td>
+                  <td className="numeric-cell">
+                    <MoneyDisplay amount={line.unitCost} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="inventory-action-bar">
         {ob.status === "DRAFT" && canSign && (

@@ -29,6 +29,7 @@ import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
+import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.BulkImportStockRequest;
@@ -42,6 +43,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OverridePickRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.PickReplacementCandidateResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
@@ -251,6 +253,16 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
+    public ResponseEntity<List<PickReplacementCandidateResponse>> listPickReplacementCandidates(
+            UUID deliveryNoteId, UUID pickLineId) {
+        ScopeContext scope = currentScope.get();
+        Map<UUID, String> batchNumbers = new HashMap<>();
+        return ResponseEntity.ok(queries.pickReplacementCandidates(deliveryNoteId, pickLineId, scope).stream()
+                .map(candidate -> toResponse(candidate, batchNo(batchNumbers, candidate.batchId(), scope)))
+                .toList());
+    }
+
+    @Override
     public ResponseEntity<Void> overridePick(
             String idempotencyKey, UUID deliveryNoteId, UUID pickLineId, OverridePickRequest request) {
         ScopeContext scope = currentScope.get();
@@ -405,6 +417,13 @@ class InventoryController implements InventoryApi {
                                 .stockLotId(p.stockLotId())
                                 .batchId(p.batchId()))
                         .toList());
+    }
+
+    private static PickReplacementCandidateResponse toResponse(PickReplacementCandidate candidate, String batchNo) {
+        return new PickReplacementCandidateResponse(
+                        candidate.stockLotId(), candidate.batchId(), candidate.availableQty())
+                .batchNo(batchNo)
+                .expiryDate(candidate.expiryDate());
     }
 
     private static OpeningBalanceResponse toResponse(OpeningBalanceView balance) {

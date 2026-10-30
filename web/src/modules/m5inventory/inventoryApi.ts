@@ -15,6 +15,8 @@ export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type PickList = components["schemas"]["PickListResponse"];
+export type PickReplacementCandidate = components["schemas"]["PickReplacementCandidateResponse"];
+export type OverridePickRequest = components["schemas"]["OverridePickRequest"];
 export type Transfer =components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
 export type ReceiveTransferRequest = components["schemas"]["ReceiveTransferRequest"];
@@ -116,6 +118,32 @@ export function useInventoryApi() {
           params: { path: { deliveryNoteId } }
         });
         return data!;
+      },
+
+      async pickReplacementCandidates(
+        deliveryNoteId: string,
+        pickLineId: string
+      ): Promise<PickReplacementCandidate[]> {
+        const { data } = await api.GET(
+          "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates",
+          { params: { path: { deliveryNoteId, pickLineId } } }
+        );
+        return data ?? [];
+      },
+
+      async overridePick(
+        deliveryNoteId: string,
+        pickLineId: string,
+        request: OverridePickRequest,
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.POST("/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override", {
+          params: {
+            path: { deliveryNoteId, pickLineId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: request
+        });
       },
 
       async transfers(locationId: string): Promise<Transfer[]> {
