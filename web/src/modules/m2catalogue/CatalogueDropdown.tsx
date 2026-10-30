@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "./catalogue.css";
 
 export type DropdownOption<T extends string = string> = {
   value: T;
@@ -18,7 +19,7 @@ type CatalogueDropdownProps<T extends string = string> = {
 
 /**
  * Reusable custom dropdown with accessible listbox, arrow icon, checkmark on selected option,
- * and keyboard/click-outside dismissal matching RegisterSocietyPage styling.
+ * vertical indicator bar on selected option, and keyboard/click-outside dismissal.
  */
 export function CatalogueDropdown<T extends string = string>({
   label,
@@ -60,7 +61,9 @@ export function CatalogueDropdown<T extends string = string>({
 
   useEffect(() => {
     if (open && menuRef.current) {
-      const selected = menuRef.current.querySelector<HTMLElement>(".register-dropdown-option--selected");
+      const selected = menuRef.current.querySelector<HTMLElement>(
+        ".register-dropdown-option--selected"
+      );
       if (selected) {
         selected.scrollIntoView({ block: "nearest" });
       }
@@ -92,6 +95,13 @@ export function CatalogueDropdown<T extends string = string>({
         <svg
           className="custom-status-dropdown__arrow"
           viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           aria-hidden="true"
         >
           <path d="m7 9 5 5 5-5" />
@@ -116,7 +126,7 @@ export function CatalogueDropdown<T extends string = string>({
                   setOpen(false);
                 }}
               >
-                <span>{placeholder}</span>
+                <span className="register-dropdown-option-label">{placeholder}</span>
                 {value === "" && (
                   <span className="custom-status-dropdown__check" aria-hidden="true">
                     <svg
@@ -154,7 +164,7 @@ export function CatalogueDropdown<T extends string = string>({
                     setOpen(false);
                   }}
                 >
-                  <span>{opt.label}</span>
+                  <span className="register-dropdown-option-label">{opt.label}</span>
                   {isSelected && (
                     <span className="custom-status-dropdown__check" aria-hidden="true">
                       <svg

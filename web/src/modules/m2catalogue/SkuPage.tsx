@@ -10,7 +10,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
-import { ReasonCapture } from "../../shell/components/ReasonCapture";
+import { CatalogueReasonCapture as ReasonCapture } from "./CatalogueReasonCapture";
 import "./catalogue.css";
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
