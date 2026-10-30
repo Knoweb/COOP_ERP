@@ -86,9 +86,7 @@ public class LowStockEvaluationHandler implements Handles<EvaluateLowStock, LowS
 
     @Transactional
     public LowStockEvaluationResult evaluateSku(UUID locationId, UUID skuId, ScopeContext scope) {
-        UUID ownerEntityId = scope.entityId();
-        Optional<ReorderStore.ReorderControlRecord> recordOpt =
-                store.findControlForUpdate(ownerEntityId, locationId, skuId);
+        Optional<ReorderStore.ReorderControlRecord> recordOpt = store.findControlForUpdate(locationId, skuId, scope);
         if (recordOpt.isEmpty() || !recordOpt.get().isActive()) {
             return new LowStockEvaluationResult(0, 0);
         }
@@ -98,9 +96,7 @@ public class LowStockEvaluationHandler implements Handles<EvaluateLowStock, LowS
 
     @Transactional
     public LowStockEvaluationResult evaluateLocation(UUID locationId, ScopeContext scope) {
-        UUID ownerEntityId = scope.entityId();
-        List<ReorderStore.ReorderControlRecord> records =
-                store.findControlsAtLocationForUpdate(ownerEntityId, locationId);
+        List<ReorderStore.ReorderControlRecord> records = store.findControlsAtLocationForUpdate(locationId, scope);
         int alerts = 0;
         for (ReorderStore.ReorderControlRecord record : records) {
             alerts += evaluateRecord(record, scope);
@@ -110,7 +106,7 @@ public class LowStockEvaluationHandler implements Handles<EvaluateLowStock, LowS
 
     private int evaluateRecord(ReorderStore.ReorderControlRecord record, ScopeContext scope) {
         Instant now = clock.instant();
-        ReorderStore.StockQuantities stock = store.calculateStock(record.locationId(), record.skuId());
+        ReorderStore.StockQuantities stock = store.calculateStock(record.locationId(), record.skuId(), scope);
         boolean isLow = stock.available().compareTo(record.reorderLevel()) <= 0;
 
         if (isLow && !record.alertTriggered()) {

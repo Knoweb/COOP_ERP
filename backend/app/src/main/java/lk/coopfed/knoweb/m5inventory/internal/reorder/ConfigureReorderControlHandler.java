@@ -112,9 +112,9 @@ public class ConfigureReorderControlHandler implements Handles<ConfigureReorderC
 
         // ---- stock evaluation for initial alert state --------------------------------------
         Optional<ReorderStore.ReorderControlRecord> existing =
-                store.findControlForUpdate(scope.entityId(), command.locationId(), command.skuId());
+                store.findControlForUpdate(command.locationId(), command.skuId(), scope);
 
-        ReorderStore.StockQuantities stock = store.calculateStock(command.locationId(), command.skuId());
+        ReorderStore.StockQuantities stock = store.calculateStock(command.locationId(), command.skuId(), scope);
         boolean isLow = stock.available().compareTo(reorderLevel) <= 0;
         boolean shouldAlert = isLow
                 && (existing.isEmpty()

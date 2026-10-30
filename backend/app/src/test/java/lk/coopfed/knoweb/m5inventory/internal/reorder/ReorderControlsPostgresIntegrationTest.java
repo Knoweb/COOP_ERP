@@ -74,6 +74,9 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
     StockLedger ledger;
 
     @Autowired
+    ReorderStore reorderStore;
+
+    @Autowired
     OuterCommand outer;
 
     private InventoryFixture fixture;
@@ -613,6 +616,56 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
         // Other entity attempts to delete shop1's reorder control -> not found
         assertThatThrownBy(() -> deleteHandler.handle(new DeleteReorderControl(shop1, skuMpcs), otherScope))
                 .isInstanceOf(ProblemException.class);
+    }
+
+    @Test
+    void nestedStoreCallsPreserveRlsScopeAndFederationReadDiscoversControls() {
+        UUID sku = fixture.sku(MPCS, "SKU_NESTED_RLS");
+        UUID batch = fixture.batch(sku, MPCS, "B-NESTED", EXPIRY);
+        ScopeContext scope = at(MPCS, shop1);
+        ScopeContext otherScope = at(OTHER_ENTITY, otherShop);
+
+        // Seed 25.000 on-hand stock
+        postReceipt(shop1, batch, new BigDecimal("25.000"), MPCS);
+        kernel.reset();
+
+        // 1. Initial configure: executes nested store.findControlForUpdate and store.calculateStock
+        // before executing the insert/upsert under RLS. Since 25 > 10, no alert emitted.
+        UUID controlId = configureHandler.handle(
+                new ConfigureReorderControl(
+                        shop1, sku, new BigDecimal("10.000"), new BigDecimal("20.000"), new BigDecimal("40.000")),
+                scope);
+        assertThat(controlId).isNotNull();
+
+        // 2. Direct standalone calculateStock with scope: executes with @Transactional(readOnly = true),
+        // applies RLS, and returns real stock. Other entity sees zero under tenant isolation.
+        ReorderStore.StockQuantities stock = reorderStore.calculateStock(shop1, sku, scope);
+        assertThat(stock.onHand()).isEqualByComparingTo("25.000");
+        assertThat(stock.available()).isEqualByComparingTo("25.000");
+
+        ReorderStore.StockQuantities otherStock = reorderStore.calculateStock(shop1, sku, otherScope);
+        assertThat(otherStock.onHand()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(otherStock.available()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // 3. Update existing configuration: executes nested calls and updates under RLS
+        UUID updatedId = configureHandler.handle(
+                new ConfigureReorderControl(
+                        shop1, sku, new BigDecimal("12.000"), new BigDecimal("25.000"), new BigDecimal("50.000")),
+                scope);
+        assertThat(updatedId).isEqualTo(controlId);
+
+        // 4. Standalone federation view query: executes under FEDERATION_VIEW policy
+        List<ReorderStore.LocationEntityKey> locations =
+                reorderStore.findDistinctLocationsWithControls(execution().federationView());
+        assertThat(locations)
+                .anyMatch(l -> l.ownerEntityId().equals(MPCS) && l.locationId().equals(shop1));
+
+        // 5. Logical retirement and reactivation: verifies full lifecycle with RLS preservation
+        deleteHandler.handle(new DeleteReorderControl(shop1, sku), scope);
+        UUID reactivatedId = configureHandler.handle(
+                new ConfigureReorderControl(shop1, sku, new BigDecimal("15.000"), new BigDecimal("30.000"), null),
+                scope);
+        assertThat(reactivatedId).isEqualTo(controlId);
     }
 
     private void postReceipt(UUID location, UUID batch, BigDecimal qty, UUID entity) {

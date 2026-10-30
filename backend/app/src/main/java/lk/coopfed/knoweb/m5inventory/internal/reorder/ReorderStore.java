@@ -20,12 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>In accordance with repository invariants (AGENTS.md), reorder controls are never
  * physically deleted; active queries filter on {@code status = 'ACTIVE'}.
  *
- * <p>Every query method is {@code @Transactional(readOnly = true)} so that the kernel's
- * {@code ScopeConnectionCustomizer} aspect fires and applies the RLS session variables
- * before any query runs.
+ * <p>Standalone query methods (e.g. {@link #findDistinctLocationsWithControls(ScopeContext)} and
+ * {@link #findControls(UUID, UUID, ScopeContext)}) are annotated with {@code @Transactional(readOnly = true)}
+ * and take a {@link ScopeContext} so that the kernel's {@code ScopeConnectionCustomizer} aspect applies
+ * the RLS session variables. Internal helper methods called within command handlers participate in the
+ * caller's transaction and accept {@link ScopeContext} to preserve the active session scope.
  */
 @Repository
-@Transactional(readOnly = true)
 public class ReorderStore {
 
     private final JdbcTemplate jdbc;
@@ -36,6 +37,7 @@ public class ReorderStore {
         this.businessDay = businessDay;
     }
 
+    @Transactional(readOnly = true)
     public List<ReorderControlView> findControls(UUID locationId, UUID skuId, ScopeContext scope) {
         Date today = Date.valueOf(businessDay.today());
         return jdbc.query(
@@ -89,7 +91,8 @@ public class ReorderStore {
                 skuId);
     }
 
-    public StockQuantities calculateStock(UUID locationId, UUID skuId) {
+    @Transactional(readOnly = true)
+    public StockQuantities calculateStock(UUID locationId, UUID skuId, ScopeContext scope) {
         Date today = Date.valueOf(businessDay.today());
         List<StockQuantities> results = jdbc.query(
                 """
@@ -120,7 +123,7 @@ public class ReorderStore {
         return results.isEmpty() ? new StockQuantities(BigDecimal.ZERO, BigDecimal.ZERO) : results.getFirst();
     }
 
-    public Optional<ReorderControlRecord> findControlForUpdate(UUID ownerEntityId, UUID locationId, UUID skuId) {
+    public Optional<ReorderControlRecord> findControlForUpdate(UUID locationId, UUID skuId, ScopeContext scope) {
         List<ReorderControlRecord> list = jdbc.query(
                 """
                 select reorder_control_id, owner_entity_id, location_id, sku_id,
@@ -141,13 +144,13 @@ public class ReorderStore {
                         toInstant(rs.getTimestamp("last_alerted_at")),
                         rs.getBigDecimal("last_alert_qty"),
                         rs.getString("status")),
-                ownerEntityId,
+                scope.entityId(),
                 locationId,
                 skuId);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.getFirst());
     }
 
-    public List<ReorderControlRecord> findControlsAtLocationForUpdate(UUID ownerEntityId, UUID locationId) {
+    public List<ReorderControlRecord> findControlsAtLocationForUpdate(UUID locationId, ScopeContext scope) {
         return jdbc.query(
                 """
                 select reorder_control_id, owner_entity_id, location_id, sku_id,
@@ -168,10 +171,11 @@ public class ReorderStore {
                         toInstant(rs.getTimestamp("last_alerted_at")),
                         rs.getBigDecimal("last_alert_qty"),
                         rs.getString("status")),
-                ownerEntityId,
+                scope.entityId(),
                 locationId);
     }
 
+    @Transactional(readOnly = true)
     public List<LocationEntityKey> findDistinctLocationsWithControls(ScopeContext view) {
         return jdbc.query(
                 """
