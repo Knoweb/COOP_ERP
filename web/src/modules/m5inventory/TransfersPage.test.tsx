@@ -75,8 +75,8 @@ function createTransfer(
 
 const api = {
   locations: vi.fn(async () => mockLocations),
-  transfers: vi.fn(async (_locId: string) => state.transfers),
-  balances: vi.fn(async (_locId: string) => mockLots),
+  transfers: vi.fn(async () => state.transfers),
+  balances: vi.fn(async () => mockLots),
   issueTransfer: vi.fn(async () =>
     createTransfer(TRANSFER_1, WAREHOUSE, SHOP, "ISSUED", "XFR-001")
   ),
