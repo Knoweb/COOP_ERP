@@ -98,4 +98,16 @@ public interface InventoryQueries {
      * If any SALE movement has an unresolved or non-positive unit cost, {@code costPending} is true.
      */
     Map<UUID, LocationSalesCost> locationsSalesCost(LocalDate from, LocalDate to, ScopeContext scope);
+
+    /**
+     * Reorder controls configured at a location, optionally for a specific SKU (PGL-M2-01).
+     */
+    List<ReorderControlView> reorderControls(UUID locationId, UUID skuId, ScopeContext scope);
+
+    /**
+     * Reorder controls configured at a location for all SKUs (PGL-M2-01).
+     */
+    default List<ReorderControlView> reorderControls(UUID locationId, ScopeContext scope) {
+        return reorderControls(locationId, null, scope);
+    }
 }

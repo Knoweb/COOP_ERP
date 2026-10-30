@@ -257,3 +257,19 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A dispatched inventory transfer remained unreceived past its configured threshold
+
+  # Polgolla M2-01: reorder controls and low-stock event
+  - code: REORDER_CONTROL_CONFIGURED
+    severity: INFO
+    offline_capturable: false
+    description_en: Reorder level and quantities configured for an SKU at a location
+
+  - code: REORDER_CONTROL_DELETED
+    severity: INFO
+    offline_capturable: false
+    description_en: Reorder control removed for an SKU at a location
+
+  - code: LOW_STOCK_DETECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock fell to or below its configured reorder level at a location

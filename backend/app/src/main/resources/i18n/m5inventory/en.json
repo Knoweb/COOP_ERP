@@ -14,7 +14,7 @@
   "m5.grn.line_invalid": "A line of the goods received note has quantities or a cost that cannot be received",
   "m5.delivery.seller_mismatch": "The delivery note belongs to another entity than the seller",
   "m5.delivery.line_invalid": "A delivery line needs an item and a quantity above zero",
-  "m5.pick_list.not_found": "The delivery note has no pick list yet",
+  "m5.pick_list.not_found": "The pick list was not found",
   "m5.opening.location_has_stock": "Stock has already moved at this location; an opening balance is only for a location without stock",
   "m5.opening.location_not_onboarding": "An opening balance can only be prepared while the location is onboarding",
   "m5.opening.required_before_activation": "Post the location’s opening balance before activating it",
@@ -104,7 +104,6 @@
   "m5.repack.yield_reason_required": "Fewer packs ({actual}) than the recipe expects ({expected}); give the reason for the shortfall",
   "m5.till_fact.type_required": "The till’s fact names no type",
   "m5.expiry_task.not_found": "The expiry task was not found",
-  "m5.pick_list.not_found": "The pick list was not found",
   "m5.pick_list.not_open": "This pick list was already dispatched",
   "m5.pick.user_required": "A warehouse user must make the pick override",
   "m5.pick.reason_invalid": "Give a reason of no more than 500 characters",
@@ -116,5 +115,11 @@
   "m5.pick.sku_mismatch": "The replacement lot must contain the same item",
   "m5.pick.location_mismatch": "The replacement lot must be at the same warehouse",
   "m5.pick.lot_unavailable": "The replacement lot does not have enough unreserved stock",
-  "m5.pick.lot_expired": "The replacement lot is expired or too close to expiry"
+  "m5.pick.lot_expired": "The replacement lot is expired or too close to expiry",
+  "m5.reorder.invalid_level": "Reorder level must be zero or greater with at most 3 decimal places",
+  "m5.reorder.invalid_qty": "Reorder quantity must be greater than zero with at most 3 decimal places",
+  "m5.reorder.invalid_max": "Maximum quantity must be greater than or equal to reorder level with at most 3 decimal places",
+  "m5.reorder.not_found": "The reorder control was not found",
+  "m5.reorder.sku_not_found": "The SKU was not found in the catalogue",
+  "m5.reorder.location_required": "A location is required"
 }
