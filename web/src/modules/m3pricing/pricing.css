@@ -1511,6 +1511,22 @@ select.pricing-select option:focus {
   border: 0;
 }
 
+/* ---- Pricing Location Filter & Custom Dropdown ------------------ */
+
+.pricing-location-filter-field {
+  flex: 0 1 calc(var(--space-8) * 5 + var(--space-4));
+  min-width: min(100%, calc(var(--space-8) * 4));
+}
+
+.pricing-location-filter-field .pricing-filter-label {
+  color: var(--color-brand-dark) !important;
+  font-weight: var(--font-weight-strong) !important;
+}
+
+.pricing-dropdown-select {
+  width: 100%;
+}
+
 /* ---- Markdown Queue Search Bar --------------------------------- */
 
 .pricing-markdown-search-field {
@@ -1534,29 +1550,37 @@ select.pricing-select option:focus {
 }
 
 .pricing-markdown-search-icon {
-  position: absolute;
-  left: var(--space-2);
-  width: var(--space-2);
-  height: var(--space-2);
-  stroke: var(--color-brand-dark);
-  pointer-events: none;
-  flex-shrink: 0;
+  position: absolute !important;
+  left: var(--space-2) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-brand-dark) !important;
+  pointer-events: none !important;
+  flex-shrink: 0 !important;
+  z-index: 2 !important;
 }
 
+.shell-page input.pricing-markdown-search-input,
+.shell-page .pricing-markdown-search-input,
 .pricing-markdown-search-input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: calc(var(--space-4) + var(--space-1));
-  padding: var(--space-1) var(--space-4) var(--space-1) calc(var(--space-4) + var(--space-1));
-  border-radius: var(--radius-pill);
-  border: var(--border-width) solid var(--color-polish-18);
-  background-color: var(--color-polish-29);
-  color: var(--color-brand-dark);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding-left: calc(var(--space-4) + var(--space-1)) !important;
+  padding-right: calc(var(--space-4) + var(--space-1)) !important;
+  padding-top: var(--space-1) !important;
+  padding-bottom: var(--space-1) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  background-color: var(--color-polish-24) !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  outline: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
 }
 
 .pricing-markdown-search-input::-webkit-search-cancel-button,
@@ -1589,41 +1613,42 @@ select.pricing-select option:focus {
   opacity: 1;
 }
 
+.shell-page input.pricing-markdown-search-input:hover,
+.shell-page .pricing-markdown-search-input:hover,
 .pricing-markdown-search-input:hover {
-  background-color: var(--color-polish-31);
-  border-color: var(--color-polish-21);
-  color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
 }
 
+.shell-page input.pricing-markdown-search-input:focus,
+.shell-page .pricing-markdown-search-input:focus,
 .pricing-markdown-search-input:focus {
-  background-color: var(--color-surface);
-  border: var(--border-width-strong) solid var(--color-polish-25);
-  color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-markdown-search-clear {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  margin: auto 0;
-  right: var(--space-1);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-3);
-  height: var(--space-3);
-  min-height: 0;
-  min-width: 0;
-  padding: 0;
-  background: var(--color-polish-22);
-  border: none;
-  border-radius: var(--radius-pill);
-  color: var(--color-polish-25);
-  cursor: pointer;
-  box-shadow: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: var(--space-1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--space-3) !important;
+  height: var(--space-3) !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  background: var(--color-polish-22) !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
+  color: var(--color-polish-25) !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  z-index: 2 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .pricing-markdown-search-clear:hover {
@@ -1659,29 +1684,37 @@ select.pricing-select option:focus {
 }
 
 .pricing-tradelist-search-icon {
-  position: absolute;
-  left: var(--space-2);
-  width: var(--space-2);
-  height: var(--space-2);
-  stroke: var(--color-brand-dark);
-  pointer-events: none;
-  flex-shrink: 0;
+  position: absolute !important;
+  left: var(--space-2) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-brand-dark) !important;
+  pointer-events: none !important;
+  flex-shrink: 0 !important;
+  z-index: 2 !important;
 }
 
+.shell-page input.pricing-tradelist-search-input,
+.shell-page .pricing-tradelist-search-input,
 .pricing-tradelist-search-input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: calc(var(--space-4) + var(--space-1));
-  padding: var(--space-1) var(--space-4) var(--space-1) calc(var(--space-4) + var(--space-1));
-  border-radius: var(--radius-pill);
-  border: var(--border-width) solid var(--color-polish-18);
-  background-color: var(--color-polish-29);
-  color: var(--color-brand-dark);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding-left: calc(var(--space-4) + var(--space-1)) !important;
+  padding-right: calc(var(--space-4) + var(--space-1)) !important;
+  padding-top: var(--space-1) !important;
+  padding-bottom: var(--space-1) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  background-color: var(--color-polish-24) !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  outline: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
 }
 
 .pricing-tradelist-search-input::-webkit-search-cancel-button,
@@ -1714,41 +1747,42 @@ select.pricing-select option:focus {
   opacity: 1;
 }
 
+.shell-page input.pricing-tradelist-search-input:hover,
+.shell-page .pricing-tradelist-search-input:hover,
 .pricing-tradelist-search-input:hover {
-  background-color: var(--color-polish-31);
-  border-color: var(--color-polish-21);
-  color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
 }
 
+.shell-page input.pricing-tradelist-search-input:focus,
+.shell-page .pricing-tradelist-search-input:focus,
 .pricing-tradelist-search-input:focus {
-  background-color: var(--color-surface);
-  border: var(--border-width-strong) solid var(--color-polish-25);
-  color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-tradelist-search-clear {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  margin: auto 0;
-  right: var(--space-1);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-3);
-  height: var(--space-3);
-  min-height: 0;
-  min-width: 0;
-  padding: 0;
-  background: var(--color-polish-22);
-  border: none;
-  border-radius: var(--radius-pill);
-  color: var(--color-polish-25);
-  cursor: pointer;
-  box-shadow: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: var(--space-1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--space-3) !important;
+  height: var(--space-3) !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  background: var(--color-polish-22) !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
+  color: var(--color-polish-25) !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  z-index: 2 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .pricing-tradelist-search-clear:hover {
@@ -1784,29 +1818,37 @@ select.pricing-select option:focus {
 }
 
 .pricing-gazette-search-icon {
-  position: absolute;
-  left: var(--space-2);
-  width: var(--space-2);
-  height: var(--space-2);
-  stroke: var(--color-brand-dark);
-  pointer-events: none;
-  flex-shrink: 0;
+  position: absolute !important;
+  left: var(--space-2) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-brand-dark) !important;
+  pointer-events: none !important;
+  flex-shrink: 0 !important;
+  z-index: 2 !important;
 }
 
+.shell-page input.pricing-gazette-search-input,
+.shell-page .pricing-gazette-search-input,
 .pricing-gazette-search-input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: calc(var(--space-4) + var(--space-1));
-  padding: var(--space-1) var(--space-4) var(--space-1) calc(var(--space-4) + var(--space-1));
-  border-radius: var(--radius-pill);
-  border: var(--border-width) solid var(--color-polish-18);
-  background-color: var(--color-polish-29);
-  color: var(--color-brand-dark);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding-left: calc(var(--space-4) + var(--space-1)) !important;
+  padding-right: calc(var(--space-4) + var(--space-1)) !important;
+  padding-top: var(--space-1) !important;
+  padding-bottom: var(--space-1) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  background-color: var(--color-polish-24) !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  outline: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
 }
 
 .pricing-gazette-search-input::-webkit-search-cancel-button,
@@ -1839,41 +1881,42 @@ select.pricing-select option:focus {
   opacity: 1;
 }
 
+.shell-page input.pricing-gazette-search-input:hover,
+.shell-page .pricing-gazette-search-input:hover,
 .pricing-gazette-search-input:hover {
-  background-color: var(--color-polish-31);
-  border-color: var(--color-polish-21);
-  color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
 }
 
+.shell-page input.pricing-gazette-search-input:focus,
+.shell-page .pricing-gazette-search-input:focus,
 .pricing-gazette-search-input:focus {
-  background-color: var(--color-surface);
-  border: var(--border-width-strong) solid var(--color-polish-25);
-  color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-gazette-search-clear {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  margin: auto 0;
-  right: var(--space-1);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-3);
-  height: var(--space-3);
-  min-height: 0;
-  min-width: 0;
-  padding: 0;
-  background: var(--color-polish-22);
-  border: none;
-  border-radius: var(--radius-pill);
-  color: var(--color-polish-25);
-  cursor: pointer;
-  box-shadow: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: var(--space-1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--space-3) !important;
+  height: var(--space-3) !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  background: var(--color-polish-22) !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
+  color: var(--color-polish-25) !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  z-index: 2 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .pricing-gazette-search-clear:hover {
