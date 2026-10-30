@@ -750,3 +750,93 @@
   grid-template-columns: repeat(auto-fit, minmax(var(--reporting-cell-min), 1fr));
   margin-block: var(--space-2);
 }
+
+
+/* ---------- Stock Reprice Modal -------------------------------------------- */
+
+.inventory-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--color-polish-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-2);
+}
+
+.inventory-modal {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  width: 100%;
+  max-width: calc(var(--space-8) * 8);
+}
+
+.inventory-modal-summary {
+  background-color: var(--color-surface-subtle);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+}
+
+.inventory-modal-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.inventory-modal-diff-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-surface-subtle);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+}
+
+.inventory-modal-blended-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-surface-subtle);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.inventory-modal-alert {
+  color: var(--color-alert-text);
+  background-color: var(--color-alert-bg);
+  border: var(--border-width) solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+}
+
+.inventory-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.inventory-modal-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.inventory-modal-field-group {
+  margin-bottom: var(--space-3);
+}
+
+.inventory-modal-title {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+}

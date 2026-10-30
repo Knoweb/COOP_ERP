@@ -339,6 +339,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/lots/{stockLotId}/reprice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reprice a stock lot or part of it with new unit cost and optional condition change
+         * @description Conserves physical inventory quantity and revalues entity weighted average cost under IAS 2. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded, m5.reprice.invalid_cost, m5.reprice.reason_required.
+         */
+        post: operations["repriceStockLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/repricings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List stock repricing history for a location and optionally an SKU */
+        get: operations["listRepricings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/reorder-controls": {
         parameters: {
             query?: never;
@@ -1151,7 +1188,7 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             /** @enum {string} */
-            category: "DAMAGED_IN_TRANSIT" | "DAMAGED_IN_STORE" | "EXPIRED" | "THEFT" | "SHRINKAGE_UNEXPLAINED" | "STAFF_CONSUMPTION" | "SAMPLES" | "DONATION" | "OTHER";
+            category: "DAMAGED_IN_TRANSIT" | "DAMAGED_IN_STORE" | "EXPIRED" | "THEFT" | "SHRINKAGE_UNEXPLAINED" | "STAFF_CONSUMPTION" | "SAMPLES" | "DONATION" | "OTHER" | "WASTE" | "SPOILAGE";
             note?: string;
             lines: components["schemas"]["WriteOffLineRequest"][];
         };
@@ -1328,6 +1365,44 @@ export interface components {
         EvaluateLowStockResponse: {
             evaluatedCount: number;
             alertsTriggeredCount: number;
+        };
+        RepriceStockLotRequest: {
+            /** @description Quantity to reprice */
+            qty: number;
+            /** @description New unit cost (>= 0) */
+            newUnitCost: number;
+            /**
+             * @description Target condition if condition is changed
+             * @enum {string}
+             */
+            targetCondition?: "GOOD" | "DAMAGED";
+            /** @description Reason for repricing */
+            reason: string;
+        };
+        StockRepricingResponse: {
+            /** Format: uuid */
+            repricingId: string;
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            qtyAffected: number;
+            previousUnitCost: number;
+            newUnitCost: number;
+            /** @enum {string} */
+            targetCondition: "GOOD" | "DAMAGED";
+            /** Format: uuid */
+            targetLotId?: string;
+            valueAdjustment: number;
+            reason: string;
+            /** Format: uuid */
+            repricedBy: string;
+            /** Format: date-time */
+            repricedAt: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1872,6 +1947,61 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    repriceStockLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                stockLotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepriceStockLotRequest"];
+            };
+        };
+        responses: {
+            /** @description Stock lot repriced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockRepricingResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRepricings: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Repricing history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockRepricingResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
     listReorderControls: {

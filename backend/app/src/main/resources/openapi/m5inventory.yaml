@@ -497,6 +497,61 @@ paths:
               schema: { $ref: '#/components/schemas/TransferResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  # ---- stock repricing & valuation adjustments (PGL-M2-03) ------------------
+  /v1/inventory/lots/{stockLotId}/reprice:
+    post:
+      tags: [Inventory]
+      operationId: repriceStockLot
+      summary: Reprice a stock lot or part of it with new unit cost and optional condition change
+      description: >
+        Conserves physical inventory quantity and revalues entity weighted average cost under IAS 2.
+        Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope,
+        m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded,
+        m5.reprice.invalid_cost, m5.reprice.reason_required.
+      x-permission: inv.stock.reprice
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: stockLotId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RepriceStockLotRequest' }
+      responses:
+        '200':
+          description: Stock lot repriced
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockRepricingResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/repricings:
+    get:
+      tags: [Inventory]
+      operationId: listRepricings
+      summary: List stock repricing history for a location and optionally an SKU
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Repricing history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockRepricingResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
   # ---- reorder controls & low-stock evaluation (PGL-M2-01) ----------------------------------
   /v1/inventory/reorder-controls:
     get:
@@ -1505,7 +1560,7 @@ components:
         category:
           type: string
           enum: [DAMAGED_IN_TRANSIT, DAMAGED_IN_STORE, EXPIRED, THEFT, SHRINKAGE_UNEXPLAINED, STAFF_CONSUMPTION,
-                 SAMPLES, DONATION, OTHER]
+                 SAMPLES, DONATION, OTHER, WASTE, SPOILAGE]
         note: { type: string, maxLength: 500 }
         lines:
           type: array
@@ -1667,3 +1722,29 @@ components:
       properties:
         evaluatedCount: { type: integer }
         alertsTriggeredCount: { type: integer }
+    RepriceStockLotRequest:
+      type: object
+      required: [qty, newUnitCost, reason]
+      properties:
+        qty: { type: number, exclusiveMinimum: 0, description: 'Quantity to reprice' }
+        newUnitCost: { type: number, minimum: 0, description: 'New unit cost (>= 0)' }
+        targetCondition: { type: string, enum: [GOOD, DAMAGED], description: 'Target condition if condition is changed' }
+        reason: { type: string, minLength: 1, maxLength: 500, description: 'Reason for repricing' }
+    StockRepricingResponse:
+      type: object
+      required: [repricingId, stockLotId, skuId, batchId, condition, qtyAffected, previousUnitCost, newUnitCost, targetCondition, valueAdjustment, reason, repricedBy, repricedAt]
+      properties:
+        repricingId: { type: string, format: uuid }
+        stockLotId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qtyAffected: { type: number }
+        previousUnitCost: { type: number }
+        newUnitCost: { type: number }
+        targetCondition: { type: string, enum: [GOOD, DAMAGED] }
+        targetLotId: { type: string, format: uuid }
+        valueAdjustment: { type: number }
+        reason: { type: string }
+        repricedBy: { type: string, format: uuid }
+        repricedAt: { type: string, format: date-time }

@@ -269,6 +269,29 @@ class CostServiceTest {
     }
 
     @Test
+    void revalueAdjustsWeightedAverageCostConservingPhysicalQuantity() {
+        // Entity has 10 units with avgCost 100.0000 (total value = 1,000.00).
+        CostRow row = CostService.apply(
+                CostRow.empty(), MovementType.RECEIPT, new BigDecimal("10.000"), new BigDecimal("100.0000"));
+        assertThat(row.qtyOnHand()).isEqualByComparingTo("10.000");
+        assertThat(row.avgCost()).isEqualByComparingTo("100.0000");
+
+        // Reprice 4 units from 100 to 70: value delta = 4 * (70 - 100) = -120.
+        // New total value = 880, new average = 880 / 10 = 88.0000. Physical qty = 10.000.
+        CostRow revalued = CostService.revalue(
+                row, new BigDecimal("4.000"), new BigDecimal("100.0000"), new BigDecimal("70.0000"));
+        assertThat(revalued.qtyOnHand()).isEqualByComparingTo("10.000");
+        assertThat(revalued.avgCost()).isEqualByComparingTo("88.0000");
+
+        // Reprice all 10 units up to 150.0000: value delta = 10 * (150 - 88) = 620.
+        // New total value = 880 + 620 = 1500, new average = 150.0000.
+        CostRow revaluedAll = CostService.revalue(
+                revalued, new BigDecimal("10.000"), new BigDecimal("88.0000"), new BigDecimal("150.0000"));
+        assertThat(revaluedAll.qtyOnHand()).isEqualByComparingTo("10.000");
+        assertThat(revaluedAll.avgCost()).isEqualByComparingTo("150.0000");
+    }
+
+    @Test
     void replayingTheSameMovementsGivesTheSameRow() {
         Random random = new Random(7L);
         for (int c = 0; c < CASES; c++) {

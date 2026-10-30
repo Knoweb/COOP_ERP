@@ -110,4 +110,16 @@ public interface InventoryQueries {
     default List<ReorderControlView> reorderControls(UUID locationId, ScopeContext scope) {
         return reorderControls(locationId, null, scope);
     }
+
+    /**
+     * Historical stock lot repricings at a location, optionally for a specific SKU (PGL-M2-03).
+     */
+    List<StockRepricingView> repricings(UUID locationId, UUID skuId, ScopeContext scope);
+
+    /**
+     * Historical stock lot repricings at a location for all SKUs (PGL-M2-03).
+     */
+    default List<StockRepricingView> repricings(UUID locationId, ScopeContext scope) {
+        return repricings(locationId, null, scope);
+    }
 }

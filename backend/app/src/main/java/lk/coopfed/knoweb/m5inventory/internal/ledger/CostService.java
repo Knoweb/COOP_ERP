@@ -35,16 +35,16 @@ import lk.coopfed.knoweb.m5inventory.api.MovementType;
  * rounded to four decimals, as every average-cost movement is; a repack's output cost loses at most
  * half a unit of the fourth decimal per pack, which is accepted (Rs 0.05 per 1,000 packs).
  */
-final class CostService {
+public final class CostService {
 
-    static final int COST_SCALE = 4;
-    static final int QTY_SCALE = 3;
-    static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
+    public static final int COST_SCALE = 4;
+    public static final int QTY_SCALE = 3;
+    public static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     /** The average and the quantity of one (entity, SKU). */
-    record CostRow(BigDecimal qtyOnHand, BigDecimal avgCost) {
+    public record CostRow(BigDecimal qtyOnHand, BigDecimal avgCost) {
 
-        static CostRow empty() {
+        public static CostRow empty() {
             return new CostRow(BigDecimal.ZERO.setScale(QTY_SCALE), BigDecimal.ZERO.setScale(COST_SCALE));
         }
     }
@@ -56,7 +56,7 @@ final class CostService {
      * type that carries its own cost, optional for an out movement (null: at the average), ignored
      * otherwise.
      */
-    static CostRow apply(CostRow row, MovementType type, BigDecimal qtyDelta, BigDecimal unitCost) {
+    public static CostRow apply(CostRow row, MovementType type, BigDecimal qtyDelta, BigDecimal unitCost) {
         BigDecimal qty = row.qtyOnHand().add(qtyDelta).setScale(QTY_SCALE, ROUNDING);
 
         if (type.carriesItsOwnCost()) {
@@ -76,11 +76,31 @@ final class CostService {
     }
 
     /**
+     * Revalues the entity average cost when a stock lot is repriced without changing quantity (IAS 2).
+     * Value adjustment = repricedQty * (newUnitCost - previousUnitCost).
+     * New average cost = (currentValue + valueAdjustment) / currentQtyOnHand.
+     */
+    public static CostRow revalue(
+            CostRow row, BigDecimal repricedQty, BigDecimal previousUnitCost, BigDecimal newUnitCost) {
+        if (row.qtyOnHand().signum() <= 0) {
+            return new CostRow(row.qtyOnHand(), newUnitCost.setScale(COST_SCALE, ROUNDING));
+        }
+        BigDecimal valueDelta = repricedQty.multiply(newUnitCost.subtract(previousUnitCost));
+        BigDecimal currentValue = row.qtyOnHand().multiply(row.avgCost());
+        BigDecimal newValue = currentValue.add(valueDelta);
+        if (newValue.signum() <= 0) {
+            return new CostRow(row.qtyOnHand(), BigDecimal.ZERO.setScale(COST_SCALE));
+        }
+        BigDecimal newAvg = newValue.divide(row.qtyOnHand(), COST_SCALE, ROUNDING);
+        return new CostRow(row.qtyOnHand(), newAvg);
+    }
+
+    /**
      * The cost a movement carries (25A section 6.1, "costFor"): the caller's for a type that
      * carries its own (an intake, a transfer in at its transfer out's cost, a sale reversal) and
      * for an out movement given a cost, else the entity average at that moment.
      */
-    static BigDecimal costAtMovement(CostRow row, MovementType type, BigDecimal qtyDelta, BigDecimal unitCost) {
+    public static BigDecimal costAtMovement(CostRow row, MovementType type, BigDecimal qtyDelta, BigDecimal unitCost) {
         return type.carriesItsOwnCost() || isOutAtGivenCost(qtyDelta, unitCost)
                 ? unitCost.setScale(COST_SCALE, ROUNDING)
                 : row.avgCost();
