@@ -312,7 +312,17 @@
     "inventory.reorder.status_ok": "Normal",
     "inventory.reorder.save": "Save control",
     "inventory.reorder.cancel": "Cancel",
-    "inventory.reorder.item": "Item"
+    "inventory.reorder.item": "Item",
+    "inventory.transfer.status.CANCELLED": "Cancelled",
+    "inventory.transfer.all": "All transfers",
+    "inventory.transfer.outbound": "Outbound",
+    "inventory.transfer.inbound": "Inbound",
+    "inventory.transfer.dispatch": "Dispatch",
+    "inventory.transfer.cancel": "Cancel",
+    "inventory.transfer.cancel_reason": "Cancellation reason",
+    "inventory.transfer.cancel_confirm": "Confirm cancellation",
+    "inventory.transfer.cancel_close": "Keep transfer",
+    "inventory.transfer.physical_return_verified": "Physical return verified at source"
   },
   "si": {
     "inventory.filter.toggle": "පෙරහන්",
@@ -627,7 +637,17 @@
     "inventory.reorder.status_ok": "සාමාන්‍යයි",
     "inventory.reorder.save": "සුරකින්න",
     "inventory.reorder.cancel": "අවලංගු කරන්න",
-    "inventory.reorder.item": "භාණ්ඩය"
+    "inventory.reorder.item": "භාණ්ඩය",
+    "inventory.transfer.status.CANCELLED": "අවලංගුයි",
+    "inventory.transfer.all": "සියලු මාරු කිරීම්",
+    "inventory.transfer.outbound": "පිටතට යන",
+    "inventory.transfer.inbound": "ඇතුළට එන",
+    "inventory.transfer.dispatch": "යැවීම සටහන් කරන්න",
+    "inventory.transfer.cancel": "අවලංගු කරන්න",
+    "inventory.transfer.cancel_reason": "අවලංගු කිරීමට හේතුව",
+    "inventory.transfer.cancel_confirm": "අවලංගු කිරීම තහවුරු කරන්න",
+    "inventory.transfer.cancel_close": "මාරු කිරීම තබාගන්න",
+    "inventory.transfer.physical_return_verified": "මුල් ස්ථානයට භෞතිකව ලැබුණු බව තහවුරුයි"
   },
   "ta": {
     "inventory.filter.toggle": "வடிகட்டிகள்",
@@ -942,6 +962,16 @@
     "inventory.reorder.status_ok": "இயல்பானது",
     "inventory.reorder.save": "சேமி",
     "inventory.reorder.cancel": "ரத்துசெய்",
-    "inventory.reorder.item": "உருப்படி"
+    "inventory.reorder.item": "உருப்படி",
+    "inventory.transfer.status.CANCELLED": "ரத்து செய்யப்பட்டது",
+    "inventory.transfer.all": "அனைத்து இடமாற்றங்கள்",
+    "inventory.transfer.outbound": "வெளிச்செல்லும்",
+    "inventory.transfer.inbound": "உள்வரும்",
+    "inventory.transfer.dispatch": "அனுப்புக",
+    "inventory.transfer.cancel": "ரத்து செய்",
+    "inventory.transfer.cancel_reason": "ரத்து செய்வதற்கான காரணம்",
+    "inventory.transfer.cancel_confirm": "ரத்து செய்வதை உறுதிப்படுத்து",
+    "inventory.transfer.cancel_close": "இடமாற்றத்தை வைத்திரு",
+    "inventory.transfer.physical_return_verified": "மூல இடத்தில் பொருள் திரும்பியது உறுதிப்படுத்தப்பட்டது"
   }
 }
