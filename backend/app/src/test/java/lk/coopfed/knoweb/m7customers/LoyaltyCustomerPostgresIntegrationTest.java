@@ -34,8 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 class LoyaltyCustomerPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final String PHONE = "0700000888";
-    private static final String NIC = "199212345678";
-    private static final String OLD_NIC_FORM = "921234567V";
+    private static final String NIC = "199000005678";
+    private static final String OLD_NIC_FORM = "900005678V";
 
     @Autowired
     Handles<RegisterLoyaltyCustomer, UUID> registerLoyalty;
