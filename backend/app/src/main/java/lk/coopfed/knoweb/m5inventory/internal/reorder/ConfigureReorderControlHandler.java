@@ -179,12 +179,7 @@ public class ConfigureReorderControlHandler implements Handles<ConfigureReorderC
             configuredPayload.put("maxQty", maxQty);
         }
 
-        audit.record(
-                AUDIT_CONFIGURED,
-                Subject.of("reorder_control", reorderControlId),
-                null,
-                configuredPayload,
-                scope);
+        audit.record(AUDIT_CONFIGURED, Subject.of("reorder_control", reorderControlId), null, configuredPayload, scope);
 
         if (shouldAlert) {
             audit.record(

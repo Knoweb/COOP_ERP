@@ -12,14 +12,20 @@ import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.query.ReorderControlView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Database operations for reorder controls and stock balance queries (PGL-M2-01).
  *
  * <p>In accordance with repository invariants (AGENTS.md), reorder controls are never
  * physically deleted; active queries filter on {@code status = 'ACTIVE'}.
+ *
+ * <p>Every query method is {@code @Transactional(readOnly = true)} so that the kernel's
+ * {@code ScopeConnectionCustomizer} aspect fires and applies the RLS session variables
+ * before any query runs.
  */
 @Repository
+@Transactional(readOnly = true)
 public class ReorderStore {
 
     private final JdbcTemplate jdbc;

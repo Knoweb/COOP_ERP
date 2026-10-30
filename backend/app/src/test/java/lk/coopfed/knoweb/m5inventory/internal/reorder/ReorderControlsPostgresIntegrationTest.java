@@ -122,9 +122,11 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
                     assertThat(a.subject().id()).isEqualTo(controlId);
                     @SuppressWarnings("unchecked")
                     Map<String, Object> after = (Map<String, Object>) a.after();
-                    assertThat(after.get("reorderLevel")).isEqualTo(new BigDecimal("10.000"));
-                    assertThat(after.get("reorderQty")).isEqualTo(new BigDecimal("25.000"));
-                    assertThat(after.get("maxQty")).isEqualTo(new BigDecimal("50.000"));
+                    assertThat(new BigDecimal(after.get("reorderLevel").toString()))
+                            .isEqualByComparingTo("10.000");
+                    assertThat(new BigDecimal(after.get("reorderQty").toString()))
+                            .isEqualByComparingTo("25.000");
+                    assertThat(new BigDecimal(after.get("maxQty").toString())).isEqualByComparingTo("50.000");
                 });
 
         assertThat(events(ReorderControlConfigured.class)).singleElement().satisfies(e -> {
@@ -160,7 +162,8 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(a -> {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> after = (Map<String, Object>) a.after();
-                    assertThat(after.get("reorderLevel")).isEqualTo(new BigDecimal("15.000"));
+                    assertThat(new BigDecimal(after.get("reorderLevel").toString()))
+                            .isEqualByComparingTo("15.000");
                 });
 
         List<ReorderControlView> updatedViews = inventoryQueries.reorderControls(shop1, scope);
@@ -281,8 +284,10 @@ class ReorderControlsPostgresIntegrationTest extends PostgresIntegrationTest {
                     Map<String, Object> after = (Map<String, Object>) a.after();
                     assertThat(after.get("locationId")).isEqualTo(shop1);
                     assertThat(after.get("skuId")).isEqualTo(sku);
-                    assertThat(after.get("availableQty")).isEqualTo(new BigDecimal("10.000"));
-                    assertThat(after.get("reorderLevel")).isEqualTo(new BigDecimal("10.000"));
+                    assertThat(new BigDecimal(after.get("availableQty").toString()))
+                            .isEqualByComparingTo("10.000");
+                    assertThat(new BigDecimal(after.get("reorderLevel").toString()))
+                            .isEqualByComparingTo("10.000");
                 });
 
         assertThat(events(LowStockDetected.class)).singleElement().satisfies(e -> {
