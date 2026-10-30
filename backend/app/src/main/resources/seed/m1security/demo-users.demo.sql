@@ -147,7 +147,7 @@ WITH job (role_id, codes) AS (
             'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prt.relationship.view', 'inv.stock.view',
             'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign', 'gov.entity.view',
             'inv.count.schedule', 'shop.count.record', 'inv.adjust.request', 'inv.writeoff.request',
-            'inv.recipe.manage', 'inv.repack.execute']),
+            'inv.recipe.manage', 'inv.repack.execute', 'inv.reorder.manage']),
         -- society manager: the second signature (countersign), the shops and their tills; receives
         -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02); and the
         -- society's shelf prices: its RETAIL list, its MRP policy and its discount rules (M3-06)
@@ -160,7 +160,7 @@ WITH job (role_id, codes) AS (
             'cat.sku.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
             'pos.receipt.view', 'pos.receipt.margin', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
-            'cat.sku.create_local']),
+            'inv.reorder.manage', 'cat.sku.create_local']),
         -- the society managers of M102 and M103 also order from their distributor and receive
         -- at the shop (DEMO-02: the second tier of the demo history)
         ('0190f0de-0000-7000-8000-000000000342'::uuid, ARRAY[

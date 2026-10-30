@@ -200,7 +200,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 11)
                 .containsEntry("m3pricing", 11)
-                .containsEntry("m5inventory", 16)
+                .containsEntry("m5inventory", 17)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 // PGL-M3-01: m7customers V0006 adds regional registration & centralized loyalty.
                 .containsEntry("m7customers", 6)
@@ -326,6 +326,17 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("location_id", legacyDestination)
                 .containsEntry("from_location_id", legacySource)
                 .containsEntry("received_qty", new java.math.BigDecimal("7.000"));
+        // PGL-M2-01: m5inventory V0017 (reorder controls)
+        assertThat(admin.queryForObject(
+                        "select count(*) from information_schema.tables where table_schema = 'inventory'"
+                                + " and table_name = 'reorder_control'",
+                        Integer.class))
+                .isEqualTo(1);
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'inventory.reorder_control'::regclass",
+                        Boolean.class))
+                .isTrue();
+
         for (String table : List.of(
                 "transfer_line",
                 "transfer_receipt",

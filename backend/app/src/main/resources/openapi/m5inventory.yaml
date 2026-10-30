@@ -497,6 +497,99 @@ paths:
               schema: { $ref: '#/components/schemas/TransferResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  # ---- reorder controls & low-stock evaluation (PGL-M2-01) ----------------------------------
+  /v1/inventory/reorder-controls:
+    get:
+      tags: [ReorderControls]
+      operationId: listReorderControls
+      summary: List reorder controls for a location
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Reorder control settings for the location
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReorderControlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+    put:
+      tags: [ReorderControls]
+      operationId: configureReorderControl
+      summary: Set or update reorder level, reorder quantity and max quantity for an SKU at a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfigureReorderControlRequest' }
+      responses:
+        '200':
+          description: Reorder control configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderControlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+    delete:
+      tags: [ReorderControls]
+      operationId: deleteReorderControl
+      summary: Delete reorder control for an SKU at a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Reorder control deleted
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/inventory/reorder-controls/evaluate:
+    post:
+      tags: [ReorderControls]
+      operationId: evaluateLowStock
+      summary: Trigger low stock evaluation for a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Number of low stock items detected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvaluateLowStockResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
   # ---- stock control (M5-11, M5-13, repack): counts, write-offs, recipes, repacks ----------
   /v1/inventory/counts:
     get:
@@ -1543,3 +1636,34 @@ components:
         executedAt: { type: string, format: date-time }
         reversalReason: { type: string }
         reversedAt: { type: string, format: date-time }
+    ConfigureReorderControlRequest:
+      type: object
+      required: [locationId, skuId, reorderLevel, reorderQty]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        reorderLevel: { type: number, minimum: 0 }
+        reorderQty: { type: number, exclusiveMinimum: 0 }
+        maxQty: { type: number, minimum: 0 }
+    ReorderControlResponse:
+      type: object
+      required: [reorderControlId, ownerEntityId, locationId, skuId, reorderLevel, reorderQty, alertTriggered]
+      properties:
+        reorderControlId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        reorderLevel: { type: number }
+        reorderQty: { type: number }
+        maxQty: { type: number }
+        alertTriggered: { type: boolean }
+        lastAlertedAt: { type: string, format: date-time }
+        lastAlertQty: { type: number }
+        currentOnHandQty: { type: number }
+        currentAvailableQty: { type: number }
+    EvaluateLowStockResponse:
+      type: object
+      required: [evaluatedCount, alertsTriggeredCount]
+      properties:
+        evaluatedCount: { type: integer }
+        alertsTriggeredCount: { type: integer }

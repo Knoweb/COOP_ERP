@@ -21,6 +21,7 @@ import { PickListPage } from "./PickListPage";
 import { ExpiryListPage } from "./ExpiryListPage";
 import { LossShrinkagePage } from "./LossShrinkagePage";
 import { InventoryPoliciesPage } from "./InventoryPoliciesPage";
+import { ReorderControlsPage } from "./ReorderControlsPage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -57,9 +58,25 @@ export const inventoryModule: ModuleDefinition = {
         </RequirePermission>
       )
     },
+
     { path: "inventory/expiry", element: <ExpiryListPage /> },
     { path: "inventory/losses", element: <LossShrinkagePage /> },
-    { path: "inventory/policies", element: <InventoryPoliciesPage /> }
+    {
+      path: "inventory/policies",
+      element: (
+        <RequirePermission anyOf={["inv.stock.view"]}>
+          <InventoryPoliciesPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "inventory/reorder-controls",
+      element: (
+        <RequirePermission anyOf={["inv.stock.view", "inv.reorder.manage"]}>
+          <ReorderControlsPage />
+        </RequirePermission>
+      )
+    }
   ],
 
   // The label is a message id of inventory.messages.json, never literal text.
@@ -75,6 +92,14 @@ export const inventoryModule: ModuleDefinition = {
     "shop.transfer.receive",
     "shop.transfer.request",
     "mpcs.transfer.approve",
-    "whs.pick"
+    "inv.count.schedule",
+    "inv.writeoff.request",
+    "inv.writeoff.witness",
+    "inv.writeoff.approve",
+    "inv.recipe.manage",
+    "inv.repack.execute",
+    "inv.repack.reverse",
+    "whs.pick",
+    "inv.reorder.manage"
   ]
 };
