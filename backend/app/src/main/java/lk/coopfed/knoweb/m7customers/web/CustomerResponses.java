@@ -195,6 +195,7 @@ final class CustomerResponses {
         res.setRegionalMemberNo(view.regionalMemberNo());
         res.setLoyaltyTier(view.loyaltyTier());
         res.setStatus(view.status());
+        res.setIsMember(view.isMember());
         res.setAllLocationsPermitted(view.allLocationsPermitted());
         res.setPermittedLocationIds(new ArrayList<>(view.permittedLocationIds()));
         res.setRegionalAttributes(
@@ -212,6 +213,8 @@ final class CustomerResponses {
         res.setEligible(eligibility.eligible());
         res.setStatus(eligibility.status());
         res.setReason(eligibility.reason());
+        res.setIsMember(eligibility.isMember());
+        res.setMemberNo(eligibility.memberNo());
         res.setCustomerId(eligibility.customerId());
         res.setLocationId(eligibility.locationId());
         res.setLoyaltyTier(eligibility.loyaltyTier());

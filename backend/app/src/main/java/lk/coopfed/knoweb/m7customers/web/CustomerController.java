@@ -234,11 +234,14 @@ class CustomerController implements CustomersApi {
     }
 
     @Override
-    public ResponseEntity<LoyaltyCustomerResponse> lookupLoyaltyCustomer(String phone, String nic, UUID customerId) {
+    public ResponseEntity<LoyaltyCustomerResponse> lookupLoyaltyCustomer(
+            String phone, String nic, UUID customerId, String memberNo) {
         ScopeContext scope = currentScope.get();
         Optional<LoyaltyCustomerView> view = Optional.empty();
         if (customerId != null) {
             view = loyaltyQueries.getLoyaltyCustomer(customerId, scope);
+        } else if (memberNo != null && !memberNo.isBlank()) {
+            view = loyaltyQueries.lookupByMemberNo(memberNo, scope);
         } else if (phone != null && !phone.isBlank()) {
             view = loyaltyQueries.lookupByPhone(phone, scope);
         } else if (nic != null && !nic.isBlank()) {

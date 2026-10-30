@@ -50,4 +50,18 @@ public record LoyaltyEligibility(
     public static LoyaltyEligibility notFound(UUID locationId) {
         return new LoyaltyEligibility(false, "NOT_FOUND", "CUSTOMER_NOT_FOUND", null, locationId, null, null);
     }
+
+    /**
+     * True if the underlying customer identity qualifies as a cooperative society member.
+     */
+    public boolean isMember() {
+        return customer != null && customer.isMember();
+    }
+
+    /**
+     * Regional society member number if present.
+     */
+    public String memberNo() {
+        return customer != null ? customer.regionalMemberNo() : null;
+    }
 }

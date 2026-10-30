@@ -113,13 +113,14 @@ paths:
     get:
       tags: [Customers]
       operationId: lookupLoyaltyCustomer
-      summary: Look up a centralized loyalty customer by phone, NIC, or customer ID across permitted branches
+      summary: Look up a centralized loyalty customer by phone, NIC, member number, or customer ID across permitted branches
       x-permission: cus.customer.view
       x-federation-view: false
       parameters:
         - { in: query, name: phone, required: false, schema: { type: string, maxLength: 20 } }
         - { in: query, name: nic, required: false, schema: { type: string, maxLength: 20 } }
         - { in: query, name: customerId, required: false, schema: { type: string, format: uuid } }
+        - { in: query, name: memberNo, required: false, schema: { type: string, maxLength: 60 } }
       responses:
         '200':
           description: The loyalty customer profile
@@ -1089,7 +1090,7 @@ components:
           additionalProperties: { type: string }
     LoyaltyCustomerResponse:
       type: object
-      required: [loyaltyId, customerId, ownerEntityId, registeredLocationId, regionCode, loyaltyTier, status, allLocationsPermitted]
+      required: [loyaltyId, customerId, ownerEntityId, registeredLocationId, regionCode, loyaltyTier, status, allLocationsPermitted, isMember]
       properties:
         loyaltyId: { type: string, format: uuid }
         customerId: { type: string, format: uuid }
@@ -1104,6 +1105,7 @@ components:
         regionalMemberNo: { type: [string, 'null'] }
         loyaltyTier: { type: string }
         status: { type: string }
+        isMember: { type: boolean }
         allLocationsPermitted: { type: boolean }
         permittedLocationIds:
           type: array
@@ -1115,11 +1117,13 @@ components:
         updatedAt: { type: string, format: date-time }
     LoyaltyEligibilityResponse:
       type: object
-      required: [eligible, status, reason]
+      required: [eligible, status, reason, isMember]
       properties:
         eligible: { type: boolean }
         status: { type: string }
         reason: { type: string }
+        isMember: { type: boolean }
+        memberNo: { type: [string, 'null'] }
         customerId: { type: [string, 'null'], format: uuid }
         locationId: { type: [string, 'null'], format: uuid }
         loyaltyTier: { type: [string, 'null'] }

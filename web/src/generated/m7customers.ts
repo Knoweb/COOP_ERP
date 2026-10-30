@@ -72,7 +72,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Look up a centralized loyalty customer by phone, NIC, or customer ID across permitted branches */
+        /** Look up a centralized loyalty customer by phone, NIC, member number, or customer ID across permitted branches */
         get: operations["lookupLoyaltyCustomer"];
         put?: never;
         post?: never;
@@ -957,6 +957,7 @@ export interface components {
             regionalMemberNo?: string | null;
             loyaltyTier: string;
             status: string;
+            isMember: boolean;
             allLocationsPermitted: boolean;
             permittedLocationIds?: string[];
             regionalAttributes?: {
@@ -971,6 +972,8 @@ export interface components {
             eligible: boolean;
             status: string;
             reason: string;
+            isMember: boolean;
+            memberNo?: string | null;
             /** Format: uuid */
             customerId?: string | null;
             /** Format: uuid */
@@ -1150,6 +1153,7 @@ export interface operations {
                 phone?: string;
                 nic?: string;
                 customerId?: string;
+                memberNo?: string;
             };
             header?: never;
             path?: never;

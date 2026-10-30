@@ -15,6 +15,9 @@ public interface LoyaltyCustomerQueries {
     /** Looks up an active loyalty customer by primary mobile phone number. */
     Optional<LoyaltyCustomerView> lookupByPhone(String phone, ScopeContext scope);
 
+    /** Looks up an active loyalty customer by regional society membership number. */
+    Optional<LoyaltyCustomerView> lookupByMemberNo(String memberNo, ScopeContext scope);
+
     /** Looks up an active loyalty customer by National Identity Card (NIC). */
     Optional<LoyaltyCustomerView> lookupByNic(String nic, ScopeContext scope);
 
@@ -24,7 +27,7 @@ public interface LoyaltyCustomerQueries {
     /** Evaluates loyalty eligibility for a customer at the specified branch/location. */
     LoyaltyEligibility checkEligibility(UUID customerId, UUID locationId, ScopeContext scope);
 
-    /** Evaluates loyalty eligibility by any identifier (UUID, phone, or NIC) at the specified branch/location. */
+    /** Evaluates loyalty eligibility by any identifier (UUID, member number, phone, or NIC) at the specified branch/location. */
     LoyaltyEligibility checkEligibility(String identifier, UUID locationId, ScopeContext scope);
 
     /** Lists loyalty customers registered under a given region code. */

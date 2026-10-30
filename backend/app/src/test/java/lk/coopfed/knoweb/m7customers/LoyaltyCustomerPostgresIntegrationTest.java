@@ -201,6 +201,7 @@ class LoyaltyCustomerPostgresIntegrationTest extends PostgresIntegrationTest {
         // Another society (OTHER) queries by phone or NIC: returns empty (RLS isolation)
         assertThat(loyaltyQueries.lookupByPhone("0700000666", other())).isEmpty();
         assertThat(loyaltyQueries.lookupByNic("199511112222", other())).isEmpty();
+        assertThat(loyaltyQueries.lookupByMemberNo("MEM-77703", other())).isEmpty();
     }
 
     @Test
@@ -271,5 +272,145 @@ class LoyaltyCustomerPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(map).containsEntry("loyaltyTier", "PLATINUM");
             assertThat(map.keySet()).doesNotContain("phone", "nic", "displayName", "name");
         });
+    }
+
+    @Test
+    void memberLookupByMemberNoAndMembershipSignalsProven() {
+        // 1. Register a member with regional member number and tier GOLD
+        RegisterLoyaltyCustomer memberCmd = new RegisterLoyaltyCustomer(
+                null,
+                "Sunil Shantha",
+                null,
+                null,
+                "si",
+                "0700000444",
+                null,
+                SHOP,
+                "POL-ZONE-01",
+                "MEM-99901",
+                "GOLD",
+                true,
+                Set.of(),
+                Map.of());
+        registerLoyalty.handle(memberCmd, office());
+
+        // 2. Direct lookup by member number
+        Optional<LoyaltyCustomerView> viewOpt = loyaltyQueries.lookupByMemberNo("MEM-99901", till());
+        assertThat(viewOpt).isPresent();
+        LoyaltyCustomerView member = viewOpt.get();
+        assertThat(member.regionalMemberNo()).isEqualTo("MEM-99901");
+        assertThat(member.isMember()).isTrue();
+        assertThat(member.loyaltyTier()).isEqualTo("GOLD");
+
+        // Trimming canonicalization test
+        assertThat(loyaltyQueries.lookupByMemberNo("   MEM-99901   ", till())).isPresent();
+
+        // Empty / null / non-existent lookups
+        assertThat(loyaltyQueries.lookupByMemberNo(null, till())).isEmpty();
+        assertThat(loyaltyQueries.lookupByMemberNo("", till())).isEmpty();
+        assertThat(loyaltyQueries.lookupByMemberNo("NON-EXISTENT", till())).isEmpty();
+
+        // RLS tenant isolation: other entity cannot see member number
+        assertThat(loyaltyQueries.lookupByMemberNo("MEM-99901", other())).isEmpty();
+
+        // 3. String cascade checkEligibility by member number barcode/input
+        LoyaltyEligibility eligibility = loyaltyQueries.checkEligibility("MEM-99901", SHOP, till());
+        assertThat(eligibility.eligible()).isTrue();
+        assertThat(eligibility.status()).isEqualTo("ACTIVE");
+        assertThat(eligibility.reason()).isEqualTo("ELIGIBLE");
+        assertThat(eligibility.isMember()).isTrue();
+        assertThat(eligibility.memberNo()).isEqualTo("MEM-99901");
+        assertThat(eligibility.customer()).isNotNull();
+        assertThat(eligibility.customer().isMember()).isTrue();
+
+        // 4. Test customer with tier MEMBER and null regionalMemberNo
+        RegisterLoyaltyCustomer tierMemberCmd = new RegisterLoyaltyCustomer(
+                null,
+                "Nimal Perera",
+                null,
+                null,
+                "si",
+                "0700000333",
+                null,
+                SHOP,
+                "POL-ZONE-01",
+                null,
+                "MEMBER",
+                true,
+                Set.of(),
+                Map.of());
+        registerLoyalty.handle(tierMemberCmd, office());
+
+        LoyaltyCustomerView tierMember =
+                loyaltyQueries.lookupByPhone("0700000333", till()).orElseThrow();
+        assertThat(tierMember.isMember()).isTrue();
+        assertThat(tierMember.regionalMemberNo()).isNull();
+
+        LoyaltyEligibility tierEligibility = loyaltyQueries.checkEligibility("0700000333", SHOP, till());
+        assertThat(tierEligibility.eligible()).isTrue();
+        assertThat(tierEligibility.isMember()).isTrue();
+        assertThat(tierEligibility.memberNo()).isNull();
+
+        // 5. Test regular customer (STANDARD tier, null member number)
+        RegisterLoyaltyCustomer standardCmd = new RegisterLoyaltyCustomer(
+                null,
+                "Regular Shopper",
+                null,
+                null,
+                "en",
+                "0700000222",
+                null,
+                SHOP,
+                "POL-ZONE-01",
+                null,
+                "STANDARD",
+                true,
+                Set.of(),
+                Map.of());
+        registerLoyalty.handle(standardCmd, office());
+
+        LoyaltyCustomerView standard =
+                loyaltyQueries.lookupByPhone("0700000222", till()).orElseThrow();
+        assertThat(standard.isMember()).isFalse();
+        assertThat(standard.regionalMemberNo()).isNull();
+
+        LoyaltyEligibility standardEligibility = loyaltyQueries.checkEligibility("0700000222", SHOP, till());
+        assertThat(standardEligibility.eligible()).isTrue();
+        assertThat(standardEligibility.isMember()).isFalse();
+        assertThat(standardEligibility.memberNo()).isNull();
+    }
+
+    @Test
+    void memberEligibilityHonorsBranchRestrictionsWhenQueriedByMemberNo() {
+        RegisterLoyaltyCustomer cmd = new RegisterLoyaltyCustomer(
+                null,
+                "Local Society Member",
+                null,
+                null,
+                "si",
+                "0700000111",
+                null,
+                SHOP,
+                "POL-ZONE-01",
+                "MEM-BRANCH-01",
+                "MEMBER",
+                false,
+                Set.of(SHOP),
+                Map.of());
+        registerLoyalty.handle(cmd, office());
+
+        // Eligible at permitted SHOP
+        LoyaltyEligibility shopEl = loyaltyQueries.checkEligibility("MEM-BRANCH-01", SHOP, office());
+        assertThat(shopEl.eligible()).isTrue();
+        assertThat(shopEl.reason()).isEqualTo("ELIGIBLE");
+        assertThat(shopEl.isMember()).isTrue();
+        assertThat(shopEl.memberNo()).isEqualTo("MEM-BRANCH-01");
+
+        // Not permitted at SHOP_2
+        LoyaltyEligibility shop2El = loyaltyQueries.checkEligibility("MEM-BRANCH-01", SHOP_2, office());
+        assertThat(shop2El.eligible()).isFalse();
+        assertThat(shop2El.reason()).isEqualTo("LOCATION_NOT_PERMITTED");
+        assertThat(shop2El.isMember()).isTrue();
+        assertThat(shop2El.memberNo()).isEqualTo("MEM-BRANCH-01");
     }
 }
