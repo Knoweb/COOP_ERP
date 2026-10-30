@@ -477,6 +477,15 @@ permissions:
     module: "m8reporting"
     description_en: "Define and maintain profit center reporting dimensions"
     scope: "ENTITY"
+  # Polgolla M1-04: asset register and branch/Coop City asset view
+  - code: "rpt.asset.view"
+    module: "m8reporting"
+    description_en: "View fixed asset registers and branch asset distributions"
+    scope: "ENTITY"
+  - code: "rpt.asset.manage"
+    module: "m8reporting"
+    description_en: "Register and maintain society fixed assets"
+    scope: "ENTITY"
   # M6 Point of Sale, the central side (26A section 10), minimal for the demo: the reads of the
   # receipts and sessions the tills uploaded. The till's own permissions (sale, refund, session)
   # come with the till track.

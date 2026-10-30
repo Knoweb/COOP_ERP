@@ -53,7 +53,7 @@ export function NewOpeningBalancePage() {
   };
 
   const cell = (index: number, field: "batchNo" | "expiryDate" | "printedMrp" | "qty" | "unitCost", type: string, labelId: string) => (
-    <td>
+    <td className={type === "number" ? "numeric-cell" : ""}>
       <input
         type={type}
         min={type === "number" ? "0" : undefined}
@@ -74,48 +74,73 @@ export function NewOpeningBalancePage() {
       <h1>{t("inventory.opening.new.title").text}</h1>
       <form onSubmit={submit} className="inventory-form-row">
         <LocationPicker value={locationId} onChange={setLocationId} />
-        <table>
-          <thead>
-            <tr>
-              <th>{t("inventory.column.item").text}</th>
-              <th>{t("inventory.column.batch").text}</th>
-              <th>{t("inventory.column.expiry").text}</th>
-              <th>{t("inventory.column.mrp").text}</th>
-              <th>{t("inventory.column.qty").text}</th>
-              <th>{t("inventory.column.unit_cost").text}</th>
-              <th>{t("inventory.column.condition").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={index}>
-                <td>{row.label}</td>
-                {cell(index, "batchNo", "text", "inventory.column.batch")}
-                {cell(index, "expiryDate", "date", "inventory.column.expiry")}
-                {cell(index, "printedMrp", "number", "inventory.column.mrp")}
-                {cell(index, "qty", "number", "inventory.column.qty")}
-                {cell(index, "unitCost", "number", "inventory.column.unit_cost")}
-                <td>
-                  <select
-                    aria-label={t("inventory.column.condition").text}
-                    value={row.condition}
-                    onChange={(event) => setRow(index, { condition: event.target.value as CountedRow["condition"] })}
-                  >
-                    <option value="GOOD">{t("inventory.condition.GOOD").text}</option>
-                    <option value="DAMAGED">{t("inventory.condition.DAMAGED").text}</option>
-                  </select>
-                </td>
-                <td>
-                  <button type="button" onClick={() => setRows((current) => current.filter((_, at) => at !== index))}>
-                    {t("inventory.remove").text}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && <p>{t("inventory.opening.lines.empty").text}</p>}
+        <section className="modern-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table opening-balance-table opening-balance-table--new">
+              <colgroup>
+                <col className="col-item" />
+                <col className="col-batch" />
+                <col className="col-expiry" />
+                <col className="col-mrp" />
+                <col className="col-qty" />
+                <col className="col-unit-cost" />
+                <col className="col-condition" />
+                <col className="col-action" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{t("inventory.column.item").text}</th>
+                  <th>{t("inventory.column.batch").text}</th>
+                  <th>{t("inventory.column.expiry").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.mrp").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.qty").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.unit_cost").text}</th>
+                  <th>{t("inventory.column.condition").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="empty-table-cell">
+                      {t("inventory.opening.lines.empty").text}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row, index) => (
+                    <tr key={index}>
+                      <td>{row.label}</td>
+                      {cell(index, "batchNo", "text", "inventory.column.batch")}
+                      {cell(index, "expiryDate", "date", "inventory.column.expiry")}
+                      {cell(index, "printedMrp", "number", "inventory.column.mrp")}
+                      {cell(index, "qty", "number", "inventory.column.qty")}
+                      {cell(index, "unitCost", "number", "inventory.column.unit_cost")}
+                      <td>
+                        <select
+                          aria-label={t("inventory.column.condition").text}
+                          value={row.condition}
+                          onChange={(event) => setRow(index, { condition: event.target.value as CountedRow["condition"] })}
+                        >
+                          <option value="GOOD">{t("inventory.condition.GOOD").text}</option>
+                          <option value="DAMAGED">{t("inventory.condition.DAMAGED").text}</option>
+                        </select>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-remove"
+                          onClick={() => setRows((current) => current.filter((_, at) => at !== index))}
+                        >
+                          {t("inventory.remove").text}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
         <div>
           <button type="submit" disabled={prepare.isPending || !locationId || rows.length === 0 || !rows.every(rowReady)}>
             {t("inventory.opening.prepare").text}

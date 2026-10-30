@@ -7,10 +7,11 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
-import { type PickList, useInventoryApi } from "./inventoryApi";
+
 import { SkuLabel } from "./SkuLabel";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 import "./inventory.css";
+import { type Batch, type PickList, useInventoryApi } from "./inventoryApi";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type PickLine = PickList["lines"][number];
@@ -125,19 +126,23 @@ export function PickListPage() {
       setDeliveryNoteId(entry.trim());
     }
   };
-  const batchIds = [...new Set((pick.data?.lines ?? []).flatMap((line) => line.batchId ? [line.batchId] : []))];
+  const batchIds = [...new Set((pick.data?.lines ?? []).flatMap((line: PickLine) => line.batchId ? [line.batchId] : []))];
   const batches = useQuery({
     queryKey: ["inventory", "pick-list", "batches", batchIds],
     queryFn: async () => {
-      const found = (await Promise.all(batchIds.map((id) => api.batch(id)))).filter((batch) => batch !== null);
-      return new Map(found.map((batch) => [batch.batchId, batch]));
+      const found = (await Promise.all(batchIds.map((id) => api.batch(id)))).filter((batch): batch is Batch => batch !== null);
+      return new Map<string, Batch>(found.map((batch) => [batch.batchId, batch]));
     },
     enabled: batchIds.length > 0
   });
 
   return (
     <main className="shell-page">
-      <PageHeader icon="stock" title={t("inventory.pick.title").text} actions={<Link className="action-link" to="/inventory">{t("inventory.back").text}</Link>} />
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
+      <PageHeader icon="stock" title={t("inventory.pick.title").text} />
       <p className="modern-intro-text">{t("inventory.pick.intro").text}</p>
       <form className="modern-filter-panel inventory-form-row" onSubmit={submit}>
         <label className="inventory-form-field">

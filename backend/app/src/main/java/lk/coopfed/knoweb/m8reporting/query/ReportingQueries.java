@@ -59,4 +59,16 @@ public interface ReportingQueries {
 
     /** Month-end P&L by profit center for a year-month and optional profit center ID. */
     MonthlyProfitCenterPnlReport monthlyProfitCenterPnl(String yearMonth, UUID profitCenterId, ScopeContext scope);
+
+    /** List assets according to the filter in the caller's scope (Polgolla M1-04). */
+    List<AssetView> listAssets(AssetFilter filter, ScopeContext scope);
+
+    /** Retrieve a single asset by ID in the caller's scope (Polgolla M1-04). */
+    Optional<AssetView> getAsset(UUID assetId, ScopeContext scope);
+
+    /**
+     * Estimates required product quantities and sales mix to achieve a target revenue amount
+     * using effective selling prices resolved from the pricing subsystem (Polgolla M1-03).
+     */
+    RevenueEstimateResult estimateRevenue(RevenueEstimatePlan plan, ScopeContext scope);
 }

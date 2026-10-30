@@ -663,6 +663,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             "a correcting document links the issued original; a kernel row, not a module's extension table",
             "trading.claim_photo",
             "photographs may be added to an issued claim, as attachments (decision (1))",
+            "trading.discrepancy_photo",
+            "photographs may be added to an issued discrepancy, as attachments (decision (1))",
             "trading.payment_allocation",
             "an insert-only fact about an issued receipt, not an extension row (decision (2))",
             "trading.cheque",
@@ -700,6 +702,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         "trading.doc_order",
                         "trading.doc_grn_line",
                         "trading.claim_photo",
+                        "trading.discrepancy_photo",
                         "trading.payment_allocation");
         assertThat(WRITTEN_AFTER_ISSUE.keySet())
                 .as("every table written after issue is a row of a document")
