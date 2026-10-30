@@ -11,9 +11,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi, type Batch } from "./catalogueApi";
-import { CatalogueDropdown } from "./CatalogueDropdown";
 import { errorText } from "./skuView";
-
 
 /**
  * Batch card with correction functionality (22A section 8, "Batch card").
@@ -227,17 +225,20 @@ export function BatchPage() {
                 />
               </label>
 
-              <CatalogueDropdown
-                label={t("shell.reason.code").text}
-                value={reasonCode}
-                onChange={(val) => setReasonCode(val)}
-                options={[
-                  { value: "MISKEYED_MRP", label: t("catalogue.batch.reason.miskeyed").text },
-                  { value: "SUPPLIER_AMENDMENT", label: t("catalogue.batch.reason.supplier_amendment").text },
-                  { value: "LABEL_ERROR", label: t("catalogue.batch.reason.label_error").text },
-                  { value: "OTHER", label: t("catalogue.reason.other").text }
-                ]}
-              />
+              <label className="catalogue-form-field">
+                <span>{t("shell.reason.code").text}</span>
+                <select
+                  value={reasonCode}
+                  onChange={(e) => setReasonCode(e.target.value)}
+                  required
+                >
+                  <option value="">{t("shell.reason.choose").text}</option>
+                  <option value="MISKEYED_MRP">{t("catalogue.batch.reason.miskeyed").text}</option>
+                  <option value="SUPPLIER_AMENDMENT">{t("catalogue.batch.reason.supplier_amendment").text}</option>
+                  <option value="LABEL_ERROR">{t("catalogue.batch.reason.label_error").text}</option>
+                  <option value="OTHER">{t("catalogue.reason.other").text}</option>
+                </select>
+              </label>
 
               <label className="catalogue-form-field" style={{ gridColumn: "1 / -1" }}>
                 <span>{t("shell.reason.text").text}</span>

@@ -4,7 +4,6 @@ import { useT } from "../../shell/i18n/useT";
 
 import { useCatalogueApi } from "./catalogueApi";
 import { languageOf, nameIn, type SkuForm } from "./skuView";
-import { CatalogueDropdown } from "./CatalogueDropdown";
 
 type Props = { form: SkuForm; onChange: (change: Partial<SkuForm>) => void; disabled?: boolean };
 
@@ -72,55 +71,73 @@ export function SkuFields({ form, onChange, disabled }: Props) {
 
       {/* Row 2: Name Tamil | Unit */}
       {text("nameTa", "catalogue.field.name_ta")}
-      <CatalogueDropdown
-        label={t("catalogue.field.unit").text}
-        value={form.baseUomCode}
-        disabled={disabled}
-        required
-        onChange={(val) => onChange({ baseUomCode: val })}
-        options={(reference.data?.units ?? [{ uomCode: form.baseUomCode, nameEn: form.baseUomCode, weight: false }]).map((unit) => ({
-          value: unit.uomCode,
-          label: `${unit.uomCode} ${nameIn(unit, language)}`
-        }))}
-      />
+      <label className="catalogue-form-field">
+        <span>
+          {t("catalogue.field.unit").text}
+          <span className="register-field-required">*</span>
+        </span>
+        <select
+          value={form.baseUomCode}
+          disabled={disabled}
+          required
+          onChange={(event) => onChange({ baseUomCode: event.target.value })}
+        >
+          {(reference.data?.units ?? [{ uomCode: form.baseUomCode, nameEn: form.baseUomCode, weight: false }]).map((unit) => (
+            <option key={unit.uomCode} value={unit.uomCode}>
+              {unit.uomCode} {nameIn(unit, language)}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/* Row 3: Tax category | MRP resolution policy */}
-      <CatalogueDropdown
-        label={t("catalogue.field.tax_category").text}
-        value={form.taxCategoryId}
-        disabled={disabled}
-        required
-        placeholder={t("catalogue.field.choose").text}
-        onChange={(val) => onChange({ taxCategoryId: val })}
-        options={(reference.data?.taxCategories ?? []).map((category) => ({
-          value: category.taxCategoryId,
-          label: nameIn(category, language)
-        }))}
-      />
-      <CatalogueDropdown
-        label={t("catalogue.field.multi_mrp_policy").text}
-        value={form.multiMrpPolicy}
-        disabled={disabled}
-        onChange={(val) => onChange({ multiMrpPolicy: val as SkuForm["multiMrpPolicy"] })}
-        options={[
-          { value: "AUTO_LOWEST", label: t("catalogue.mrp_policy.AUTO_LOWEST").text },
-          { value: "BARCODE_RESOLVED", label: t("catalogue.mrp_policy.BARCODE_RESOLVED").text },
-          { value: "PICKER", label: t("catalogue.mrp_policy.PICKER").text }
-        ]}
-      />
+      <label className="catalogue-form-field">
+        <span>
+          {t("catalogue.field.tax_category").text}
+          <span className="register-field-required">*</span>
+        </span>
+        <select
+          value={form.taxCategoryId}
+          disabled={disabled}
+          required
+          onChange={(event) => onChange({ taxCategoryId: event.target.value })}
+        >
+          <option value="">{t("catalogue.field.choose").text}</option>
+          {(reference.data?.taxCategories ?? []).map((category) => (
+            <option key={category.taxCategoryId} value={category.taxCategoryId}>
+              {nameIn(category, language)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="catalogue-form-field">
+        <span>{t("catalogue.field.multi_mrp_policy").text}</span>
+        <select
+          value={form.multiMrpPolicy}
+          disabled={disabled}
+          onChange={(event) => onChange({ multiMrpPolicy: event.target.value as SkuForm["multiMrpPolicy"] })}
+        >
+          <option value="AUTO_LOWEST">{t("catalogue.mrp_policy.AUTO_LOWEST").text}</option>
+          <option value="BARCODE_RESOLVED">{t("catalogue.mrp_policy.BARCODE_RESOLVED").text}</option>
+          <option value="PICKER">{t("catalogue.mrp_policy.PICKER").text}</option>
+        </select>
+      </label>
 
       {/* Row 4: Item origin | Expiry warning window (days) */}
-      <CatalogueDropdown
-        label={t("catalogue.field.origin_kind").text}
-        value={form.originKind}
-        disabled={disabled}
-        onChange={(val) => onChange({ originKind: val as SkuForm["originKind"] })}
-        options={[
-          { value: "PURCHASED", label: t("catalogue.origin.PURCHASED").text },
-          { value: "REPACK_OUTPUT", label: t("catalogue.origin.REPACK_OUTPUT").text },
-          { value: "LOCAL_SOURCED", label: t("catalogue.origin.LOCAL_SOURCED").text }
-        ]}
-      />
+      <label className="catalogue-form-field">
+        <span>{t("catalogue.field.origin_kind").text}</span>
+        <select
+          value={form.originKind}
+          disabled={disabled}
+          onChange={(event) => onChange({ originKind: event.target.value as SkuForm["originKind"] })}
+        >
+          <option value="PURCHASED">{t("catalogue.origin.PURCHASED").text}</option>
+          <option value="REPACK_OUTPUT">{t("catalogue.origin.REPACK_OUTPUT").text}</option>
+          <option value="LOCAL_SOURCED">{t("catalogue.origin.LOCAL_SOURCED").text}</option>
+        </select>
+      </label>
+
       <label className="catalogue-form-field">
         <span>{t("catalogue.field.expiry_warning_days").text}</span>
         <input

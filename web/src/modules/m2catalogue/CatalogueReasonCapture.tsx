@@ -1,7 +1,6 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useT } from "../../shell/i18n/useT";
-import { CatalogueDropdown } from "./CatalogueDropdown";
 
 
 export type ReasonCode = {
@@ -42,14 +41,21 @@ export function CatalogueReasonCapture({
         {title}
       </h2>
 
-      <CatalogueDropdown
-        label={t("shell.reason.code").text}
-        value={code}
-        placeholder={t("shell.reason.choose").text}
-        onChange={(val) => setCode(val)}
-        required
-        options={codes.map((c) => ({ value: c.code, label: c.label }))}
-      />
+      <label className="reason-capture__field">
+        <span>{t("shell.reason.code").text}</span>
+        <select
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          required
+        >
+          <option value="">{t("shell.reason.choose").text}</option>
+          {codes.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="reason-capture__field">
         <span>{t("shell.reason.text").text}</span>
