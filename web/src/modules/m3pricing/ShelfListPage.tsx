@@ -16,6 +16,7 @@ import type { RetailPrice, SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { bindingCeiling, chipOf, errorText, incompleteLines, reasonMessageId } from "./priceListState";
 import { ShelfLabelPrintAction } from "./ShelfLabelPrintAction";
+import { PricingSelect } from "./PricingSelect";
 import "./pricing.css";
 
 /** A line as the author edits it: the price stays text until the server reads it. */
@@ -409,46 +410,36 @@ function PriceCheck({ rows }: { rows: Row[] }) {
       <form onSubmit={submit} className="pricing-form-grid">
         <label className="modern-field">
           <span className="modern-field__label pricing-filter-label">{t("pricing.check.shop").text}</span>
-          <div className="modern-select">
-            <select
-              className="pricing-select"
-              aria-label={t("pricing.check.shop").text}
-              required
-              value={locationId}
-              onChange={(event) => setLocationId(event.target.value)}
-            >
-              <option value="">{t("pricing.check.choose").text}</option>
-              {shops.map((shop) => (
-                <option key={shop.locationId} value={shop.locationId}>
-                  {inLocale(locale, shop.nameEn, shop.nameSi, shop.nameTa)}
-                </option>
-              ))}
-            </select>
-            <svg className="modern-select__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-          </div>
+          <PricingSelect
+            aria-label={t("pricing.check.shop").text}
+            value={locationId}
+            onChange={setLocationId}
+            options={[
+              { value: "", label: t("pricing.check.choose").text },
+              ...shops.map((shop) => ({
+                value: shop.locationId,
+                label: inLocale(locale, shop.nameEn, shop.nameSi, shop.nameTa)
+              }))
+            ]}
+          />
         </label>
         <label className="modern-field">
           <span className="modern-field__label pricing-filter-label">{t("pricing.column.item").text}</span>
-          <div className="modern-select">
-            <select
-              className="pricing-select"
-              aria-label={t("pricing.column.item").text}
-              required
-              value={skuId}
-              onChange={(event) => setSkuId(event.target.value)}
-            >
-              <option value="">{t("pricing.check.choose").text}</option>
-              {rows.map((row, index) => {
+          <PricingSelect
+            aria-label={t("pricing.column.item").text}
+            value={skuId}
+            onChange={setSkuId}
+            options={[
+              { value: "", label: t("pricing.check.choose").text },
+              ...rows.map((row, index) => {
                 const sku = skus[index]?.data;
-                return (
-                  <option key={row.skuId} value={row.skuId}>
-                    {sku ? skuText(sku, locale) : row.skuId}
-                  </option>
-                );
-              })}
-            </select>
-            <svg className="modern-select__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-          </div>
+                return {
+                  value: row.skuId,
+                  label: sku ? skuText(sku, locale) : row.skuId
+                };
+              })
+            ]}
+          />
         </label>
         <label className="modern-field">
           <span className="modern-field__label pricing-filter-label">{t("pricing.check.date").text}</span>
