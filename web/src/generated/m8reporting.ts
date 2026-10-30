@@ -331,6 +331,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/revenue-estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calculate required stock quantities and revenue estimates for a target sales mix
+         * @description Estimates required product quantities needed to achieve a target revenue amount using a specified product/SKU mix and current effective/commercial selling prices resolved from the pricing subsystem. Codes this operation can answer with 422: m8.estimator.target_revenue_invalid, m8.estimator.mix_empty, m8.estimator.duplicate_sku, m8.estimator.mix_must_equal_100, m8.estimator.sku_not_found, m8.estimator.unresolved_price, m8.estimator.location_required, m8.estimator.location_unknown.
+         */
+        post: operations["estimateRevenue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -700,6 +720,72 @@ export interface components {
         };
         AssetListResponse: {
             items: components["schemas"]["AssetResponse"][];
+        };
+        RevenueEstimateItemRequest: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Percentage share of revenue (e.g. 40.00) */
+            mixPercent: string;
+        };
+        RevenueEstimateRequest: {
+            /** @description Target revenue in LKR */
+            targetRevenue: string;
+            /**
+             * Format: uuid
+             * @description Shop or location where prices are resolved
+             */
+            locationId?: string | null;
+            /**
+             * @description Price resolution basis
+             * @default RETAIL
+             * @enum {string|null}
+             */
+            priceType: "RETAIL" | "COMMERCIAL" | null;
+            /**
+             * Format: date
+             * @description Effective date for price resolution
+             */
+            businessDate?: string | null;
+            items: components["schemas"]["RevenueEstimateItemRequest"][];
+        };
+        RevenueEstimateItemResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            uomCode: string;
+            unitPrice: string;
+            priceSource: string;
+            mixPercent: string;
+            targetShare: string;
+            rawQuantity: string;
+            roundedQuantity: string;
+            estimatedRevenue: string;
+            roundingVariance: string;
+        };
+        RevenueEstimateAssumptions: {
+            targetRevenue: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            priceType: string;
+            /** Format: date */
+            businessDate: string;
+            roundingMethod: string;
+            priceResolutionPolicy: string;
+        };
+        RevenueEstimateResponse: {
+            targetRevenue: string;
+            totalEstimatedRevenue: string;
+            targetVariance: string;
+            totalMixPercent: string;
+            currency: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            priceType: string;
+            /** Format: date */
+            businessDate: string;
+            items: components["schemas"]["RevenueEstimateItemResponse"][];
+            assumptions: components["schemas"]["RevenueEstimateAssumptions"];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1377,6 +1463,42 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    estimateRevenue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevenueEstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Revenue estimate and sales mix plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevenueEstimateResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope or location forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
         };
     };
 }

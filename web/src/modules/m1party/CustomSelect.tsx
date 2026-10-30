@@ -52,7 +52,7 @@ export function CustomSelect<T extends string>({ value, options, onChange, ariaL
   }, [open]);
 
   const selectedOption = options.find((opt) => opt.value === value);
-  const triggerLabel = selectedOption?.label ?? placeholder ?? "";
+  const triggerLabel = selectedOption?.label ?? placeholder ?? (options[0]?.label ?? "");
 
   return (
     <div className={`custom-dropdown ${open ? "custom-dropdown--open" : ""} ${openUp ? "custom-dropdown--up" : ""}`} ref={containerRef}>

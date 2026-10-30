@@ -242,6 +242,77 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void withdrawDraftFollowsTheHttpContract() {
+        ResponseEntity<JsonNode> created = send(
+                HttpMethod.POST, "/v1/pricing/lists", FEDERATION, Map.of("kind", "TRADE", "name", "Withdrawable list"));
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        String listId = created.getBody().get("priceListId").asText();
+        String endpoint = "/v1/pricing/lists/" + listId + "/withdraw";
+
+        // Another entity cannot withdraw the Federation's draft.
+        ResponseEntity<JsonNode> stranger =
+                send(HttpMethod.POST, endpoint, DISTRIBUTOR, Map.of("reason", "Not my list"));
+
+        assertThat(stranger.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(stranger.getBody().get("code").asText()).isEqualTo("m3.price_list.not_found");
+
+        // A blank reason is not valid.
+        ResponseEntity<JsonNode> blank = send(HttpMethod.POST, endpoint, FEDERATION, Map.of("reason", "  "));
+
+        assertThat(blank.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(blank.getBody().get("code").asText()).isEqualTo("request.field.required");
+
+        // The owner withdraws the draft successfully.
+        ResponseEntity<JsonNode> withdrawn =
+                send(HttpMethod.POST, endpoint, FEDERATION, Map.of("reason", "Pricing changed"));
+
+        assertThat(withdrawn.getStatusCode())
+                .as(String.valueOf(withdrawn.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(withdrawn.getBody().get("status").asText()).isEqualTo("WITHDRAWN");
+        assertThat(withdrawn.getBody().get("priceListId").asText()).isEqualTo(listId);
+
+        // The same draft cannot be withdrawn twice.
+        ResponseEntity<JsonNode> again = send(HttpMethod.POST, endpoint, FEDERATION, Map.of("reason", "Again"));
+
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(again.getBody().get("code").asText()).isEqualTo("m3.price_list.not_draft");
+
+        // A published price list cannot be withdrawn.
+        ResponseEntity<JsonNode> another = send(
+                HttpMethod.POST, "/v1/pricing/lists", FEDERATION, Map.of("kind", "TRADE", "name", "Published list"));
+
+        String publishedId = another.getBody().get("priceListId").asText();
+
+        ResponseEntity<JsonNode> lines = send(
+                HttpMethod.PUT,
+                "/v1/pricing/lists/" + publishedId + "/lines",
+                FEDERATION,
+                Map.of("lines", List.of(Map.of("skuId", rice, "uomCode", "EA", "tierFromQty", 0, "price", 100))));
+
+        assertThat(lines.getBody().get("saved").asBoolean()).isTrue();
+
+        ResponseEntity<JsonNode> published = send(
+                HttpMethod.POST,
+                "/v1/pricing/lists/" + publishedId + "/publish",
+                FEDERATION,
+                Map.of("applyFrom", applyFrom.toString()));
+
+        assertThat(published.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<JsonNode> refused = send(
+                HttpMethod.POST,
+                "/v1/pricing/lists/" + publishedId + "/withdraw",
+                FEDERATION,
+                Map.of("reason", "Cannot withdraw published list"));
+
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getBody().get("code").asText()).isEqualTo("m3.price_list.not_draft");
+    }
+
+    @Test
     void aRequestOutsideTheSchemaIsRefusedBeforeTheHandler() {
         ResponseEntity<JsonNode> response =
                 send(HttpMethod.POST, "/v1/pricing/lists", FEDERATION, Map.of("kind", "TRADE"));

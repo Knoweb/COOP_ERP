@@ -46,6 +46,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_grn_line", FOLLOWS_HEADER_UPDATED),
             Map.entry("doc_discrepancy", FOLLOWS_HEADER),
             Map.entry("doc_discrepancy_line", FOLLOWS_HEADER),
+            Map.entry("discrepancy_photo", FOLLOWS_HEADER),
             Map.entry("doc_invoice", FOLLOWS_HEADER_UPDATED),
             Map.entry("opening_receivable", FOLLOWS_HEADER),
             Map.entry("doc_credit_note", FOLLOWS_HEADER_UPDATED),
@@ -142,14 +143,15 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             String where = policy.get("tablename") + "." + policy.get("policyname");
             // A receipt's allocation and cheque rows name their header as receipt_document_id (V0006).
             // A claim photograph names its claim as claim_document_id (V0008).
+            // A discrepancy photograph names its discrepancy as discrepancy_document_id (V0015).
             if ("document_read".equals(policy.get("policyname"))) {
                 assertThat((String) policy.get("qual"))
                         .as(where)
-                        .containsPattern("kernel\\.document_visible\\((receipt_|claim_)?document_id\\)");
+                        .containsPattern("kernel\\.document_visible\\((receipt_|claim_|discrepancy_)?document_id\\)");
             } else {
                 assertThat((String) policy.get("with_check"))
                         .as(where)
-                        .containsPattern("kernel\\.document_owned\\((receipt_|claim_)?document_id\\)");
+                        .containsPattern("kernel\\.document_owned\\((receipt_|claim_|discrepancy_)?document_id\\)");
             }
         }
     }

@@ -1093,6 +1093,46 @@ paths:
               schema:
                 $ref: 'common.yaml#/components/schemas/Problem'
 
+  /v1/trading/discrepancies/{discrepancyId}/photos:
+
+    parameters:
+      - in: path
+        name: discrepancyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      tags: [Dispute]
+      operationId: addDiscrepancyPhoto
+      summary: Authorise the upload of one photograph for a discrepancy
+      description: >
+        Answers a URL the client PUTs the bytes to, with the content type given here. Problems:
+        m4.discrepancy.not_found, m4.discrepancy.settled_already, attachment.content_type_not_allowed,
+        attachment.too_large.
+      x-permission: del.discrepancy.resolve
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscrepancyPhotoRequest'
+      responses:
+        '200':
+          description: Authorised
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyPhotoResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/trading/discrepancies/{discrepancyId}/settle:
 
     parameters:
@@ -2847,6 +2887,10 @@ components:
           format: uuid
         settlementReason:
           type: string
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscrepancyPhotoStatusResponse'
         lines:
           type: array
           items:
@@ -3193,6 +3237,42 @@ components:
           format: uuid
         qty:
           $ref: '#/components/schemas/Quantity'
+
+    DiscrepancyPhotoRequest:
+      type: object
+      required: [contentType]
+      properties:
+        contentType:
+          type: string
+          maxLength: 100
+        contentLength:
+          type: integer
+          format: int64
+          minimum: 1
+
+    DiscrepancyPhotoResponse:
+      type: object
+      required: [attachmentId, url, expiresAt]
+      properties:
+        attachmentId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    DiscrepancyPhotoStatusResponse:
+      type: object
+      required: [attachmentId, status]
+      properties:
+        attachmentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, COMPLETE, FAILED]
 
     ClaimPhotoRequest:
       type: object
