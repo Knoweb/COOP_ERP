@@ -48,13 +48,13 @@ class LoyaltyCustomerPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setup() {
-        CustomersFixture.appointOfficer(superuserJdbc());
+        CustomersFixture.arrange(superuserJdbc());
         kernel.reset();
     }
 
     @AfterEach
     void clean() {
-        CustomersFixture.cleanAllCustomers(superuserJdbc());
+        CustomersFixture.clean(superuserJdbc());
     }
 
     @Test

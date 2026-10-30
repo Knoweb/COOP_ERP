@@ -187,9 +187,9 @@ public class RegisterLoyaltyCustomerHandler implements Handles<RegisterLoyaltyCu
                 jdbc.update(
                         """
                         insert into customers.loyalty_permitted_location
-                            (loyalty_id, location_id, owner_entity_id, permitted_at, permitted_by)
+                            (loyalty_id, permitted_location_id, owner_entity_id, permitted_at, permitted_by)
                         values (?, ?, ?, ?, ?)
-                        on conflict (loyalty_id, location_id) do update set revoked_at = null
+                        on conflict (loyalty_id, permitted_location_id) do update set revoked_at = null
                         """,
                         loyaltyId,
                         loc,

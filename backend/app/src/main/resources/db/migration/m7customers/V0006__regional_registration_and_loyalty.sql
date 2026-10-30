@@ -30,15 +30,15 @@ CREATE INDEX loyalty_customer_reg_no ON customers.loyalty_customer (owner_entity
 
 CREATE TABLE customers.loyalty_permitted_location (
     loyalty_id               uuid          NOT NULL REFERENCES customers.loyalty_customer(loyalty_id),
-    location_id              uuid          NOT NULL,
+    permitted_location_id    uuid          NOT NULL,
     owner_entity_id          uuid          NOT NULL,
     permitted_at             timestamptz   NOT NULL DEFAULT now(),
     permitted_by             uuid,
     revoked_at               timestamptz,
-    PRIMARY KEY (loyalty_id, location_id)
+    PRIMARY KEY (loyalty_id, permitted_location_id)
 );
 
-CREATE INDEX loyalty_permitted_loc_idx ON customers.loyalty_permitted_location (owner_entity_id, location_id);
+CREATE INDEX loyalty_permitted_loc_idx ON customers.loyalty_permitted_location (owner_entity_id, permitted_location_id);
 
 -- Row Level Security: Member personal data is the society's (CR-18-2).
 -- Access-controlled by caller entity and location.
@@ -55,7 +55,7 @@ CREATE POLICY own_read ON customers.loyalty_customer FOR SELECT TO app_rw
                 OR EXISTS (
                     SELECT 1 FROM customers.loyalty_permitted_location pl
                      WHERE pl.loyalty_id = loyalty_customer.loyalty_id
-                       AND pl.location_id = kernel.scope_location()
+                       AND pl.permitted_location_id = kernel.scope_location()
                        AND pl.revoked_at IS NULL
                 )));
 
@@ -93,4 +93,3 @@ GRANT UPDATE (registered_location_id, region_code, regional_member_no, loyalty_t
 
 GRANT SELECT, INSERT ON customers.loyalty_permitted_location TO app_rw;
 GRANT UPDATE (revoked_at) ON customers.loyalty_permitted_location TO app_rw;
-

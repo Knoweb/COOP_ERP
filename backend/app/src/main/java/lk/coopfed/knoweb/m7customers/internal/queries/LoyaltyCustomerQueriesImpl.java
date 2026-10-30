@@ -22,12 +22,14 @@ import lk.coopfed.knoweb.m7customers.query.LoyaltyCustomerView;
 import lk.coopfed.knoweb.m7customers.query.LoyaltyEligibility;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implementation of LoyaltyCustomerQueries protected by Row Level Security (PGL-M3-01).
  * Resolves centralized loyalty identities and evaluates branch eligibility.
  */
 @Service
+@Transactional(readOnly = true)
 class LoyaltyCustomerQueriesImpl implements LoyaltyCustomerQueries {
 
     private static final TypeReference<Map<String, String>> MAP_TYPE = new TypeReference<>() {};
@@ -196,8 +198,8 @@ class LoyaltyCustomerQueriesImpl implements LoyaltyCustomerQueries {
 
     private Set<UUID> loadPermittedLocations(UUID loyaltyId) {
         List<UUID> locs = jdbc.query(
-                "SELECT location_id FROM customers.loyalty_permitted_location WHERE loyalty_id = ? AND revoked_at IS NULL",
-                (rs, rowNum) -> rs.getObject("location_id", UUID.class),
+                "SELECT permitted_location_id FROM customers.loyalty_permitted_location WHERE loyalty_id = ? AND revoked_at IS NULL",
+                (rs, rowNum) -> rs.getObject("permitted_location_id", UUID.class),
                 loyaltyId);
         return new HashSet<>(locs);
     }

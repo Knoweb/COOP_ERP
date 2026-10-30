@@ -126,9 +126,9 @@ public class UpdateRegionalRegistrationHandler implements Handles<UpdateRegional
                 jdbc.update(
                         """
                         insert into customers.loyalty_permitted_location
-                            (loyalty_id, location_id, owner_entity_id, permitted_at, permitted_by, revoked_at)
+                            (loyalty_id, permitted_location_id, owner_entity_id, permitted_at, permitted_by, revoked_at)
                         values (?, ?, ?, ?, ?, null)
-                        on conflict (loyalty_id, location_id) do update set revoked_at = null
+                        on conflict (loyalty_id, permitted_location_id) do update set revoked_at = null
                         """,
                         loyaltyId,
                         loc,
@@ -141,7 +141,7 @@ public class UpdateRegionalRegistrationHandler implements Handles<UpdateRegional
                         """
                         update customers.loyalty_permitted_location
                            set revoked_at = ?
-                         where loyalty_id = ? and revoked_at is null and location_id != ALL (?)
+                         where loyalty_id = ? and revoked_at is null and permitted_location_id != ALL (?)
                         """,
                         now,
                         loyaltyId,
