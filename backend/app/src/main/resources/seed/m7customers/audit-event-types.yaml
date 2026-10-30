@@ -162,3 +162,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Members were imported in bulk from a sheet or payload
+
+  # Polgolla Program 2026 - Wave 1 (PGL-M3-01).
+  - code: LOYALTY_CUSTOMER_ENROLLED
+    severity: INFO
+    offline_capturable: false
+    description_en: A loyalty customer was enrolled with regional registration details
+
+  - code: REGIONAL_REGISTRATION_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's regional registration and loyalty branch access were updated
