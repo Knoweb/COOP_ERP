@@ -1,6 +1,7 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
+import { navItemsFor } from "../../shell/modules/assemble";
 import { reportingModule } from "./module";
 
 describe("the reporting routes", () => {
@@ -30,5 +31,28 @@ describe("the reporting routes", () => {
     expect(reportingModule.navItems[4].requiredPermissions).toEqual(["rpt.target.view"]);
     expect(reportingModule.navItems[5].requiredPermissions).toEqual(["rpt.target.view"]);
     expect(reportingModule.navItems[6].requiredPermissions).toEqual(["rpt.report.run"]);
+  });
+
+  it("shows all reporting navigation entries to a FEDERATION_VIEW user", () => {
+    const fedView = {
+      policyClass: "FEDERATION_VIEW" as const,
+      permissions: [
+        "rpt.report.run",
+        "rpt.export.run",
+        "rpt.target.view",
+        "rpt.profit_center.view",
+        "rpt.asset.view"
+      ]
+    };
+    const items = navItemsFor([reportingModule], fedView);
+    expect(items.map((i) => i.to)).toEqual([
+      "/reporting",
+      "/reporting/shop-reports",
+      "/reporting/profit-centers",
+      "/reporting/assets",
+      "/reporting/targets",
+      "/reporting/revenue-estimator",
+      "/reporting/finance"
+    ]);
   });
 });

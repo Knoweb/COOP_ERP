@@ -31,6 +31,44 @@ describe("what a user may see", () => {
     expect(hasPermission(as(["hello.greeting.register"]), "hello.greeting.register")).toBe(true);
   });
 
+  it("allows FEDERATION_VIEW to see reporting reads while keeping mutating commands blocked", () => {
+    const reportingPerms = [
+      "rpt.report.run",
+      "rpt.export.run",
+      "rpt.target.view",
+      "rpt.target.manage",
+      "rpt.profit_center.view",
+      "rpt.profit_center.manage",
+      "rpt.asset.view",
+      "rpt.asset.manage",
+      "cat.import.run"
+    ];
+    const fedView = as(reportingPerms, "FEDERATION_VIEW");
+
+    // FEDERATION_VIEW reads: explicit allowlist (.run) and convention (.view)
+    expect(hasPermission(fedView, "rpt.report.run")).toBe(true);
+    expect(hasPermission(fedView, "rpt.export.run")).toBe(true);
+    expect(hasPermission(fedView, "rpt.target.view")).toBe(true);
+    expect(hasPermission(fedView, "rpt.profit_center.view")).toBe(true);
+    expect(hasPermission(fedView, "rpt.asset.view")).toBe(true);
+
+    // FEDERATION_VIEW commands: blocked
+    expect(hasPermission(fedView, "rpt.target.manage")).toBe(false);
+    expect(hasPermission(fedView, "rpt.profit_center.manage")).toBe(false);
+    expect(hasPermission(fedView, "rpt.asset.manage")).toBe(false);
+    expect(hasPermission(fedView, "cat.import.run")).toBe(false);
+
+    // OWN behavior remains unchanged: holds both reads and commands
+    const own = as(reportingPerms, "OWN");
+    expect(hasPermission(own, "rpt.report.run")).toBe(true);
+    expect(hasPermission(own, "rpt.export.run")).toBe(true);
+    expect(hasPermission(own, "rpt.target.view")).toBe(true);
+    expect(hasPermission(own, "rpt.target.manage")).toBe(true);
+    expect(hasPermission(own, "rpt.profit_center.manage")).toBe(true);
+    expect(hasPermission(own, "rpt.asset.manage")).toBe(true);
+    expect(hasPermission(own, "cat.import.run")).toBe(true);
+  });
+
   it("asks for at least one of several permissions, and for nothing when the list is empty", () => {
     expect(hasAnyPermission(as(["hello.greeting.read"]), ["hello.greeting.register", "hello.greeting.read"])).toBe(true);
     expect(hasAnyPermission(as(["hello.greeting.read"]), ["hello.greeting.register"])).toBe(false);
