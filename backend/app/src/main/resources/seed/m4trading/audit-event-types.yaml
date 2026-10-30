@@ -115,6 +115,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Discrepancy raised by a goods received note confirmation
 
+  - code: DISCREPANCY_PHOTO_ADDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A photograph authorised for upload on a discrepancy
+
   - code: INVOICE_ISSUED
     severity: INFO
     offline_capturable: false

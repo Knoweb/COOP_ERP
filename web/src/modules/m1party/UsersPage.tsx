@@ -9,6 +9,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { useAdminApi } from "./adminApi";
 import type { User, UserStatus } from "./adminApi";
 import { USER_STATUSES, USER_STATUS_LOOK, refusalOf } from "./adminView";
+import { CustomSelect } from "./CustomSelect";
 
 /**
  * The users of the caller's entity (21A section 8, "Users"; M1-07). The server narrows the list
@@ -38,37 +39,59 @@ export function UsersPage() {
         title={t("party.users.title").text}
         actions={
           canManage ? (
-            <Link className="modern-btn" to="/party/users/new">
-              {t("party.users.new").text}
+            <Link className="modern-btn users-new-btn" to="/party/users/new">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <line x1="20" y1="8" x2="20" y2="14" />
+                <line x1="23" y1="11" x2="17" y2="11" />
+              </svg>
+              <span>{t("party.users.new").text}</span>
             </Link>
           ) : undefined
         }
       />
 
-      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel">
+      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel users-filter-panel">
         <label className="modern-field">
           <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
-          <div className="modern-select">
-            <select value={status} onChange={(event) => setStatus(event.target.value as UserStatus | "")}>
-              <option value="">{t("party.filter.status.any").text}</option>
-              {USER_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {t(`party.user.status.${value}`).text}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            value={status}
+            onChange={(val) => setStatus(val)}
+            ariaLabel={t("party.filter.status").text}
+            options={[
+              { value: "", label: t("party.filter.status.any").text },
+              ...USER_STATUSES.map((val) => ({
+                value: val,
+                label: t(`party.user.status.${val}`).text
+              }))
+            ]}
+          />
         </label>
       </form>
 
       {users.isLoading && <p>{t("party.list.loading").text}</p>}
       {users.isError && <p role="alert">{refusalOf(users.error, t("party.error.generic").text).text}</p>}
-      {empty && <p>{t("party.users.empty").text}</p>}
+      {empty && (
+        <div className="party-empty-card">
+          <p className="party-empty-text">{t("party.users.empty").text}</p>
+        </div>
+      )}
 
       {shown.length > 0 && (
-        <div className="modern-table-card">
-          <div className="modern-table-scroll">
-            <table className="modern-table">
+        <div className="modern-table-card users-table-card">
+          <div className="modern-table-scroll users-table-scroll">
+            <table className="modern-table users-table">
               <thead>
                 <tr>
                   <th scope="col">{t("party.user.username").text}</th>

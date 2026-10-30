@@ -51,8 +51,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m1security", "20");
         // CAT-06: m2catalogue V0011 (location_assortment) from V0010.
         streams.put("m2catalogue", "10");
-        // M1-03: m3pricing V0010 (commercial_price_list) from V0009 (label_job).
-        streams.put("m3pricing", "9");
+        // PRC-11: m3pricing V0011 (superseded line closure) from V0010.
+        streams.put("m3pricing", "10");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // INV-07, INV-09 and INV-05: m5inventory V0012-V0016 (receipt, shortfall, cancellation,
@@ -199,7 +199,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 11)
-                .containsEntry("m3pricing", 10)
+                .containsEntry("m3pricing", 11)
                 .containsEntry("m5inventory", 17)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5)
@@ -255,7 +255,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
         // PRC-10: m4trading V0014 (order adjustments).
         // CAT-12: m4trading V0015 (inter-entity receivable opening balances).
-        assertThat(after).containsEntry("m4trading", 15);
+        // ORD-10: m4trading V0016 (discrepancy photos).
+        assertThat(after).containsEntry("m4trading", 16);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
@@ -265,6 +266,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isEqualTo("trading.opening_receivable");
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'trading.opening_receivable'::regclass",
+                        Boolean.class))
+                .isTrue();
+
+        assertThat(admin.queryForObject("select to_regclass('trading.discrepancy_photo')::text", String.class))
+                .isEqualTo("trading.discrepancy_photo");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'trading.discrepancy_photo'::regclass",
                         Boolean.class))
                 .isTrue();
 
