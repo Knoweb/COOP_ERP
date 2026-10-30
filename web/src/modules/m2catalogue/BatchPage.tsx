@@ -163,13 +163,17 @@ export function BatchPage() {
       <DocumentHeader
         code="BATCH"
         title={batch.batchNo}
-        subtitle={t("catalogue.batch.title").text}
+        subtitle={<h2 className="document-header__subtitle" style={{ margin: 0, fontSize: "inherit", fontWeight: "inherit", display: "inline" }}>{t("catalogue.batch.title").text}</h2>}
         state={{ look: chipState, label: t(`catalogue.batch.status.${batch.status}`).text }}
         facts={[
           { label: t("catalogue.column.batch_no").text, value: batch.batchNo },
           {
             label: t("catalogue.column.mrp").text,
-            value: batch.printedMrp != null ? <MoneyDisplay amount={batch.printedMrp} /> : undefined
+            value: batch.printedMrp != null ? (
+              <span className="batch-detail-value--mrp">
+                <MoneyDisplay amount={batch.printedMrp} />
+              </span>
+            ) : undefined
           },
           {
             label: t("catalogue.column.expiry").text,
