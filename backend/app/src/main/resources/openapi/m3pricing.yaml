@@ -183,6 +183,35 @@ paths:
               schema: { $ref: '#/components/schemas/PriceListResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/lists/{listId}/withdraw:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: withdrawDraft
+      summary: Withdraw an unpublished price-list draft
+      description: >
+        Only the owning entity may withdraw a DRAFT.
+        A reason is required. Published versions cannot be withdrawn.
+      x-permission: prc.pricelist.author
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithdrawDraftRequest' }
+      responses:
+        '200':
+          description: The withdrawn draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/pricing/resolve/trade:
     get:
       tags: [Pricing]
@@ -748,6 +777,11 @@ components:
       required: [applyFrom]
       properties:
         applyFrom: { type: string, format: date, description: The first business date the version applies }
+    WithdrawDraftRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
     SetLinesRequest:
       type: object
       required: [lines]

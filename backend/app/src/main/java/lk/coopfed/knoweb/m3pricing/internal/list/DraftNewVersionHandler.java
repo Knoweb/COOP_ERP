@@ -31,8 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
  * SUPERSEDED; the list has no other draft (the one_draft_per_list and one_draft_retail indexes are
  * the backstop). Mutation: the next version as a DRAFT with the source's lines carried forward
  * (M3-06: "new DRAFT with lines carried forward"), each dated today until publication dates it
- * apply_from, as SetLines dates a draft line. Closing the previous version's lines at
- * apply_from - 1 stays deferred: the lookups read the newest version in force on the date.
+ * apply_from, as SetLines dates a draft line. Publication closes the previous version's
+ * lines at the day before the new version takes effect.
  */
 @Service
 @CommandHandler(permission = "prc.pricelist.author")
@@ -112,6 +112,7 @@ public class DraftNewVersionHandler implements Handles<DraftNewVersion, UUID> {
         after.put("priceListId", priceListId);
         after.put("rootPriceListId", source.rootPriceListId());
         after.put("sourceVersionId", source.priceListId());
+        after.put("sourceSuperseded", PriceListStore.SUPERSEDED.equals(source.status()));
         after.put("version", version);
         after.put("status", PriceListStore.DRAFT);
         after.put("linesCarried", carried.size());

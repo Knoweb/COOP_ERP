@@ -14,6 +14,7 @@ import { ShopTargetsPage } from "./ShopTargetsPage";
 import { ShopReportsPage } from "./ShopReportsPage";
 import { ProfitCentersPnlPage } from "./ProfitCentersPnlPage";
 import { AssetRegisterPage } from "./AssetRegisterPage";
+import { RevenueEstimatorPage } from "./RevenueEstimatorPage";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 
 // Every M8 screen reads APIs that need rpt.report.run; rpt.export.run alone (a custom role) must
@@ -38,6 +39,7 @@ export const reportingModule: ModuleDefinition = {
     { path: "reporting/shop-reports", element: guard(<ShopReportsPage />) },
     { path: "reporting/profit-centers", element: guardProfitCenters(<ProfitCentersPnlPage />) },
     { path: "reporting/assets", element: guardAssets(<AssetRegisterPage />) },
+    { path: "reporting/revenue-estimator", element: guardTargets(<RevenueEstimatorPage />) },
     { path: "reporting/reports/:reportId", element: guard(<ReportPage />) }
   ],
 
@@ -47,7 +49,8 @@ export const reportingModule: ModuleDefinition = {
     { labelId: "reporting.shop_reports.nav", to: "/reporting/shop-reports", requiredPermissions: REPORT },
     { labelId: "reporting.profit_centers.nav", to: "/reporting/profit-centers", requiredPermissions: PROFIT_CENTERS },
     { labelId: "reporting.assets.nav", to: "/reporting/assets", requiredPermissions: ASSETS },
-    { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS }
+    { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS },
+    { labelId: "reporting.estimator.nav", to: "/reporting/revenue-estimator", requiredPermissions: TARGETS }
   ],
 
   // x-permissions of openapi/m8reporting.yaml, read from the session's resolved set (PR #144).
