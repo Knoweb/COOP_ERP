@@ -33,4 +33,12 @@ public record LoyaltyCustomerView(
         permittedLocationIds = permittedLocationIds == null ? Set.of() : Set.copyOf(permittedLocationIds);
         regionalAttributes = regionalAttributes == null ? Map.of() : Map.copyOf(regionalAttributes);
     }
+
+    /**
+     * Determines whether this customer is an active cooperative society member.
+     * True if the regional member number is present or the tier is explicitly MEMBER.
+     */
+    public boolean isMember() {
+        return (regionalMemberNo != null && !regionalMemberNo.isBlank()) || "MEMBER".equalsIgnoreCase(loyaltyTier);
+    }
 }

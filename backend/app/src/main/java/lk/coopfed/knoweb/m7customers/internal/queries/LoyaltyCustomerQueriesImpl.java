@@ -61,6 +61,19 @@ class LoyaltyCustomerQueriesImpl implements LoyaltyCustomerQueries {
     }
 
     @Override
+    public Optional<LoyaltyCustomerView> lookupByMemberNo(String memberNo, ScopeContext scope) {
+        if (memberNo == null || memberNo.isBlank()) {
+            return Optional.empty();
+        }
+        String canonical = memberNo.strip();
+        List<LoyaltyCustomerView> list = jdbc.query(
+                baseSelect() + " WHERE lc.regional_member_no = ? ORDER BY lc.created_at DESC LIMIT 1",
+                (rs, rowNum) -> mapRow(rs),
+                canonical);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
     public Optional<LoyaltyCustomerView> lookupByNic(String nic, ScopeContext scope) {
         if (nic == null || nic.isBlank()) {
             return Optional.empty();
@@ -125,10 +138,15 @@ class LoyaltyCustomerQueriesImpl implements LoyaltyCustomerQueries {
         try {
             UUID cid = UUID.fromString(text);
             LoyaltyEligibility res = checkEligibility(cid, locationId, scope);
-            if (res.eligible()) {
+            if (!"NOT_FOUND".equals(res.status())) {
                 return res;
             }
         } catch (IllegalArgumentException ignored) {
+        }
+
+        Optional<LoyaltyCustomerView> byMember = lookupByMemberNo(text, scope);
+        if (byMember.isPresent()) {
+            return checkEligibility(byMember.get().customerId(), locationId, scope);
         }
 
         Optional<LoyaltyCustomerView> byPhone = lookupByPhone(text, scope);
