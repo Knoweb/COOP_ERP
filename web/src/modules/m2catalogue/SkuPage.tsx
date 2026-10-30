@@ -10,10 +10,12 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
-import { ReasonCapture } from "../../shell/components/ReasonCapture";
-import "./catalogue.css";
+import { CatalogueReasonCapture as ReasonCapture } from "./CatalogueReasonCapture";
+
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
+import { CatalogueDropdown } from "./CatalogueDropdown";
+import { CatalogueDatePicker } from "./CatalogueDatePicker";
 import { chipOf, EMPTY_FORM, errorText, formOf, keyForUpload, languageOf, nameIn, requestOf, type SkuForm } from "./skuView";
 import type { AttachImageRequest } from "./catalogueApi";
 
@@ -126,112 +128,140 @@ export function SkuPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/catalogue">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("catalogue.back").text}
-      </Link>
-      <h1>{nameIn(item, language)}</h1>
-      <p className="catalogue-header-row">
-        <span>{item.skuCode}</span>
-        <StateChip state={chipOf(item.status)} label={t(`catalogue.status.${item.status}`).text} />
-      </p>
+      <div className="sku-editor-container">
+        <Link className="back-pill-btn" to="/catalogue">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          <span>{t("catalogue.back").text}</span>
+        </Link>
 
-      <form onSubmit={submit} className="catalogue-form-row">
-        <SkuFields form={form} disabled={!editable} onChange={(change) => setForm((current) => ({ ...current, ...change }))} />
-        {editable && (
-          <div>
-            <button type="submit" disabled={save.isPending || !form.nameEn.trim()}>
-              {t("catalogue.save").text}
-            </button>
-            {save.isSuccess && <span role="status">{t("catalogue.saved").text}</span>}
-          </div>
-        )}
-        {save.isError && <p role="alert">{errorText(save.error, t("catalogue.error.generic").text)}</p>}
-      </form>
+        <div className="sku-header-card">
+          <h1>{nameIn(item, language)}</h1>
+          <p className="catalogue-header-row">
+            <span className="sku-code-badge">{item.skuCode}</span>
+            <StateChip state={chipOf(item.status)} label={t(`catalogue.status.${item.status}`).text} />
+          </p>
+        </div>
 
-      {item.status === "DRAFT" && (canEditLocal || canShare) && (
-        <section className="catalogue-action-bar">
-          {canEditLocal && (
-            <button type="button" disabled={activate.isPending} onClick={() => activate.mutate("LOCAL")}>
-              {t("catalogue.activate.local").text}
-            </button>
-          )}
-          {canShare && (
-            <button type="button" disabled={activate.isPending} onClick={() => activate.mutate("SHARED")}>
-              {t("catalogue.activate.shared").text}
-            </button>
-          )}
-          {activate.isError && <p role="alert">{errorText(activate.error, t("catalogue.error.generic").text)}</p>}
-        </section>
-      )}
+        <div className="sku-editor-card">
+          <form onSubmit={submit} className="catalogue-form-row">
+            <SkuFields form={form} disabled={!editable} onChange={(change) => setForm((current) => ({ ...current, ...change }))} />
+            {editable && (
+              <div className="sku-form-actions">
+                <button type="submit" className="register-submit-btn" disabled={save.isPending || !form.nameEn.trim()}>
+                  {t("catalogue.save").text}
+                </button>
+                {save.isSuccess && <span role="status" className="sku-saved-badge">{t("catalogue.saved").text}</span>}
+              </div>
+            )}
+            {save.isError && <p role="alert" className="register-error-banner">{errorText(save.error, t("catalogue.error.generic").text)}</p>}
+          </form>
 
-      {(item.status === "LOCAL" || item.status === "SHARED") && canDeactivate && (
-        <section className="catalogue-action-bar">
-          {!confirmingDeactivate ? (
-            <button
-              type="button"
-              className="action-button action-button--secondary"
-              onClick={() => setConfirmingDeactivate(true)}
-            >
-              {t("catalogue.deactivate").text}
-            </button>
-          ) : (
-            <ReasonCapture
-              title={t("catalogue.deactivate.title").text}
-              codes={[
-                { code: "DISCONTINUED", label: t("catalogue.reason.discontinued").text },
-                { code: "SUPPLIER_DEFECT", label: t("catalogue.reason.supplier_defect").text },
-                { code: "SEASONAL_END", label: t("catalogue.reason.seasonal_end").text },
-                { code: "OTHER", label: t("catalogue.reason.other").text }
-              ]}
-              onConfirm={(code, text) =>
-                deactivate.mutate({ reasonCode: code, reasonText: text ?? undefined })
-              }
-              onCancel={() => setConfirmingDeactivate(false)}
-              pending={deactivate.isPending}
-            />
+          {item.status === "DRAFT" && (canEditLocal || canShare) && (
+            <section className="catalogue-action-bar">
+              {canEditLocal && (
+                <button type="button" className="action-button action-btn--reactivate" disabled={activate.isPending} onClick={() => activate.mutate("LOCAL")}>
+                  {t("catalogue.activate.local").text}
+                </button>
+              )}
+              {canShare && (
+                <button type="button" className="action-button action-btn--reactivate" disabled={activate.isPending} onClick={() => activate.mutate("SHARED")}>
+                  {t("catalogue.activate.shared").text}
+                </button>
+              )}
+              {activate.isError && <p role="alert" className="register-error-banner">{errorText(activate.error, t("catalogue.error.generic").text)}</p>}
+            </section>
           )}
-          {deactivate.isError && (
-            <p role="alert">{errorText(deactivate.error, t("catalogue.error.generic").text)}</p>
-          )}
-        </section>
-      )}
 
-      {item.status === "INACTIVE" && canDeactivate && (
-        <section className="catalogue-action-bar">
-          {!confirmingReactivate ? (
-            <button
-              type="button"
-              className="action-button action-button--primary"
-              onClick={() => setConfirmingReactivate(true)}
-            >
-              {t("catalogue.reactivate").text}
-            </button>
-          ) : (
-            <ReasonCapture
-              title={t("catalogue.reactivate.title").text}
-              codes={[
-                { code: "RESTORED", label: t("catalogue.reason.restored").text },
-                { code: "STOCK_RESUMED", label: t("catalogue.reason.stock_resumed").text },
-                { code: "OTHER", label: t("catalogue.reason.other").text }
-              ]}
-              onConfirm={(code, text) =>
-                reactivate.mutate({ reasonCode: code, reasonText: text ?? undefined })
-              }
-              onCancel={() => setConfirmingReactivate(false)}
-              pending={reactivate.isPending}
-            />
+          {(item.status === "LOCAL" || item.status === "SHARED") && canDeactivate && (
+            <section className="catalogue-action-bar">
+              {!confirmingDeactivate ? (
+                <button
+                  type="button"
+                  className="action-button action-btn--deactivate"
+                  onClick={() => setConfirmingDeactivate(true)}
+                >
+                  {t("catalogue.deactivate").text}
+                </button>
+              ) : (
+                <ReasonCapture
+                  title={t("catalogue.deactivate.title").text}
+                  codes={[
+                    { code: "DISCONTINUED", label: t("catalogue.reason.discontinued").text },
+                    { code: "SUPPLIER_DEFECT", label: t("catalogue.reason.supplier_defect").text },
+                    { code: "SEASONAL_END", label: t("catalogue.reason.seasonal_end").text },
+                    { code: "OTHER", label: t("catalogue.reason.other").text }
+                  ]}
+                  onConfirm={(code, text) =>
+                    deactivate.mutate({ reasonCode: code, reasonText: text ?? undefined })
+                  }
+                  onCancel={() => setConfirmingDeactivate(false)}
+                  pending={deactivate.isPending}
+                />
+              )}
+              {deactivate.isError && (
+                <p role="alert" className="register-error-banner">{errorText(deactivate.error, t("catalogue.error.generic").text)}</p>
+              )}
+            </section>
           )}
-          {reactivate.isError && (
-            <p role="alert">{errorText(reactivate.error, t("catalogue.error.generic").text)}</p>
-          )}
-        </section>
-      )}
 
-      <Conversions skuId={skuId} canEdit={canEditLocal && item.status !== "INACTIVE"} baseUom={item.baseUomCode} />
-      <Barcodes skuId={skuId} canEdit={canBarcode && (item.status === "LOCAL" || item.status === "SHARED")} baseUom={item.baseUomCode} />
-      <Images skuId={skuId} canEdit={canImage && (item.status === "LOCAL" || item.status === "SHARED")} />
-      <Batches skuId={skuId} />
+          {item.status === "INACTIVE" && canDeactivate && (
+            <section className="catalogue-action-bar">
+              {!confirmingReactivate ? (
+                <button
+                  type="button"
+                  className="action-button action-btn--reactivate"
+                  onClick={() => setConfirmingReactivate(true)}
+                >
+                  {t("catalogue.reactivate").text}
+                </button>
+              ) : (
+                <ReasonCapture
+                  title={t("catalogue.reactivate.title").text}
+                  codes={[
+                    { code: "RESTORED", label: t("catalogue.reason.restored").text },
+                    { code: "STOCK_RESUMED", label: t("catalogue.reason.stock_resumed").text },
+                    { code: "OTHER", label: t("catalogue.reason.other").text }
+                  ]}
+                  onConfirm={(code, text) =>
+                    reactivate.mutate({ reasonCode: code, reasonText: text ?? undefined })
+                  }
+                  onCancel={() => setConfirmingReactivate(false)}
+                  pending={reactivate.isPending}
+                />
+              )}
+              {reactivate.isError && (
+                <p role="alert" className="register-error-banner">{errorText(reactivate.error, t("catalogue.error.generic").text)}</p>
+              )}
+            </section>
+          )}
+
+          <div className="sku-section-divider" />
+
+          <Conversions skuId={skuId} canEdit={canEditLocal && item.status !== "INACTIVE"} baseUom={item.baseUomCode} />
+
+          <div className="sku-section-divider" />
+
+          <Barcodes skuId={skuId} canEdit={canBarcode && (item.status === "LOCAL" || item.status === "SHARED")} baseUom={item.baseUomCode} />
+
+          <div className="sku-section-divider" />
+
+          <Images skuId={skuId} canEdit={canImage && (item.status === "LOCAL" || item.status === "SHARED")} />
+        </div>
+
+        <Batches skuId={skuId} />
+      </div>
     </main>
   );
 }
@@ -265,57 +295,97 @@ function Conversions({ skuId, canEdit, baseUom }: { skuId: string; canEdit: bool
 
   return (
     <section className="catalogue-section">
-      <h2>{t("catalogue.conversions.title").text}</h2>
-      {conversions.data?.length === 0 && <p>{t("catalogue.conversions.empty").text}</p>}
-      {conversions.data && conversions.data.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t("catalogue.column.unit").text}</th>
-              <th>{t("catalogue.column.factor").text}</th>
-              <th>{t("catalogue.column.from").text}</th>
-              <th>{t("catalogue.column.to").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {conversions.data.map((row) => (
-              <tr key={`${row.uomCode}-${row.effectiveFrom}`}>
-                <td>{row.uomCode}</td>
-                <td>{t("catalogue.conversion.factor", undefined, { factor: row.factorToBase, base: baseUom }).text}</td>
-                <td>{formatDate(row.effectiveFrom)}</td>
-                <td>{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="sku-section-header">
+        <h2 className="sku-section-title">{t("catalogue.conversions.title").text}</h2>
+      </div>
+
+      {conversions.data?.length === 0 && (
+        <div className="conversion-empty-state">
+          <p>{t("catalogue.conversions.empty").text}</p>
+        </div>
       )}
-      {canEdit && (
-        <form onSubmit={submit} className="catalogue-filter-bar">
-          <label className="catalogue-form-field">
-            {t("catalogue.field.unit").text}
-            <select required value={uomCode} onChange={(event) => setUomCode(event.target.value)}>
-              <option value="">{t("catalogue.field.choose").text}</option>
-              {(reference.data?.units ?? [])
-                .filter((unit) => unit.uomCode !== baseUom)
-                .map((unit) => (
-                  <option key={unit.uomCode} value={unit.uomCode}>
-                    {unit.uomCode}
-                  </option>
+
+      {conversions.data && conversions.data.length > 0 && (
+        <div className="modern-table-card" style={{ marginBottom: "var(--space-3)" }}>
+          <div className="modern-table-scroll">
+            <table className="modern-table catalogue-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t("catalogue.column.unit").text}</th>
+                  <th scope="col">{t("catalogue.column.factor").text}</th>
+                  <th scope="col">{t("catalogue.column.from").text}</th>
+                  <th scope="col">{t("catalogue.column.to").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {conversions.data.map((row) => (
+                  <tr key={`${row.uomCode}-${row.effectiveFrom}`}>
+                    <td>
+                      <span className="catalogue-uom-badge">{row.uomCode}</span>
+                    </td>
+                    <td className="table-primary-text">
+                      {t("catalogue.conversion.factor", undefined, { factor: row.factorToBase, base: baseUom }).text}
+                    </td>
+                    <td>{formatDate(row.effectiveFrom)}</td>
+                    <td>{row.effectiveTo ? formatDate(row.effectiveTo) : "—"}</td>
+                  </tr>
                 ))}
-            </select>
-          </label>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {canEdit && (
+        <form onSubmit={submit} className="conversion-form-grid">
+          <CatalogueDropdown
+            label={t("catalogue.field.unit").text}
+            value={uomCode}
+            placeholder={t("catalogue.field.choose").text}
+            onChange={(val) => setUomCode(val)}
+            required
+            options={(reference.data?.units ?? [])
+              .filter((unit) => unit.uomCode !== baseUom)
+              .map((unit) => ({
+                value: unit.uomCode,
+                label: unit.uomCode
+              }))}
+          />
+
           <label className="catalogue-form-field">
-            {t("catalogue.field.factor").text}
-            <input type="number" min="0" step="any" required value={factor} onChange={(event) => setFactor(event.target.value)} />
+            <span>{t("catalogue.field.factor").text}</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              required
+              value={factor}
+              onChange={(event) => setFactor(event.target.value)}
+            />
           </label>
-          <label className="catalogue-form-field">
-            {t("catalogue.field.effective_from").text}
-            <input type="date" required value={from} onChange={(event) => setFrom(event.target.value)} />
-          </label>
-          <button type="submit" disabled={define.isPending || !uomCode || !factor || !from}>
-            {t("catalogue.conversions.add").text}
-          </button>
-          {define.isError && <p role="alert">{errorText(define.error, t("catalogue.error.generic").text)}</p>}
+
+          <CatalogueDatePicker
+            label={t("catalogue.field.effective_from").text}
+            value={from}
+            onChange={(val) => setFrom(val)}
+            required
+          />
+
+          <div className="conversion-submit-wrap">
+            <button
+              type="submit"
+              className="register-submit-btn"
+              disabled={define.isPending || !uomCode || !factor || !from}
+            >
+              {t("catalogue.conversions.add").text}
+            </button>
+          </div>
+
+          {define.isError && (
+            <p role="alert" className="register-error-banner" style={{ gridColumn: "1 / -1" }}>
+              {errorText(define.error, t("catalogue.error.generic").text)}
+            </p>
+          )}
         </form>
       )}
     </section>
@@ -385,65 +455,86 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
 
   return (
     <section className="catalogue-section">
-      <h2>{t("catalogue.barcodes.title").text}</h2>
-      {barcodes.data?.length === 0 && <p>{t("catalogue.barcodes.empty").text}</p>}
+      <div className="sku-section-header">
+        <h2 className="sku-section-title">{t("catalogue.barcodes.title").text}</h2>
+      </div>
+
+      {barcodes.data?.length === 0 && (
+        <div className="conversion-empty-state">
+          <p>{t("catalogue.barcodes.empty").text}</p>
+        </div>
+      )}
+
       {barcodes.data && barcodes.data.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t("catalogue.column.barcode").text}</th>
-              <th>{t("catalogue.column.symbology").text}</th>
-              <th>{t("catalogue.column.unit").text}</th>
-              <th>{t("catalogue.column.linked_batch").text}</th>
-              <th>{t("catalogue.column.status").text}</th>
-              {canEdit && <th>{t("catalogue.column.actions").text}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {barcodes.data.map((row) => (
-              <tr key={`${row.barcode}-${row.symbology}`}>
-                <td>{row.barcode}</td>
-                <td>{row.symbology}</td>
-                <td>{row.uomCode}</td>
-                <td>
-                  {row.batchId ? (
-                    <Link to={`/catalogue/batches/${row.batchId}`}>
-                      {batchMap.get(row.batchId) ?? row.batchId.slice(0, 8)}
-                    </Link>
-                  ) : (
-                    <span>{t("catalogue.barcode.unlinked").text}</span>
-                  )}
-                </td>
-                <td>{t(`catalogue.barcode.status.${row.status}`).text}</td>
-                {canEdit && (
-                  <td>
-                    {row.status === "ACTIVE" && (
-                      <div className="table-actions">
-                        <button
-                          type="button"
-                          className="action-button action-button--secondary"
-                          onClick={() => {
-                            setLinkingBarcode({ barcode: row.barcode, symbology: row.symbology });
-                            setSelectedBatchId(row.batchId ?? "");
-                          }}
-                        >
-                          {t("catalogue.barcode.link").text}
-                        </button>
-                        <button
-                          type="button"
-                          className="action-button action-button--secondary"
-                          onClick={() => setRetiringBarcode({ barcode: row.barcode, symbology: row.symbology })}
-                        >
-                          {t("catalogue.barcode.retire").text}
-                        </button>
-                      </div>
+        <div className="modern-table-card" style={{ marginBottom: "var(--space-3)" }}>
+          <div className="modern-table-scroll">
+            <table className="modern-table catalogue-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t("catalogue.column.barcode").text}</th>
+                  <th scope="col">{t("catalogue.column.symbology").text}</th>
+                  <th scope="col">{t("catalogue.column.unit").text}</th>
+                  <th scope="col">{t("catalogue.column.linked_batch").text}</th>
+                  <th scope="col">{t("catalogue.column.status").text}</th>
+                  {canEdit && <th scope="col">{t("catalogue.column.actions").text}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {barcodes.data.map((row) => (
+                  <tr key={`${row.barcode}-${row.symbology}`}>
+                    <td>
+                      <span className="sku-code-badge">{row.barcode}</span>
+                    </td>
+                    <td className="table-primary-text">{row.symbology}</td>
+                    <td>
+                      <span className="catalogue-uom-badge">{row.uomCode}</span>
+                    </td>
+                    <td>
+                      {row.batchId ? (
+                        <Link to={`/catalogue/batches/${row.batchId}`} className="table-link">
+                          {batchMap.get(row.batchId) ?? row.batchId.slice(0, 8)}
+                        </Link>
+                      ) : (
+                        <span className="table-muted-text">{t("catalogue.barcode.unlinked").text}</span>
+                      )}
+                    </td>
+                    <td>
+                      <StateChip
+                        state={row.status === "ACTIVE" ? "issued" : "void"}
+                        label={t(`catalogue.barcode.status.${row.status}`).text}
+                      />
+                    </td>
+                    {canEdit && (
+                      <td>
+                        {row.status === "ACTIVE" && (
+                          <div className="table-actions">
+                            <button
+                              type="button"
+                              className="action-button action-btn--secondary"
+                              onClick={() => {
+                                setLinkingBarcode({ barcode: row.barcode, symbology: row.symbology });
+                                setSelectedBatchId(row.batchId ?? "");
+                              }}
+                            >
+                              {t("catalogue.barcode.link").text}
+                            </button>
+                            <button
+                              type="button"
+                              className="action-button action-btn--secondary"
+                              onClick={() => setRetiringBarcode({ barcode: row.barcode, symbology: row.symbology })}
+                            >
+                              {t("catalogue.barcode.retire").text}
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {retiringBarcode && (
@@ -467,11 +558,11 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
           pending={retire.isPending}
         />
       )}
-      {retire.isError && <p role="alert">{errorText(retire.error, t("catalogue.error.generic").text)}</p>}
+      {retire.isError && <p role="alert" className="register-error-banner">{errorText(retire.error, t("catalogue.error.generic").text)}</p>}
 
       {linkingBarcode && (
         <form
-          className="catalogue-filter-bar catalogue-inline-form"
+          className="linking-barcode-card"
           role="dialog"
           aria-labelledby="link-batch-title"
           onSubmit={(e) => {
@@ -485,70 +576,97 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
             }
           }}
         >
-          <h4 id="link-batch-title">{t("catalogue.barcode.link.title").text}: {linkingBarcode.barcode}</h4>
-          <label className="catalogue-form-field">
-            {t("catalogue.barcode.link.select").text}
-            <select
-              required
-              value={selectedBatchId}
-              onChange={(e) => setSelectedBatchId(e.target.value)}
-            >
-              <option value="">{t("catalogue.field.choose").text}</option>
-              {(batches.data ?? []).map((b) => (
-                <option key={b.batchId} value={b.batchId}>
-                  {b.batchNo} {b.printedMrp != null ? `(MRP ${b.printedMrp})` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            className="action-button action-button--primary"
-            disabled={link.isPending || !selectedBatchId}
-          >
-            {t("catalogue.barcode.link.submit").text}
-          </button>
-          <button
-            type="button"
-            className="action-button action-button--secondary"
-            onClick={() => setLinkingBarcode(null)}
-          >
-            {t("shell.reason.cancel").text}
-          </button>
-          {link.isError && <p role="alert">{errorText(link.error, t("catalogue.error.generic").text)}</p>}
+          <h4 id="link-batch-title" className="linking-barcode-title">
+            <span>{t("catalogue.barcode.link.title").text}:</span>
+            <span className="sku-code-badge">{linkingBarcode.barcode}</span>
+          </h4>
+          <div className="linking-barcode-row">
+            <div className="linking-barcode-field-wrap">
+              <CatalogueDropdown
+                value={selectedBatchId}
+                placeholder={t("catalogue.barcode.link.select").text}
+                onChange={(val) => setSelectedBatchId(val)}
+                required
+                options={(batches.data ?? []).map((b) => ({
+                  value: b.batchId,
+                  label: `${b.batchNo}${b.printedMrp != null ? ` (MRP ${b.printedMrp})` : ""}`
+                }))}
+              />
+            </div>
+            <div className="linking-barcode-actions">
+              <button
+                type="submit"
+                className="action-button action-button--primary"
+                disabled={link.isPending || !selectedBatchId}
+              >
+                {t("catalogue.barcode.link.submit").text}
+              </button>
+              <button
+                type="button"
+                className="action-button action-button--secondary"
+                onClick={() => setLinkingBarcode(null)}
+              >
+                {t("shell.reason.cancel").text}
+              </button>
+            </div>
+          </div>
+          {link.isError && <p role="alert" className="register-error-banner">{errorText(link.error, t("catalogue.error.generic").text)}</p>}
         </form>
       )}
 
       {canEdit && (
-        <form onSubmit={submit} className="catalogue-filter-bar">
+        <form onSubmit={submit} className="conversion-form-grid">
           <label className="catalogue-form-field">
-            {t("catalogue.field.barcode").text}
-            <input type="text" required maxLength={48} value={barcode} onChange={(event) => setBarcode(event.target.value)} />
+            <span>{t("catalogue.field.barcode").text}</span>
+            <input
+              type="text"
+              required
+              maxLength={48}
+              value={barcode}
+              placeholder={t("catalogue.field.barcode").text}
+              onChange={(event) => setBarcode(event.target.value)}
+            />
           </label>
-          <label className="catalogue-form-field">
-            {t("catalogue.field.symbology").text}
-            <select value={symbology} onChange={(event) => setSymbology(event.target.value as Symbology)}>
-              {SYMBOLOGIES.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="catalogue-form-field">
-            {t("catalogue.field.barcode_unit").text}
-            <select value={uomCode} onChange={(event) => setUomCode(event.target.value)}>
-              {units.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" disabled={register.isPending || !barcode.trim()}>
-            {t("catalogue.barcodes.add").text}
-          </button>
-          {register.isError && <p role="alert">{errorText(register.error, t("catalogue.error.generic").text)}</p>}
+
+          <CatalogueDropdown
+            label={t("catalogue.field.symbology").text}
+            value={symbology}
+            placeholder={t("catalogue.field.choose").text}
+            onChange={(val) => setSymbology(val as Symbology)}
+            required
+            options={SYMBOLOGIES.map((val) => ({
+              value: val,
+              label: val
+            }))}
+          />
+
+          <CatalogueDropdown
+            label={t("catalogue.field.barcode_unit").text}
+            value={uomCode}
+            placeholder={t("catalogue.field.choose").text}
+            onChange={(val) => setUomCode(val)}
+            required
+            options={units.map((unit) => ({
+              value: unit,
+              label: unit
+            }))}
+          />
+
+          <div className="conversion-submit-wrap">
+            <button
+              type="submit"
+              className="register-submit-btn"
+              disabled={register.isPending || !barcode.trim() || !symbology || !uomCode}
+            >
+              {t("catalogue.barcodes.add").text}
+            </button>
+          </div>
+
+          {register.isError && (
+            <p role="alert" className="register-error-banner" style={{ gridColumn: "1 / -1" }}>
+              {errorText(register.error, t("catalogue.error.generic").text)}
+            </p>
+          )}
         </form>
       )}
     </section>
@@ -563,39 +681,56 @@ function Batches({ skuId }: { skuId: string }) {
 
   return (
     <section className="catalogue-section">
-      <h2>{t("catalogue.batches.title").text}</h2>
-      {batches.data?.length === 0 && <p>{t("catalogue.batches.empty").text}</p>}
+      <div className="sku-section-header">
+        <h2 className="sku-section-title">{t("catalogue.batches.title").text}</h2>
+      </div>
+      {batches.data?.length === 0 && (
+        <div className="conversion-empty-state">
+          <p>{t("catalogue.batches.empty").text}</p>
+        </div>
+      )}
       {batches.data && batches.data.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t("catalogue.column.batch_no").text}</th>
-              <th>{t("catalogue.column.expiry").text}</th>
-              <th>{t("catalogue.column.mrp").text}</th>
-              <th>{t("catalogue.column.status").text}</th>
-              <th>{t("catalogue.column.actions").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {batches.data.map((batch) => (
-              <tr key={batch.batchId}>
-                <td>
-                  <Link to={`/catalogue/batches/${batch.batchId}`}>{batch.batchNo}</Link>
-                </td>
-                <td>{batch.expiryDate ? formatDate(batch.expiryDate) : ""}</td>
-                <td>{batch.printedMrp != null && <MoneyDisplay amount={batch.printedMrp} />}</td>
-                <td>{t(`catalogue.batch.status.${batch.status}`).text}</td>
-                <td>
-                  <div className="table-actions">
-                    <Link className="action-link" to={`/catalogue/batches/${batch.batchId}`}>
-                      {t("catalogue.batches.view_batch").text}
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="modern-table-card" style={{ marginBottom: "var(--space-3)" }}>
+          <div className="modern-table-scroll">
+            <table className="modern-table catalogue-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t("catalogue.column.batch_no").text}</th>
+                  <th scope="col">{t("catalogue.column.expiry").text}</th>
+                  <th scope="col">{t("catalogue.column.mrp").text}</th>
+                  <th scope="col">{t("catalogue.column.status").text}</th>
+                  <th scope="col">{t("catalogue.column.actions").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.data.map((batch) => (
+                  <tr key={batch.batchId}>
+                    <td>
+                      <Link to={`/catalogue/batches/${batch.batchId}`} className="sku-code-badge" style={{ textDecoration: "none" }}>
+                        {batch.batchNo}
+                      </Link>
+                    </td>
+                    <td className="table-primary-text">{batch.expiryDate ? formatDate(batch.expiryDate) : "—"}</td>
+                    <td>{batch.printedMrp != null ? <MoneyDisplay amount={batch.printedMrp} /> : "—"}</td>
+                    <td>
+                      <StateChip
+                        state={batch.status === "REGISTERED" ? "issued" : "void"}
+                        label={t(`catalogue.batch.status.${batch.status}`).text}
+                      />
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <Link className="action-link" to={`/catalogue/batches/${batch.batchId}`}>
+                          {t("catalogue.batches.view_batch").text}
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </section>
   );
@@ -708,8 +843,8 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   const activeImage = images.data?.find(img => img.status === "ACTIVE" || img.status === "PENDING");
   
   // Clear sessionStorage if the image is actually active from the backend
-  if (activeImage?.imageUrl || activeImage?.thumbUrl) {
-    if (localPreviewUrl) {
+  useEffect(() => {
+    if ((activeImage?.imageUrl || activeImage?.thumbUrl) && localPreviewUrl) { setLocalPreviewUrl(null); sessionStorage.removeItem(`sku_preview_${skuId}`); } }, [activeImage?.imageUrl, activeImage?.thumbUrl, localPreviewUrl, skuId]); void { a: () => {
       setLocalPreviewUrl(null);
       sessionStorage.removeItem(`sku_preview_${skuId}`);
     }
@@ -817,21 +952,18 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
               {t("catalogue.images.settings_hint").text}
             </p>
             
-            <label className="catalogue-form-field">
-              <span className="catalogue-image-settings-label">
-                {t("catalogue.field.barcode").text}
-              </span>
-              <select 
-                value={barcode} 
-                onChange={(e) => setBarcode(e.target.value)}
-                className="catalogue-image-settings-select"
-              >
-                <option value="">{t("catalogue.field.choose").text}</option>
-                {(barcodes.data ?? []).filter(b => b.status === "ACTIVE").map((b) => (
-                  <option key={b.barcode} value={b.barcode}>{b.barcode}</option>
-                ))}
-              </select>
-            </label>
+            <CatalogueDropdown
+              label={t("catalogue.field.barcode").text}
+              value={barcode}
+              placeholder={t("catalogue.field.choose").text}
+              onChange={(val) => setBarcode(val)}
+              options={(barcodes.data ?? [])
+                .filter((b) => b.status === "ACTIVE")
+                .map((b) => ({
+                  value: b.barcode,
+                  label: b.barcode
+                }))}
+            />
         </div>
       )}
       

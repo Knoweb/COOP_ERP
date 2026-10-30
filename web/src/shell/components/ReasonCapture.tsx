@@ -1,5 +1,5 @@
-import { useState } from "react";
 import type { FormEvent } from "react";
+import { useState } from "react";
 import { useT } from "../i18n/useT";
 
 /**
@@ -47,6 +47,7 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
       <h2 id="reason-capture-title" className="reason-capture__title">
         {title}
       </h2>
+
       <label className="reason-capture__field">
         {t("shell.reason.code").text}
         <select value={code} onChange={(event) => setCode(event.target.value)} required>
@@ -58,10 +59,17 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
           ))}
         </select>
       </label>
+
       <label className="reason-capture__field">
         {t("shell.reason.text").text}
-        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={3} />
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          rows={1}
+          className="reason-capture__textarea"
+        />
       </label>
+
       <div className="reason-capture__actions">
         <button type="submit" className="approval-bar__button approval-bar__button--primary" disabled={pending || !code}>
           {t("shell.reason.confirm").text}

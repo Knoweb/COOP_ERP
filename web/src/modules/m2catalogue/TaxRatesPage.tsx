@@ -6,13 +6,13 @@ import { useT } from "../../shell/i18n/useT";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip, type ChipState } from "../../shell/components/StateChip";
-import { DropdownSelect } from "../../shell/components/DropdownSelect";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { useCatalogueApi, type TaxCategory, type TaxRate } from "./catalogueApi";
 import { errorText } from "./skuView";
-import "./catalogue.css";
+import { CatalogueDropdown } from "./CatalogueDropdown";
+
 
 export function TaxRatesPage() {
   const t = useT();
@@ -128,13 +128,25 @@ export function TaxRatesPage() {
 
   return (
     <main className="shell-page" id="tax-rates-page">
-      <Link className="back-link" to="/catalogue">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6" />
-          <path d="M9 12h10" />
-        </svg>
-        {t("catalogue.back").text}
-      </Link>
+      <div style={{ marginBottom: "var(--space-2)" }}>
+        <Link className="back-pill-btn" to="/catalogue">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("catalogue.back").text}
+        </Link>
+      </div>
 
       <PageHeader
         icon="catalogue"
@@ -228,22 +240,17 @@ export function TaxRatesPage() {
               {t("catalogue.tax.publish_rate").text}
             </h2>
             <form onSubmit={handlePublishRateSubmit} className="catalogue-form-row">
-              <label className="catalogue-form-field">
-                <span className="tax-field-required">{t("catalogue.tax.field.category").text} *</span>
-                <DropdownSelect
-                  id="publish-rate-category-select"
-                  value={rateTaxCategoryId}
-                  onChange={(val) => setRateTaxCategoryId(val)}
-                  placeholder={t("catalogue.field.choose").text}
-                  options={[
-                    { value: "", label: t("catalogue.field.choose").text },
-                    ...categories.map((cat: TaxCategory) => ({
-                      value: cat.taxCategoryId,
-                      label: `${cat.code} - ${cat.nameEn}`
-                    }))
-                  ]}
-                />
-              </label>
+              <CatalogueDropdown
+                label={t("catalogue.tax.field.category").text}
+                value={rateTaxCategoryId}
+                placeholder={t("catalogue.field.choose").text}
+                onChange={(val) => setRateTaxCategoryId(val)}
+                required
+                options={categories.map((cat: TaxCategory) => ({
+                  value: cat.taxCategoryId,
+                  label: `${cat.code} - ${cat.nameEn}`
+                }))}
+              />
 
               <label className="catalogue-form-field">
                 <span className="tax-field-required">{t("catalogue.tax.field.rate").text} *</span>
@@ -346,20 +353,17 @@ export function TaxRatesPage() {
             </p>
           </div>
 
-          <label className="catalogue-form-field tax-category-filter">
-            <DropdownSelect
-              id="filter-tax-rates-category-select"
+          <div className="tax-filter-dropdown-wrap">
+            <CatalogueDropdown
               value={selectedCategoryId}
+              placeholder={t("catalogue.tax.filter.all_categories").text}
               onChange={(val) => setSelectedCategoryId(val)}
-              options={[
-                { value: "", label: t("catalogue.tax.filter.all_categories").text },
-                ...categories.map((cat: TaxCategory) => ({
-                  value: cat.taxCategoryId,
-                  label: `${cat.code} - ${cat.nameEn}`
-                }))
-              ]}
+              options={categories.map((cat: TaxCategory) => ({
+                value: cat.taxCategoryId,
+                label: `${cat.code} - ${cat.nameEn}`
+              }))}
             />
-          </label>
+          </div>
         </div>
 
         {ratesQuery.isLoading && <p>{t("catalogue.loading").text}</p>}

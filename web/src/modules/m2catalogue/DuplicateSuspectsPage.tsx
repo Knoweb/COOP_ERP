@@ -8,7 +8,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi } from "./catalogueApi";
 import { errorText } from "./skuView";
-import "./catalogue.css";
+
 
 type FilterStatus = "OPEN" | "MERGED" | "DISMISSED";
 
@@ -61,10 +61,25 @@ export function DuplicateSuspectsPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/catalogue">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("catalogue.back").text}
-      </Link>
+      <div style={{ marginBottom: "var(--space-2)" }}>
+        <Link className="back-pill-btn" to="/catalogue">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("catalogue.back").text}
+        </Link>
+      </div>
 
       <PageHeader
         icon="catalogue"
@@ -73,14 +88,14 @@ export function DuplicateSuspectsPage() {
       <p className="catalogue-import-subtitle">{t("catalogue.suspects.description").text}</p>
 
       {/* Filter Tabs */}
-      <div className="import-tabs" role="tablist">
+      <div className="suspects-tabs" role="tablist">
         {(["OPEN", "MERGED", "DISMISSED"] as FilterStatus[]).map((st) => (
           <button
             key={st}
             type="button"
             role="tab"
             aria-selected={filter === st}
-            className={`import-tab ${filter === st ? "import-tab--active" : ""}`}
+            className={`suspects-tab ${filter === st ? "suspects-tab--active" : ""}`}
             onClick={() => {
               setFilter(st);
               setSuccessMsg("");
@@ -119,7 +134,9 @@ export function DuplicateSuspectsPage() {
                   <span className={`score-badge ${getScoreBadgeClass(suspect.score)}`}>
                     {(suspect.score * 100).toFixed(0)}% {t("catalogue.suspects.score").text}
                   </span>
-                  <span className="suspect-card__status">{suspect.status}</span>
+                  <span className={`suspect-card__status suspect-card__status--${suspect.status.toLowerCase()}`}>
+                    {suspect.status}
+                  </span>
                 </div>
 
                 <div className="suspect-card__comparison">
