@@ -317,7 +317,7 @@ export function NotificationsPage() {
         )}
         {log.data && log.data.length > 0 && (
           <div className="modern-table-card">
-            <div className="notification-log-scroll">
+            <div className="modern-table-scroll notification-log-scroll">
               <table className="modern-table notification-log-table">
                 <thead>
                   <tr>

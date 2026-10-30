@@ -234,9 +234,9 @@
 }
 
 .notification-log-scroll {
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   width: 100%;
-  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -374,92 +374,115 @@
 }
 
 /* Delivery Log Table */
+.shell-page .notification-log-table,
 .notification-log-table {
   width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  table-layout: auto;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
+.shell-page .notification-log-table th,
+.shell-page .notification-log-table td,
 .notification-log-table th,
 .notification-log-table td {
   padding: var(--space-2) var(--space-1);
   font-size: var(--font-size-xs);
   vertical-align: middle;
+  line-height: var(--line-height);
 }
 
+.shell-page .notification-log-table th:first-child,
+.shell-page .notification-log-table td:first-child,
 .notification-log-table th:first-child,
 .notification-log-table td:first-child {
   padding-left: var(--space-2);
 }
 
+.shell-page .notification-log-table th:last-child,
+.shell-page .notification-log-table td:last-child,
 .notification-log-table th:last-child,
 .notification-log-table td:last-child {
   padding-right: var(--space-2);
 }
 
-/* Col 1: When - shrink-wrap date without truncating */
+/* Col 1: When - tightly wrapped to date content without wasted space */
+.shell-page .notification-log-table th:nth-child(1),
+.shell-page .notification-log-table td:nth-child(1),
 .notification-log-table th:nth-child(1),
 .notification-log-table td:nth-child(1) {
   white-space: nowrap;
-  width: 1%;
+  width: calc(var(--space-8) + var(--space-6) + var(--space-2));
+  padding-right: var(--space-half);
 }
 
 /* Col 2: Template - natural clean wrapping */
+.shell-page .notification-log-table th:nth-child(2),
+.shell-page .notification-log-table td:nth-child(2),
+.notification-log-table th:nth-child(2),
 .notification-log-table td:nth-child(2) {
+  width: calc(var(--space-8) * 3);
   word-break: normal;
   overflow-wrap: break-word;
 }
 
 /* Col 3: Channel - shrink to badge */
+.shell-page .notification-log-table th:nth-child(3),
+.shell-page .notification-log-table td:nth-child(3),
 .notification-log-table th:nth-child(3),
 .notification-log-table td:nth-child(3) {
   white-space: nowrap;
-  width: 1%;
+  width: calc(var(--space-8) + var(--space-2));
 }
 
-/* Col 4: Recipient - balanced readable space for identity */
+/* Col 4: Recipient - balanced readable space for identity with clean wrapping */
+.shell-page .notification-log-table th:nth-child(4),
+.shell-page .notification-log-table td:nth-child(4),
 .notification-log-table th:nth-child(4),
 .notification-log-table td:nth-child(4) {
-  width: 22%;
-  min-width: calc(var(--space-8) * 2);
+  width: calc(var(--space-8) * 3 + var(--space-2));
   word-break: normal;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Col 5: Language - shrink to label */
+.shell-page .notification-log-table th:nth-child(5),
+.shell-page .notification-log-table td:nth-child(5),
 .notification-log-table th:nth-child(5),
 .notification-log-table td:nth-child(5) {
   white-space: nowrap;
-  width: 1%;
+  width: calc(var(--space-8) + var(--space-2));
 }
 
 /* Col 6: Status - shrink to chip */
+.shell-page .notification-log-table th:nth-child(6),
+.shell-page .notification-log-table td:nth-child(6),
 .notification-log-table th:nth-child(6),
 .notification-log-table td:nth-child(6) {
   white-space: nowrap;
-  width: 1%;
+  width: calc(var(--space-8) + var(--space-3));
 }
 
-/* Col 7: Attempts - tightly compact to header, extra space removed */
+/* Col 7: Attempts - tightly compact to header */
+.shell-page .notification-log-table th:nth-child(7),
+.shell-page .notification-log-table td:nth-child(7),
 .notification-log-table th:nth-child(7),
 .notification-log-table td:nth-child(7) {
   text-align: center;
   white-space: nowrap;
-  width: 1%;
+  width: calc(var(--space-8) + var(--space-1));
   padding-left: var(--space-half);
   padding-right: var(--space-half);
 }
 
-/* Col 8: Note - balanced compact note width */
+/* Col 8: Note - absorbs all remaining table space so When and compact columns never stretch */
+.shell-page .notification-log-table th:nth-child(8),
+.shell-page .notification-log-table td:nth-child(8),
 .notification-log-table th:nth-child(8),
 .notification-log-table td:nth-child(8) {
-  width: 18%;
-  min-width: calc(var(--space-8) * 1.8);
+  width: 100%;
   word-break: normal;
   overflow-wrap: break-word;
 }
-
 .integration-empty-card {
   padding: var(--space-4);
   text-align: center;
