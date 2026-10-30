@@ -49,11 +49,11 @@ include::module-m4trading.adoc[]
 plantuml::module-m6pos.puml[,,format=svg]
 include::module-m6pos.adoc[]
 
-== M8 Reporting Pipeline
-plantuml::module-m8reporting.puml[,,format=svg]
-include::module-m8reporting.adoc[]
-
 == Demo data
 plantuml::module-demo.puml[,,format=svg]
 include::module-demo.adoc[]
+
+== M8 Reporting Pipeline
+plantuml::module-m8reporting.puml[,,format=svg]
+include::module-m8reporting.adoc[]
 

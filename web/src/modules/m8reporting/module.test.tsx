@@ -5,7 +5,7 @@ import { reportingModule } from "./module";
 
 describe("the reporting routes", () => {
   it("protect each route with the appropriate permission requirement", () => {
-    expect(reportingModule.routes.length).toBe(8);
+    expect(reportingModule.routes.length).toBe(9);
     for (const route of reportingModule.routes) {
       expect(isValidElement(route.element) && route.element.type === RequirePermission, String(route.path)).toBe(true);
       const perms = (route.element as { props: { anyOf: string[] } }).props.anyOf;
@@ -22,12 +22,13 @@ describe("the reporting routes", () => {
   });
 
   it("show the menu entries only to users with the required permissions", () => {
-    expect(reportingModule.navItems.length).toBe(6);
+    expect(reportingModule.navItems.length).toBe(7);
     expect(reportingModule.navItems[0].requiredPermissions).toEqual(["rpt.report.run"]);
     expect(reportingModule.navItems[1].requiredPermissions).toEqual(["rpt.report.run"]);
     expect(reportingModule.navItems[2].requiredPermissions).toEqual(["rpt.profit_center.view"]);
     expect(reportingModule.navItems[3].requiredPermissions).toEqual(["rpt.asset.view"]);
     expect(reportingModule.navItems[4].requiredPermissions).toEqual(["rpt.target.view"]);
     expect(reportingModule.navItems[5].requiredPermissions).toEqual(["rpt.target.view"]);
+    expect(reportingModule.navItems[6].requiredPermissions).toEqual(["rpt.report.run"]);
   });
 });

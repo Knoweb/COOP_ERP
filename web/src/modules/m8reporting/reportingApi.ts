@@ -39,6 +39,17 @@ export type RevenueEstimateResponse = components["schemas"]["RevenueEstimateResp
 export type RevenueEstimateItemResponse = components["schemas"]["RevenueEstimateItemResponse"];
 export type RevenueEstimateAssumptions = components["schemas"]["RevenueEstimateAssumptions"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
+export type DebtorsReport = components["schemas"]["DebtorsReportResponse"];
+export type DebtorSummaryItem = components["schemas"]["DebtorSummaryItem"];
+export type CreditorsReport = components["schemas"]["CreditorsReportResponse"];
+export type CreditorSummaryItem = components["schemas"]["CreditorSummaryItem"];
+export type OpeningBalancesReport = components["schemas"]["OpeningBalancesReportResponse"];
+export type OpeningBalanceItem = components["schemas"]["OpeningBalanceItem"];
+export type GoodsSuppliedReport = components["schemas"]["GoodsSuppliedReportResponse"];
+export type GoodsSuppliedLineItem = components["schemas"]["GoodsSuppliedLineItem"];
+export type CreditVoucher = components["schemas"]["CreditVoucherResponse"];
+export type CreditVoucherLine = components["schemas"]["CreditVoucherLineResponse"];
+export type CreditVoucherPrint = components["schemas"]["CreditVoucherPrintResponse"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
 export type ReportQuery = { from?: string; to?: string; locationId?: string };
@@ -242,6 +253,90 @@ export function useReportingApi() {
         const { data } = await api.POST("/v1/reporting/revenue-estimates", {
           params: { header: { "Idempotency-Key": idempotencyKey } },
           body
+        });
+        return data!;
+      },
+
+      async listDebtorsReport(asOf?: string): Promise<DebtorsReport> {
+        const { data } = await api.GET("/v1/reporting/finance/debtors", {
+          params: { query: { asOf } }
+        });
+        return data!;
+      },
+
+      async exportDebtorsCsv(asOf?: string): Promise<string> {
+        const { data } = await api.GET("/v1/reporting/finance/debtors/csv", {
+          params: { query: { asOf } },
+          parseAs: "text"
+        });
+        return data as string;
+      },
+
+      async listCreditorsReport(asOf?: string): Promise<CreditorsReport> {
+        const { data } = await api.GET("/v1/reporting/finance/creditors", {
+          params: { query: { asOf } }
+        });
+        return data!;
+      },
+
+      async exportCreditorsCsv(asOf?: string): Promise<string> {
+        const { data } = await api.GET("/v1/reporting/finance/creditors/csv", {
+          params: { query: { asOf } },
+          parseAs: "text"
+        });
+        return data as string;
+      },
+
+      async listOpeningBalancesReport(counterpartyId?: string): Promise<OpeningBalancesReport> {
+        const { data } = await api.GET("/v1/reporting/finance/opening-balances", {
+          params: { query: { counterpartyId } }
+        });
+        return data!;
+      },
+
+      async exportOpeningBalancesCsv(counterpartyId?: string): Promise<string> {
+        const { data } = await api.GET("/v1/reporting/finance/opening-balances/csv", {
+          params: { query: { counterpartyId } },
+          parseAs: "text"
+        });
+        return data as string;
+      },
+
+      async getGoodsSuppliedReport(query?: {
+        from?: string;
+        to?: string;
+        societyId?: string;
+        locationId?: string;
+      }): Promise<GoodsSuppliedReport> {
+        const { data } = await api.GET("/v1/reporting/finance/goods-supplied", {
+          params: { query }
+        });
+        return data!;
+      },
+
+      async exportGoodsSuppliedCsv(query?: {
+        from?: string;
+        to?: string;
+        societyId?: string;
+        locationId?: string;
+      }): Promise<string> {
+        const { data } = await api.GET("/v1/reporting/finance/goods-supplied/csv", {
+          params: { query },
+          parseAs: "text"
+        });
+        return data as string;
+      },
+
+      async getCreditVoucher(invoiceId: string): Promise<CreditVoucher> {
+        const { data } = await api.GET("/v1/reporting/finance/credit-vouchers/{invoiceId}", {
+          params: { path: { invoiceId } }
+        });
+        return data!;
+      },
+
+      async printCreditVoucher(invoiceId: string): Promise<CreditVoucherPrint> {
+        const { data } = await api.GET("/v1/reporting/finance/credit-vouchers/{invoiceId}/print", {
+          params: { path: { invoiceId } }
         });
         return data!;
       }
