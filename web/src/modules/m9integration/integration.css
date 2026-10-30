@@ -7,24 +7,39 @@
 }
 
 .modern-filter-panel--notifications {
-  width: fit-content;
-  max-width: 100%;
   display: flex;
+  width: fit-content;
+  max-width: calc(var(--space-8) * 3 + var(--space-1));
   flex-direction: column;
   box-sizing: border-box;
-  padding: var(--space-3);
-  margin-bottom: var(--space-4);
+  gap: var(--space-half);
+  background: var(--color-polish-22);
+  padding: var(--space-1) calc(var(--space-1) + var(--space-half));
+  border-radius: calc(var(--radius) * 2.5);
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-23);
+  margin-bottom: var(--space-2);
+  border: var(--border-width) solid var(--color-polish-14);
 }
 
 .modern-filter-panel--notifications .modern-field--select {
-  width: calc(var(--space-8) * 3 + var(--space-4));
+  width: calc(var(--space-8) * 2 + var(--space-4) + var(--space-half));
   max-width: 100%;
+  gap: var(--space-half);
 }
 
-/* Custom Dropdown (White background, plum accents, NO ash gray) */
-.integration-custom-dropdown {
+.modern-filter-panel--notifications .modern-field__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+  line-height: var(--line-height);
+  text-transform: uppercase;
+}
+
+/* Custom Dropdown (Matching Users page filter style) */
+.modern-filter-panel--notifications .integration-custom-dropdown {
   position: relative;
   width: 100%;
+  max-width: calc(var(--space-8) * 2 + var(--space-4) + var(--space-half));
 }
 
 .integration-dropdown-trigger {
@@ -33,11 +48,11 @@
   justify-content: space-between;
   box-sizing: border-box;
   width: 100%;
-  min-height: calc(var(--space-4) + var(--space-1));
-  padding: var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: calc(var(--radius) * 2.5);
-  background-color: var(--color-polish-24);
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half));
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: calc(var(--radius) * 2);
+  background-color: var(--color-surface);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-sm);
@@ -52,7 +67,7 @@
 .integration-dropdown-trigger:hover,
 .integration-dropdown-trigger:focus,
 .integration-dropdown-trigger--open {
-  border-color: var(--color-polish-25);
+  border-color: var(--color-accent);
   background-color: var(--color-surface);
   box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
 }
@@ -60,7 +75,7 @@
 .integration-dropdown-arrow {
   width: var(--space-2);
   height: var(--space-2);
-  stroke: var(--color-polish-25);
+  stroke: var(--color-accent);
   fill: none;
   stroke-width: 2;
   stroke-linecap: round;
@@ -79,14 +94,14 @@
   top: calc(100% + var(--space-half));
   left: 0;
   width: 100%;
-  min-width: 100%;
+  min-width: calc(var(--space-8) * 2 + var(--space-4) + var(--space-half));
   box-sizing: border-box;
   padding: var(--space-half) 0;
   margin: 0;
   list-style: none;
   background-color: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
-  border-radius: calc(var(--radius) * 3);
+  border-radius: calc(var(--radius) * 2);
   box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23);
   z-index: 50;
   overflow: hidden;
@@ -100,7 +115,7 @@
   min-height: auto !important;
   min-width: auto !important;
   height: auto !important;
-  padding: var(--space-half) var(--space-2) !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
   background: none !important;
   border: none !important;
   border-radius: 0 !important;
@@ -240,39 +255,104 @@
   box-sizing: border-box;
 }
 
+.shell-page table.notification-rules-table,
+.shell-page .notification-rules-table,
 .notification-rules-table {
   width: 100%;
   min-width: calc(var(--space-8) * 8);
   table-layout: auto;
+  border-collapse: collapse !important;
 }
 
-.notification-rules-table th,
+.shell-page .notification-rules-table th,
+.notification-rules-table th {
+  padding: var(--space-2) var(--space-2) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+
+.shell-page .notification-rules-table td,
 .notification-rules-table td {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) !important;
+  font-size: var(--font-size-sm) !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
 }
 
+.shell-page .notification-rules-table th:first-child,
+.shell-page .notification-rules-table td:first-child,
 .notification-rules-table th:first-child,
 .notification-rules-table td:first-child {
-  padding-left: var(--space-3);
+  min-width: 0 !important;
+  padding-left: var(--space-3) !important;
 }
 
+.shell-page .notification-rules-table th:last-child,
+.shell-page .notification-rules-table td:last-child,
+.notification-rules-table th:last-child,
+.notification-rules-table td:last-child {
+  padding-right: var(--space-3) !important;
+  text-align: right;
+  white-space: nowrap !important;
+  width: 1%;
+}
+
+/* Col 1: Name */
+.shell-page .notification-rules-table th:nth-child(1),
+.shell-page .notification-rules-table td:nth-child(1),
 .notification-rules-table td:nth-child(1) {
   font-weight: var(--font-weight-strong);
   color: var(--color-polish-25);
-  word-break: break-word;
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0 !important;
 }
 
-.notification-rules-table td:nth-child(4),
-.notification-rules-table td:nth-child(5) {
-  white-space: nowrap;
+/* Col 2: Event */
+.shell-page .notification-rules-table th:nth-child(2),
+.shell-page .notification-rules-table td:nth-child(2),
+.notification-rules-table td:nth-child(2) {
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0 !important;
 }
 
-.notification-rules-table th:last-child,
-.notification-rules-table td:last-child {
-  text-align: right;
-  white-space: nowrap;
+/* Col 3: Audience */
+.shell-page .notification-rules-table th:nth-child(3),
+.shell-page .notification-rules-table td:nth-child(3),
+.notification-rules-table td:nth-child(3) {
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0 !important;
+}
+
+/* Col 4: Channels */
+.shell-page .notification-rules-table th:nth-child(4),
+.shell-page .notification-rules-table td:nth-child(4),
+.notification-rules-table td:nth-child(4) {
+  white-space: nowrap !important;
   width: 1%;
-  padding-right: var(--space-3);
+  min-width: 0 !important;
+}
+
+/* Col 5: Status */
+.shell-page .notification-rules-table th:nth-child(5),
+.shell-page .notification-rules-table td:nth-child(5),
+.notification-rules-table td:nth-child(5) {
+  white-space: nowrap !important;
+  width: 1%;
+  min-width: 0 !important;
+  text-align: center;
 }
 
 .notification-rule-btn {
@@ -374,112 +454,147 @@
 }
 
 /* Delivery Log Table */
+.shell-page table.notification-log-table,
 .shell-page .notification-log-table,
 .notification-log-table {
   width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
+  min-width: calc(var(--space-8) * 13 + var(--space-2));
+  table-layout: auto;
+  border-collapse: collapse !important;
 }
 
 .shell-page .notification-log-table th,
-.shell-page .notification-log-table td,
-.notification-log-table th,
-.notification-log-table td {
-  padding: var(--space-2) var(--space-1);
-  font-size: var(--font-size-xs);
+.notification-log-table th {
+  padding: var(--space-2) var(--space-1) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
   vertical-align: middle;
   line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+
+.shell-page .notification-log-table td,
+.notification-log-table td {
+  padding: var(--space-2) var(--space-1) !important;
+  font-size: var(--font-size-sm) !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
 }
 
 .shell-page .notification-log-table th:first-child,
 .shell-page .notification-log-table td:first-child,
 .notification-log-table th:first-child,
 .notification-log-table td:first-child {
-  padding-left: var(--space-2);
+  min-width: 0 !important;
+  padding-left: var(--space-2) !important;
 }
 
 .shell-page .notification-log-table th:last-child,
 .shell-page .notification-log-table td:last-child,
 .notification-log-table th:last-child,
 .notification-log-table td:last-child {
-  padding-right: var(--space-2);
+  padding-right: var(--space-2) !important;
 }
 
-/* Col 1: When - tightly wrapped to date content without wasted space */
+/* Col 1: When - shrink-to-fit timestamp with zero empty whitespace */
+.notification-log-table col.log-col-when,
+.notification-log-table th.log-col-when,
+.notification-log-table td.log-col-when,
 .shell-page .notification-log-table th:nth-child(1),
-.shell-page .notification-log-table td:nth-child(1),
-.notification-log-table th:nth-child(1),
-.notification-log-table td:nth-child(1) {
-  white-space: nowrap;
-  width: calc(var(--space-8) + var(--space-6) + var(--space-2));
-  padding-right: var(--space-half);
+.shell-page .notification-log-table td:nth-child(1) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  padding-right: var(--space-half) !important;
+  text-align: left !important;
 }
 
-/* Col 2: Template - natural clean wrapping */
+/* Col 2: Template - natural balanced width */
+.notification-log-table col.log-col-template,
+.notification-log-table th.log-col-template,
+.notification-log-table td.log-col-template,
 .shell-page .notification-log-table th:nth-child(2),
-.shell-page .notification-log-table td:nth-child(2),
-.notification-log-table th:nth-child(2),
-.notification-log-table td:nth-child(2) {
-  width: calc(var(--space-8) * 3);
+.shell-page .notification-log-table td:nth-child(2) {
+  width: calc(var(--space-8) * 2 + var(--space-4));
+  white-space: normal !important;
   word-break: normal;
   overflow-wrap: break-word;
 }
 
-/* Col 3: Channel - shrink to badge */
+/* Col 3: Channel - shrink-to-fit badge */
+.notification-log-table col.log-col-channel,
+.notification-log-table th.log-col-channel,
+.notification-log-table td.log-col-channel,
 .shell-page .notification-log-table th:nth-child(3),
-.shell-page .notification-log-table td:nth-child(3),
-.notification-log-table th:nth-child(3),
-.notification-log-table td:nth-child(3) {
-  white-space: nowrap;
-  width: calc(var(--space-8) + var(--space-2));
+.shell-page .notification-log-table td:nth-child(3) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  text-align: left;
 }
 
-/* Col 4: Recipient - balanced readable space for identity with clean wrapping */
+/* Col 4: Recipient - balanced comfortable width */
+.notification-log-table col.log-col-recipient,
+.notification-log-table th.log-col-recipient,
+.notification-log-table td.log-col-recipient,
 .shell-page .notification-log-table th:nth-child(4),
-.shell-page .notification-log-table td:nth-child(4),
-.notification-log-table th:nth-child(4),
-.notification-log-table td:nth-child(4) {
-  width: calc(var(--space-8) * 3 + var(--space-2));
+.shell-page .notification-log-table td:nth-child(4) {
+  width: calc(var(--space-8) * 3);
+  white-space: normal !important;
   word-break: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
-/* Col 5: Language - shrink to label */
+/* Col 5: Language - shrink-to-fit */
+.notification-log-table col.log-col-language,
+.notification-log-table th.log-col-language,
+.notification-log-table td.log-col-language,
 .shell-page .notification-log-table th:nth-child(5),
-.shell-page .notification-log-table td:nth-child(5),
-.notification-log-table th:nth-child(5),
-.notification-log-table td:nth-child(5) {
-  white-space: nowrap;
-  width: calc(var(--space-8) + var(--space-2));
+.shell-page .notification-log-table td:nth-child(5) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  text-align: left;
 }
 
-/* Col 6: Status - shrink to chip */
+/* Col 6: Status - shrink-to-fit chip */
+.notification-log-table col.log-col-status,
+.notification-log-table th.log-col-status,
+.notification-log-table td.log-col-status,
 .shell-page .notification-log-table th:nth-child(6),
-.shell-page .notification-log-table td:nth-child(6),
-.notification-log-table th:nth-child(6),
-.notification-log-table td:nth-child(6) {
-  white-space: nowrap;
-  width: calc(var(--space-8) + var(--space-3));
-}
-
-/* Col 7: Attempts - tightly compact to header */
-.shell-page .notification-log-table th:nth-child(7),
-.shell-page .notification-log-table td:nth-child(7),
-.notification-log-table th:nth-child(7),
-.notification-log-table td:nth-child(7) {
+.shell-page .notification-log-table td:nth-child(6) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
   text-align: center;
-  white-space: nowrap;
-  width: calc(var(--space-8) + var(--space-1));
-  padding-left: var(--space-half);
-  padding-right: var(--space-half);
 }
 
-/* Col 8: Note - absorbs all remaining table space so When and compact columns never stretch */
+/* Col 7: Attempts - shrink-to-fit count */
+.notification-log-table col.log-col-attempts,
+.notification-log-table th.log-col-attempts,
+.notification-log-table td.log-col-attempts,
+.shell-page .notification-log-table th:nth-child(7),
+.shell-page .notification-log-table td:nth-child(7) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  text-align: center;
+  padding-left: var(--space-half) !important;
+  padding-right: var(--space-half) !important;
+}
+
+/* Col 8: Note - balanced readable space */
+.notification-log-table col.log-col-note,
+.notification-log-table th.log-col-note,
+.notification-log-table td.log-col-note,
 .shell-page .notification-log-table th:nth-child(8),
-.shell-page .notification-log-table td:nth-child(8),
-.notification-log-table th:nth-child(8),
-.notification-log-table td:nth-child(8) {
-  width: 100%;
+.shell-page .notification-log-table td:nth-child(8) {
+  width: calc(var(--space-8) * 4);
+  white-space: normal !important;
   word-break: normal;
   overflow-wrap: break-word;
 }

@@ -319,31 +319,41 @@ export function NotificationsPage() {
           <div className="modern-table-card">
             <div className="modern-table-scroll notification-log-scroll">
               <table className="modern-table notification-log-table">
+              <colgroup>
+                <col className="log-col-when" />
+                <col className="log-col-template" />
+                <col className="log-col-channel" />
+                <col className="log-col-recipient" />
+                <col className="log-col-language" />
+                <col className="log-col-status" />
+                <col className="log-col-attempts" />
+                <col className="log-col-note" />
+              </colgroup>
                 <thead>
                   <tr>
-                    <th scope="col">{t("integration.log.col.when").text}</th>
-                    <th scope="col">{t("integration.log.col.template").text}</th>
-                    <th scope="col">{t("integration.log.col.channel").text}</th>
-                    <th scope="col">{t("integration.log.col.recipient").text}</th>
-                    <th scope="col">{t("integration.log.col.language").text}</th>
-                    <th scope="col">{t("integration.log.col.status").text}</th>
-                    <th scope="col" className="integration-number">{t("integration.log.col.attempts").text}</th>
-                    <th scope="col">{t("integration.log.col.note").text}</th>
+                    <th scope="col" className="log-col-when">{t("integration.log.col.when").text}</th>
+                    <th scope="col" className="log-col-template">{t("integration.log.col.template").text}</th>
+                    <th scope="col" className="log-col-channel">{t("integration.log.col.channel").text}</th>
+                    <th scope="col" className="log-col-recipient">{t("integration.log.col.recipient").text}</th>
+                    <th scope="col" className="log-col-language">{t("integration.log.col.language").text}</th>
+                    <th scope="col" className="log-col-status">{t("integration.log.col.status").text}</th>
+                    <th scope="col" className="integration-number log-col-attempts">{t("integration.log.col.attempts").text}</th>
+                    <th scope="col" className="log-col-note">{t("integration.log.col.note").text}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {log.data.map((entry) => (
                     <tr key={entry.notificationId}>
-                      <td>{formatInstant(entry.createdAt)}</td>
-                      <td title={entry.templateId ?? undefined}>{entry.templateId ? t(`integration.template.${entry.templateId}`, entry.templateId).text : ""}</td>
-                      <td>{t(`integration.channel.${entry.channel}`, entry.channel).text}</td>
-                      <td>{recipientText(entry)}</td>
-                      <td>{entry.language ? t(`integration.language.${entry.language}`, entry.language).text : ""}</td>
-                      <td>
+                      <td className="log-col-when">{formatInstant(entry.createdAt)}</td>
+                      <td className="log-col-template" title={entry.templateId ?? undefined}>{entry.templateId ? t(`integration.template.${entry.templateId}`, entry.templateId).text : ""}</td>
+                      <td className="log-col-channel">{t(`integration.channel.${entry.channel}`, entry.channel).text}</td>
+                      <td className="log-col-recipient">{recipientText(entry)}</td>
+                      <td className="log-col-language">{entry.language ? t(`integration.language.${entry.language}`, entry.language).text : ""}</td>
+                      <td className="log-col-status">
                         <StateChip state={LOG_LOOK[entry.status]} label={t(`integration.log.status.${entry.status}`).text} />
                       </td>
-                      <td className="integration-number">{entry.attempts}</td>
-                      <td>{noteText(entry)}</td>
+                      <td className="integration-number log-col-attempts">{entry.attempts}</td>
+                      <td className="log-col-note">{noteText(entry)}</td>
                     </tr>
                   ))}
                 </tbody>
