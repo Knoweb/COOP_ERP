@@ -284,7 +284,7 @@ function UserRoles({ userId, deactivated }: { userId: string; deactivated: boole
                     <td>
                       <button
                         type="button"
-                        className="modern-btn"
+                        className="modern-btn party-revoke-btn"
                         aria-label={t("party.roles.revoke.of", undefined, { role: roleLabel }).text}
                         onClick={() => {
                           setDone(null);
