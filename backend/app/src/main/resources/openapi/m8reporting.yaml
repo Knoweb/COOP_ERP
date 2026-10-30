@@ -466,8 +466,270 @@ paths:
           description: Scope forbidden
         '404':
           description: Asset not found in caller's permitted scope
+  /v1/reporting/revenue-estimates:
+    post:
+      tags: [Reporting]
+      operationId: estimateRevenue
+      summary: Calculate required stock quantities and revenue estimates for a target sales mix
+      description: >
+        Estimates required product quantities needed to achieve a target revenue amount using
+        a specified product/SKU mix and current effective/commercial selling prices resolved
+        from the pricing subsystem.
+        Codes this operation can answer with 422: m8.estimator.target_revenue_invalid,
+        m8.estimator.mix_empty, m8.estimator.duplicate_sku, m8.estimator.mix_must_equal_100,
+        m8.estimator.sku_not_found, m8.estimator.unresolved_price,
+        m8.estimator.location_required, m8.estimator.location_unknown.
+      x-permission: rpt.target.view
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevenueEstimateRequest' }
+      responses:
+        '200':
+          description: Revenue estimate and sales mix plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RevenueEstimateResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope or location forbidden
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/finance/debtors:
+    get:
+      tags: [Reporting]
+      operationId: listDebtorsReport
+      summary: Monthly debtor list of the caller's permitted scope
+      description: >
+        Lists active debtor exposures, open invoices, unapplied receipts and credits,
+        and net exposure for counterparties that buy from the caller's entity.
+      x-permission: rpt.report.run
+      parameters:
+        - $ref: '#/components/parameters/FinanceAsOf'
+      responses:
+        '200':
+          description: Debtors report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DebtorsReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/debtors/csv:
+    get:
+      tags: [Reporting]
+      operationId: exportDebtorsReportCsv
+      summary: Monthly debtor list as CSV
+      description: >
+        Exports the monthly debtor list as RFC 4180 CSV with sanitized formula cells.
+      x-permission: rpt.export.run
+      parameters:
+        - $ref: '#/components/parameters/FinanceAsOf'
+      responses:
+        '200':
+          description: Debtors CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/creditors:
+    get:
+      tags: [Reporting]
+      operationId: listCreditorsReport
+      summary: Monthly creditor list of the caller's permitted scope
+      description: >
+        Lists active creditor liabilities, open payables, unapplied payments and credits,
+        and net liability for suppliers the caller's entity buys from.
+      x-permission: rpt.report.run
+      parameters:
+        - $ref: '#/components/parameters/FinanceAsOf'
+      responses:
+        '200':
+          description: Creditors report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditorsReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/creditors/csv:
+    get:
+      tags: [Reporting]
+      operationId: exportCreditorsReportCsv
+      summary: Monthly creditor list as CSV
+      description: >
+        Exports the monthly creditor list as RFC 4180 CSV with sanitized formula cells.
+      x-permission: rpt.export.run
+      parameters:
+        - $ref: '#/components/parameters/FinanceAsOf'
+      responses:
+        '200':
+          description: Creditors CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/opening-balances:
+    get:
+      tags: [Reporting]
+      operationId: listOpeningBalancesReport
+      summary: Inter-entity opening balances list
+      description: >
+        Lists inter-entity opening receivable balances where the caller is seller or buyer.
+      x-permission: rpt.report.run
+      parameters:
+        - $ref: '#/components/parameters/FinanceCounterpartyId'
+      responses:
+        '200':
+          description: Opening balances report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalancesReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/opening-balances/csv:
+    get:
+      tags: [Reporting]
+      operationId: exportOpeningBalancesReportCsv
+      summary: Inter-entity opening balances list as CSV
+      description: >
+        Exports inter-entity opening balances as RFC 4180 CSV with sanitized formula cells.
+      x-permission: rpt.export.run
+      parameters:
+        - $ref: '#/components/parameters/FinanceCounterpartyId'
+      responses:
+        '200':
+          description: Opening balances CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/goods-supplied:
+    get:
+      tags: [Reporting]
+      operationId: getGoodsSuppliedReport
+      summary: Goods supplied summary
+      description: >
+        Daily or monthly summary of goods supplied across entities and locations with
+        quantities, unit prices, tax amounts, and line totals reconciling to source documents.
+      x-permission: rpt.report.run
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/FinanceSocietyId'
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '200':
+          description: Goods supplied report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoodsSuppliedReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/goods-supplied/csv:
+    get:
+      tags: [Reporting]
+      operationId: exportGoodsSuppliedReportCsv
+      summary: Goods supplied summary as CSV
+      description: >
+        Exports goods supplied summary as RFC 4180 CSV with sanitized formula cells.
+      x-permission: rpt.export.run
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/FinanceSocietyId'
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '200':
+          description: Goods supplied CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+  /v1/reporting/finance/credit-vouchers/{invoiceId}:
+    get:
+      tags: [Reporting]
+      operationId: getCreditVoucher
+      summary: Credit purchase voucher details
+      description: >
+        Returns printable credit-purchase voucher metadata and lines for a given invoice.
+        Codes this operation can answer with 404: m8.finance.invoice_not_found.
+      x-permission: rpt.report.run
+      parameters:
+        - $ref: '#/components/parameters/VoucherInvoiceId'
+      responses:
+        '200':
+          description: Credit voucher details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditVoucherResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+        '404':
+          description: Invoice not found in caller's permitted scope
+  /v1/reporting/finance/credit-vouchers/{invoiceId}/print:
+    get:
+      tags: [Reporting]
+      operationId: printCreditVoucher
+      summary: Printable A4 PDF for credit purchase voucher
+      description: >
+        Renders or returns a pre-signed link to a printable A4 credit-purchase voucher PDF.
+        Codes this operation can answer with 404: m8.finance.invoice_not_found.
+        Codes this operation can answer with 422: m8.finance.print_not_ready, report.renderer_unavailable.
+      x-permission: rpt.export.run
+      parameters:
+        - $ref: '#/components/parameters/VoucherInvoiceId'
+      responses:
+        '200':
+          description: Printable voucher URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditVoucherPrintResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+        '404':
+          description: Invoice not found in caller's permitted scope
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
+    FinanceAsOf:
+      in: query
+      name: asOf
+      required: false
+      description: Calculation date (defaults to current date)
+      schema: { type: string, format: date }
+    FinanceCounterpartyId:
+      in: query
+      name: counterpartyId
+      required: false
+      description: Filter by specific counterparty
+      schema: { type: string, format: uuid }
+    FinanceSocietyId:
+      in: query
+      name: societyId
+      required: false
+      description: Filter goods supplied by society / owner entity
+      schema: { type: string, format: uuid }
+    VoucherInvoiceId:
+      in: path
+      name: invoiceId
+      required: true
+      description: The trading tax invoice ID
+      schema: { type: string, format: uuid }
     ReportId:
       in: path
       name: reportId
@@ -925,3 +1187,346 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/AssetResponse' }
+    RevenueEstimateItemRequest:
+      type: object
+      required: [skuId, mixPercent]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        mixPercent:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+          description: Percentage share of revenue (e.g. 40.00)
+    RevenueEstimateRequest:
+      type: object
+      required: [targetRevenue, items]
+      properties:
+        targetRevenue:
+          type: string
+          pattern: '^-?[0-9]+(\.[0-9]{1,2})?$'
+          description: Target revenue in LKR
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Shop or location where prices are resolved
+        priceType:
+          type: string
+          enum: [RETAIL, COMMERCIAL]
+          default: RETAIL
+          nullable: true
+          description: Price resolution basis
+        businessDate:
+          type: string
+          format: date
+          nullable: true
+          description: Effective date for price resolution
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RevenueEstimateItemRequest' }
+    RevenueEstimateItemResponse:
+      type: object
+      required:
+        - skuId
+        - skuCode
+        - skuName
+        - uomCode
+        - unitPrice
+        - priceSource
+        - mixPercent
+        - targetShare
+        - rawQuantity
+        - roundedQuantity
+        - estimatedRevenue
+        - roundingVariance
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuName: { type: string }
+        uomCode: { type: string }
+        unitPrice: { type: string }
+        priceSource: { type: string }
+        mixPercent: { type: string }
+        targetShare: { type: string }
+        rawQuantity: { type: string }
+        roundedQuantity: { type: string }
+        estimatedRevenue: { type: string }
+        roundingVariance: { type: string }
+    RevenueEstimateAssumptions:
+      type: object
+      required:
+        - targetRevenue
+        - priceType
+        - businessDate
+        - roundingMethod
+        - priceResolutionPolicy
+      properties:
+        targetRevenue: { type: string }
+        locationId: { type: string, format: uuid, nullable: true }
+        priceType: { type: string }
+        businessDate: { type: string, format: date }
+        roundingMethod: { type: string }
+        priceResolutionPolicy: { type: string }
+    RevenueEstimateResponse:
+      type: object
+      required:
+        - targetRevenue
+        - totalEstimatedRevenue
+        - targetVariance
+        - totalMixPercent
+        - currency
+        - priceType
+        - businessDate
+        - items
+        - assumptions
+      properties:
+        targetRevenue: { type: string }
+        totalEstimatedRevenue: { type: string }
+        targetVariance: { type: string }
+        totalMixPercent: { type: string }
+        currency: { type: string }
+        locationId: { type: string, format: uuid, nullable: true }
+        priceType: { type: string }
+        businessDate: { type: string, format: date }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RevenueEstimateItemResponse' }
+        assumptions: { $ref: '#/components/schemas/RevenueEstimateAssumptions' }
+    DebtorSummaryItem:
+      type: object
+      required:
+        - counterpartyId
+        - counterpartyCode
+        - counterpartyName
+        - openInvoices
+        - acceptedNotInvoiced
+        - unappliedReceipts
+        - unappliedCredits
+        - netExposure
+      properties:
+        counterpartyId: { type: string, format: uuid }
+        counterpartyCode: { type: string }
+        counterpartyName: { type: string }
+        creditLimit: { type: string, nullable: true }
+        openInvoices: { type: string }
+        acceptedNotInvoiced: { type: string }
+        unappliedReceipts: { type: string }
+        unappliedCredits: { type: string }
+        netExposure: { type: string }
+        warnThresholdPercent: { type: integer, nullable: true }
+    DebtorsReportResponse:
+      type: object
+      required:
+        - asOf
+        - items
+        - totalOpenInvoices
+        - totalUnappliedReceipts
+        - totalUnappliedCredits
+        - totalNetExposure
+      properties:
+        asOf: { type: string, format: date }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DebtorSummaryItem' }
+        totalOpenInvoices: { type: string }
+        totalUnappliedReceipts: { type: string }
+        totalUnappliedCredits: { type: string }
+        totalNetExposure: { type: string }
+    CreditorSummaryItem:
+      type: object
+      required:
+        - counterpartyId
+        - counterpartyCode
+        - counterpartyName
+        - openInvoices
+        - acceptedNotInvoiced
+        - unappliedPayments
+        - unappliedCredits
+        - netLiability
+      properties:
+        counterpartyId: { type: string, format: uuid }
+        counterpartyCode: { type: string }
+        counterpartyName: { type: string }
+        openInvoices: { type: string }
+        acceptedNotInvoiced: { type: string }
+        unappliedPayments: { type: string }
+        unappliedCredits: { type: string }
+        netLiability: { type: string }
+    CreditorsReportResponse:
+      type: object
+      required:
+        - asOf
+        - items
+        - totalOpenInvoices
+        - totalUnappliedPayments
+        - totalUnappliedCredits
+        - totalNetLiability
+      properties:
+        asOf: { type: string, format: date }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CreditorSummaryItem' }
+        totalOpenInvoices: { type: string }
+        totalUnappliedPayments: { type: string }
+        totalUnappliedCredits: { type: string }
+        totalNetLiability: { type: string }
+    OpeningBalanceItem:
+      type: object
+      required:
+        - openingReceivableId
+        - docNumberDisplay
+        - counterpartyId
+        - counterpartyCode
+        - counterpartyName
+        - role
+        - amount
+        - createdAt
+      properties:
+        openingReceivableId: { type: string, format: uuid }
+        docNumberDisplay: { type: string }
+        counterpartyId: { type: string, format: uuid }
+        counterpartyCode: { type: string }
+        counterpartyName: { type: string }
+        role: { type: string }
+        amount: { type: string }
+        referenceNo: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        signedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    OpeningBalancesReportResponse:
+      type: object
+      required:
+        - items
+        - totalAmount
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OpeningBalanceItem' }
+        totalAmount: { type: string }
+    GoodsSuppliedLineItem:
+      type: object
+      required:
+        - invoiceId
+        - invoiceDocNumber
+        - invoiceDate
+        - societyEntityId
+        - societyName
+        - skuId
+        - skuCode
+        - skuName
+        - uomCode
+        - quantity
+        - unitPrice
+        - taxRatePercent
+        - taxAmount
+        - lineTotal
+      properties:
+        invoiceId: { type: string, format: uuid }
+        invoiceDocNumber: { type: string }
+        invoiceDate: { type: string, format: date }
+        societyEntityId: { type: string, format: uuid }
+        societyName: { type: string }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuName: { type: string }
+        uomCode: { type: string }
+        quantity: { type: string }
+        unitPrice: { type: string }
+        taxRatePercent: { type: string }
+        taxAmount: { type: string }
+        lineTotal: { type: string }
+    GoodsSuppliedReportResponse:
+      type: object
+      required:
+        - lines
+        - totalQuantity
+        - totalNetAmount
+        - totalTaxAmount
+        - totalGrossAmount
+        - lineCount
+      properties:
+        from: { type: string, format: date, nullable: true }
+        to: { type: string, format: date, nullable: true }
+        societyId: { type: string, format: uuid, nullable: true }
+        locationId: { type: string, format: uuid, nullable: true }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/GoodsSuppliedLineItem' }
+        totalQuantity: { type: string }
+        totalNetAmount: { type: string }
+        totalTaxAmount: { type: string }
+        totalGrossAmount: { type: string }
+        lineCount: { type: integer }
+    CreditVoucherLineResponse:
+      type: object
+      required:
+        - lineNo
+        - skuId
+        - skuCode
+        - skuName
+        - uomCode
+        - quantity
+        - unitPrice
+        - taxRatePercent
+        - taxAmount
+        - lineTotal
+      properties:
+        lineNo: { type: integer }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuName: { type: string }
+        uomCode: { type: string }
+        quantity: { type: string }
+        unitPrice: { type: string }
+        taxRatePercent: { type: string }
+        taxAmount: { type: string }
+        lineTotal: { type: string }
+    CreditVoucherResponse:
+      type: object
+      required:
+        - voucherNumber
+        - invoiceId
+        - invoiceDocNumber
+        - date
+        - buyerEntityId
+        - buyerName
+        - sellerEntityId
+        - sellerName
+        - sourceTransactionReference
+        - netAmount
+        - taxAmount
+        - grossAmount
+        - lines
+      properties:
+        voucherNumber: { type: string }
+        invoiceId: { type: string, format: uuid }
+        invoiceDocNumber: { type: string }
+        date: { type: string, format: date }
+        buyerEntityId: { type: string, format: uuid }
+        buyerName: { type: string }
+        buyerCode: { type: string, nullable: true }
+        sellerEntityId: { type: string, format: uuid }
+        sellerName: { type: string }
+        sellerCode: { type: string, nullable: true }
+        sellerVatNo: { type: string, nullable: true }
+        buyerVatNo: { type: string, nullable: true }
+        sourceTransactionReference: { type: string }
+        netAmount: { type: string }
+        taxAmount: { type: string }
+        grossAmount: { type: string }
+        status: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/CreditVoucherLineResponse' }
+    CreditVoucherPrintResponse:
+      type: object
+      required:
+        - invoiceId
+        - voucherNumber
+        - downloadUrl
+      properties:
+        invoiceId: { type: string, format: uuid }
+        voucherNumber: { type: string }
+        downloadUrl: { type: string, format: uri }

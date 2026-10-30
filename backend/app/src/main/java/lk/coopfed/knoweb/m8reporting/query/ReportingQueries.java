@@ -65,4 +65,29 @@ public interface ReportingQueries {
 
     /** Retrieve a single asset by ID in the caller's scope (Polgolla M1-04). */
     Optional<AssetView> getAsset(UUID assetId, ScopeContext scope);
+
+    /**
+     * Estimates required product quantities and sales mix to achieve a target revenue amount
+     * using effective selling prices resolved from the pricing subsystem (Polgolla M1-03).
+     */
+    RevenueEstimateResult estimateRevenue(RevenueEstimatePlan plan, ScopeContext scope);
+
+    /** Monthly debtor list for the caller's permitted scope (Polgolla M1-10). */
+    DebtorsReport debtorsReport(java.time.LocalDate asOf, ScopeContext scope);
+
+    /** Monthly creditor list for the caller's permitted scope (Polgolla M1-10). */
+    CreditorsReport creditorsReport(java.time.LocalDate asOf, ScopeContext scope);
+
+    /** Inter-entity opening balances list for the caller's entity (Polgolla M1-10). */
+    OpeningBalancesReport openingBalancesReport(UUID counterpartyId, ScopeContext scope);
+
+    /** Goods supplied summary across entities/locations (Polgolla M1-10). */
+    GoodsSuppliedReport goodsSuppliedReport(
+            java.time.LocalDate from, java.time.LocalDate to, UUID societyId, UUID locationId, ScopeContext scope);
+
+    /** Credit-purchase voucher details for an invoice (Polgolla M1-10). */
+    Optional<CreditVoucherView> getCreditVoucher(UUID invoiceId, ScopeContext scope);
+
+    /** Render or obtain pre-signed link to printable credit voucher A4 PDF (Polgolla M1-10). */
+    java.net.URI renderCreditVoucher(UUID invoiceId, ScopeContext scope);
 }

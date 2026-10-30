@@ -148,8 +148,8 @@ public class PriceListStore {
 
     /**
      * The version of a list in force on a date: the newest version, published or since superseded,
-     * whose apply_from is on or before the date. Without the closure of the previous version's
-     * lines (deferred for the demo), this is what keeps two versions from both answering.
+     * whose apply_from is on or before the date. Publication also closes the predecessor's
+     * line dates, while version selection preserves historical price resolution.
      */
     public Optional<PriceListView> versionInForce(UUID rootPriceListId, LocalDate date) {
         return jdbc

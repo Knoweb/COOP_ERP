@@ -69,6 +69,10 @@ public final class CustomersFixture {
         return ScopeContext.dev(null, SOCIETY, SHOP);
     }
 
+    public static ScopeContext till2() {
+        return ScopeContext.dev(null, SOCIETY, SHOP_2);
+    }
+
     public static void arrange(JdbcTemplate admin) {
         clean(admin);
         entity(admin, SOCIETY, SOCIETY_CODE);
@@ -102,6 +106,8 @@ public final class CustomersFixture {
             "customer_account",
             "customer_tag",
             "customer_consent",
+            "loyalty_permitted_location",
+            "loyalty_customer",
             "customer_phone",
             "customer"
         }) {

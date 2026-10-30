@@ -45,6 +45,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customers/loyalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register or enroll a customer in centralized loyalty with regional registration
+         * @description Enrolls an existing customer or registers a new member with centralized loyalty identity and regional registration details (PGL-M3-01). Preserves tenant and location scope isolation.
+         */
+        post: operations["registerLoyaltyCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Look up a centralized loyalty customer by phone, NIC, or customer ID across permitted branches */
+        get: operations["lookupLoyaltyCustomer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/eligibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check loyalty eligibility and tier for a customer at a specified branch/location */
+        get: operations["checkLoyaltyEligibility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/{customerId}/regional-registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Update regional registration details and permitted branch access */
+        put: operations["updateRegionalRegistration"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customers/{customerId}": {
         parameters: {
             query?: never;
@@ -819,6 +892,92 @@ export interface components {
             field: string;
             reason: string;
         };
+        RegisterLoyaltyCustomerRequest: {
+            /** Format: uuid */
+            customerId?: string | null;
+            displayName?: string | null;
+            displayNameSi?: string | null;
+            displayNameTa?: string | null;
+            language?: components["schemas"]["Language"];
+            phone?: string | null;
+            nic?: string | null;
+            /** Format: uuid */
+            registeredLocationId: string;
+            regionCode: string;
+            regionalMemberNo?: string | null;
+            /**
+             * @default STANDARD
+             * @enum {string}
+             */
+            loyaltyTier: "STANDARD" | "SILVER" | "GOLD" | "PLATINUM" | "MEMBER";
+            /** @default true */
+            allLocationsPermitted: boolean;
+            permittedLocationIds?: string[];
+            regionalAttributes?: {
+                [key: string]: string;
+            };
+        };
+        UpdateRegionalRegistrationRequest: {
+            /** Format: uuid */
+            registeredLocationId: string;
+            regionCode: string;
+            regionalMemberNo?: string | null;
+            /**
+             * @default STANDARD
+             * @enum {string}
+             */
+            loyaltyTier: "STANDARD" | "SILVER" | "GOLD" | "PLATINUM" | "MEMBER";
+            /**
+             * @default ACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "SUSPENDED" | "INACTIVE";
+            /** @default true */
+            allLocationsPermitted: boolean;
+            permittedLocationIds?: string[];
+            regionalAttributes?: {
+                [key: string]: string;
+            };
+        };
+        LoyaltyCustomerResponse: {
+            /** Format: uuid */
+            loyaltyId: string;
+            /** Format: uuid */
+            customerId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            displayName?: string | null;
+            displayNameSi?: string | null;
+            displayNameTa?: string | null;
+            phone?: string | null;
+            nicLast4?: string | null;
+            /** Format: uuid */
+            registeredLocationId: string;
+            regionCode: string;
+            regionalMemberNo?: string | null;
+            loyaltyTier: string;
+            status: string;
+            allLocationsPermitted: boolean;
+            permittedLocationIds?: string[];
+            regionalAttributes?: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            enrolledAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        LoyaltyEligibilityResponse: {
+            eligible: boolean;
+            status: string;
+            reason: string;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: uuid */
+            locationId?: string | null;
+            loyaltyTier?: string | null;
+            customer?: components["schemas"]["LoyaltyCustomerResponse"];
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -950,6 +1109,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkCustomerReport"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    registerLoyaltyCustomer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterLoyaltyCustomerRequest"];
+            };
+        };
+        responses: {
+            /** @description Enrolled in loyalty; the loyalty profile */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyCustomerResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    lookupLoyaltyCustomer: {
+        parameters: {
+            query?: {
+                phone?: string;
+                nic?: string;
+                customerId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The loyalty customer profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyCustomerResponse"];
+                };
+            };
+            /** @description Not found, or caller scope is not permitted to access this customer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    checkLoyaltyEligibility: {
+        parameters: {
+            query: {
+                identifier: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Eligibility evaluation result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyEligibilityResponse"];
+                };
+            };
+        };
+    };
+    updateRegionalRegistration: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRegionalRegistrationRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated regional registration; returns loyalty profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyCustomerResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

@@ -15,7 +15,12 @@
 * `l.c.k.k.api.Formats` (in Platform Kernel)
 * `l.c.k.m.query.CatalogueQueries` (in M2 Catalogue & Batch)
 * `l.c.k.m.query.InventoryQueries` (in M5 Inventory, Costing, Repack & Loss)
+* `l.c.k.m.query.PricingQueries` (in M3 Pricing & Rules)
+* `l.c.k.m.query.ExposureQueries` (in M4 Trading Documents)
+* `l.c.k.m.query.InvoiceQueries` (in M4 Trading Documents)
+* `l.c.k.m.query.OpeningReceivableQueries` (in M4 Trading Documents)
 * `l.c.k.k.api.A4Renderer` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
+* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 |===

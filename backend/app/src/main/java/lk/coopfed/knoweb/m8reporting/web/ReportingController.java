@@ -1,16 +1,20 @@
 package lk.coopfed.knoweb.m8reporting.web;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import lk.coopfed.knoweb.kernel.api.PermissionResolver;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m8reporting.api.CreateProfitCenter;
@@ -21,16 +25,28 @@ import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.api.UpdateShopTarget;
 import lk.coopfed.knoweb.m8reporting.query.AssetFilter;
 import lk.coopfed.knoweb.m8reporting.query.AssetView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherLineView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorsReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
+import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalanceItemView;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalancesReport;
 import lk.coopfed.knoweb.m8reporting.query.ProfitCenterView;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimatePlan;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimateResult;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
@@ -38,17 +54,28 @@ import lk.coopfed.knoweb.m8reporting.web.generated.AssetListResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.AssetResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateProfitCenterRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateShopTargetRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditVoucherLineResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditVoucherPrintResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditVoucherResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditorSummaryItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditorsReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardTile;
+import lk.coopfed.knoweb.m8reporting.web.generated.DebtorSummaryItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.DebtorsReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ExceptionItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.GoodsSuppliedLineItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.GoodsSuppliedReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyDailyTrendItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyProfitCenterPnlResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportSummary;
+import lk.coopfed.knoweb.m8reporting.web.generated.OpeningBalanceItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.OpeningBalancesReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterListResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlSummary;
@@ -60,12 +87,17 @@ import lk.coopfed.knoweb.m8reporting.web.generated.ReportDefinitionResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportRunResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportingApi;
 import lk.coopfed.knoweb.m8reporting.web.generated.RequestReportRunRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateAssumptions;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetPerformanceItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetPerformanceResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.TrendPoint;
 import lk.coopfed.knoweb.m8reporting.web.generated.UpdateShopTargetRequest;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -94,6 +126,8 @@ class ReportingController implements ReportingApi {
     private final Messages messages;
     private final ObjectProvider<A4Renderer> renderer;
     private final Clock clock;
+    private final PermissionResolver permissionResolver;
+    private final boolean enforcePermissions;
 
     ReportingController(
             ReportingQueries queries,
@@ -106,7 +140,9 @@ class ReportingController implements ReportingApi {
             Handles<RegisterAsset, UUID> registerAssetHandler,
             Messages messages,
             ObjectProvider<A4Renderer> renderer,
-            Clock clock) {
+            Clock clock,
+            PermissionResolver permissionResolver,
+            @Value("${coop-erp.security.enforce-permissions:true}") boolean enforcePermissions) {
         this.queries = queries;
         this.currentScope = currentScope;
         this.requestRun = requestRun;
@@ -118,6 +154,8 @@ class ReportingController implements ReportingApi {
         this.messages = messages;
         this.renderer = renderer;
         this.clock = clock;
+        this.permissionResolver = permissionResolver;
+        this.enforcePermissions = enforcePermissions;
     }
 
     @Override
@@ -700,5 +738,335 @@ class ReportingController implements ReportingApi {
             response.setAcquisitionCost(view.acquisitionCost().toPlainString());
         }
         return response;
+    }
+
+    @Override
+    public ResponseEntity<RevenueEstimateResponse> estimateRevenue(
+            String idempotencyKey, RevenueEstimateRequest request) {
+        ScopeContext scope = currentScope.get();
+        if (scope.policyClass() != PolicyClass.OWN || scope.userId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        if (enforcePermissions && !permissionResolver.allows(scope, "rpt.target.view")) {
+            throw new ProblemException("permission.denied", Map.of("permission", "rpt.target.view"));
+        }
+        if (request == null) {
+            throw new ProblemException("m8.estimator.mix_empty");
+        }
+        if (scope.locationId() != null
+                && request.getLocationId() != null
+                && !scope.locationId().equals(request.getLocationId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : request.getLocationId();
+
+        BigDecimal targetRevenue;
+        try {
+            targetRevenue = request.getTargetRevenue() != null ? new BigDecimal(request.getTargetRevenue()) : null;
+        } catch (NumberFormatException e) {
+            throw new ProblemException("m8.estimator.target_revenue_invalid");
+        }
+
+        List<RevenueEstimatePlan.MixItem> items = request.getItems() == null
+                ? List.of()
+                : request.getItems().stream()
+                        .map(i -> {
+                            BigDecimal mix;
+                            try {
+                                mix = i.getMixPercent() != null ? new BigDecimal(i.getMixPercent()) : null;
+                            } catch (NumberFormatException e) {
+                                throw new ProblemException("m8.estimator.mix_must_equal_100");
+                            }
+                            return new RevenueEstimatePlan.MixItem(i.getSkuId(), mix);
+                        })
+                        .toList();
+
+        RevenueEstimatePlan plan = new RevenueEstimatePlan(
+                targetRevenue,
+                effectiveLocationId,
+                request.getPriceType() != null ? request.getPriceType().toString() : "RETAIL",
+                request.getBusinessDate(),
+                items);
+
+        RevenueEstimateResult result = queries.estimateRevenue(plan, scope);
+        return ResponseEntity.ok(toResponse(result));
+    }
+
+    private static RevenueEstimateResponse toResponse(RevenueEstimateResult result) {
+        RevenueEstimateResponse response = new RevenueEstimateResponse();
+        response.setTargetRevenue(result.targetRevenue().toPlainString());
+        response.setTotalEstimatedRevenue(result.totalEstimatedRevenue().toPlainString());
+        response.setTargetVariance(result.targetVariance().toPlainString());
+        response.setTotalMixPercent(result.totalMixPercent().toPlainString());
+        response.setCurrency(result.currency());
+        response.setLocationId(result.locationId());
+        response.setPriceType(result.priceType());
+        response.setBusinessDate(result.businessDate());
+
+        List<RevenueEstimateItemResponse> itemDtos = result.items().stream()
+                .map(item -> {
+                    RevenueEstimateItemResponse dto = new RevenueEstimateItemResponse();
+                    dto.setSkuId(item.skuId());
+                    dto.setSkuCode(item.skuCode());
+                    dto.setSkuName(item.skuName());
+                    dto.setUomCode(item.uomCode());
+                    dto.setUnitPrice(item.unitPrice().toPlainString());
+                    dto.setPriceSource(item.priceSource());
+                    dto.setMixPercent(item.mixPercent().toPlainString());
+                    dto.setTargetShare(item.targetShare().toPlainString());
+                    dto.setRawQuantity(item.rawQuantity().toPlainString());
+                    dto.setRoundedQuantity(item.roundedQuantity().toPlainString());
+                    dto.setEstimatedRevenue(item.estimatedRevenue().toPlainString());
+                    dto.setRoundingVariance(item.roundingVariance().toPlainString());
+                    return dto;
+                })
+                .toList();
+        response.setItems(itemDtos);
+
+        RevenueEstimateAssumptions assumptionsDto = new RevenueEstimateAssumptions();
+        assumptionsDto.setTargetRevenue(result.assumptions().targetRevenue());
+        assumptionsDto.setLocationId(result.assumptions().locationId());
+        assumptionsDto.setPriceType(result.assumptions().priceType());
+        assumptionsDto.setBusinessDate(result.businessDate());
+        assumptionsDto.setRoundingMethod(result.assumptions().roundingMethod());
+        assumptionsDto.setPriceResolutionPolicy(result.assumptions().priceResolutionPolicy());
+        response.setAssumptions(assumptionsDto);
+
+        return response;
+    }
+
+    @Override
+    public ResponseEntity<DebtorsReportResponse> listDebtorsReport(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        DebtorsReport report = queries.debtorsReport(asOf, scope);
+        DebtorsReportResponse response = new DebtorsReportResponse(
+                report.asOf(),
+                report.items().stream()
+                        .map(ReportingController::toDebtorItemResponse)
+                        .toList(),
+                report.totalOpenInvoices().toPlainString(),
+                report.totalUnappliedReceipts().toPlainString(),
+                report.totalUnappliedCredits().toPlainString(),
+                report.totalNetExposure().toPlainString());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportDebtorsReportCsv(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        DebtorsReport report = queries.debtorsReport(asOf, scope);
+        String name = "debtors_" + (asOf != null ? asOf : report.asOf()) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeDebtors(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<CreditorsReportResponse> listCreditorsReport(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        CreditorsReport report = queries.creditorsReport(asOf, scope);
+        CreditorsReportResponse response = new CreditorsReportResponse(
+                report.asOf(),
+                report.items().stream()
+                        .map(ReportingController::toCreditorItemResponse)
+                        .toList(),
+                report.totalOpenInvoices().toPlainString(),
+                report.totalUnappliedPayments().toPlainString(),
+                report.totalUnappliedCredits().toPlainString(),
+                report.totalNetLiability().toPlainString());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportCreditorsReportCsv(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        CreditorsReport report = queries.creditorsReport(asOf, scope);
+        String name = "creditors_" + (asOf != null ? asOf : report.asOf()) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeCreditors(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<OpeningBalancesReportResponse> listOpeningBalancesReport(UUID counterpartyId) {
+        ScopeContext scope = currentScope.get();
+        OpeningBalancesReport report = queries.openingBalancesReport(counterpartyId, scope);
+        OpeningBalancesReportResponse response = new OpeningBalancesReportResponse(
+                report.items().stream()
+                        .map(ReportingController::toOpeningBalanceItemResponse)
+                        .toList(),
+                report.totalAmount().toPlainString());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportOpeningBalancesReportCsv(UUID counterpartyId) {
+        ScopeContext scope = currentScope.get();
+        OpeningBalancesReport report = queries.openingBalancesReport(counterpartyId, scope);
+        String name = "opening_balances" + (counterpartyId != null ? "_" + counterpartyId : "") + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeOpeningBalances(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<GoodsSuppliedReportResponse> getGoodsSuppliedReport(
+            LocalDate from, LocalDate to, UUID societyId, UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        GoodsSuppliedReport report = queries.goodsSuppliedReport(from, to, societyId, locationId, scope);
+        GoodsSuppliedReportResponse response = new GoodsSuppliedReportResponse(
+                report.lines().stream()
+                        .map(ReportingController::toGoodsSuppliedLineResponse)
+                        .toList(),
+                report.totalQuantity().toPlainString(),
+                report.totalNetAmount().toPlainString(),
+                report.totalTaxAmount().toPlainString(),
+                report.totalGrossAmount().toPlainString(),
+                report.lineCount());
+        response.setFrom(report.from());
+        response.setTo(report.to());
+        response.setSocietyId(report.societyId());
+        response.setLocationId(report.locationId());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportGoodsSuppliedReportCsv(
+            LocalDate from, LocalDate to, UUID societyId, UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        GoodsSuppliedReport report = queries.goodsSuppliedReport(from, to, societyId, locationId, scope);
+        String name = "goods_supplied" + (from != null ? "_" + from + "_" + to : "") + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeGoodsSupplied(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<CreditVoucherResponse> getCreditVoucher(UUID invoiceId) {
+        ScopeContext scope = currentScope.get();
+        CreditVoucherView voucher = queries.getCreditVoucher(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m8.finance.invoice_not_found"));
+        CreditVoucherResponse response = new CreditVoucherResponse(
+                voucher.voucherNumber(),
+                voucher.invoiceId(),
+                voucher.invoiceDocNumber(),
+                voucher.date(),
+                voucher.buyerEntityId(),
+                voucher.buyerName(),
+                voucher.sellerEntityId(),
+                voucher.sellerName(),
+                voucher.sourceTransactionReference(),
+                voucher.netAmount().toPlainString(),
+                voucher.taxAmount().toPlainString(),
+                voucher.grossAmount().toPlainString(),
+                voucher.lines().stream()
+                        .map(ReportingController::toCreditVoucherLineResponse)
+                        .toList());
+        response.setBuyerCode(voucher.buyerCode());
+        response.setSellerCode(voucher.sellerCode());
+        response.setSellerVatNo(voucher.sellerVatNo());
+        response.setBuyerVatNo(voucher.buyerVatNo());
+        response.setStatus(voucher.status());
+        response.setNotes(voucher.notes());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<CreditVoucherPrintResponse> printCreditVoucher(UUID invoiceId) {
+        ScopeContext scope = currentScope.get();
+        CreditVoucherView voucher = queries.getCreditVoucher(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m8.finance.invoice_not_found"));
+        URI url = queries.renderCreditVoucher(invoiceId, scope);
+        CreditVoucherPrintResponse response = new CreditVoucherPrintResponse(invoiceId, voucher.voucherNumber(), url);
+        return ResponseEntity.ok(response);
+    }
+
+    private static DebtorSummaryItem toDebtorItemResponse(DebtorSummaryItemView item) {
+        DebtorSummaryItem dto = new DebtorSummaryItem(
+                item.counterpartyId(),
+                item.counterpartyCode(),
+                item.counterpartyName(),
+                item.openInvoices().toPlainString(),
+                item.acceptedNotInvoiced().toPlainString(),
+                item.unappliedReceipts().toPlainString(),
+                item.unappliedCredits().toPlainString(),
+                item.netExposure().toPlainString());
+        if (item.creditLimit() != null) {
+            dto.setCreditLimit(item.creditLimit().toPlainString());
+        }
+        dto.setWarnThresholdPercent(item.warnThresholdPercent());
+        return dto;
+    }
+
+    private static CreditorSummaryItem toCreditorItemResponse(CreditorSummaryItemView item) {
+        return new CreditorSummaryItem(
+                item.counterpartyId(),
+                item.counterpartyCode(),
+                item.counterpartyName(),
+                item.openInvoices().toPlainString(),
+                item.acceptedNotInvoiced().toPlainString(),
+                item.unappliedPayments().toPlainString(),
+                item.unappliedCredits().toPlainString(),
+                item.netLiability().toPlainString());
+    }
+
+    private static OpeningBalanceItem toOpeningBalanceItemResponse(OpeningBalanceItemView item) {
+        OpeningBalanceItem dto = new OpeningBalanceItem(
+                item.openingReceivableId(),
+                item.docNumberDisplay(),
+                item.counterpartyId(),
+                item.counterpartyCode(),
+                item.counterpartyName(),
+                item.role(),
+                item.amount().toPlainString(),
+                item.createdAt());
+        dto.setReferenceNo(item.referenceNo());
+        dto.setNotes(item.notes());
+        dto.setSignedAt(item.signedAt());
+        return dto;
+    }
+
+    private static GoodsSuppliedLineItem toGoodsSuppliedLineResponse(GoodsSuppliedLineItemView line) {
+        return new GoodsSuppliedLineItem(
+                line.invoiceId(),
+                line.invoiceDocNumber(),
+                line.invoiceDate(),
+                line.societyEntityId(),
+                line.societyName(),
+                line.skuId(),
+                line.skuCode(),
+                line.skuName(),
+                line.uomCode(),
+                line.quantity().toPlainString(),
+                line.unitPrice().toPlainString(),
+                line.taxRatePercent().toPlainString(),
+                line.taxAmount().toPlainString(),
+                line.lineTotal().toPlainString());
+    }
+
+    private static CreditVoucherLineResponse toCreditVoucherLineResponse(CreditVoucherLineView line) {
+        return new CreditVoucherLineResponse(
+                line.lineNo(),
+                line.skuId(),
+                line.skuCode(),
+                line.skuName(),
+                line.uomCode(),
+                line.quantity().toPlainString(),
+                line.unitPrice().toPlainString(),
+                line.taxRatePercent().toPlainString(),
+                line.taxAmount().toPlainString(),
+                line.lineTotal().toPlainString());
     }
 }

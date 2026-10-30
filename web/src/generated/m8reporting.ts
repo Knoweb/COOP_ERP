@@ -331,6 +331,226 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/revenue-estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calculate required stock quantities and revenue estimates for a target sales mix
+         * @description Estimates required product quantities needed to achieve a target revenue amount using a specified product/SKU mix and current effective/commercial selling prices resolved from the pricing subsystem. Codes this operation can answer with 422: m8.estimator.target_revenue_invalid, m8.estimator.mix_empty, m8.estimator.duplicate_sku, m8.estimator.mix_must_equal_100, m8.estimator.sku_not_found, m8.estimator.unresolved_price, m8.estimator.location_required, m8.estimator.location_unknown.
+         */
+        post: operations["estimateRevenue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/debtors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly debtor list of the caller's permitted scope
+         * @description Lists active debtor exposures, open invoices, unapplied receipts and credits, and net exposure for counterparties that buy from the caller's entity.
+         */
+        get: operations["listDebtorsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/debtors/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly debtor list as CSV
+         * @description Exports the monthly debtor list as RFC 4180 CSV with sanitized formula cells.
+         */
+        get: operations["exportDebtorsReportCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/creditors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly creditor list of the caller's permitted scope
+         * @description Lists active creditor liabilities, open payables, unapplied payments and credits, and net liability for suppliers the caller's entity buys from.
+         */
+        get: operations["listCreditorsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/creditors/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly creditor list as CSV
+         * @description Exports the monthly creditor list as RFC 4180 CSV with sanitized formula cells.
+         */
+        get: operations["exportCreditorsReportCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/opening-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inter-entity opening balances list
+         * @description Lists inter-entity opening receivable balances where the caller is seller or buyer.
+         */
+        get: operations["listOpeningBalancesReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/opening-balances/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inter-entity opening balances list as CSV
+         * @description Exports inter-entity opening balances as RFC 4180 CSV with sanitized formula cells.
+         */
+        get: operations["exportOpeningBalancesReportCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/goods-supplied": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Goods supplied summary
+         * @description Daily or monthly summary of goods supplied across entities and locations with quantities, unit prices, tax amounts, and line totals reconciling to source documents.
+         */
+        get: operations["getGoodsSuppliedReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/goods-supplied/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Goods supplied summary as CSV
+         * @description Exports goods supplied summary as RFC 4180 CSV with sanitized formula cells.
+         */
+        get: operations["exportGoodsSuppliedReportCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/credit-vouchers/{invoiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Credit purchase voucher details
+         * @description Returns printable credit-purchase voucher metadata and lines for a given invoice. Codes this operation can answer with 404: m8.finance.invoice_not_found.
+         */
+        get: operations["getCreditVoucher"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/finance/credit-vouchers/{invoiceId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Printable A4 PDF for credit purchase voucher
+         * @description Renders or returns a pre-signed link to a printable A4 credit-purchase voucher PDF. Codes this operation can answer with 404: m8.finance.invoice_not_found. Codes this operation can answer with 422: m8.finance.print_not_ready, report.renderer_unavailable.
+         */
+        get: operations["printCreditVoucher"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -701,6 +921,216 @@ export interface components {
         AssetListResponse: {
             items: components["schemas"]["AssetResponse"][];
         };
+        RevenueEstimateItemRequest: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Percentage share of revenue (e.g. 40.00) */
+            mixPercent: string;
+        };
+        RevenueEstimateRequest: {
+            /** @description Target revenue in LKR */
+            targetRevenue: string;
+            /**
+             * Format: uuid
+             * @description Shop or location where prices are resolved
+             */
+            locationId?: string | null;
+            /**
+             * @description Price resolution basis
+             * @default RETAIL
+             * @enum {string|null}
+             */
+            priceType: "RETAIL" | "COMMERCIAL" | null;
+            /**
+             * Format: date
+             * @description Effective date for price resolution
+             */
+            businessDate?: string | null;
+            items: components["schemas"]["RevenueEstimateItemRequest"][];
+        };
+        RevenueEstimateItemResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            uomCode: string;
+            unitPrice: string;
+            priceSource: string;
+            mixPercent: string;
+            targetShare: string;
+            rawQuantity: string;
+            roundedQuantity: string;
+            estimatedRevenue: string;
+            roundingVariance: string;
+        };
+        RevenueEstimateAssumptions: {
+            targetRevenue: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            priceType: string;
+            /** Format: date */
+            businessDate: string;
+            roundingMethod: string;
+            priceResolutionPolicy: string;
+        };
+        RevenueEstimateResponse: {
+            targetRevenue: string;
+            totalEstimatedRevenue: string;
+            targetVariance: string;
+            totalMixPercent: string;
+            currency: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            priceType: string;
+            /** Format: date */
+            businessDate: string;
+            items: components["schemas"]["RevenueEstimateItemResponse"][];
+            assumptions: components["schemas"]["RevenueEstimateAssumptions"];
+        };
+        DebtorSummaryItem: {
+            /** Format: uuid */
+            counterpartyId: string;
+            counterpartyCode: string;
+            counterpartyName: string;
+            creditLimit?: string | null;
+            openInvoices: string;
+            acceptedNotInvoiced: string;
+            unappliedReceipts: string;
+            unappliedCredits: string;
+            netExposure: string;
+            warnThresholdPercent?: number | null;
+        };
+        DebtorsReportResponse: {
+            /** Format: date */
+            asOf: string;
+            items: components["schemas"]["DebtorSummaryItem"][];
+            totalOpenInvoices: string;
+            totalUnappliedReceipts: string;
+            totalUnappliedCredits: string;
+            totalNetExposure: string;
+        };
+        CreditorSummaryItem: {
+            /** Format: uuid */
+            counterpartyId: string;
+            counterpartyCode: string;
+            counterpartyName: string;
+            openInvoices: string;
+            acceptedNotInvoiced: string;
+            unappliedPayments: string;
+            unappliedCredits: string;
+            netLiability: string;
+        };
+        CreditorsReportResponse: {
+            /** Format: date */
+            asOf: string;
+            items: components["schemas"]["CreditorSummaryItem"][];
+            totalOpenInvoices: string;
+            totalUnappliedPayments: string;
+            totalUnappliedCredits: string;
+            totalNetLiability: string;
+        };
+        OpeningBalanceItem: {
+            /** Format: uuid */
+            openingReceivableId: string;
+            docNumberDisplay: string;
+            /** Format: uuid */
+            counterpartyId: string;
+            counterpartyCode: string;
+            counterpartyName: string;
+            role: string;
+            amount: string;
+            referenceNo?: string | null;
+            notes?: string | null;
+            /** Format: date-time */
+            signedAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        OpeningBalancesReportResponse: {
+            items: components["schemas"]["OpeningBalanceItem"][];
+            totalAmount: string;
+        };
+        GoodsSuppliedLineItem: {
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceDocNumber: string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: uuid */
+            societyEntityId: string;
+            societyName: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            uomCode: string;
+            quantity: string;
+            unitPrice: string;
+            taxRatePercent: string;
+            taxAmount: string;
+            lineTotal: string;
+        };
+        GoodsSuppliedReportResponse: {
+            /** Format: date */
+            from?: string | null;
+            /** Format: date */
+            to?: string | null;
+            /** Format: uuid */
+            societyId?: string | null;
+            /** Format: uuid */
+            locationId?: string | null;
+            lines: components["schemas"]["GoodsSuppliedLineItem"][];
+            totalQuantity: string;
+            totalNetAmount: string;
+            totalTaxAmount: string;
+            totalGrossAmount: string;
+            lineCount: number;
+        };
+        CreditVoucherLineResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            uomCode: string;
+            quantity: string;
+            unitPrice: string;
+            taxRatePercent: string;
+            taxAmount: string;
+            lineTotal: string;
+        };
+        CreditVoucherResponse: {
+            voucherNumber: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceDocNumber: string;
+            /** Format: date */
+            date: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            buyerName: string;
+            buyerCode?: string | null;
+            /** Format: uuid */
+            sellerEntityId: string;
+            sellerName: string;
+            sellerCode?: string | null;
+            sellerVatNo?: string | null;
+            buyerVatNo?: string | null;
+            sourceTransactionReference: string;
+            netAmount: string;
+            taxAmount: string;
+            grossAmount: string;
+            status?: string | null;
+            notes?: string | null;
+            lines: components["schemas"]["CreditVoucherLineResponse"][];
+        };
+        CreditVoucherPrintResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            voucherNumber: string;
+            /** Format: uri */
+            downloadUrl: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -747,6 +1177,14 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Calculation date (defaults to current date) */
+        FinanceAsOf: string;
+        /** @description Filter by specific counterparty */
+        FinanceCounterpartyId: string;
+        /** @description Filter goods supplied by society / owner entity */
+        FinanceSocietyId: string;
+        /** @description The trading tax invoice ID */
+        VoucherInvoiceId: string;
         ReportId: string;
         /** @description The first day of the period (period reports) */
         From: string;
@@ -1377,6 +1815,379 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    estimateRevenue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevenueEstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Revenue estimate and sales mix plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevenueEstimateResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope or location forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDebtorsReport: {
+        parameters: {
+            query?: {
+                /** @description Calculation date (defaults to current date) */
+                asOf?: components["parameters"]["FinanceAsOf"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Debtors report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebtorsReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exportDebtorsReportCsv: {
+        parameters: {
+            query?: {
+                /** @description Calculation date (defaults to current date) */
+                asOf?: components["parameters"]["FinanceAsOf"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Debtors CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listCreditorsReport: {
+        parameters: {
+            query?: {
+                /** @description Calculation date (defaults to current date) */
+                asOf?: components["parameters"]["FinanceAsOf"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Creditors report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditorsReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exportCreditorsReportCsv: {
+        parameters: {
+            query?: {
+                /** @description Calculation date (defaults to current date) */
+                asOf?: components["parameters"]["FinanceAsOf"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Creditors CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listOpeningBalancesReport: {
+        parameters: {
+            query?: {
+                /** @description Filter by specific counterparty */
+                counterpartyId?: components["parameters"]["FinanceCounterpartyId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Opening balances report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalancesReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exportOpeningBalancesReportCsv: {
+        parameters: {
+            query?: {
+                /** @description Filter by specific counterparty */
+                counterpartyId?: components["parameters"]["FinanceCounterpartyId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Opening balances CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getGoodsSuppliedReport: {
+        parameters: {
+            query?: {
+                /** @description The first day of the period (period reports) */
+                from?: components["parameters"]["From"];
+                /** @description The last day of the period (period reports) */
+                to?: components["parameters"]["To"];
+                /** @description Filter goods supplied by society / owner entity */
+                societyId?: components["parameters"]["FinanceSocietyId"];
+                /** @description One location (the stock position); all the caller reads when absent */
+                locationId?: components["parameters"]["LocationId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Goods supplied report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsSuppliedReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exportGoodsSuppliedReportCsv: {
+        parameters: {
+            query?: {
+                /** @description The first day of the period (period reports) */
+                from?: components["parameters"]["From"];
+                /** @description The last day of the period (period reports) */
+                to?: components["parameters"]["To"];
+                /** @description Filter goods supplied by society / owner entity */
+                societyId?: components["parameters"]["FinanceSocietyId"];
+                /** @description One location (the stock position); all the caller reads when absent */
+                locationId?: components["parameters"]["LocationId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Goods supplied CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getCreditVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The trading tax invoice ID */
+                invoiceId: components["parameters"]["VoucherInvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credit voucher details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditVoucherResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invoice not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    printCreditVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The trading tax invoice ID */
+                invoiceId: components["parameters"]["VoucherInvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Printable voucher URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditVoucherPrintResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invoice not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
         };
     };
 }

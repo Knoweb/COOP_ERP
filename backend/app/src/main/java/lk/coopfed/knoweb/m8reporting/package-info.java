@@ -9,5 +9,13 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M8 Reporting Pipeline",
-        allowedDependencies = {"kernel", "kernel::api", "m1party::query", "m2catalogue::query", "m5inventory::query"})
+        allowedDependencies = {
+            "kernel",
+            "kernel::api",
+            "m1party::query",
+            "m2catalogue::query",
+            "m3pricing::query",
+            "m4trading::query",
+            "m5inventory::query"
+        })
 package lk.coopfed.knoweb.m8reporting;

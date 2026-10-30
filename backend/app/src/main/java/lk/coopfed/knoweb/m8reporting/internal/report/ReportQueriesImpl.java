@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m8reporting.internal.report;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -11,18 +12,23 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.Formats;
+import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -30,6 +36,16 @@ import lk.coopfed.knoweb.m1party.query.LocationFilter;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.SkuView;
+import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
+import lk.coopfed.knoweb.m4trading.query.ExposureView;
+import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
+import lk.coopfed.knoweb.m4trading.query.InvoiceView;
+import lk.coopfed.knoweb.m4trading.query.OpeningReceivableQueries;
+import lk.coopfed.knoweb.m4trading.query.OpeningReceivableView;
+import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
@@ -37,16 +53,26 @@ import lk.coopfed.knoweb.m8reporting.internal.report.ReportCatalogue.Definition;
 import lk.coopfed.knoweb.m8reporting.internal.report.TileCatalogue.TileDefinition;
 import lk.coopfed.knoweb.m8reporting.query.AssetFilter;
 import lk.coopfed.knoweb.m8reporting.query.AssetView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherLineView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorsReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
+import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyDailyTrendItem;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportSummary;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalanceItemView;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalancesReport;
 import lk.coopfed.knoweb.m8reporting.query.ProfitCenterPnlItem;
 import lk.coopfed.knoweb.m8reporting.query.ProfitCenterView;
 import lk.coopfed.knoweb.m8reporting.query.ReportDefinitionView;
@@ -55,11 +81,14 @@ import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimatePlan;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimateResult;
 import lk.coopfed.knoweb.m8reporting.query.ShopPerformanceState;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceRow;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -104,6 +133,13 @@ class ReportQueriesImpl implements ReportingQueries {
     private final Clock clock;
     private final ZoneId zone;
     private final InventoryQueries inventoryQueries;
+    private final PricingQueries pricing;
+    private final ExposureQueries exposureQueries;
+    private final InvoiceQueries invoiceQueries;
+    private final OpeningReceivableQueries openingReceivableQueries;
+    private final Formats formats;
+    private final Messages messages;
+    private final ObjectProvider<A4Renderer> a4RendererProvider;
 
     /**
      * What a dashboard depends on: the caller's whole visibility, as the policies of M8 read it
@@ -140,7 +176,14 @@ class ReportQueriesImpl implements ReportingQueries {
             ConfigRegistry config,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String zone,
-            InventoryQueries inventoryQueries) {
+            InventoryQueries inventoryQueries,
+            PricingQueries pricing,
+            ExposureQueries exposureQueries,
+            InvoiceQueries invoiceQueries,
+            OpeningReceivableQueries openingReceivableQueries,
+            Formats formats,
+            Messages messages,
+            ObjectProvider<A4Renderer> a4RendererProvider) {
         this.jdbc = jdbc;
         this.party = party;
         this.catalogue = catalogue;
@@ -153,6 +196,13 @@ class ReportQueriesImpl implements ReportingQueries {
         this.clock = clock;
         this.zone = ZoneId.of(zone);
         this.inventoryQueries = inventoryQueries;
+        this.pricing = pricing;
+        this.exposureQueries = exposureQueries;
+        this.invoiceQueries = invoiceQueries;
+        this.openingReceivableQueries = openingReceivableQueries;
+        this.formats = formats;
+        this.messages = messages;
+        this.a4RendererProvider = a4RendererProvider;
     }
 
     @Override
@@ -1259,5 +1309,580 @@ class ReportQueriesImpl implements ReportingQueries {
                 },
                 assetId);
         return found.isEmpty() ? Optional.empty() : Optional.of(found.get(0));
+    }
+
+    @Override
+    public RevenueEstimateResult estimateRevenue(RevenueEstimatePlan plan, ScopeContext scope) {
+        if (scope.policyClass() == PolicyClass.NONE) {
+            throw new ProblemException("permission.denied");
+        }
+        if (plan.targetRevenue() == null || plan.targetRevenue().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ProblemException("m8.estimator.target_revenue_invalid");
+        }
+        if (plan.items() == null || plan.items().isEmpty()) {
+            throw new ProblemException("m8.estimator.mix_empty");
+        }
+
+        Set<UUID> seenSkus = new HashSet<>();
+        for (RevenueEstimatePlan.MixItem item : plan.items()) {
+            if (item.skuId() == null || !seenSkus.add(item.skuId())) {
+                throw new ProblemException("m8.estimator.duplicate_sku");
+            }
+            if (item.mixPercent() == null || item.mixPercent().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ProblemException("m8.estimator.mix_must_equal_100");
+            }
+        }
+
+        BigDecimal totalMix = plan.items().stream()
+                .map(RevenueEstimatePlan.MixItem::mixPercent)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        if (totalMix.compareTo(new BigDecimal("100.00")) != 0) {
+            throw new ProblemException("m8.estimator.mix_must_equal_100");
+        }
+
+        UUID locationId = plan.locationId();
+        if (scope.locationId() != null) {
+            if (locationId != null && !scope.locationId().equals(locationId)) {
+                throw new ProblemException("m8.estimator.location_forbidden");
+            }
+            locationId = scope.locationId();
+        }
+        if (locationId == null) {
+            throw new ProblemException("m8.estimator.location_required");
+        }
+
+        Optional<LocationView> locOpt = party.getLocation(locationId, scope);
+        if (locOpt.isEmpty()) {
+            throw new ProblemException("m8.estimator.location_unknown");
+        }
+
+        LocalDate businessDate =
+                plan.businessDate() != null ? plan.businessDate() : LocalDate.now(clock.withZone(zone));
+        String priceType = "COMMERCIAL".equalsIgnoreCase(plan.priceType()) ? "COMMERCIAL" : "RETAIL";
+
+        List<RevenueEstimateResult.EstimatedItem> calculatedItems = new ArrayList<>();
+        BigDecimal totalEstimatedRevenue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        Names names = new Names(party, catalogue, scope);
+
+        for (RevenueEstimatePlan.MixItem item : plan.items()) {
+            Optional<SkuView> skuOpt = catalogue.getSku(item.skuId(), scope);
+            if (skuOpt.isEmpty() || "INACTIVE".equalsIgnoreCase(skuOpt.get().status())) {
+                throw new ProblemException(
+                        "m8.estimator.sku_not_found",
+                        Map.of("skuId", item.skuId().toString()));
+            }
+            SkuView sku = skuOpt.get();
+
+            Optional<RetailPrice> priceOpt;
+            if ("COMMERCIAL".equals(priceType)) {
+                priceOpt = pricing.resolveCommercialPrice(
+                        locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, businessDate, scope);
+            } else {
+                priceOpt = pricing.resolveRetailPrice(
+                        locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, businessDate, scope);
+            }
+
+            if (priceOpt.isEmpty()
+                    || !priceOpt.get().sellable()
+                    || priceOpt.get().unitPrice() == null
+                    || priceOpt.get().unitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ProblemException(
+                        "m8.estimator.unresolved_price",
+                        Map.of("skuId", item.skuId().toString(), "skuCode", sku.skuCode()));
+            }
+
+            RetailPrice resolved = priceOpt.get();
+            BigDecimal unitPrice = resolved.unitPrice().setScale(4, RoundingMode.HALF_UP);
+
+            BigDecimal targetShare = plan.targetRevenue()
+                    .multiply(item.mixPercent())
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+            BigDecimal rawQty = targetShare.divide(unitPrice, 4, RoundingMode.HALF_UP);
+
+            BigDecimal roundedQty;
+            if (sku.soldByWeight()) {
+                roundedQty = rawQty.setScale(3, RoundingMode.HALF_UP);
+            } else {
+                roundedQty = rawQty.setScale(0, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal estimatedRevenue = roundedQty.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal roundingVariance = estimatedRevenue.subtract(targetShare).setScale(2, RoundingMode.HALF_UP);
+
+            totalEstimatedRevenue = totalEstimatedRevenue.add(estimatedRevenue);
+
+            String skuName = names.skuName(sku.skuId());
+            String priceSource = resolved.capReason() != null ? resolved.capReason() : priceType;
+
+            calculatedItems.add(new RevenueEstimateResult.EstimatedItem(
+                    sku.skuId(),
+                    sku.skuCode(),
+                    skuName,
+                    sku.baseUomCode(),
+                    unitPrice,
+                    priceSource,
+                    item.mixPercent().setScale(2, RoundingMode.HALF_UP),
+                    targetShare,
+                    rawQty,
+                    roundedQty,
+                    estimatedRevenue,
+                    roundingVariance));
+        }
+
+        BigDecimal targetVariance =
+                totalEstimatedRevenue.subtract(plan.targetRevenue().setScale(2, RoundingMode.HALF_UP));
+
+        RevenueEstimateResult.Assumptions assumptions = new RevenueEstimateResult.Assumptions(
+                plan.targetRevenue().setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                locationId,
+                priceType,
+                businessDate.toString(),
+                "HALF_UP to unit precision (discrete items: integer, weighted items: 3 decimals)",
+                "COMMERCIAL".equals(priceType)
+                        ? "Commercial list in force with retail fallback, bounded by MRP and control price"
+                        : "Retail list in force, bounded by in-stock MRP and control price");
+
+        return new RevenueEstimateResult(
+                plan.targetRevenue().setScale(2, RoundingMode.HALF_UP),
+                totalEstimatedRevenue,
+                targetVariance,
+                totalMix,
+                "LKR",
+                locationId,
+                priceType,
+                businessDate,
+                calculatedItems,
+                assumptions);
+    }
+
+    @Override
+    public DebtorsReport debtorsReport(LocalDate asOf, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new DebtorsReport(
+                    asOf != null ? asOf : today(),
+                    List.of(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+        }
+        LocalDate date = asOf != null ? asOf : today();
+        List<ExposureView> exposures = exposureQueries.listExposures(OrderQueries.Role.SELLER, scope);
+        List<DebtorSummaryItemView> items = new ArrayList<>();
+        BigDecimal totalOpenInvoices = BigDecimal.ZERO;
+        BigDecimal totalUnappliedReceipts = BigDecimal.ZERO;
+        BigDecimal totalUnappliedCredits = BigDecimal.ZERO;
+        BigDecimal totalNetExposure = BigDecimal.ZERO;
+
+        for (ExposureView exp : exposures) {
+            UUID debtorId = exp.buyerEntityId();
+            String code = partyCode(debtorId, scope);
+            String name = partyName(debtorId, scope);
+            BigDecimal openInv = exp.openInvoices() != null ? exp.openInvoices() : BigDecimal.ZERO;
+            BigDecimal unappRec = exp.unappliedReceipts() != null ? exp.unappliedReceipts() : BigDecimal.ZERO;
+            BigDecimal unappCred = exp.unappliedCredits() != null ? exp.unappliedCredits() : BigDecimal.ZERO;
+            BigDecimal netExp = exp.amount() != null ? exp.amount() : BigDecimal.ZERO;
+            BigDecimal accNotInvoiced = exp.acceptedNotInvoiced() != null ? exp.acceptedNotInvoiced() : BigDecimal.ZERO;
+
+            items.add(new DebtorSummaryItemView(
+                    debtorId,
+                    code,
+                    name,
+                    exp.creditLimit(),
+                    openInv,
+                    accNotInvoiced,
+                    unappRec,
+                    unappCred,
+                    netExp,
+                    exp.warnThresholdPercent()));
+
+            totalOpenInvoices = totalOpenInvoices.add(openInv);
+            totalUnappliedReceipts = totalUnappliedReceipts.add(unappRec);
+            totalUnappliedCredits = totalUnappliedCredits.add(unappCred);
+            totalNetExposure = totalNetExposure.add(netExp);
+        }
+
+        items.sort(Comparator.comparing(DebtorSummaryItemView::counterpartyName));
+
+        return new DebtorsReport(
+                date, items, totalOpenInvoices, totalUnappliedReceipts, totalUnappliedCredits, totalNetExposure);
+    }
+
+    @Override
+    public CreditorsReport creditorsReport(LocalDate asOf, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new CreditorsReport(
+                    asOf != null ? asOf : today(),
+                    List.of(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+        }
+        LocalDate date = asOf != null ? asOf : today();
+        List<ExposureView> exposures = exposureQueries.listExposures(OrderQueries.Role.BUYER, scope);
+        List<CreditorSummaryItemView> items = new ArrayList<>();
+        BigDecimal totalOpenInvoices = BigDecimal.ZERO;
+        BigDecimal totalUnappliedPayments = BigDecimal.ZERO;
+        BigDecimal totalUnappliedCredits = BigDecimal.ZERO;
+        BigDecimal totalNetLiability = BigDecimal.ZERO;
+
+        for (ExposureView exp : exposures) {
+            UUID creditorId = exp.sellerEntityId();
+            String code = partyCode(creditorId, scope);
+            String name = partyName(creditorId, scope);
+            BigDecimal openInv = exp.openInvoices() != null ? exp.openInvoices() : BigDecimal.ZERO;
+            BigDecimal unappPay = exp.unappliedReceipts() != null ? exp.unappliedReceipts() : BigDecimal.ZERO;
+            BigDecimal unappCred = exp.unappliedCredits() != null ? exp.unappliedCredits() : BigDecimal.ZERO;
+            BigDecimal netLiab = exp.amount() != null ? exp.amount() : BigDecimal.ZERO;
+            BigDecimal accNotInvoiced = exp.acceptedNotInvoiced() != null ? exp.acceptedNotInvoiced() : BigDecimal.ZERO;
+
+            items.add(new CreditorSummaryItemView(
+                    creditorId, code, name, openInv, accNotInvoiced, unappPay, unappCred, netLiab));
+
+            totalOpenInvoices = totalOpenInvoices.add(openInv);
+            totalUnappliedPayments = totalUnappliedPayments.add(unappPay);
+            totalUnappliedCredits = totalUnappliedCredits.add(unappCred);
+            totalNetLiability = totalNetLiability.add(netLiab);
+        }
+
+        items.sort(Comparator.comparing(CreditorSummaryItemView::counterpartyName));
+
+        return new CreditorsReport(
+                date, items, totalOpenInvoices, totalUnappliedPayments, totalUnappliedCredits, totalNetLiability);
+    }
+
+    @Override
+    public OpeningBalancesReport openingBalancesReport(UUID counterpartyId, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new OpeningBalancesReport(List.of(), BigDecimal.ZERO);
+        }
+        List<OpeningReceivableView> list = openingReceivableQueries.listOpeningReceivables(counterpartyId, scope);
+        List<OpeningBalanceItemView> items = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (OpeningReceivableView row : list) {
+            UUID cpartyId;
+            String role;
+            if (scope.entityId().equals(row.sellerEntityId())) {
+                role = "SELLER";
+                cpartyId = row.buyerEntityId();
+            } else {
+                role = "BUYER";
+                cpartyId = row.sellerEntityId();
+            }
+            String code = partyCode(cpartyId, scope);
+            String name = partyName(cpartyId, scope);
+            BigDecimal amt = row.amount() != null ? row.amount() : BigDecimal.ZERO;
+            Instant signedAt = row.sellerSignedAt() != null ? row.sellerSignedAt() : row.buyerSignedAt();
+
+            items.add(new OpeningBalanceItemView(
+                    row.openingReceivableId(),
+                    row.docNumberDisplay(),
+                    cpartyId,
+                    code,
+                    name,
+                    role,
+                    amt,
+                    row.referenceNo(),
+                    row.notes(),
+                    signedAt,
+                    row.createdAt()));
+
+            totalAmount = totalAmount.add(amt);
+        }
+
+        return new OpeningBalancesReport(items, totalAmount);
+    }
+
+    @Override
+    public GoodsSuppliedReport goodsSuppliedReport(
+            LocalDate from, LocalDate to, UUID societyId, UUID locationId, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new GoodsSuppliedReport(
+                    from,
+                    to,
+                    societyId,
+                    locationId,
+                    List.of(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    0);
+        }
+
+        Map<UUID, InvoiceView> invoiceMap = new LinkedHashMap<>();
+        for (InvoiceView inv : invoiceQueries.listInvoices(OrderQueries.Role.SELLER, scope)) {
+            invoiceMap.put(inv.invoiceId(), inv);
+        }
+        for (InvoiceView inv : invoiceQueries.listInvoices(OrderQueries.Role.BUYER, scope)) {
+            invoiceMap.putIfAbsent(inv.invoiceId(), inv);
+        }
+
+        List<GoodsSuppliedLineItemView> lines = new ArrayList<>();
+        BigDecimal totalQty = BigDecimal.ZERO;
+        BigDecimal totalNet = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal totalGross = BigDecimal.ZERO;
+
+        for (InvoiceView inv : invoiceMap.values()) {
+            if ("CANCELLED".equalsIgnoreCase(inv.status())) {
+                continue;
+            }
+            if (from != null && inv.taxPointDate() != null && inv.taxPointDate().isBefore(from)) {
+                continue;
+            }
+            if (to != null && inv.taxPointDate() != null && inv.taxPointDate().isAfter(to)) {
+                continue;
+            }
+            if (societyId != null
+                    && !societyId.equals(inv.buyerEntityId())
+                    && !societyId.equals(inv.sellerEntityId())) {
+                continue;
+            }
+
+            String societyName = partyName(inv.buyerEntityId(), scope);
+
+            for (InvoiceView.InvoiceLineView line : inv.lines()) {
+                var skuOpt = catalogue.getSku(line.skuId(), scope);
+                String skuCode = skuOpt.map(SkuView::skuCode).orElse("");
+                String skuName = skuOpt.map(s -> {
+                            String lang = scope.lang();
+                            if ("si".equalsIgnoreCase(lang)
+                                    && s.nameSi() != null
+                                    && !s.nameSi().isBlank()) return s.nameSi();
+                            if ("ta".equalsIgnoreCase(lang)
+                                    && s.nameTa() != null
+                                    && !s.nameTa().isBlank()) return s.nameTa();
+                            return s.nameEn() != null ? s.nameEn() : "";
+                        })
+                        .orElse(line.skuId().toString());
+
+                BigDecimal lineNet = line.qty().multiply(line.unitPrice()).setScale(2, RoundingMode.HALF_UP);
+                lines.add(new GoodsSuppliedLineItemView(
+                        inv.invoiceId(),
+                        inv.docNumberDisplay(),
+                        inv.taxPointDate(),
+                        inv.buyerEntityId(),
+                        societyName,
+                        line.skuId(),
+                        skuCode,
+                        skuName,
+                        line.uomCode(),
+                        line.qty(),
+                        line.unitPrice(),
+                        line.taxRatePercent(),
+                        line.taxAmount(),
+                        line.lineTotal()));
+
+                totalQty = totalQty.add(line.qty());
+                totalNet = totalNet.add(lineNet);
+                totalTax = totalTax.add(line.taxAmount());
+                totalGross = totalGross.add(line.lineTotal());
+            }
+        }
+
+        return new GoodsSuppliedReport(
+                from, to, societyId, locationId, lines, totalQty, totalNet, totalTax, totalGross, lines.size());
+    }
+
+    @Override
+    public Optional<CreditVoucherView> getCreditVoucher(UUID invoiceId, ScopeContext scope) {
+        if (invoiceId == null || scope == null) {
+            return Optional.empty();
+        }
+        return invoiceQueries.getInvoice(invoiceId, scope).map(inv -> {
+            String voucherNumber = "CPV-" + inv.docNumberDisplay();
+            String buyerName = partyName(inv.buyerEntityId(), scope);
+            String buyerCode = partyCode(inv.buyerEntityId(), scope);
+            String sellerName = partyName(inv.sellerEntityId(), scope);
+            String sellerCode = partyCode(inv.sellerEntityId(), scope);
+
+            List<CreditVoucherLineView> lines = new ArrayList<>();
+            for (InvoiceView.InvoiceLineView line : inv.lines()) {
+                var skuOpt = catalogue.getSku(line.skuId(), scope);
+                String skuCode = skuOpt.map(SkuView::skuCode).orElse("");
+                String skuName = skuOpt.map(s -> {
+                            String lang = scope.lang();
+                            if ("si".equalsIgnoreCase(lang)
+                                    && s.nameSi() != null
+                                    && !s.nameSi().isBlank()) return s.nameSi();
+                            if ("ta".equalsIgnoreCase(lang)
+                                    && s.nameTa() != null
+                                    && !s.nameTa().isBlank()) return s.nameTa();
+                            return s.nameEn() != null ? s.nameEn() : "";
+                        })
+                        .orElse(line.skuId().toString());
+
+                lines.add(new CreditVoucherLineView(
+                        line.lineNo(),
+                        line.skuId(),
+                        skuCode,
+                        skuName,
+                        line.uomCode(),
+                        line.qty(),
+                        line.unitPrice(),
+                        line.taxRatePercent(),
+                        line.taxAmount(),
+                        line.lineTotal()));
+            }
+
+            return new CreditVoucherView(
+                    voucherNumber,
+                    inv.invoiceId(),
+                    inv.docNumberDisplay(),
+                    inv.taxPointDate(),
+                    inv.buyerEntityId(),
+                    buyerName,
+                    buyerCode,
+                    inv.sellerEntityId(),
+                    sellerName,
+                    sellerCode,
+                    inv.sellerVatNo(),
+                    inv.buyerVatNo(),
+                    inv.docNumberDisplay(),
+                    inv.netAmount(),
+                    inv.taxAmount(),
+                    inv.grossAmount(),
+                    inv.status(),
+                    null,
+                    lines);
+        });
+    }
+
+    @Override
+    public URI renderCreditVoucher(UUID invoiceId, ScopeContext scope) {
+        CreditVoucherView voucher = getCreditVoucher(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m8.finance.invoice_not_found"));
+
+        A4Renderer pdfRenderer = a4RendererProvider.getIfAvailable();
+        if (pdfRenderer == null) {
+            throw new ProblemException("report.renderer_unavailable");
+        }
+
+        try {
+            Map<String, Object> model = buildVoucherPrintModel(voucher, scope);
+            A4Renderer.Rendered rendered = pdfRenderer.render(A4Renderer.DOCUMENT_A4, model, scope.locale(), scope);
+            return rendered.url();
+        } catch (ProblemException pe) {
+            if ("report.renderer_unavailable".equals(pe.getMessage())) {
+                Optional<String> objectKey = invoiceQueries.printObjectKey(invoiceId, scope);
+                if (objectKey.isPresent()) {
+                    if (voucher.sellerEntityId().equals(scope.entityId())) {
+                        return pdfRenderer.presignGet(objectKey.get(), scope);
+                    } else {
+                        return pdfRenderer.presignGetOfParty(objectKey.get(), voucher.sellerEntityId(), scope);
+                    }
+                }
+                throw new ProblemException("m8.finance.print_not_ready");
+            }
+            throw pe;
+        }
+    }
+
+    private Map<String, Object> buildVoucherPrintModel(CreditVoucherView voucher, ScopeContext scope) {
+        Locale locale = scope.locale();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("title", messages.t("m8.finance.voucher.title", locale));
+        data.put("number", voucher.voucherNumber());
+        data.put("date", voucher.date() != null ? formats.date(voucher.date()) : "");
+        data.put("from", partyBox(voucher.sellerName(), voucher.sellerCode(), voucher.sellerVatNo()));
+        data.put("to", partyBox(voucher.buyerName(), voucher.buyerCode(), voucher.buyerVatNo()));
+        data.put(
+                "references",
+                List.of(
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.invoice_ref", locale),
+                                "value",
+                                voucher.invoiceDocNumber()),
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.type", locale),
+                                "value",
+                                messages.t("m8.finance.voucher.credit_purchase", locale))));
+
+        List<Map<String, Object>> lines = new ArrayList<>();
+        for (CreditVoucherLineView line : voucher.lines()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put(
+                    "description",
+                    (line.skuCode().isEmpty() ? "" : line.skuCode() + " ") + line.skuName() + " (" + line.uomCode()
+                            + ")");
+            row.put("quantity", formats.quantity(line.quantity(), locale));
+            row.put("unitPrice", formats.money(line.unitPrice(), locale));
+            row.put("amount", formats.money(line.lineTotal(), locale));
+            lines.add(row);
+        }
+        data.put("lines", lines);
+
+        data.put(
+                "totals",
+                List.of(
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.net", locale),
+                                "value",
+                                formats.money(voucher.netAmount(), locale)),
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.tax", locale),
+                                "value",
+                                formats.money(voucher.taxAmount(), locale)),
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.gross", locale),
+                                "value",
+                                formats.money(voucher.grossAmount(), locale))));
+        return data;
+    }
+
+    private Map<String, Object> partyBox(String name, String code, String vatNo) {
+        Map<String, Object> box = new LinkedHashMap<>();
+        box.put("title", name != null ? name : "");
+        String details = (code != null && !code.isBlank() ? code : "");
+        if (vatNo != null && !vatNo.isBlank()) {
+            details = details.isEmpty() ? "VAT: " + vatNo : details + " | VAT: " + vatNo;
+        }
+        box.put("lines", details);
+        return box;
+    }
+
+    private String partyName(UUID entityId, ScopeContext scope) {
+        if (entityId == null) {
+            return "";
+        }
+        return party.getEntity(entityId, scope)
+                .map(e -> {
+                    String lang = scope != null && scope.lang() != null ? scope.lang() : "en";
+                    if ("si".equalsIgnoreCase(lang)
+                            && e.legalNameSi() != null
+                            && !e.legalNameSi().isBlank()) {
+                        return e.legalNameSi();
+                    }
+                    if ("ta".equalsIgnoreCase(lang)
+                            && e.legalNameTa() != null
+                            && !e.legalNameTa().isBlank()) {
+                        return e.legalNameTa();
+                    }
+                    if (e.legalNameEn() != null && !e.legalNameEn().isBlank()) {
+                        return e.legalNameEn();
+                    }
+                    return e.entityCode() != null ? e.entityCode() : entityId.toString();
+                })
+                .orElse(entityId.toString());
+    }
+
+    private String partyCode(UUID entityId, ScopeContext scope) {
+        if (entityId == null) {
+            return "";
+        }
+        return party.getEntity(entityId, scope)
+                .map(e -> e.entityCode() != null ? e.entityCode() : "")
+                .orElse("");
     }
 }

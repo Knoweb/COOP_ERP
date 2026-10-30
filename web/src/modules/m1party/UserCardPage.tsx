@@ -14,6 +14,7 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { useAdminApi } from "./adminApi";
 import type { Assignment, CredentialKind, CredentialReset, UserReason } from "./adminApi";
 import { DEACTIVATE_REASONS, REVOKE_REASONS, USER_STATUS_LOOK, assignableRoles, locationName, refusalOf, roleName, userActions } from "./adminView";
+import { CustomSelect } from "./CustomSelect";
 
 /**
  * One user's card (21A section 8, "User card"; M1-07 and M1-08): who the user is, the
@@ -106,18 +107,20 @@ export function UserCardPage() {
   return (
     <main className="shell-page">
       <BackToUsers />
-      <DocumentHeader
-        code={data.username}
-        title={data.displayName}
-        subtitle={t(`party.user.kind.${data.userKind}`).text}
-        state={{ look: USER_STATUS_LOOK[data.status], label: t(`party.user.status.${data.status}`).text }}
-        facts={[
-          { label: t("party.field.language").text, value: t(`party.language.${data.language}`).text },
-          { label: t("party.user.pin").text, value: t(data.pinSet ? "party.user.pin.set" : "party.user.pin.not_set").text }
-        ]}
-      >
-        <ApprovalBar actions={actions} />
-      </DocumentHeader>
+      <div className="user-card-header">
+        <DocumentHeader
+          code={data.username}
+          title={data.displayName}
+          subtitle={t(`party.user.kind.${data.userKind}`).text}
+          state={{ look: USER_STATUS_LOOK[data.status], label: t(`party.user.status.${data.status}`).text }}
+          facts={[
+            { label: t("party.field.language").text, value: t(`party.language.${data.language}`).text },
+            { label: t("party.user.pin").text, value: t(data.pinSet ? "party.user.pin.set" : "party.user.pin.not_set").text }
+          ]}
+        >
+          <ApprovalBar actions={actions} />
+        </DocumentHeader>
+      </div>
 
       {deactivating && (
         <ReasonCapture
@@ -158,7 +161,21 @@ function BackToUsers() {
   return (
     <p>
       <Link className="back-link" to="/party/users">
-        {t("party.users.back").text}
+        <svg
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M19 12H5" />
+          <path d="m12 19-7-7 7-7" />
+        </svg>
+        <span>{t("party.users.back").text}</span>
       </Link>
     </p>
   );
@@ -267,7 +284,7 @@ function UserRoles({ userId, deactivated }: { userId: string; deactivated: boole
                     <td>
                       <button
                         type="button"
-                        className="modern-btn"
+                        className="modern-btn party-revoke-btn"
                         aria-label={t("party.roles.revoke.of", undefined, { role: roleLabel }).text}
                         onClick={() => {
                           setDone(null);
@@ -297,29 +314,37 @@ function UserRoles({ userId, deactivated }: { userId: string; deactivated: boole
       )}
 
       {!deactivated && (
-        <form onSubmit={submit} className="party-form-row" aria-labelledby="party-assign-title">
+        <form onSubmit={submit} className="party-form-row party-assign-form" aria-labelledby="party-assign-title">
           <h3 id="party-assign-title">{t("party.roles.assign.title").text}</h3>
           <label className="party-form-field">
-            {t("party.roles.role").text}
-            <select aria-label={t("party.roles.role").text} value={roleId} onChange={(event) => setRoleId(event.target.value)} required>
-              <option value="">{t("party.roles.choose").text}</option>
-              {assignableRoles(roles.data ?? []).map((role) => (
-                <option key={role.roleId} value={role.roleId}>
-                  {roleName(role, locale)}
-                </option>
-              ))}
-            </select>
+            <span>{t("party.roles.role").text}</span>
+            <CustomSelect
+              value={roleId}
+              onChange={(val) => setRoleId(val)}
+              ariaLabel={t("party.roles.role").text}
+              options={[
+                { value: "", label: t("party.roles.choose").text },
+                ...assignableRoles(roles.data ?? []).map((role) => ({
+                  value: role.roleId,
+                  label: roleName(role, locale)
+                }))
+              ]}
+            />
           </label>
           <label className="party-form-field">
-            {t("party.roles.where").text}
-            <select aria-label={t("party.roles.where").text} value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-              <option value="">{t("party.roles.entity_wide").text}</option>
-              {(locations.data ?? []).map((location) => (
-                <option key={location.locationId} value={location.locationId}>
-                  {locationName(location, locale)}
-                </option>
-              ))}
-            </select>
+            <span>{t("party.roles.where").text}</span>
+            <CustomSelect
+              value={locationId}
+              onChange={(val) => setLocationId(val)}
+              ariaLabel={t("party.roles.where").text}
+              options={[
+                { value: "", label: t("party.roles.entity_wide").text },
+                ...(locations.data ?? []).map((location) => ({
+                  value: location.locationId,
+                  label: locationName(location, locale)
+                }))
+              ]}
+            />
           </label>
           <button type="submit" className="modern-btn" disabled={!roleId || assign.isPending}>
             {t("party.roles.assign").text}
