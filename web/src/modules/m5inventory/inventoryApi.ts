@@ -17,9 +17,10 @@ export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type PickList = components["schemas"]["PickListResponse"];
 export type PickReplacementCandidate = components["schemas"]["PickReplacementCandidateResponse"];
 export type OverridePickRequest = components["schemas"]["OverridePickRequest"];
-export type Transfer =components["schemas"]["TransferResponse"];
+export type Transfer = components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
 export type ReceiveTransferRequest = components["schemas"]["ReceiveTransferRequest"];
+export type CancelTransferRequest = components["schemas"]["CancelTransferRequest"];
 export type Count = components["schemas"]["CountResponse"];
 export type ScheduleCountRequest = components["schemas"]["ScheduleCountRequest"];
 export type CountLineRequest = components["schemas"]["CountLineRequest"];
@@ -162,12 +163,31 @@ export function useInventoryApi() {
         return data!;
       },
 
+      async dispatchTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
+        const { data } = await api.POST("/v1/inventory/transfers/{transferId}/dispatch", {
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
       async receiveTransfer(
         transferId: string,
         idempotencyKey: string,
         request?: ReceiveTransferRequest
       ): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async cancelTransfer(
+        transferId: string,
+        request: CancelTransferRequest,
+        idempotencyKey: string
+      ): Promise<Transfer> {
+        const { data } = await api.POST("/v1/inventory/transfers/{transferId}/cancel", {
           params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
           body: request
         });

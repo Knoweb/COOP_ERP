@@ -7,7 +7,8 @@ import type {
   OpeningBalance,
   OpeningBalanceLineRequest,
   RequestTransferRequest,
-  TransferRequest
+  TransferRequest,
+  Transfer
 } from "./inventoryApi";
 
 // A batch-less SKU still needs a batch row (M2-05, doc 22 section 3.7), so M2 registers a
@@ -106,4 +107,20 @@ export function sourceFor(
   }
   const warehouses = locations.filter((l) => l.locationType === "WAREHOUSE");
   return warehouses.length === 1 ? warehouses[0].locationId : undefined;
+}
+
+/** The look of a transfer's state: issued, in transit, received, or cancelled. */
+export function transferChip(status: Transfer["status"]): ChipState {
+  switch (status) {
+    case "ISSUED":
+      return "draft";
+    case "IN_TRANSIT":
+      return "alert";
+    case "RECEIVED":
+      return "issued";
+    case "CANCELLED":
+      return "void";
+    default:
+      return "draft";
+  }
 }
