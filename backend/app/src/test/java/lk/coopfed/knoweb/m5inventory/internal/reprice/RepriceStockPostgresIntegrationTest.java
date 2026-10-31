@@ -216,6 +216,59 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void conditionDowngradeBlendsIntoExistingTargetLot() {
+        UUID sku = fixture.sku(MPCS, "SKU_REPRICE_MERGE_TARGET");
+        UUID batch = fixture.batch(sku, MPCS, "BAT_MERGE", EXPIRY);
+        ScopeContext scope = at(MPCS, shop);
+
+        // 10 units GOOD at Rs 100
+        postReceipt(shop, batch, new BigDecimal("10.000"), new BigDecimal("100.0000"), MPCS);
+        kernel.reset();
+        LotBalance goodLot = queries.balances(shop, sku, false, scope).get(0);
+
+        // First downgrade 2 units to DAMAGED at Rs 60 (creates DAMAGED lot)
+        repriceHandler.handle(
+                new RepriceStockLot(
+                        goodLot.stockLotId(),
+                        new BigDecimal("2.000"),
+                        new BigDecimal("60.0000"),
+                        LotCondition.DAMAGED,
+                        "Initial damage"),
+                scope);
+        kernel.reset();
+
+        // Now downgrade another 3 units from GOOD (currently 8 units) to DAMAGED at Rs 50
+        // Existing target lot: 2 units at Rs 60
+        // Blended target cost: (2*60 + 3*50)/5 = 270/5 = 54.0000
+        StockRepricingResult result = repriceHandler.handle(
+                new RepriceStockLot(
+                        goodLot.stockLotId(),
+                        new BigDecimal("3.000"),
+                        new BigDecimal("50.0000"),
+                        LotCondition.DAMAGED,
+                        "Subsequent damage"),
+                scope);
+
+        List<LotBalance> lotsAfter = queries.balances(shop, sku, false, scope);
+        assertThat(lotsAfter).hasSize(2);
+
+        LotBalance goodAfter = lotsAfter.stream()
+                .filter(l -> "GOOD".equals(l.condition()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(goodAfter.qtyOnHand()).isEqualByComparingTo("5.000");
+        assertThat(goodAfter.unitCost()).isEqualByComparingTo("100.0000");
+
+        LotBalance damagedAfter = lotsAfter.stream()
+                .filter(l -> "DAMAGED".equals(l.condition()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(damagedAfter.qtyOnHand()).isEqualByComparingTo("5.000");
+        assertThat(damagedAfter.unitCost()).isEqualByComparingTo("54.0000");
+        assertThat(damagedAfter.stockLotId()).isEqualTo(result.targetLotId());
+    }
+
+    @Test
     void guardsPreventInvalidInputs() {
         UUID sku = fixture.sku(MPCS, "SKU_REPRICE_GUARDS");
         UUID batch = fixture.batch(sku, MPCS, "BAT_GUARDS", EXPIRY);
@@ -343,6 +396,35 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
                         String.class,
                         spoilageWriteOffId);
         assertThat(spoilageCategoryInDb).isEqualTo("SPOILAGE");
+    }
+
+    @Test
+    void directExecutionOfApplyLotRepriceWithoutAuditIsRefused() {
+        UUID sku = fixture.sku(MPCS, "SKU_DIRECT_REPRICE");
+        UUID batch = fixture.batch(sku, MPCS, "BAT_DIR", EXPIRY);
+        ScopeContext scope = at(MPCS, shop);
+
+        postReceipt(shop, batch, new BigDecimal("10.000"), new BigDecimal("100.0000"), MPCS);
+        kernel.reset();
+        LotBalance lot = queries.balances(shop, sku, false, scope).get(0);
+
+        // Attempting to directly call inventory.apply_lot_reprice without an audit row in the current transaction
+        org.springframework.jdbc.core.JdbcTemplate jdbc = superuserJdbc();
+        assertThatThrownBy(() -> jdbc.execute(
+                        String.format(
+                                "select set_config('app.scope_class', 'OWN', true), "
+                                        + "set_config('app.scope_entity_id', '%s', true), "
+                                        + "set_config('app.scope_location_id', '%s', true), "
+                                        + "set_config('app.user_id', '%s', true), "
+                                        + "inventory.apply_lot_reprice(gen_random_uuid(), '%s'::uuid, 50.0000)",
+                                MPCS,
+                                shop,
+                                scope.userId(),
+                                lot.stockLotId())))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .satisfies(e -> assertThat(
+                                ((org.springframework.dao.DataAccessException) e).getMostSpecificCause().getMessage())
+                        .contains("m5.reprice.audit_required"));
     }
 
     private void postReceipt(UUID loc, UUID itemBatch, BigDecimal qty, BigDecimal unitCost, UUID entity) {

@@ -130,81 +130,16 @@ public class RepriceStockLotHandler implements Handles<RepriceStockLot, StockRep
                     sourceLot.skuId());
         });
 
+        // Determine target lot ID if condition changes
         UUID targetLotId = null;
-        boolean fullReprice = command.qty().compareTo(sourceLot.qtyOnHand()) == 0;
-
-        if (targetCondition == sourceLot.condition()) {
-            if (fullReprice) {
-                // Full repricing in-place: update lot cost
-                jdbc.update(
-                        "update inventory.stock_lot set unit_cost = ? where stock_lot_id = ?",
-                        newUnitCost,
-                        sourceLot.stockLotId());
-            } else {
-                // Partial repricing in-place: blend lot unit cost
-                BigDecimal remainingQty = sourceLot.qtyOnHand().subtract(command.qty());
-                BigDecimal blendedCost = command.qty()
-                        .multiply(newUnitCost)
-                        .add(remainingQty.multiply(previousUnitCost))
-                        .divide(sourceLot.qtyOnHand(), CostService.COST_SCALE, CostService.ROUNDING);
-                jdbc.update(
-                        "update inventory.stock_lot set unit_cost = ? where stock_lot_id = ?",
-                        blendedCost,
-                        sourceLot.stockLotId());
-            }
-        } else {
-            // Condition change (e.g. GOOD -> DAMAGED): deduct qty from source lot
-            if (fullReprice) {
-                jdbc.update(
-                        "update inventory.stock_lot set qty_on_hand = ? where stock_lot_id = ?",
-                        BigDecimal.ZERO.setScale(CostService.QTY_SCALE),
-                        sourceLot.stockLotId());
-            } else {
-                jdbc.update(
-                        "update inventory.stock_lot set qty_on_hand = ? where stock_lot_id = ?",
-                        sourceLot.qtyOnHand().subtract(command.qty()),
-                        sourceLot.stockLotId());
-            }
-
-            // Move into target condition lot
-            var existingTargetLot =
-                    store.findLotByCondition(sourceLot.locationId(), sourceLot.batchId(), targetCondition);
-
-            if (existingTargetLot.isPresent()) {
-                LotRecord target = existingTargetLot.get();
-                BigDecimal newTargetQty = target.qtyOnHand().add(command.qty());
-                BigDecimal targetBlended = target.qtyOnHand()
-                        .multiply(target.unitCost())
-                        .add(command.qty().multiply(newUnitCost))
-                        .divide(newTargetQty, CostService.COST_SCALE, CostService.ROUNDING);
-                jdbc.update(
-                        "update inventory.stock_lot set qty_on_hand = ?, unit_cost = ? where stock_lot_id = ?",
-                        newTargetQty,
-                        targetBlended,
-                        target.stockLotId());
-                targetLotId = target.stockLotId();
-            } else {
-                targetLotId = UUID.randomUUID();
-                jdbc.update(
-                        """
-                        insert into inventory.stock_lot
-                            (stock_lot_id, owner_entity_id, location_id, batch_id, sku_id,
-                             expiry_date, condition, qty_on_hand, unit_cost, received_at)
-                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        targetLotId,
-                        sourceLot.ownerEntityId(),
-                        sourceLot.locationId(),
-                        sourceLot.batchId(),
-                        sourceLot.skuId(),
-                        sourceLot.expiryDate(),
-                        targetCondition.name(),
-                        command.qty(),
-                        newUnitCost,
-                        Timestamp.from(now));
-            }
+        var existingTargetLot = targetCondition != sourceLot.condition()
+                ? store.findLotByCondition(sourceLot.locationId(), sourceLot.batchId(), targetCondition)
+                : java.util.Optional.<LotRecord>empty();
+        if (targetCondition != sourceLot.condition()) {
+            targetLotId = existingTargetLot.map(LotRecord::stockLotId).orElseGet(UUID::randomUUID);
         }
 
+        // 1. Insert immutable audit ledger record FIRST (required by database security definer procedure)
         jdbc.update(
                 """
                 insert into inventory.stock_repricing
@@ -229,6 +164,85 @@ public class RepriceStockLotHandler implements Handles<RepriceStockLot, StockRep
                 command.reason().trim(),
                 scope.userId(),
                 Timestamp.from(now));
+
+        boolean fullReprice = command.qty().compareTo(sourceLot.qtyOnHand()) == 0;
+
+        // 2. Perform lot mutations (privileged unit_cost update requires repricingId from step 1)
+        if (targetCondition == sourceLot.condition()) {
+            if (fullReprice) {
+                // Full repricing in-place: update lot cost via SECURITY DEFINER procedure linked to audit
+                jdbc.queryForObject(
+                        "select inventory.apply_lot_reprice(?, ?, ?)",
+                        Boolean.class,
+                        repricingId,
+                        sourceLot.stockLotId(),
+                        newUnitCost);
+            } else {
+                // Partial repricing in-place: blend lot unit cost via SECURITY DEFINER procedure linked to audit
+                BigDecimal remainingQty = sourceLot.qtyOnHand().subtract(command.qty());
+                BigDecimal blendedCost = command.qty()
+                        .multiply(newUnitCost)
+                        .add(remainingQty.multiply(previousUnitCost))
+                        .divide(sourceLot.qtyOnHand(), CostService.COST_SCALE, CostService.ROUNDING);
+                jdbc.queryForObject(
+                        "select inventory.apply_lot_reprice(?, ?, ?)",
+                        Boolean.class,
+                        repricingId,
+                        sourceLot.stockLotId(),
+                        blendedCost);
+            }
+        } else {
+            // Condition change (e.g. GOOD -> DAMAGED): deduct qty from source lot
+            if (fullReprice) {
+                jdbc.update(
+                        "update inventory.stock_lot set qty_on_hand = ? where stock_lot_id = ?",
+                        BigDecimal.ZERO.setScale(CostService.QTY_SCALE),
+                        sourceLot.stockLotId());
+            } else {
+                jdbc.update(
+                        "update inventory.stock_lot set qty_on_hand = ? where stock_lot_id = ?",
+                        sourceLot.qtyOnHand().subtract(command.qty()),
+                        sourceLot.stockLotId());
+            }
+
+            // Move into target condition lot
+            if (existingTargetLot.isPresent()) {
+                LotRecord target = existingTargetLot.get();
+                BigDecimal newTargetQty = target.qtyOnHand().add(command.qty());
+                BigDecimal targetBlended = target.qtyOnHand()
+                        .multiply(target.unitCost())
+                        .add(command.qty().multiply(newUnitCost))
+                        .divide(newTargetQty, CostService.COST_SCALE, CostService.ROUNDING);
+                jdbc.update(
+                        "update inventory.stock_lot set qty_on_hand = ? where stock_lot_id = ?",
+                        newTargetQty,
+                        target.stockLotId());
+                jdbc.queryForObject(
+                        "select inventory.apply_lot_reprice(?, ?, ?)",
+                        Boolean.class,
+                        repricingId,
+                        target.stockLotId(),
+                        targetBlended);
+            } else {
+                jdbc.update(
+                        """
+                        insert into inventory.stock_lot
+                            (stock_lot_id, owner_entity_id, location_id, batch_id, sku_id,
+                             expiry_date, condition, qty_on_hand, unit_cost, received_at)
+                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        targetLotId,
+                        sourceLot.ownerEntityId(),
+                        sourceLot.locationId(),
+                        sourceLot.batchId(),
+                        sourceLot.skuId(),
+                        sourceLot.expiryDate(),
+                        targetCondition.name(),
+                        command.qty(),
+                        newUnitCost,
+                        Timestamp.from(now));
+            }
+        }
 
         // ---- 3. Audit ----------------------------------------------------------------------
         audit.record(
