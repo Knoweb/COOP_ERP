@@ -23,13 +23,16 @@ import lk.coopfed.knoweb.m5inventory.api.OpeningStockRow;
 import lk.coopfed.knoweb.m5inventory.api.OverridePick;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
+import lk.coopfed.knoweb.m5inventory.api.RepriceStockLot;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.StockRepricingResult;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
+import lk.coopfed.knoweb.m5inventory.query.StockRepricingView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.BulkImportStockRequest;
@@ -47,8 +50,10 @@ import lk.coopfed.knoweb.m5inventory.web.generated.PickReplacementCandidateRespo
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.RepriceStockLotRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockProblem;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockRepricingResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +82,7 @@ class InventoryController implements InventoryApi {
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
     private final Handles<CancelTransfer, UUID> cancelTransfer;
     private final Handles<OverridePick, UUID> overridePick;
+    private final Handles<RepriceStockLot, StockRepricingResult> reprice;
 
     InventoryController(
             InventoryQueries queries,
@@ -90,7 +96,8 @@ class InventoryController implements InventoryApi {
             Handles<DispatchTransfer, UUID> dispatchTransfer,
             Handles<ReceiveTransfer, UUID> receiveTransfer,
             Handles<CancelTransfer, UUID> cancelTransfer,
-            Handles<OverridePick, UUID> overridePick) {
+            Handles<OverridePick, UUID> overridePick,
+            Handles<RepriceStockLot, StockRepricingResult> reprice) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
@@ -103,6 +110,7 @@ class InventoryController implements InventoryApi {
         this.receiveTransfer = receiveTransfer;
         this.cancelTransfer = cancelTransfer;
         this.overridePick = overridePick;
+        this.reprice = reprice;
     }
 
     // ---- transfers (M5-09) ----------------------------------------------------------------
@@ -417,6 +425,72 @@ class InventoryController implements InventoryApi {
                                 .stockLotId(p.stockLotId())
                                 .batchId(p.batchId()))
                         .toList());
+    }
+
+    @Override
+    public ResponseEntity<StockRepricingResponse> repriceStockLot(
+            String idempotencyKey, UUID stockLotId, RepriceStockLotRequest request) {
+        ScopeContext scope = currentScope.get();
+        LotCondition targetCondition = request.getTargetCondition() != null
+                ? LotCondition.valueOf(request.getTargetCondition().getValue())
+                : null;
+        StockRepricingResult result = reprice.handle(
+                new RepriceStockLot(
+                        stockLotId, request.getQty(), request.getNewUnitCost(), targetCondition, request.getReason()),
+                scope);
+        return ResponseEntity.ok(toResponse(result));
+    }
+
+    @Override
+    public ResponseEntity<List<StockRepricingResponse>> listRepricings(UUID locationId, UUID skuId) {
+        ScopeContext scope = currentScope.get();
+        List<StockRepricingView> views = queries.repricings(locationId, skuId, scope);
+        return ResponseEntity.ok(
+                views.stream().map(InventoryController::toResponse).toList());
+    }
+
+    private static StockRepricingResponse toResponse(StockRepricingResult r) {
+        StockRepricingResponse response = new StockRepricingResponse(
+                r.repricingId(),
+                r.stockLotId(),
+                r.skuId(),
+                r.batchId(),
+                StockRepricingResponse.ConditionEnum.fromValue(r.condition().name()),
+                r.qtyAffected(),
+                r.previousUnitCost(),
+                r.newUnitCost(),
+                StockRepricingResponse.TargetConditionEnum.fromValue(
+                        r.targetCondition().name()),
+                r.valueAdjustment(),
+                r.reason(),
+                r.repricedBy(),
+                r.repricedAt());
+        if (r.targetLotId() != null) {
+            response.targetLotId(r.targetLotId());
+        }
+        return response;
+    }
+
+    private static StockRepricingResponse toResponse(StockRepricingView v) {
+        StockRepricingResponse response = new StockRepricingResponse(
+                v.repricingId(),
+                v.stockLotId(),
+                v.skuId(),
+                v.batchId(),
+                StockRepricingResponse.ConditionEnum.fromValue(v.condition().name()),
+                v.qtyAffected(),
+                v.previousUnitCost(),
+                v.newUnitCost(),
+                StockRepricingResponse.TargetConditionEnum.fromValue(
+                        v.targetCondition().name()),
+                v.valueAdjustment(),
+                v.reason(),
+                v.repricedBy(),
+                v.repricedAt());
+        if (v.targetLotId() != null) {
+            response.targetLotId(v.targetLotId());
+        }
+        return response;
     }
 
     private static PickReplacementCandidateResponse toResponse(PickReplacementCandidate candidate, String batchNo) {

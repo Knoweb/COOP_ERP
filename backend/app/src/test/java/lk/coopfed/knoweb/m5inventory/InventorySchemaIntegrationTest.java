@@ -46,6 +46,51 @@ class InventorySchemaIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void repricingProcedureEnforcesScopeUserAuditAndCostInvariants() {
+        UUID randomId = java.util.UUID.randomUUID();
+
+        // 1. Direct call without OWN scope is refused
+        assertThatThrownBy(() -> appJdbc.execute(
+                        "select inventory.apply_lot_reprice(gen_random_uuid(), gen_random_uuid(), 10.00)"))
+                .isInstanceOf(DataAccessException.class)
+                .satisfies(e -> assertThat(
+                                ((DataAccessException) e).getMostSpecificCause().getMessage())
+                        .contains("m5.scope.own_required"));
+
+        // 2. Direct call without authenticated user is refused
+        assertThatThrownBy(() -> appJdbc.execute(
+                        "select set_config('app.scope_class', 'OWN', true), "
+                                + "set_config('app.scope_entity_id', gen_random_uuid()::text, true), "
+                                + "inventory.apply_lot_reprice(gen_random_uuid(), gen_random_uuid(), 10.00)"))
+                .isInstanceOf(DataAccessException.class)
+                .satisfies(e -> assertThat(
+                                ((DataAccessException) e).getMostSpecificCause().getMessage())
+                        .contains("m5.reprice.user_required"));
+
+        // 3. Direct call with negative cost is refused
+        assertThatThrownBy(() -> appJdbc.execute(
+                        "select set_config('app.scope_class', 'OWN', true), "
+                                + "set_config('app.scope_entity_id', gen_random_uuid()::text, true), "
+                                + "set_config('app.user_id', gen_random_uuid()::text, true), "
+                                + "inventory.apply_lot_reprice(gen_random_uuid(), gen_random_uuid(), -5.00)"))
+                .isInstanceOf(DataAccessException.class)
+                .satisfies(e -> assertThat(
+                                ((DataAccessException) e).getMostSpecificCause().getMessage())
+                        .contains("m5.reprice.invalid_cost"));
+
+        // 4. Direct call without an immutable stock_repricing audit record in current transaction is refused
+        assertThatThrownBy(() -> appJdbc.execute(
+                        "select set_config('app.scope_class', 'OWN', true), "
+                                + "set_config('app.scope_entity_id', gen_random_uuid()::text, true), "
+                                + "set_config('app.user_id', gen_random_uuid()::text, true), "
+                                + "inventory.apply_lot_reprice(gen_random_uuid(), gen_random_uuid(), 10.00)"))
+                .isInstanceOf(DataAccessException.class)
+                .satisfies(e -> assertThat(
+                                ((DataAccessException) e).getMostSpecificCause().getMessage())
+                        .contains("m5.reprice.audit_required"));
+    }
+
+    @Test
     void transferLifecycleFactsAreInsertOnlyAndForceRowLevelSecurity() {
         for (String table : List.of(
                 "transfer_receipt_line", "transfer_cancellation", "transfer_shortfall", "transfer_shortfall_line")) {

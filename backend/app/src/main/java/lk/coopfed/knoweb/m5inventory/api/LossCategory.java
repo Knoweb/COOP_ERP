@@ -10,5 +10,7 @@ public enum LossCategory {
     STAFF_CONSUMPTION,
     SAMPLES,
     DONATION,
-    OTHER
+    OTHER,
+    WASTE,
+    SPOILAGE
 }
