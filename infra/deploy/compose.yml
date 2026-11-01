@@ -100,7 +100,7 @@ services:
   # The broker. The plain image, without the management console: nobody needs the console on a
   # demo server, and it costs memory. Its memory watermark is the size file's.
   rabbitmq:
-    image: rabbitmq:3.13
+    image: rabbitmq:4.4
     restart: unless-stopped
     logging: *logging
     <<: *no-new-privileges
