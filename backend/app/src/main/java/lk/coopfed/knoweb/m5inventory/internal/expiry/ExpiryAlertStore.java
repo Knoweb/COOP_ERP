@@ -19,11 +19,15 @@ import lk.coopfed.knoweb.m5inventory.query.NearExpiryLotView;
 import lk.coopfed.knoweb.m5inventory.query.SlowMovingStockView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Persistence queries and state tracking for near-expiry and slow-moving stock alerts (PGL-M2-07).
+ * Persistence queries for near-expiry and slow-moving stock alerts (PGL-M2-07).
+ * In accordance with ArchUnit rule {@code onlyCommandHandlersWriteToTheDatabase}, only
+ * reads are performed here; alert state mutations are performed directly by the {@code @CommandHandler}.
  */
 @Repository
+@Transactional(readOnly = true)
 public class ExpiryAlertStore {
 
     private final JdbcTemplate jdbc;
@@ -331,98 +335,4 @@ public class ExpiryAlertStore {
     private record StockOnHandRecord(UUID skuId, BigDecimal qtyOnHand, BigDecimal avgCost) {}
 
     private record SalesWindowRecord(UUID skuId, BigDecimal netSales, Timestamp lastSaleAt) {}
-
-    /**
-     * Record a new triggered stock alert.
-     */
-    public void recordAlertTriggered(
-            UUID alertId,
-            UUID entityId,
-            UUID locationId,
-            String alertType,
-            UUID skuId,
-            UUID batchId,
-            String alertTier,
-            BigDecimal qtyOnHand,
-            Timestamp now) {
-
-        String sql =
-                """
-                insert into inventory.stock_alert_state
-                    (alert_id, owner_entity_id, location_id, alert_type, sku_id, batch_id,
-                     alert_tier, status, qty_on_hand, last_alerted_at)
-                values (?, ?, ?, ?, ?, ?, ?, 'TRIGGERED', ?, ?)
-                """;
-        jdbc.update(sql, alertId, entityId, locationId, alertType, skuId, batchId, alertTier, qtyOnHand, now);
-    }
-
-    /**
-     * Update tier and timestamp on an existing triggered alert (e.g. escalated WARNING -> CRITICAL).
-     */
-    public void updateAlertTier(UUID alertId, String newTier, BigDecimal qtyOnHand, Timestamp now) {
-        String sql =
-                """
-                update inventory.stock_alert_state
-                   set alert_tier = ?,
-                       qty_on_hand = ?,
-                       last_alerted_at = ?
-                 where alert_id = ?
-                """;
-        jdbc.update(sql, newTier, qtyOnHand, now, alertId);
-    }
-
-    /**
-     * Resolve obsolete near-expiry alerts where stock lot has been depleted (qty <= 0) or batch is gone.
-     */
-    public int resolveObsoleteNearExpiryAlerts(UUID locationId, Timestamp now) {
-        String sql =
-                """
-                update inventory.stock_alert_state a
-                   set status = 'RESOLVED',
-                       resolved_at = ?
-                 where a.location_id = ?
-                   and a.alert_type = 'NEAR_EXPIRY'
-                   and a.status = 'TRIGGERED'
-                   and not exists (
-                       select 1
-                         from inventory.stock_lot l
-                        where l.location_id = a.location_id
-                          and l.batch_id = a.batch_id
-                          and l.qty_on_hand > 0
-                   )
-                """;
-        return jdbc.update(sql, now, locationId);
-    }
-
-    /**
-     * Resolve slow-moving alerts where stock is depleted or SKU is no longer slow-moving.
-     */
-    public int resolveObsoleteSlowMovingAlerts(UUID locationId, Set<UUID> currentlySlowSkus, Timestamp now) {
-        if (currentlySlowSkus == null || currentlySlowSkus.isEmpty()) {
-            return jdbc.update(
-                    """
-                    update inventory.stock_alert_state
-                       set status = 'RESOLVED',
-                           resolved_at = ?
-                     where location_id = ?
-                       and alert_type = 'SLOW_MOVING'
-                       and status = 'TRIGGERED'
-                    """,
-                    now,
-                    locationId);
-        }
-
-        List<ActiveAlertRecord> active = findActiveAlerts(locationId, "SLOW_MOVING", null);
-        int resolved = 0;
-        for (ActiveAlertRecord record : active) {
-            if (!currentlySlowSkus.contains(record.skuId())) {
-                jdbc.update(
-                        "update inventory.stock_alert_state set status = 'RESOLVED', resolved_at = ? where alert_id = ?",
-                        now,
-                        record.alertId());
-                resolved++;
-            }
-        }
-        return resolved;
-    }
 }

@@ -31,6 +31,7 @@ import lk.coopfed.knoweb.m5inventory.query.NearExpiryLotView;
 import lk.coopfed.knoweb.m5inventory.query.SlowMovingStockView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class EvaluateExpiryAlertsHandlerTest {
 
@@ -42,6 +43,7 @@ class EvaluateExpiryAlertsHandlerTest {
     private ControlPolicy policy;
     private AuditFacade audit;
     private EventPublisher events;
+    private JdbcTemplate jdbc;
     private Clock clock;
     private EvaluateExpiryAlertsHandler handler;
 
@@ -51,9 +53,10 @@ class EvaluateExpiryAlertsHandlerTest {
         policy = mock(ControlPolicy.class);
         audit = mock(AuditFacade.class);
         events = mock(EventPublisher.class);
+        jdbc = mock(JdbcTemplate.class);
         clock = Clock.fixed(Instant.parse("2026-11-01T10:00:00Z"), ZoneId.of("Asia/Colombo"));
 
-        handler = new EvaluateExpiryAlertsHandler(store, policy, clock, "Asia/Colombo", audit, events);
+        handler = new EvaluateExpiryAlertsHandler(store, policy, jdbc, clock, "Asia/Colombo", audit, events);
     }
 
     private ScopeContext ownScope(UUID entityId, UUID locationId) {

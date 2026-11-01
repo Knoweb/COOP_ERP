@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m5inventory.internal.expiry;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
 import lk.coopfed.knoweb.m5inventory.query.NearExpiryLotView;
 import lk.coopfed.knoweb.m5inventory.query.SlowMovingStockView;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
 
     private final ExpiryAlertStore store;
     private final ControlPolicy policy;
+    private final JdbcTemplate jdbc;
     private final Clock clock;
     private final ZoneId businessZone;
     private final AuditFacade audit;
@@ -49,12 +52,14 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
     public EvaluateExpiryAlertsHandler(
             ExpiryAlertStore store,
             ControlPolicy policy,
+            JdbcTemplate jdbc,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone,
             AuditFacade audit,
             EventPublisher events) {
         this.store = store;
         this.policy = policy;
+        this.jdbc = jdbc;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
         this.audit = audit;
@@ -117,7 +122,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
             if (existing == null) {
                 // New near-expiry alert
                 alertId = UUID.randomUUID();
-                store.recordAlertTriggered(
+                recordAlertTriggered(
                         alertId,
                         scope.entityId(),
                         locationId,
@@ -132,7 +137,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
                     && !"CRITICAL".equalsIgnoreCase(existing.alertTier())) {
                 // Escalation from WARNING to CRITICAL: re-alert with higher urgency
                 alertId = existing.alertId();
-                store.updateAlertTier(alertId, "CRITICAL", lot.qtyOnHand(), nowTs);
+                updateAlertTier(alertId, "CRITICAL", lot.qtyOnHand(), nowTs);
                 emit = true;
             } else {
                 alertId = existing.alertId();
@@ -169,7 +174,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
         }
 
         // Clean up any near-expiry alerts for batches that have since been depleted
-        store.resolveObsoleteNearExpiryAlerts(locationId, nowTs);
+        resolveObsoleteNearExpiryAlerts(locationId, nowTs);
 
         // 2. Evaluate slow-moving stock
         List<SlowMovingStockView> slowMovingItems =
@@ -191,7 +196,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
 
             if (existing == null) {
                 UUID alertId = UUID.randomUUID();
-                store.recordAlertTriggered(
+                recordAlertTriggered(
                         alertId,
                         scope.entityId(),
                         locationId,
@@ -233,8 +238,90 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
         }
 
         // Clean up slow-moving alerts for items that now have sales or zero stock
-        store.resolveObsoleteSlowMovingAlerts(locationId, currentSlowSkus, nowTs);
+        resolveObsoleteSlowMovingAlerts(locationId, currentSlowSkus, nowTs, scope);
 
         return new ExpiryAlertScanResult(nearExpiryAlertsEmitted, slowMovingAlertsEmitted, totalEvaluated);
+    }
+
+    private void recordAlertTriggered(
+            UUID alertId,
+            UUID entityId,
+            UUID locationId,
+            String alertType,
+            UUID skuId,
+            UUID batchId,
+            String alertTier,
+            BigDecimal qtyOnHand,
+            Timestamp now) {
+        String sql =
+                """
+                insert into inventory.stock_alert_state
+                    (alert_id, owner_entity_id, location_id, alert_type, sku_id, batch_id,
+                     alert_tier, status, qty_on_hand, last_alerted_at)
+                values (?, ?, ?, ?, ?, ?, ?, 'TRIGGERED', ?, ?)
+                """;
+        jdbc.update(sql, alertId, entityId, locationId, alertType, skuId, batchId, alertTier, qtyOnHand, now);
+    }
+
+    private void updateAlertTier(UUID alertId, String newTier, BigDecimal qtyOnHand, Timestamp now) {
+        String sql =
+                """
+                update inventory.stock_alert_state
+                   set alert_tier = ?,
+                       qty_on_hand = ?,
+                       last_alerted_at = ?
+                 where alert_id = ?
+                """;
+        jdbc.update(sql, newTier, qtyOnHand, now, alertId);
+    }
+
+    private int resolveObsoleteNearExpiryAlerts(UUID locationId, Timestamp now) {
+        String sql =
+                """
+                update inventory.stock_alert_state a
+                   set status = 'RESOLVED',
+                       resolved_at = ?
+                 where a.location_id = ?
+                   and a.alert_type = 'NEAR_EXPIRY'
+                   and a.status = 'TRIGGERED'
+                   and not exists (
+                       select 1
+                         from inventory.stock_lot l
+                        where l.location_id = a.location_id
+                          and l.batch_id = a.batch_id
+                          and l.qty_on_hand > 0
+                   )
+                """;
+        return jdbc.update(sql, now, locationId);
+    }
+
+    private int resolveObsoleteSlowMovingAlerts(
+            UUID locationId, Set<UUID> currentlySlowSkus, Timestamp now, ScopeContext scope) {
+        if (currentlySlowSkus == null || currentlySlowSkus.isEmpty()) {
+            return jdbc.update(
+                    """
+                    update inventory.stock_alert_state
+                       set status = 'RESOLVED',
+                           resolved_at = ?
+                     where location_id = ?
+                       and alert_type = 'SLOW_MOVING'
+                       and status = 'TRIGGERED'
+                    """,
+                    now,
+                    locationId);
+        }
+
+        List<ExpiryAlertStore.ActiveAlertRecord> active = store.findActiveAlerts(locationId, "SLOW_MOVING", scope);
+        int resolved = 0;
+        for (ExpiryAlertStore.ActiveAlertRecord record : active) {
+            if (!currentlySlowSkus.contains(record.skuId())) {
+                jdbc.update(
+                        "update inventory.stock_alert_state set status = 'RESOLVED', resolved_at = ? where alert_id = ?",
+                        now,
+                        record.alertId());
+                resolved++;
+            }
+        }
+        return resolved;
     }
 }
