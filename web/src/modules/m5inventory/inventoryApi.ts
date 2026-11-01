@@ -41,6 +41,9 @@ export type ConfigureReorderControlRequest = components["schemas"]["ConfigureReo
 export type RepriceStockLotRequest = components["schemas"]["RepriceStockLotRequest"];
 export type StockRepricingResponse = components["schemas"]["StockRepricingResponse"];
 export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockResponse"];
+export type ExpiryAlertItem = components["schemas"]["ExpiryAlertItemResponse"];
+export type SlowMovingStock = components["schemas"]["SlowMovingStockResponse"];
+export type ExpiryAlertScan = components["schemas"]["ExpiryAlertScanResponse"];
 
 export function useInventoryApi() {
   const api = useApiClient<paths>();
@@ -458,6 +461,53 @@ export function useInventoryApi() {
           throw error;
         }
         return data ?? [];
+      },
+
+      async expiryFeed(
+        locationId: string,
+        windowDays?: number,
+        tier?: "ALL" | "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED"
+      ): Promise<ExpiryAlertItem[]> {
+        const { data, error } = await api.GET("/v1/inventory/locations/{locationId}/expiry-feed", {
+          params: {
+            path: { locationId },
+            query: { windowDays, tier }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async slowMovingStock(
+        locationId: string,
+        evaluationDays?: number,
+        thresholdDaysOfSupply?: number
+      ): Promise<SlowMovingStock[]> {
+        const { data, error } = await api.GET("/v1/inventory/locations/{locationId}/slow-moving", {
+          params: {
+            path: { locationId },
+            query: { evaluationDays, thresholdDaysOfSupply }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async scanExpiryAlerts(locationId: string, idempotencyKey: string): Promise<ExpiryAlertScan> {
+        const { data, error } = await api.POST("/v1/inventory/locations/{locationId}/expiry-alerts/scan", {
+          params: {
+            path: { locationId },
+            header: { "Idempotency-Key": idempotencyKey }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
       }
     }),
     [api, party, catalogue, trading]

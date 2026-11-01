@@ -840,3 +840,108 @@
   margin-top: 0;
   margin-bottom: var(--space-3);
 }
+
+
+/* ---------- Expiry & Slow-Moving View (PGL-M2-07) ---------------------------- */
+
+.expiry-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-block: var(--space-3);
+}
+
+.expiry-kpi-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.expiry-kpi-card--critical {
+  border-left: 4px solid var(--color-alert);
+}
+
+.expiry-kpi-card--warning {
+  border-left: 4px solid var(--color-caution, #d97706);
+}
+
+.expiry-kpi-card--slow {
+  border-left: 4px solid var(--color-primary);
+}
+
+.expiry-kpi-card--expired {
+  border-left: 4px solid var(--color-text-muted);
+}
+
+.expiry-kpi-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.expiry-kpi-count {
+  font-size: var(--font-size-xl, 1.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.expiry-tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  margin-block: var(--space-3);
+}
+
+.expiry-tab-button {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.expiry-tab-button:hover {
+  color: var(--color-text);
+}
+
+.expiry-tab-button--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.expiry-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.expiry-tier-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.expiry-tier-select {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.expiry-scan-banner {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-sm);
+}

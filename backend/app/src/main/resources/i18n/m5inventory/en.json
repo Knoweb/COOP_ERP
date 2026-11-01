@@ -126,5 +126,6 @@
   "m5.reprice.invalid_qty": "Reprice quantity must be greater than zero with at most 3 decimal places",
   "m5.reprice.qty_exceeded": "Reprice quantity exceeds the quantity available on this lot",
   "m5.reprice.invalid_cost": "Unit cost must be zero or greater with at most 4 decimal places",
-  "m5.reprice.reason_required": "A reason is required for repricing"
+  "m5.reprice.reason_required": "A reason is required for repricing",
+  "m5.expiry.location_required": "A location is required"
 }
