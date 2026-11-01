@@ -1,25 +1,29 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import "./inventory.css";
-import { useInventoryApi, type Sku } from "./inventoryApi";
+import { useInventoryApi, type LotBalance, type Sku } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
 import { SkuLabel } from "./SkuLabel";
+import { StockRepriceModal } from "./StockRepriceModal";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 
 export function StockPage() {
   const t = useT();
   const formatDate = useFormatDate();
   const api = useInventoryApi();
+  const queryClient = useQueryClient();
   const canPrepare = useHasPermission("inv.opening.prepare");
+  const canReprice = useHasPermission("inv.stock.reprice");
   const [locationId, setLocationId] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLot, setSelectedLot] = useState<LotBalance | null>(null);
 
   const balances = useQuery({
     queryKey: ["inventory", "balances", locationId],
@@ -246,6 +250,7 @@ export function StockPage() {
                 <col className="col-fefo" />
                 <col className="col-available" />
                 <col className="col-unit-cost" />
+                {canReprice && <col className="col-actions" />}
               </colgroup>
               <thead>
                 <tr>
@@ -257,13 +262,14 @@ export function StockPage() {
                   <th className="col-fefo">{t("inventory.column.fefo").text}</th>
                   <th className="col-available numeric-cell">{t("inventory.column.available").text}</th>
                   <th className="col-unit-cost numeric-cell">{t("inventory.column.unit_cost").text}</th>
+                  {canReprice && <th className="col-actions">{t("inventory.actions").text}</th>}
                 </tr>
               </thead>
 
               <tbody>
                 {filteredBalances.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="empty-table-cell">
+                    <td colSpan={canReprice ? 9 : 8} className="empty-table-cell">
                       {t("inventory.find.none").text}
                     </td>
                   </tr>
@@ -319,6 +325,18 @@ export function StockPage() {
                       <td className="col-unit-cost numeric-cell">
                         {lot.unitCost != null ? <MoneyDisplay amount={lot.unitCost} /> : "—"}
                       </td>
+
+                      {canReprice && (
+                        <td className="col-actions">
+                          <button
+                            type="button"
+                            className="button button--small button--secondary"
+                            onClick={() => setSelectedLot(lot)}
+                          >
+                            {t("inventory.reprice.action").text}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -327,6 +345,16 @@ export function StockPage() {
           </div>
         </section>
       )}
+
+      <StockRepriceModal
+        isOpen={selectedLot !== null}
+        onClose={() => setSelectedLot(null)}
+        lot={selectedLot}
+        sku={selectedLot ? skuMap.get(selectedLot.skuId) ?? null : null}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["inventory", "balances", locationId] });
+        }}
+      />
     </main>
   );
 }

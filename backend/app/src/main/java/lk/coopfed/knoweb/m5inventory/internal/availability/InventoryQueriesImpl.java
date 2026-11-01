@@ -22,6 +22,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
 import lk.coopfed.knoweb.m5inventory.internal.reorder.ReorderStore;
+import lk.coopfed.knoweb.m5inventory.internal.reprice.RepriceStore;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.EntityCost;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
@@ -33,6 +34,7 @@ import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
 import lk.coopfed.knoweb.m5inventory.query.ReorderControlView;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
+import lk.coopfed.knoweb.m5inventory.query.StockRepricingView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -89,18 +91,21 @@ class InventoryQueriesImpl implements InventoryQueries {
     private final ControlPolicy policy;
     private final ZoneId zone;
     private final ReorderStore reorderStore;
+    private final RepriceStore repriceStore;
 
     InventoryQueriesImpl(
             JdbcTemplate jdbc,
             BusinessDay businessDay,
             ControlPolicy policy,
             ReorderStore reorderStore,
+            RepriceStore repriceStore,
             @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
         this.policy = policy;
         this.zone = ZoneId.of(zone);
         this.reorderStore = reorderStore;
+        this.repriceStore = repriceStore;
     }
 
     @Override
@@ -650,5 +655,10 @@ class InventoryQueriesImpl implements InventoryQueries {
     @Override
     public List<ReorderControlView> reorderControls(UUID locationId, UUID skuId, ScopeContext scope) {
         return reorderStore.findControls(locationId, skuId, scope);
+    }
+
+    @Override
+    public List<StockRepricingView> repricings(UUID locationId, UUID skuId, ScopeContext scope) {
+        return repriceStore.findRepricings(locationId, skuId, scope);
     }
 }

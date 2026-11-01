@@ -121,5 +121,10 @@
   "m5.reorder.invalid_max": "Maximum quantity must be greater than or equal to reorder level with at most 3 decimal places",
   "m5.reorder.not_found": "The reorder control was not found",
   "m5.reorder.sku_not_found": "The SKU was not found in the catalogue",
-  "m5.reorder.location_required": "A location is required"
+  "m5.reorder.location_required": "A location is required",
+  "m5.reprice.not_found": "The stock lot was not found or has no quantity on hand",
+  "m5.reprice.invalid_qty": "Reprice quantity must be greater than zero with at most 3 decimal places",
+  "m5.reprice.qty_exceeded": "Reprice quantity exceeds the quantity available on this lot",
+  "m5.reprice.invalid_cost": "Unit cost must be zero or greater with at most 4 decimal places",
+  "m5.reprice.reason_required": "A reason is required for repricing"
 }

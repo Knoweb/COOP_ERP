@@ -273,3 +273,9 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Stock fell to or below its configured reorder level at a location
+
+  # Polgolla M2-03: stock repricing and waste/spoilage adjustments
+  - code: STOCK_REPRICED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock lot unit cost repriced and entity valuation adjusted

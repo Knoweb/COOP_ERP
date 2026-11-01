@@ -38,6 +38,8 @@ export type TransferRequest = tradingComponents["schemas"]["TransferRequestRespo
 export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
 export type ReorderControl = components["schemas"]["ReorderControlResponse"];
 export type ConfigureReorderControlRequest = components["schemas"]["ConfigureReorderControlRequest"];
+export type RepriceStockLotRequest = components["schemas"]["RepriceStockLotRequest"];
+export type StockRepricingResponse = components["schemas"]["StockRepricingResponse"];
 export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockResponse"];
 
 export function useInventoryApi() {
@@ -432,6 +434,30 @@ export function useInventoryApi() {
           }
         });
         return data!;
+      },
+
+      async repriceStockLot(stockLotId: string, req: RepriceStockLotRequest, idempotencyKey: string): Promise<StockRepricingResponse> {
+        const { data, error } = await api.POST("/v1/inventory/lots/{stockLotId}/reprice", {
+          params: {
+            path: { stockLotId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: req
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async repricings(locationId: string, skuId?: string): Promise<StockRepricingResponse[]> {
+        const { data, error } = await api.GET("/v1/inventory/repricings", {
+          params: { query: { locationId, skuId } }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
       }
     }),
     [api, party, catalogue, trading]
