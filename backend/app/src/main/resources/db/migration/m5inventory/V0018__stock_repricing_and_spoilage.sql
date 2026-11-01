@@ -59,7 +59,15 @@ CREATE POLICY fed_view ON inventory.stock_repricing FOR SELECT TO app_rw
 CREATE POLICY ext_view ON inventory.stock_repricing FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
 
+-- definer_read on stock_repricing TO app_seed:
+-- inventory.apply_lot_reprice runs as its owner (app_seed), whom FORCE ROW LEVEL SECURITY
+-- binds too. This policy enables the SECURITY DEFINER function to verify the mandatory audit record.
+DROP POLICY IF EXISTS definer_read ON inventory.stock_repricing;
+CREATE POLICY definer_read ON inventory.stock_repricing FOR SELECT TO app_seed
+    USING (true);
+
 GRANT SELECT, INSERT ON inventory.stock_repricing TO app_rw;
+GRANT SELECT ON inventory.stock_repricing TO app_seed;
 
 -- 3. Authorized stock lot revaluation via SECURITY DEFINER function.
 -- Ensure app_rw holds no direct UPDATE privilege on stock_lot.unit_cost:
