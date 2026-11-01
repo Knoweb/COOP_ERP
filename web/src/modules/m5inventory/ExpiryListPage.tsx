@@ -31,14 +31,14 @@ export function ExpiryListPage() {
   const feedQuery = useQuery({
     queryKey: ["inventory", "expiry-feed", locationId, tierFilter],
     queryFn: () =>
-      api.expiryFeed(locationId, 90, tierFilter === "ALL" ? undefined : tierFilter),
+      api.expiryFeed(locationId, undefined, tierFilter === "ALL" ? undefined : tierFilter),
     enabled: locationId !== "" && activeTab === "feed"
   });
 
   // Query across all tiers to compute summary KPIs
   const allFeedQuery = useQuery({
     queryKey: ["inventory", "expiry-feed-all", locationId],
-    queryFn: () => api.expiryFeed(locationId, 90, undefined),
+    queryFn: () => api.expiryFeed(locationId, undefined, undefined),
     enabled: locationId !== ""
   });
 
@@ -130,7 +130,7 @@ export function ExpiryListPage() {
           </section>
 
           {/* Tab Navigation */}
-          <nav className="expiry-tabs" aria-label="Inventory Alert Views">
+          <nav className="expiry-tabs" aria-label={t("inventory.expiry.tab_views_label").text}>
             <button
               type="button"
               className={`expiry-tab-button ${activeTab === "feed" ? "expiry-tab-button--active" : ""}`}

@@ -83,8 +83,6 @@ public class ExpiryAlertStore {
             int warningDays,
             ScopeContext scope) {
 
-        int maxDays = windowDays != null ? windowDays : warningDays;
-
         String sql =
                 """
                 select l.stock_lot_id, l.location_id, l.sku_id, l.batch_id, b.batch_no,
@@ -126,7 +124,9 @@ public class ExpiryAlertStore {
 
         List<NearExpiryLotView> filtered = new ArrayList<>();
         for (NearExpiryLotView view : candidates) {
-            if (view.daysToExpiry() > maxDays && !"EXPIRED".equalsIgnoreCase(view.urgencyTier())) {
+            if (windowDays != null
+                    && view.daysToExpiry() > windowDays
+                    && !"EXPIRED".equalsIgnoreCase(view.urgencyTier())) {
                 continue;
             }
             if (tier != null && !tier.isBlank() && !"ALL".equalsIgnoreCase(tier)) {

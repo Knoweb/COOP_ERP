@@ -190,7 +190,8 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
 
         UUID sku = fixture.sku(MPCS, "SCAN_MILK");
         UUID batch = fixture.batch(sku, MPCS, "B-SCAN", today.plusDays(5)); // Critical
-        postGood(shop1, batch, "30.000", "150.00", MPCS);
+        postGood(shop1, batch, "60.000", "150.00", MPCS);
+        postSale(shop1, batch, "30.000", MPCS);
 
         UUID skuStag = fixture.sku(MPCS, "SCAN_STAG");
         UUID batchStag = fixture.batch(skuStag, MPCS, "B-SSTAG", today.plusDays(120));

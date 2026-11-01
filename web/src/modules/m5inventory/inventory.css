@@ -846,7 +846,7 @@
 
 .expiry-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2.5), 1fr));
   gap: var(--space-3);
   margin-block: var(--space-3);
 }
@@ -862,19 +862,19 @@
 }
 
 .expiry-kpi-card--critical {
-  border-left: 4px solid var(--color-alert);
+  border-left: var(--space-half) solid var(--color-alert-text);
 }
 
 .expiry-kpi-card--warning {
-  border-left: 4px solid var(--color-caution, #d97706);
+  border-left: var(--space-half) solid var(--color-disputed-text);
 }
 
 .expiry-kpi-card--slow {
-  border-left: 4px solid var(--color-primary);
+  border-left: var(--space-half) solid var(--color-accent);
 }
 
 .expiry-kpi-card--expired {
-  border-left: 4px solid var(--color-text-muted);
+  border-left: var(--space-half) solid var(--color-text-muted);
 }
 
 .expiry-kpi-title {
@@ -883,7 +883,7 @@
 }
 
 .expiry-kpi-count {
-  font-size: var(--font-size-xl, 1.5rem);
+  font-size: var(--font-size-xl);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -898,9 +898,9 @@
 .expiry-tab-button {
   background: none;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: var(--border-width-strong) solid transparent;
   padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -911,8 +911,8 @@
 }
 
 .expiry-tab-button--active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
 }
 
 .expiry-controls-row {
