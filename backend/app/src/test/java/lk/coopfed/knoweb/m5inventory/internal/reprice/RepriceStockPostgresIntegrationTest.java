@@ -410,20 +410,17 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
 
         // Attempting to directly call inventory.apply_lot_reprice without an audit row in the current transaction
         org.springframework.jdbc.core.JdbcTemplate jdbc = superuserJdbc();
-        assertThatThrownBy(() -> jdbc.execute(
-                        String.format(
-                                "select set_config('app.scope_class', 'OWN', true), "
-                                        + "set_config('app.scope_entity_id', '%s', true), "
-                                        + "set_config('app.scope_location_id', '%s', true), "
-                                        + "set_config('app.user_id', '%s', true), "
-                                        + "inventory.apply_lot_reprice(gen_random_uuid(), '%s'::uuid, 50.0000)",
-                                MPCS,
-                                shop,
-                                scope.userId(),
-                                lot.stockLotId())))
+        assertThatThrownBy(() -> jdbc.execute(String.format(
+                        "select set_config('app.scope_class', 'OWN', true), "
+                                + "set_config('app.scope_entity_id', '%s', true), "
+                                + "set_config('app.scope_location_id', '%s', true), "
+                                + "set_config('app.user_id', '%s', true), "
+                                + "inventory.apply_lot_reprice(gen_random_uuid(), '%s'::uuid, 50.0000)",
+                        MPCS, shop, scope.userId(), lot.stockLotId())))
                 .isInstanceOf(org.springframework.dao.DataAccessException.class)
-                .satisfies(e -> assertThat(
-                                ((org.springframework.dao.DataAccessException) e).getMostSpecificCause().getMessage())
+                .satisfies(e -> assertThat(((org.springframework.dao.DataAccessException) e)
+                                .getMostSpecificCause()
+                                .getMessage())
                         .contains("m5.reprice.audit_required"));
     }
 
