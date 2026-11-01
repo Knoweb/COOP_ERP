@@ -15,7 +15,7 @@
 # would break; the base digest and the image's SBOM say what was installed.
 FROM eclipse-temurin:21-jre@sha256:cff19e6215689161eb6162c11b86b0c60ddf802164f2eaf48d570f8fb79a36c5 AS jre
 
-FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends chromium ca-certificates \
     && rm -rf /var/lib/apt/lists/*
