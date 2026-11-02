@@ -412,6 +412,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/locations/{locationId}/expiry-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Near-expiry stock alert feed for a location with remaining quantities and urgency tiers */
+        get: operations["getExpiryAlertFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/slow-moving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Slow-moving and stagnant stock items at a location */
+        get: operations["getSlowMovingStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/expiry-alerts/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger evaluation and publishing of near-expiry and slow-moving alerts for a location */
+        post: operations["scanExpiryAlerts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/counts": {
         parameters: {
             query?: never;
@@ -1404,6 +1455,47 @@ export interface components {
             /** Format: date-time */
             repricedAt: string;
         };
+        ExpiryAlertItemResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo: string;
+            /** Format: date */
+            expiryDate: string;
+            daysToExpiry: number;
+            qtyOnHand: number;
+            unitCost: number;
+            /** @enum {string} */
+            urgencyTier: "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED" | "HEALTHY";
+            alertActive: boolean;
+        };
+        SlowMovingStockResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            qtyOnHand: number;
+            unitCost: number;
+            daysWithoutSale: number;
+            /** Format: date */
+            lastSaleDate?: string | null;
+            salesInWindow: number;
+            averageDailySales: number;
+            daysOfSupply: number;
+            /** @enum {string} */
+            classification: "STAGNANT" | "SLOW_VELOCITY";
+            alertActive: boolean;
+        };
+        ExpiryAlertScanResponse: {
+            nearExpiryAlertsEmitted: number;
+            slowMovingAlertsEmitted: number;
+            totalEvaluated: number;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -2105,6 +2197,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvaluateLowStockResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getExpiryAlertFeed: {
+        parameters: {
+            query?: {
+                windowDays?: number;
+                tier?: "ALL" | "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED";
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of near-expiry stock lots with urgency tiers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryAlertItemResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getSlowMovingStock: {
+        parameters: {
+            query?: {
+                evaluationDays?: number;
+                thresholdDaysOfSupply?: number;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of slow-moving stock items with velocity metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlowMovingStockResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    scanExpiryAlerts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alert scan evaluation summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryAlertScanResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

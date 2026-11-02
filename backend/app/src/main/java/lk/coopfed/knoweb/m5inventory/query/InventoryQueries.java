@@ -116,6 +116,11 @@ public interface InventoryQueries {
      */
     List<StockRepricingView> repricings(UUID locationId, UUID skuId, ScopeContext scope);
 
+    List<NearExpiryLotView> nearExpiryLots(UUID locationId, Integer windowDays, String tier, ScopeContext scope);
+
+    List<SlowMovingStockView> slowMovingStock(
+            UUID locationId, Integer evaluationDays, Integer thresholdDaysOfSupply, ScopeContext scope);
+
     /**
      * Historical stock lot repricings at a location for all SKUs (PGL-M2-03).
      */
