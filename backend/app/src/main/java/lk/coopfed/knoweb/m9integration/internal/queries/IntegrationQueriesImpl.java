@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m9integration.internal.journal.JournalFileV1;
 import lk.coopfed.knoweb.m9integration.internal.journal.JournalFiles;
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries;
+import lk.coopfed.knoweb.m9integration.query.NotificationRequestView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -332,5 +333,73 @@ class IntegrationQueriesImpl implements IntegrationQueries {
 
     private static java.time.Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();
+    }
+
+    @Override
+    public List<NotificationRequestView> notificationRequests(String status, int limit, ScopeContext scope) {
+        int rows = Math.max(1, Math.min(limit, 500));
+        UUID entityId = scope != null ? scope.entityId() : null;
+        return jdbc.query(
+                """
+                select request_id, owner_entity_id, channel, recipient_tag, message_type, content,
+                       status, attempts, provider, provider_ref, last_error, dedup_key,
+                       next_attempt_at, created_at, updated_at
+                  from integration.notification_request
+                 where (?::uuid is null or owner_entity_id = ?::uuid)
+                   and (?::text is null or status = ?::text)
+                 order by created_at desc
+                 limit ?
+                """,
+                (rs, i) -> new NotificationRequestView(
+                        rs.getObject("request_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getString("channel"),
+                        rs.getString("recipient_tag"),
+                        rs.getString("message_type"),
+                        rs.getString("content"),
+                        rs.getString("status"),
+                        rs.getInt("attempts"),
+                        rs.getString("provider"),
+                        rs.getString("provider_ref"),
+                        rs.getString("last_error"),
+                        rs.getString("dedup_key"),
+                        instant(rs.getTimestamp("next_attempt_at")),
+                        instant(rs.getTimestamp("created_at")),
+                        instant(rs.getTimestamp("updated_at"))),
+                entityId,
+                entityId,
+                status,
+                status,
+                rows);
+    }
+
+    @Override
+    public Optional<NotificationRequestView> notificationRequest(UUID requestId, ScopeContext scope) {
+        List<NotificationRequestView> list = jdbc.query(
+                """
+                select request_id, owner_entity_id, channel, recipient_tag, message_type, content,
+                       status, attempts, provider, provider_ref, last_error, dedup_key,
+                       next_attempt_at, created_at, updated_at
+                  from integration.notification_request
+                 where request_id = ?
+                """,
+                (rs, i) -> new NotificationRequestView(
+                        rs.getObject("request_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getString("channel"),
+                        rs.getString("recipient_tag"),
+                        rs.getString("message_type"),
+                        rs.getString("content"),
+                        rs.getString("status"),
+                        rs.getInt("attempts"),
+                        rs.getString("provider"),
+                        rs.getString("provider_ref"),
+                        rs.getString("last_error"),
+                        rs.getString("dedup_key"),
+                        instant(rs.getTimestamp("next_attempt_at")),
+                        instant(rs.getTimestamp("created_at")),
+                        instant(rs.getTimestamp("updated_at"))),
+                requestId);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 }

@@ -5,6 +5,7 @@
 |Spring components
 |_Services_
 
+* `l.c.k.m.api.NotificationGateway` (via `l.c.k.m.internal.notify.CentralNotificationGateway`)
 * `l.c.k.m.query.ApprovedPayrollContributionQueries` (via `l.c.k.m.internal.queries.ApprovedPayrollContributionQueriesImpl`)
 * `l.c.k.m.query.AttendanceQueries` (via `l.c.k.m.internal.queries.AttendanceQueriesImpl`)
 * `l.c.k.m.query.EmployeeQueries` (via `l.c.k.m.internal.queries.EmployeeQueriesImpl`)

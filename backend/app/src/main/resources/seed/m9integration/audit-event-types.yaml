@@ -30,3 +30,13 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Overtime calculation was approved for payroll contribution
+
+  - code: NOTIFICATION_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification request was queued through the centralized notification gateway
+
+  - code: NOTIFICATION_SENT
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification was successfully dispatched to the provider through the centralized notification gateway

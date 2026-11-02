@@ -431,7 +431,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
     /** M9's V0006 over the demo server's rows: the new posting key, the closed door, the definer function. */
     private static void assertWhatM9sV0006LeavesInPlace(JdbcTemplate admin, Map<String, Integer> after) {
-        assertThat(after).containsEntry("m9integration", 7);
+        assertThat(after).containsEntry("m9integration", 8);
         assertThat(admin.queryForObject(
                         "select relforcerowsecurity from pg_class where oid = 'integration.hr_employee'::regclass",
                         Boolean.class))
@@ -442,6 +442,10 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isTrue();
         assertThat(admin.queryForObject(
                         "select relforcerowsecurity from pg_class where oid = 'integration.payroll_contribution'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.notification_request'::regclass",
                         Boolean.class))
                 .isTrue();
         assertThat(admin.queryForList(
