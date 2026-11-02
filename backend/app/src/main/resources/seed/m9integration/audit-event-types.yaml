@@ -40,8 +40,3 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A notification was successfully dispatched to the provider through the centralized notification gateway
-
-  - code: NOTIFICATION_FAILED
-    severity: ALERT
-    offline_capturable: false
-    description_en: A notification delivery permanently failed after exhausting retry attempts
