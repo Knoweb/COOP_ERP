@@ -386,14 +386,14 @@ class LoyaltyRewardsAndInsurancePostgresIntegrationTest extends PostgresIntegrat
         // 4. Invariant: STRICTLY NO automatic cash payout or accounting posting occurs!
         Integer customerPostingCount = superuserJdbc()
                 .queryForObject(
-                        "SELECT COUNT(*) FROM customers.account_posting WHERE customer_id = ?",
+                        "SELECT COUNT(*) FROM customers.account_posting p JOIN customers.customer_account a ON a.account_id = p.account_id WHERE a.customer_id = ?",
                         Integer.class,
                         customerId);
         assertThat(customerPostingCount).isZero();
 
         Integer customerPaymentCount = superuserJdbc()
                 .queryForObject(
-                        "SELECT COUNT(*) FROM customers.doc_customer_payment WHERE customer_id = ?",
+                        "SELECT COUNT(*) FROM customers.doc_customer_payment cp JOIN customers.customer_account a ON a.account_id = cp.account_id WHERE a.customer_id = ?",
                         Integer.class,
                         customerId);
         assertThat(customerPaymentCount).isZero();
