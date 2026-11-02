@@ -118,6 +118,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customers/loyalty/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the society active loyalty reward and insurance policy */
+        get: operations["getActiveLoyaltyPolicy"];
+        /** Configure or update the society loyalty reward and insurance policy */
+        put: operations["configureLoyaltyPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record qualifying customer spend transaction */
+        post: operations["recordLoyaltySpend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/rewards/calculate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Calculate monthly qualifying spend, rewards and insurance eligibility */
+        post: operations["calculateMonthlyLoyaltyRewards"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/{loyaltyId}/rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loyaltyId: string;
+            };
+            cookie?: never;
+        };
+        /** Get monthly reward records for a loyalty customer */
+        get: operations["getLoyaltyRewards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/{loyaltyId}/insurance-eligibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loyaltyId: string;
+            };
+            cookie?: never;
+        };
+        /** Evaluate insurance benefit eligibility for a customer as of a date */
+        get: operations["checkInsuranceEligibility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/insurance-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit a loyalty insurance benefit claim */
+        post: operations["submitInsuranceClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/insurance-claims/{claimId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: string;
+            };
+            cookie?: never;
+        };
+        /** Get a loyalty insurance claim by claim ID */
+        get: operations["getInsuranceClaim"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/loyalty/insurance-claims/{claimId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Update the lifecycle status of an insurance claim */
+        put: operations["updateInsuranceClaimStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customers/{customerId}": {
         parameters: {
             query?: never;
@@ -981,6 +1126,135 @@ export interface components {
             loyaltyTier?: string | null;
             customer?: components["schemas"]["LoyaltyCustomerResponse"];
         };
+        ConfigureLoyaltyPolicyRequest: {
+            policyName: string;
+            monthlySpendThreshold?: number;
+            minMembershipMonths?: number;
+            monthlyRewardPoints?: number;
+            insuranceBenefitAmount?: number;
+            /** @default true */
+            active: boolean;
+        };
+        LoyaltyRewardPolicyResponse: {
+            /** Format: uuid */
+            policyId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            policyName: string;
+            monthlySpendThreshold: number;
+            minMembershipMonths: number;
+            monthlyRewardPoints: number;
+            insuranceBenefitAmount: number;
+            active: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        RecordLoyaltySpendRequest: {
+            /** Format: uuid */
+            loyaltyId: string;
+            /** Format: uuid */
+            locationId?: string | null;
+            /** Format: date */
+            spendDate?: string | null;
+            amount: number;
+            receiptNumber?: string | null;
+        };
+        RecordLoyaltySpendResponse: {
+            /** Format: uuid */
+            spendId: string;
+            /** Format: uuid */
+            loyaltyId: string;
+            amount: number;
+        };
+        CalculateMonthlyLoyaltyRewardsRequest: {
+            periodMonth: string;
+            /** Format: uuid */
+            customerId?: string | null;
+        };
+        CalculateMonthlyLoyaltyRewardsResponse: {
+            periodMonth: string;
+            evaluatedCount: number;
+            rewardIds: string[];
+        };
+        LoyaltyMonthlyRewardResponse: {
+            /** Format: uuid */
+            rewardId: string;
+            /** Format: uuid */
+            ownerEntityId?: string;
+            /** Format: uuid */
+            loyaltyId: string;
+            /** Format: uuid */
+            customerId: string;
+            periodMonth: string;
+            qualifyingSpend: number;
+            spendThreshold: number;
+            membershipMonths: number;
+            minMembershipMonths: number;
+            pointsAwarded: number;
+            insuranceEligible: boolean;
+            /** @enum {string} */
+            rewardStatus: "AWARDED" | "DISQUALIFIED";
+            disqualificationReason?: string | null;
+            /** Format: date-time */
+            evaluatedAt?: string;
+        };
+        LoyaltyInsuranceEligibilityResponse: {
+            /** Format: uuid */
+            loyaltyId: string;
+            /** Format: uuid */
+            customerId?: string | null;
+            eligible: boolean;
+            reason: string;
+            monthlyQualifyingSpend: number;
+            spendThreshold: number;
+            membershipMonths: number;
+            minMembershipMonths: number;
+            insuranceBenefitAmount: number;
+            /** Format: date */
+            evaluatedAsOf: string;
+        };
+        SubmitInsuranceClaimRequest: {
+            /** Format: uuid */
+            loyaltyId: string;
+            /** @enum {string} */
+            claimType: "DEATH_BENEFIT" | "HOSPITALIZATION" | "CRITICAL_ILLNESS" | "ACCIDENT" | "OTHER";
+            /** Format: date */
+            incidentDate: string;
+            claimantRelationship: string;
+            supportingDocumentRef: string;
+        };
+        LoyaltyInsuranceClaimResponse: {
+            /** Format: uuid */
+            claimId: string;
+            /** Format: uuid */
+            ownerEntityId?: string;
+            /** Format: uuid */
+            loyaltyId: string;
+            /** Format: uuid */
+            customerId: string;
+            claimType: string;
+            /** @enum {string} */
+            claimStatus: "SUBMITTED" | "ELIGIBLE_SUPPORTED" | "APPROVED" | "REJECTED" | "SETTLED_EXTERNALLY";
+            policyBenefitAmount: number;
+            /** Format: date */
+            incidentDate: string;
+            claimantRelationship: string;
+            supportingDocumentRef: string;
+            eligibilityVerified: boolean;
+            eligibilitySnapshotJson?: string | null;
+            rejectionReason?: string | null;
+            /** Format: date-time */
+            submittedAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        UpdateInsuranceClaimStatusRequest: {
+            /** @enum {string} */
+            status: "SUBMITTED" | "ELIGIBLE_SUPPORTED" | "APPROVED" | "REJECTED" | "SETTLED_EXTERNALLY";
+            rejectionReason?: string | null;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1227,6 +1501,257 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoyaltyCustomerResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getActiveLoyaltyPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active loyalty policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyRewardPolicyResponse"];
+                };
+            };
+            /** @description No active policy found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    configureLoyaltyPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureLoyaltyPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Policy configured successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyRewardPolicyResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    recordLoyaltySpend: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordLoyaltySpendRequest"];
+            };
+        };
+        responses: {
+            /** @description Spend recorded successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordLoyaltySpendResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    calculateMonthlyLoyaltyRewards: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculateMonthlyLoyaltyRewardsRequest"];
+            };
+        };
+        responses: {
+            /** @description Monthly evaluation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculateMonthlyLoyaltyRewardsResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getLoyaltyRewards: {
+        parameters: {
+            query?: {
+                periodMonth?: string;
+            };
+            header?: never;
+            path: {
+                loyaltyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reward evaluations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyMonthlyRewardResponse"][];
+                };
+            };
+        };
+    };
+    checkInsuranceEligibility: {
+        parameters: {
+            query?: {
+                asOfDate?: string;
+            };
+            header?: never;
+            path: {
+                loyaltyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Insurance eligibility evaluation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyInsuranceEligibilityResponse"];
+                };
+            };
+        };
+    };
+    submitInsuranceClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitInsuranceClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description Claim submitted and eligibility verified */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyInsuranceClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getInsuranceClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The insurance claim */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyInsuranceClaimResponse"];
+                };
+            };
+            /** @description Claim not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateInsuranceClaimStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInsuranceClaimStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Claim status updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyInsuranceClaimResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
