@@ -30,6 +30,9 @@ export type CorrectBatchRequest = components["schemas"]["CorrectBatchRequest"];
 export type LinkBarcodeToBatchRequest = components["schemas"]["LinkBarcodeToBatchRequest"];
 export type SupplierResponse = components["schemas"]["SupplierResponse"];
 export type RegisterSupplierRequest = components["schemas"]["RegisterSupplierRequest"];
+export type BulkImportSuppliersRequest = components["schemas"]["BulkImportSuppliersRequest"];
+export type SupplierImportReportResponse = components["schemas"]["SupplierImportReportResponse"];
+export type SupplierValidationError = components["schemas"]["SupplierValidationError"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -231,6 +234,17 @@ export function useCatalogueApi() {
 
       async registerSupplier(body: RegisterSupplierRequest, idempotencyKey: string): Promise<SupplierResponse> {
         const { data } = await api.POST("/v1/catalogue/suppliers", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async importSuppliers(
+        body: BulkImportSuppliersRequest,
+        idempotencyKey: string
+      ): Promise<SupplierImportReportResponse> {
+        const { data } = await api.POST("/v1/catalogue/suppliers/import", {
           params: { header: { "Idempotency-Key": idempotencyKey } },
           body
         });
