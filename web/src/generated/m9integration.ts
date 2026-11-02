@@ -230,6 +230,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/integration/hr/employees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List employees within caller's scope */
+        get: operations["listEmployees"];
+        put?: never;
+        /** Register or update an employee profile */
+        post: operations["registerEmployee"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/hr/employees/{employeeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get employee profile by ID */
+        get: operations["getEmployee"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/attendance/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch import biometric punch records from attendance devices */
+        post: operations["importAttendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List attendance records */
+        get: operations["listAttendance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/overtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List overtime calculations */
+        get: operations["listOvertimeCalculations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/overtime/{calculationId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve overtime calculation for payroll contribution */
+        post: operations["approveOvertime"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payroll-contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List approved payroll contributions */
+        get: operations["listPayrollContributions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payroll-contributions/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary totals of approved payroll contributions for a period */
+        get: operations["getPayrollContributionSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -383,6 +520,147 @@ export interface components {
              * @description when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)
              */
             nextAttemptAt?: string | null;
+        };
+        RegisterEmployeeRequest: {
+            employeeNo: string;
+            fullName: string;
+            nic?: string | null;
+            epfNo?: string | null;
+            hourlyRate: number;
+            /** Format: uuid */
+            locationId?: string | null;
+        };
+        EmployeeResponse: {
+            /** Format: uuid */
+            employeeId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            employeeNo: string;
+            fullName: string;
+            nic?: string | null;
+            epfNo?: string | null;
+            hourlyRate: number;
+            /** Format: uuid */
+            locationId?: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ImportAttendanceRequest: {
+            items: components["schemas"]["AttendanceImportItem"][];
+        };
+        AttendanceImportItem: {
+            externalRecordId: string;
+            employeeNo: string;
+            deviceIdentifier: string;
+            sourceProvider: string;
+            /** Format: date */
+            businessDate: string;
+            /** Format: date-time */
+            clockIn: string;
+            /** Format: date-time */
+            clockOut: string;
+            rawPayload?: string | null;
+        };
+        AttendanceImportResponse: {
+            imported: number;
+            duplicate: number;
+            rejected: number;
+            recordIds: string[];
+            rejections: components["schemas"]["AttendanceRejection"][];
+        };
+        AttendanceRejection: {
+            externalRecordId: string;
+            reason: string;
+        };
+        AttendanceRecordResponse: {
+            /** Format: uuid */
+            attendanceId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            externalRecordId: string;
+            /** Format: uuid */
+            employeeId: string;
+            employeeNo: string;
+            employeeName: string;
+            deviceIdentifier: string;
+            sourceProvider: string;
+            /** Format: date */
+            businessDate: string;
+            /** Format: date-time */
+            clockIn: string;
+            /** Format: date-time */
+            clockOut: string;
+            workedMinutes: number;
+            /** @enum {string} */
+            status: "RECORDED" | "VALIDATED" | "REJECTED";
+            rejectionReason?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        OvertimeCalculationResponse: {
+            /** Format: uuid */
+            calculationId: string;
+            /** Format: uuid */
+            attendanceId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            employeeId: string;
+            employeeNo: string;
+            employeeName: string;
+            /** Format: date */
+            businessDate: string;
+            workedMinutes: number;
+            standardMinutes: number;
+            qualifyingOtMinutes: number;
+            calculatedOtMinutes: number;
+            otMultiplier: number;
+            calculatedAmount: number;
+            /** @enum {string} */
+            status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "NO_OT_EARNED";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ApproveOvertimeRequest: {
+            payrollPeriod: string;
+            notes?: string | null;
+        };
+        PayrollContributionResponse: {
+            /** Format: uuid */
+            contributionId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            employeeId: string;
+            employeeNo: string;
+            employeeName: string;
+            /** Format: uuid */
+            calculationId: string;
+            payrollPeriod: string;
+            /** @enum {string} */
+            contributionType: "OVERTIME" | "BONUS" | "ALLOWANCE";
+            approvedOtMinutes: number;
+            approvedAmount: number;
+            /** Format: uuid */
+            approvedBy: string;
+            /** Format: date-time */
+            approvedAt: string;
+            approvalNotes?: string | null;
+            /** @enum {string} */
+            status: "APPROVED_PENDING_PAYROLL" | "POSTED_TO_PAYROLL" | "CANCELLED";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PayrollContributionSummaryResponse: {
+            payrollPeriod: string;
+            totalEmployees: number;
+            totalOtMinutes: number;
+            totalApprovedAmount: number;
+            contributionCount: number;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -768,6 +1046,242 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listEmployees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of employees */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeResponse"][];
+                };
+            };
+        };
+    };
+    registerEmployee: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterEmployeeRequest"];
+            };
+        };
+        responses: {
+            /** @description Employee registered or updated */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getEmployee: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                employeeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Employee details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeResponse"];
+                };
+            };
+            /** @description Employee not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    importAttendance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportAttendanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Import results summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceImportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listAttendance: {
+        parameters: {
+            query?: {
+                businessDate?: string;
+                employeeId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of attendance records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecordResponse"][];
+                };
+            };
+        };
+    };
+    listOvertimeCalculations: {
+        parameters: {
+            query?: {
+                status?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "NO_OT_EARNED";
+                businessDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of overtime calculations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OvertimeCalculationResponse"][];
+                };
+            };
+        };
+    };
+    approveOvertime: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveOvertimeRequest"];
+            };
+        };
+        responses: {
+            /** @description Approved payroll contribution */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollContributionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPayrollContributions: {
+        parameters: {
+            query?: {
+                payrollPeriod?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of payroll contributions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollContributionResponse"][];
+                };
+            };
+        };
+    };
+    getPayrollContributionSummary: {
+        parameters: {
+            query: {
+                payrollPeriod: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Period summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollContributionSummaryResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
 }

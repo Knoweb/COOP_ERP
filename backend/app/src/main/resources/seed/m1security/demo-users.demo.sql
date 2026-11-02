@@ -268,10 +268,12 @@ ON CONFLICT DO NOTHING;
 -- of its own, so that the other lanes' additions above merge without a conflict.
 WITH job (role_id, codes) AS (
     VALUES
-        ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
-        ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY['int.notify.view', 'int.notify.manage']),
-        ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
-        ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view'])
+        ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY['int.notify.view', 'int.notify.manage', 'int.employee.manage', 'int.attendance.import', 'int.overtime.approve', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY['int.employee.manage', 'int.attendance.import', 'int.overtime.approve', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, ARRAY['int.attendance.import', 'int.payroll.view'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code

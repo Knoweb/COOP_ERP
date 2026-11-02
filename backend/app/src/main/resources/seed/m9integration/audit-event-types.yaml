@@ -15,3 +15,18 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A notification rule was activated or retired
+
+  - code: EMPLOYEE_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: An employee profile was registered or updated for attendance and payroll
+
+  - code: ATTENDANCE_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Biometric attendance punch records were imported and validated
+
+  - code: OVERTIME_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: Overtime calculation was approved for payroll contribution
