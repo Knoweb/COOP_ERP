@@ -60,6 +60,10 @@ public interface IntegrationQueries {
      */
     List<LogEntry> log(String status, int limit, ScopeContext scope);
 
+    List<NotificationRequestView> notificationRequests(String status, int limit, ScopeContext scope);
+
+    Optional<NotificationRequestView> notificationRequest(UUID requestId, ScopeContext scope);
+
     /**
      * @param provisional the period was open when the export was made (wave 2, CR-29-1 item 1):
      *     marked in the list, the file name and the file

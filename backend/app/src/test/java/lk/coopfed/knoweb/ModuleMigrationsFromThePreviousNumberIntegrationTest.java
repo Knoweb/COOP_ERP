@@ -66,7 +66,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // contact door) on a database at V0005. In the scaffold proof the stream is the copy's
         // (V0001 up from hello), which has no V0005: it is migrated whole, and M9's own checks
         // below are left out.
-        streams.put("m9integration", ScaffoldProof.active() ? null : "5");
+        streams.put("m9integration", ScaffoldProof.active() ? null : "6");
         return streams;
     }
 
@@ -431,7 +431,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
     /** M9's V0006 over the demo server's rows: the new posting key, the closed door, the definer function. */
     private static void assertWhatM9sV0006LeavesInPlace(JdbcTemplate admin, Map<String, Integer> after) {
-        assertThat(after).containsEntry("m9integration", 6);
+        assertThat(after).containsEntry("m9integration", 7);
         assertThat(admin.queryForList(
                         "select conname from pg_constraint where conrelid = 'integration.journal_posting'::regclass"
                                 + " and contype = 'u'",
