@@ -16,6 +16,7 @@
             "m2catalogue::query",
             "m3pricing::query",
             "m4trading::query",
-            "m5inventory::query"
+            "m5inventory::query",
+            "m9integration::query"
         })
 package lk.coopfed.knoweb.m8reporting;

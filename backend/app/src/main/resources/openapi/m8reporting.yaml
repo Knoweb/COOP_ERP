@@ -704,6 +704,79 @@ paths:
         '404':
           description: Invoice not found in caller's permitted scope
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/final-accounts:
+    get:
+      tags: [Reporting]
+      operationId: getFinalAccounts
+      summary: Monthly final accounts statement combining revenue, COGS and approved expenses
+      description: >
+        Produces month-end final accounts statement reconciling retail sales revenue,
+        cost of goods sold, gross profit, and approved payroll/operating expenses.
+        Surfaces partial or pending data explicitly without fabricating zero figures.
+      x-permission: rpt.report.run
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: 'Year and month (YYYY-MM), defaults to current business month'
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+      responses:
+        '200':
+          description: Monthly final accounts statement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinalAccountsReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/final-accounts/expenses:
+    get:
+      tags: [Reporting]
+      operationId: getFinalAccountsExpenses
+      summary: Monthly operating expense breakdown including approved payroll contributions
+      description: >
+        Produces detailed monthly operating expense breakdown, classifying approved
+        staff/payroll contributions from M9 and documenting non-payroll expense status.
+      x-permission: rpt.report.run
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: 'Year and month (YYYY-MM), defaults to current business month'
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+      responses:
+        '200':
+          description: Operating expense details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinalAccountsExpensesResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/final-accounts/csv:
+    get:
+      tags: [Reporting]
+      operationId: exportFinalAccountsCsv
+      summary: Export monthly final accounts statement and expense breakdown as CSV
+      description: Exports monthly final accounts statement and expense breakdown as CSV.
+      x-permission: rpt.export.run
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+      responses:
+        '200':
+          description: CSV file stream
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Scope forbidden
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     FinanceAsOf:
@@ -1530,3 +1603,92 @@ components:
         invoiceId: { type: string, format: uuid }
         voucherNumber: { type: string }
         downloadUrl: { type: string, format: uri }
+    FinalAccountsReportResponse:
+      type: object
+      required:
+        - period
+        - currency
+        - status
+        - revenue
+        - costPending
+        - payrollExpenses
+        - otherExpensesPending
+        - expenseCategories
+        - payrollContributions
+      properties:
+        period: { type: string }
+        currency: { type: string }
+        status:
+          type: string
+          enum: [COMPLETE, PARTIAL, UNAVAILABLE]
+        statusReason: { type: string, nullable: true }
+        revenue: { type: string }
+        cogs: { type: string, nullable: true }
+        costPending: { type: boolean }
+        grossProfit: { type: string, nullable: true }
+        grossProfitMarginPercent: { type: string, nullable: true }
+        payrollExpenses: { type: string }
+        otherExpenses: { type: string, nullable: true }
+        otherExpensesPending: { type: boolean }
+        totalExpenses: { type: string, nullable: true }
+        operatingProfit: { type: string, nullable: true }
+        operatingProfitMarginPercent: { type: string, nullable: true }
+        expenseCategories:
+          type: array
+          items: { $ref: '#/components/schemas/ExpenseCategoryResponse' }
+        payrollContributions:
+          type: array
+          items: { $ref: '#/components/schemas/FinalAccountPayrollItemResponse' }
+    ExpenseCategoryResponse:
+      type: object
+      required:
+        - category
+        - categoryName
+        - status
+      properties:
+        category: { type: string }
+        categoryName: { type: string }
+        amount: { type: string, nullable: true }
+        status: { type: string }
+        notes: { type: string, nullable: true }
+    FinalAccountPayrollItemResponse:
+      type: object
+      required:
+        - contributionId
+        - employeeId
+        - employeeNo
+        - employeeName
+        - contributionType
+        - approvedAmount
+        - approvedOtMinutes
+        - status
+      properties:
+        contributionId: { type: string, format: uuid }
+        employeeId: { type: string, format: uuid }
+        employeeNo: { type: string }
+        employeeName: { type: string }
+        contributionType: { type: string }
+        approvedAmount: { type: string }
+        approvedOtMinutes: { type: integer }
+        approvedAt: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+    FinalAccountsExpensesResponse:
+      type: object
+      required:
+        - period
+        - currency
+        - totalPayrollExpenses
+        - contributionCount
+        - categories
+        - contributions
+      properties:
+        period: { type: string }
+        currency: { type: string }
+        totalPayrollExpenses: { type: string }
+        contributionCount: { type: integer }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/ExpenseCategoryResponse' }
+        contributions:
+          type: array
+          items: { $ref: '#/components/schemas/FinalAccountPayrollItemResponse' }

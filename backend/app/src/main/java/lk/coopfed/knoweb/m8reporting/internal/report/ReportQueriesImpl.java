@@ -64,6 +64,8 @@ import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
 import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsExpenses;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsReport;
 import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
 import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyDailyTrendItem;
@@ -88,6 +90,7 @@ import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceRow;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
+import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -137,6 +140,7 @@ class ReportQueriesImpl implements ReportingQueries {
     private final ExposureQueries exposureQueries;
     private final InvoiceQueries invoiceQueries;
     private final OpeningReceivableQueries openingReceivableQueries;
+    private final ApprovedPayrollContributionQueries payrollQueries;
     private final Formats formats;
     private final Messages messages;
     private final ObjectProvider<A4Renderer> a4RendererProvider;
@@ -181,6 +185,7 @@ class ReportQueriesImpl implements ReportingQueries {
             ExposureQueries exposureQueries,
             InvoiceQueries invoiceQueries,
             OpeningReceivableQueries openingReceivableQueries,
+            ApprovedPayrollContributionQueries payrollQueries,
             Formats formats,
             Messages messages,
             ObjectProvider<A4Renderer> a4RendererProvider) {
@@ -200,6 +205,7 @@ class ReportQueriesImpl implements ReportingQueries {
         this.exposureQueries = exposureQueries;
         this.invoiceQueries = invoiceQueries;
         this.openingReceivableQueries = openingReceivableQueries;
+        this.payrollQueries = payrollQueries;
         this.formats = formats;
         this.messages = messages;
         this.a4RendererProvider = a4RendererProvider;
@@ -1884,5 +1890,174 @@ class ReportQueriesImpl implements ReportingQueries {
         return party.getEntity(entityId, scope)
                 .map(e -> e.entityCode() != null ? e.entityCode() : "")
                 .orElse("");
+    }
+
+    @Override
+    public FinalAccountsReport finalAccounts(String yearMonth, ScopeContext scope) {
+        YearMonth ym;
+        if (yearMonth == null || yearMonth.isBlank()) {
+            ym = YearMonth.now(clock);
+        } else {
+            try {
+                ym = YearMonth.parse(yearMonth);
+            } catch (Exception e) {
+                throw new ProblemException("m8.final_accounts.month_invalid");
+            }
+        }
+        LocalDate periodStart = ym.atDay(1);
+        LocalDate periodEnd = ym.atEndOfMonth();
+
+        record LocationSales(UUID locationId, BigDecimal netSales, long txnCount) {}
+        Map<UUID, LocationSales> salesByLocation = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select location_id,
+                       coalesce(sum(net), 0) as net_sales,
+                       count(receipt_id) as txn_count
+                  from reporting.shop_sale_fact
+                 where business_date between ? and ?
+                 group by location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    salesByLocation.put(
+                            locId, new LocationSales(locId, rs.getBigDecimal("net_sales"), rs.getLong("txn_count")));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd));
+
+        Map<UUID, LocationSalesCost> costByLocation =
+                inventoryQueries.locationsSalesCost(periodStart, periodEnd, scope);
+
+        BigDecimal totalRevenue = salesByLocation.values().stream()
+                .map(LocationSales::netSales)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        boolean costPending = false;
+        BigDecimal totalCogs = BigDecimal.ZERO;
+        for (Map.Entry<UUID, LocationSales> entry : salesByLocation.entrySet()) {
+            UUID locId = entry.getKey();
+            LocationSales ls = entry.getValue();
+            LocationSalesCost lc = costByLocation.get(locId);
+            if (ls.netSales() != null
+                    && ls.netSales().compareTo(BigDecimal.ZERO) > 0
+                    && (lc == null || lc.movementCount() == 0)) {
+                costPending = true;
+            } else if (lc != null && lc.costPending()) {
+                costPending = true;
+            }
+        }
+        for (LocationSalesCost lc : costByLocation.values()) {
+            if (lc.costPending()) {
+                costPending = true;
+            } else if (lc.recognizedCost() != null) {
+                totalCogs = totalCogs.add(lc.recognizedCost());
+            }
+        }
+
+        BigDecimal grossProfit = null;
+        BigDecimal grossProfitMargin = null;
+        BigDecimal recognizedCogs = null;
+        if (!costPending) {
+            recognizedCogs = totalCogs.setScale(2, RoundingMode.HALF_UP);
+            grossProfit = totalRevenue.subtract(recognizedCogs).setScale(2, RoundingMode.HALF_UP);
+            grossProfitMargin = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                    ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        List<ApprovedPayrollContributionQueries.ApprovedPayrollContributionView> contributions =
+                payrollQueries.listApprovedContributions(ym.toString(), scope);
+
+        List<FinalAccountsReport.PayrollContributionLineItem> payrollLines = new ArrayList<>();
+        BigDecimal payrollExpenses = BigDecimal.ZERO;
+        int totalOtMinutes = 0;
+        Set<UUID> countedContributions = new HashSet<>();
+        for (ApprovedPayrollContributionQueries.ApprovedPayrollContributionView c : contributions) {
+            if (!"CANCELLED".equalsIgnoreCase(c.status()) && countedContributions.add(c.contributionId())) {
+                BigDecimal amt = c.approvedAmount() != null ? c.approvedAmount() : BigDecimal.ZERO;
+                payrollExpenses = payrollExpenses.add(amt);
+                totalOtMinutes += c.approvedOtMinutes();
+                payrollLines.add(new FinalAccountsReport.PayrollContributionLineItem(
+                        c.contributionId(),
+                        c.employeeId(),
+                        c.employeeNo(),
+                        c.employeeName(),
+                        c.contributionType(),
+                        amt.setScale(2, RoundingMode.HALF_UP),
+                        c.approvedOtMinutes(),
+                        c.approvedAt(),
+                        c.status()));
+            }
+        }
+        payrollExpenses = payrollExpenses.setScale(2, RoundingMode.HALF_UP);
+
+        List<FinalAccountsReport.ExpenseCategoryItem> categories = new ArrayList<>();
+        categories.add(new FinalAccountsReport.ExpenseCategoryItem(
+                "STAFF_PAYROLL",
+                "Staff & Payroll Costs",
+                payrollExpenses,
+                "APPROVED",
+                "Approved biometric attendance and overtime contributions from M9 (" + payrollLines.size()
+                        + " contribution(s), " + totalOtMinutes + " approved OT minutes)"));
+        categories.add(
+                new FinalAccountsReport.ExpenseCategoryItem(
+                        "OTHER_OPERATING",
+                        "Other Operating Expenses",
+                        null,
+                        "UNAVAILABLE",
+                        "Non-payroll operating expenses (rent, utilities, transport, maintenance) require general ledger / cashbook journal integration, which arrives in Phase 3"));
+
+        BigDecimal otherExpenses = null;
+        boolean otherExpensesPending = true;
+
+        // When mandatory other operating expenses are unavailable, total operating expenses,
+        // operating profit, and operating margin cannot be determined without fabricating figures.
+        BigDecimal totalExpenses = null;
+        BigDecimal operatingProfit = null;
+        BigDecimal operatingMarginPercent = null;
+
+        String status = FinalAccountsReport.STATUS_PARTIAL;
+        String statusReason;
+        if (costPending) {
+            statusReason =
+                    "Cost of Goods Sold is pending inventory cost resolution; non-payroll operating expenses (rent, utilities) pending Phase 3 general ledger integration";
+        } else {
+            statusReason =
+                    "Non-payroll operating expenses (rent, utilities) pending Phase 3 general ledger integration; total operating expenses and operating profit are unavailable";
+        }
+
+        return new FinalAccountsReport(
+                ym.toString(),
+                "LKR",
+                status,
+                statusReason,
+                totalRevenue,
+                recognizedCogs,
+                costPending,
+                grossProfit,
+                grossProfitMargin,
+                payrollExpenses,
+                otherExpenses,
+                otherExpensesPending,
+                totalExpenses,
+                operatingProfit,
+                operatingMarginPercent,
+                categories,
+                payrollLines);
+    }
+
+    @Override
+    public FinalAccountsExpenses finalAccountsExpenses(String yearMonth, ScopeContext scope) {
+        FinalAccountsReport report = finalAccounts(yearMonth, scope);
+        return new FinalAccountsExpenses(
+                report.period(),
+                report.currency(),
+                report.payrollExpenses(),
+                report.payrollContributions().size(),
+                report.expenseCategories(),
+                report.payrollContributions());
     }
 }

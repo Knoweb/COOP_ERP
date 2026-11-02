@@ -165,5 +165,6 @@
   "m8.finance.voucher.tax": "வாட் தொகை",
   "m8.finance.voucher.gross": "மொத்த தொகை",
   "m8.finance.invoice_not_found": "அனுமதிக்கப்பட்ட வரம்பிற்குள் வரி விலைப்பட்டியல் காணப்படவில்லை",
-  "m8.finance.print_not_ready": "அச்சிடக்கூடிய உறுதிச்சீட்டு ஆவணம் இன்னும் தயாராகவில்லை"
+  "m8.finance.print_not_ready": "அச்சிடக்கூடிய உறுதிச்சீட்டு ஆவணம் இன்னும் தயாராகவில்லை",
+  "m8.final_accounts.month_invalid": "மாதம் YYYY-MM வடிவத்தில் இருக்க வேண்டும்"
 }

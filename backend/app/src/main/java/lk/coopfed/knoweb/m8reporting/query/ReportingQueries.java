@@ -90,4 +90,15 @@ public interface ReportingQueries {
 
     /** Render or obtain pre-signed link to printable credit voucher A4 PDF (Polgolla M1-10). */
     java.net.URI renderCreditVoucher(UUID invoiceId, ScopeContext scope);
+
+    /**
+     * Monthly final accounts statement combining revenue, cost of goods sold, gross profit,
+     * and approved operating/payroll expenses (Polgolla M1-09).
+     */
+    FinalAccountsReport finalAccounts(String yearMonth, ScopeContext scope);
+
+    /**
+     * Monthly operating expense breakdown including approved staff/payroll contributions (Polgolla M1-09).
+     */
+    FinalAccountsExpenses finalAccountsExpenses(String yearMonth, ScopeContext scope);
 }

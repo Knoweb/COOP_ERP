@@ -629,3 +629,19 @@
 .finance-goods-society-input {
   max-width: var(--reporting-key-column-min);
 }
+
+.finance-status-subtitle {
+  margin-top: var(--space-half);
+  margin-bottom: 0;
+}
+
+.finance-margin-percent {
+  font-size: var(--font-size-sm);
+  margin-left: var(--space-half);
+  color: var(--color-text-muted);
+}
+
+.finance-notes-cell {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
