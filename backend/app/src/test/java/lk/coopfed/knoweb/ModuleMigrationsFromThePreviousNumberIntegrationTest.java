@@ -50,7 +50,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
         streams.put("m1security", "20");
         // CAT-06: m2catalogue V0011 (location_assortment) from V0010.
-        streams.put("m2catalogue", "10");
+        streams.put("m2catalogue", "11");
         // PRC-11: m3pricing V0011 (superseded line closure) from V0010.
         streams.put("m3pricing", "10");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
@@ -198,7 +198,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
-                .containsEntry("m2catalogue", 11)
+                .containsEntry("m2catalogue", 12)
                 .containsEntry("m3pricing", 11)
                 .containsEntry("m5inventory", 19)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
