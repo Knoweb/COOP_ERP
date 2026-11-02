@@ -1093,3 +1093,52 @@ config_items:
     sensitive: false
     till_visible: true
     module: m6pos
+  # M3-05: HR Fingerprint Attendance and Overtime calculation rules
+  - key: hr.attendance.standard_daily_minutes
+    value_type: INTEGER
+    schema: { minimum: 60, maximum: 1440 }
+    description_en: Standard working minutes per day before overtime eligibility
+    description_si: අතිකාල සුදුසුකමට පෙර දිනකට සම්මත වැඩ කරන මිනිත්තු
+    description_ta: மேலதிக நேர தகுதிக்கு முன் ஒரு நாளைக்கு நிலையான வேலை நிமிடங்கள்
+    default: 480
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  - key: hr.attendance.overtime_threshold_minutes
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 240 }
+    description_en: Minimum excess minutes worked required to qualify for overtime
+    description_si: අතිකාල සඳහා සුදුසුකම් ලැබීමට අවශ්‍ය අවම අමතර වැඩ කරන මිනිත්තු
+    description_ta: மேலதிக நேரத்திற்கு தகுதி பெற தேவையான குறைந்தபட்ச கூடுதல் வேலை நிமிடங்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  - key: hr.attendance.overtime_rate_multiplier
+    value_type: DECIMAL
+    schema: { minimum: 1.0, maximum: 3.0 }
+    description_en: Hourly rate multiplier for standard weekday overtime
+    description_si: සාමාන්‍ය සතියේ දින අතිකාල සඳහා පැයක ගාස්තු ගුණකය
+    description_ta: நிலையான வாரநாள் மேலதிக நேரத்திற்கான மணிநேர வீதப் பெருக்கி
+    default: 1.50
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  - key: hr.attendance.weekend_rate_multiplier
+    value_type: DECIMAL
+    schema: { minimum: 1.0, maximum: 3.0 }
+    description_en: Hourly rate multiplier for weekend overtime
+    description_si: සති අන්ත අතිකාල සඳහා පැයක ගාස්තු ගුණකය
+    description_ta: வார இறுதி மேලதிக நேரத்திற்கான மணிநேர வீதப் பெருக்கி
+    default: 2.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration

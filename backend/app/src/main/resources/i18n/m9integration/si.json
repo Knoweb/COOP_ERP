@@ -13,5 +13,13 @@
   "m9.rule.not_found": "එවැනි සම්මේලන පුරා නීතියක් නැත",
   "m9.rule.status_invalid": "නීතියක් සක්‍රිය කරනු හෝ විශ්‍රාම ගන්වනු ලැබේ",
   "m9.rule.status_unchanged": "නීතිය දැනටමත් {status} ය",
-  "m9.rule.template_inactive": "නීතියේ සැකිල්ල සක්‍රිය නොවන තාක් නීතිය සක්‍රිය කළ නොහැක"
+  "m9.rule.template_inactive": "නීතියේ සැකිල්ල සක්‍රිය නොවන තාක් නීතිය සක්‍රිය කළ නොහැක",
+  "m9.employee.not_found": "සේවක {0} සොයාගත නොහැක",
+  "m9.employee.already_exists": "සේවක {0} දැනටමත් පවතී",
+  "m9.attendance.clock_times_invalid": "පිටවීමේ වේලාව පැමිණීමේ වේලාවට පෙර නොවිය යුතුය",
+  "m9.attendance.item_rejected": "පැමිණීමේ සටහන ප්‍රතික්ෂේප විය: {0}",
+  "m9.overtime.not_found": "අතිකාල ගණනය කිරීම {0} සොයාගත නොහැක",
+  "m9.overtime.already_processed": "අතිකාල ගණනය කිරීම {0} දැනටමත් සකසා ඇත",
+  "m9.overtime.not_qualifying": "අතිකාල ගණනය කිරීම {0} අතිකාල අනුමැතිය සඳහා සුදුසුකම් නොලබයි",
+  "m9.overtime.period_invalid": "වැටුප් කාලසීමා ආකෘතිය YYYY-MM විය යුතුය"
 }
