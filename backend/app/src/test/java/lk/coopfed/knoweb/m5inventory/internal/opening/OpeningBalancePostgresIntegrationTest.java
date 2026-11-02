@@ -27,6 +27,7 @@ import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalancePosted;
 import lk.coopfed.knoweb.m5inventory.api.OpeningStockBulkImported;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.RejectOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
@@ -61,6 +62,9 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     CountersignOpeningBalanceHandler countersign;
+
+    @Autowired
+    RejectOpeningBalanceHandler reject;
 
     @Autowired
     BulkOpeningStockImporter bulkImporter;
@@ -526,6 +530,48 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
                 "m5.opening.federation_required");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(queries.balances(shop, null, true, own(MPCS))).isEmpty();
+    }
+
+    @Test
+    void draftCanBeRejectedByOfficerAndAllowsRePreparation() {
+        UUID id = prepare.handle(command(line("5", "200")), own(MPCS));
+        kernel.reset();
+
+        UUID rejectedId = reject.handle(
+                new RejectOpeningBalance(id, "Physical stock discrepancy found during pre-check"), own(MPCS, OFFICER));
+
+        assertThat(rejectedId).isEqualTo(id);
+
+        OpeningBalanceView view = queries.openingBalance(id, own(MPCS)).orElseThrow();
+        assertThat(view.status()).isEqualTo("REJECTED");
+        assertThat(view.rejectedBy()).isEqualTo(OFFICER);
+        assertThat(view.rejectionReason()).isEqualTo("Physical stock discrepancy found during pre-check");
+        assertThat(view.rejectedAt()).isNotNull();
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly(RejectOpeningBalanceHandler.AUDIT_REJECTED);
+
+        assertThat(events(OpeningBalanceChanged.class))
+                .containsExactly(new OpeningBalanceChanged(id, MPCS, shop, "REJECTED"));
+
+        // Rejected balance can never be signed or countersigned
+        assertThatThrownBy(() -> sign.handle(new SignOpeningBalance(id), own(MPCS, OFFICER)))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("m5.opening.not_draft");
+
+        assertThatThrownBy(() -> countersign.handle(new CountersignOpeningBalance(id), federationOfficer()))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("m5.opening.not_signed");
+
+        assertThatThrownBy(() -> reject.handle(new RejectOpeningBalance(id, "Another attempt"), own(MPCS, OFFICER)))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("m5.opening.already_rejected");
+
+        // Location is now unblocked and can prepare a new opening balance
+        kernel.reset();
+        UUID newDraftId = prepare.handle(command(line("10", "190")), own(MPCS));
+        assertThat(newDraftId).isNotNull().isNotEqualTo(id);
     }
 
     // ---- helpers --------------------------------------------------------------------------

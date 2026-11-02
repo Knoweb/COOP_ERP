@@ -62,7 +62,15 @@ class BulkOpeningStockImporterTest {
         audit = mock(AuditFacade.class);
         events = mock(EventPublisher.class);
 
-        importer = new BulkOpeningStockImporter(store, party, catalogue, batches, jdbc, audit, events);
+        importer = new BulkOpeningStockImporter(
+                store,
+                party,
+                catalogue,
+                batches,
+                jdbc,
+                audit,
+                events,
+                java.time.Clock.fixed(java.time.Instant.parse("2026-11-02T10:00:00Z"), java.time.ZoneOffset.UTC));
     }
 
     @Test
@@ -204,5 +212,122 @@ class BulkOpeningStockImporterTest {
         // Verify domain events: OpeningBalanceChanged with DRAFT, and OpeningStockBulkImported
         verify(events).publish(any(OpeningBalanceChanged.class));
         verify(events).publish(any(OpeningStockBulkImported.class));
+    }
+
+    @Test
+    void validateModeDoesNotWriteToDatabaseAndReturnsDiagnostics() {
+        LocationView onboardingLoc = mock(LocationView.class);
+        when(onboardingLoc.ownerEntityId()).thenReturn(ENTITY);
+        when(onboardingLoc.status()).thenReturn("ONBOARDING");
+        when(party.getLocation(LOCATION, scope)).thenReturn(Optional.of(onboardingLoc));
+        when(store.locationHasMovements(LOCATION)).thenReturn(false);
+        when(store.openBalanceAt(LOCATION)).thenReturn(false);
+
+        SkuView dhalSku = new SkuView(
+                SKU_ID,
+                "DHAL1",
+                ENTITY,
+                "ACTIVE",
+                "Red Dhal",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "KG",
+                false,
+                true,
+                true,
+                true,
+                (short) 30,
+                null,
+                null,
+                null,
+                null);
+        when(catalogue.searchSku(any(SkuFilter.class), eq(scope))).thenReturn(new SkuPage(List.of(dhalSku), null));
+        when(catalogue.getSku(SKU_ID, scope)).thenReturn(Optional.of(dhalSku));
+
+        String csv =
+                """
+                sku,uom,qty,unit_cost,batch_no,expiry_date,printed_mrp,condition
+                DHAL1,KG,10.000,150.0000,B101,2027-12-31,200.00,GOOD
+                """;
+
+        BulkImportOpeningStock cmd =
+                new BulkImportOpeningStock(LOCATION, BulkImportOpeningStock.MODE_VALIDATE, csv, null);
+        BulkOpeningStockReport report = importer.handle(cmd, scope);
+
+        assertThat(report.status()).isEqualTo(BulkOpeningStockReport.VALID);
+        assertThat(report.totalRows()).isEqualTo(1);
+        assertThat(report.validRows()).isEqualTo(1);
+        assertThat(report.errorRows()).isEqualTo(0);
+        assertThat(report.totalValuation()).isEqualByComparingTo("1500.00");
+        assertThat(report.previewRows()).hasSize(1);
+        assertThat(report.previewRows().get(0).status()).isEqualTo("VALID");
+        assertThat(report.previewRows().get(0).extendedCost()).isEqualByComparingTo("1500.00");
+        assertThat(report.openingBalanceId()).isNull();
+
+        // Verify zero writes / audits / events
+        org.mockito.Mockito.verifyNoInteractions(audit);
+        org.mockito.Mockito.verifyNoInteractions(events);
+        org.mockito.Mockito.verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void validateModeFlagsItemValidationProblems() {
+        LocationView onboardingLoc = mock(LocationView.class);
+        when(onboardingLoc.ownerEntityId()).thenReturn(ENTITY);
+        when(onboardingLoc.status()).thenReturn("ONBOARDING");
+        when(party.getLocation(LOCATION, scope)).thenReturn(Optional.of(onboardingLoc));
+        when(store.locationHasMovements(LOCATION)).thenReturn(false);
+        when(store.openBalanceAt(LOCATION)).thenReturn(false);
+
+        // SKU requires batch, expiry, MRP, and has base UOM "KG"
+        SkuView trackedSku = new SkuView(
+                SKU_ID,
+                "TRACKED1",
+                ENTITY,
+                "ACTIVE",
+                "Tracked Item",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "KG",
+                false,
+                true,
+                true,
+                true,
+                (short) 30,
+                null,
+                null,
+                null,
+                null);
+        when(catalogue.searchSku(any(SkuFilter.class), eq(scope))).thenReturn(new SkuPage(List.of(trackedSku), null));
+        when(catalogue.getSku(SKU_ID, scope)).thenReturn(Optional.of(trackedSku));
+
+        String csv =
+                """
+                sku,uom,qty,unit_cost,batch_no,expiry_date,printed_mrp,condition
+                TRACKED1,KG,10,100,,2027-12-31,120,GOOD
+                TRACKED1,KG,10,100,B1,,120,GOOD
+                TRACKED1,KG,10,100,B1,2027-12-31,,GOOD
+                TRACKED1,PCS,10,100,B1,2027-12-31,120,GOOD
+                """;
+
+        BulkImportOpeningStock cmd =
+                new BulkImportOpeningStock(LOCATION, BulkImportOpeningStock.MODE_VALIDATE, csv, null);
+        BulkOpeningStockReport report = importer.handle(cmd, scope);
+
+        assertThat(report.status()).isEqualTo(BulkOpeningStockReport.REJECTED);
+        assertThat(report.totalRows()).isEqualTo(4);
+        assertThat(report.errorRows()).isEqualTo(4);
+        assertThat(report.validRows()).isEqualTo(0);
+        assertThat(report.problems()).hasSize(4);
+        assertThat(report.problems().get(0).message()).isEqualTo("m5.opening.batch_required");
+        assertThat(report.problems().get(1).message()).isEqualTo("m5.opening.expiry_required");
+        assertThat(report.problems().get(2).message()).isEqualTo("m5.opening.mrp_required");
+        assertThat(report.problems().get(3).message()).isEqualTo("m5.opening.uom_mismatch");
     }
 }

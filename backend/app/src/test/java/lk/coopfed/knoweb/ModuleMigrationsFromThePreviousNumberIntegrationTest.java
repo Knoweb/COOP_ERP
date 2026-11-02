@@ -200,7 +200,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 12)
                 .containsEntry("m3pricing", 11)
-                .containsEntry("m5inventory", 19)
+                .containsEntry("m5inventory", 20)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 // PGL-M3-01: m7customers V0006 adds regional registration & centralized loyalty.
                 .containsEntry("m7customers", 6)

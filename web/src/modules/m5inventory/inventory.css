@@ -945,3 +945,140 @@
   margin-bottom: var(--space-3);
   font-size: var(--font-size-sm);
 }
+
+
+/* ---------- Initial Stock Excel Import & Re-check (PGL-M2-06) --------------- */
+
+.opening-tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  margin-block: var(--space-3);
+}
+
+.opening-tab-button {
+  background: none;
+  border: none;
+  border-bottom: var(--border-width-strong) solid transparent;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.opening-tab-button:hover {
+  color: var(--color-text);
+}
+
+.opening-tab-button--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.opening-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface-subtle);
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: var(--space-3);
+}
+
+.opening-dropzone:hover,
+.opening-dropzone:focus-within {
+  border-color: var(--color-accent);
+  background-color: var(--color-surface);
+}
+
+.opening-template-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.opening-file-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.opening-preview-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.opening-preview-kpi-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.opening-preview-kpi-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.opening-preview-kpi-value {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.opening-status-badge {
+  display: inline-block;
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.opening-status-badge--valid {
+  color: var(--color-issued-text);
+  background-color: var(--color-issued-bg);
+}
+
+.opening-status-badge--error {
+  color: var(--color-alert-text);
+  background-color: var(--color-alert-bg);
+}
+
+.inventory-rejection-banner {
+  padding: var(--space-3);
+  background-color: var(--color-alert-bg);
+  border: var(--border-width) solid var(--color-alert-text);
+  color: var(--color-alert-text);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  font-weight: 600;
+}
+
+.inventory-reject-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface-subtle);
+  margin-top: var(--space-2);
+}
+
+.inventory-action-row {
+  display: flex;
+  gap: var(--space-2);
+}
