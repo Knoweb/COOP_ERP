@@ -267,6 +267,190 @@ paths:
                 items: { $ref: '#/components/schemas/NotificationLogResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/hr/employees:
+    get:
+      tags: [Integration]
+      operationId: listEmployees
+      summary: List employees within caller's scope
+      x-permission: int.payroll.view
+      responses:
+        '200':
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EmployeeResponse' }
+    post:
+      tags: [Integration]
+      operationId: registerEmployee
+      summary: Register or update an employee profile
+      x-permission: int.employee.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterEmployeeRequest' }
+      responses:
+        '201':
+          description: Employee registered or updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeeResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/hr/employees/{employeeId}:
+    get:
+      tags: [Integration]
+      operationId: getEmployee
+      summary: Get employee profile by ID
+      x-permission: int.payroll.view
+      parameters:
+        - in: path
+          name: employeeId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Employee details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeeResponse' }
+        '404':
+          description: Employee not found
+  /v1/integration/attendance/import:
+    post:
+      tags: [Integration]
+      operationId: importAttendance
+      summary: Batch import biometric punch records from attendance devices
+      x-permission: int.attendance.import
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportAttendanceRequest' }
+      responses:
+        '200':
+          description: Import results summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttendanceImportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/attendance:
+    get:
+      tags: [Integration]
+      operationId: listAttendance
+      summary: List attendance records
+      x-permission: int.payroll.view
+      parameters:
+        - in: query
+          name: businessDate
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: employeeId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AttendanceRecordResponse' }
+  /v1/integration/overtime:
+    get:
+      tags: [Integration]
+      operationId: listOvertimeCalculations
+      summary: List overtime calculations
+      x-permission: int.payroll.view
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [PENDING_APPROVAL, APPROVED, REJECTED, NO_OT_EARNED] }
+        - in: query
+          name: businessDate
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: List of overtime calculations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OvertimeCalculationResponse' }
+  /v1/integration/overtime/{calculationId}/approve:
+    post:
+      tags: [Integration]
+      operationId: approveOvertime
+      summary: Approve overtime calculation for payroll contribution
+      x-permission: int.overtime.approve
+      parameters:
+        - in: path
+          name: calculationId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveOvertimeRequest' }
+      responses:
+        '200':
+          description: Approved payroll contribution
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PayrollContributionResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: Calculation not found
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/payroll-contributions:
+    get:
+      tags: [Integration]
+      operationId: listPayrollContributions
+      summary: List approved payroll contributions
+      x-permission: int.payroll.view
+      parameters:
+        - in: query
+          name: payrollPeriod
+          required: false
+          schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+      responses:
+        '200':
+          description: List of payroll contributions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PayrollContributionResponse' }
+  /v1/integration/payroll-contributions/summary:
+    get:
+      tags: [Integration]
+      operationId: getPayrollContributionSummary
+      summary: Summary totals of approved payroll contributions for a period
+      x-permission: int.payroll.view
+      parameters:
+        - in: query
+          name: payrollPeriod
+          required: true
+          schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+      responses:
+        '200':
+          description: Period summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PayrollContributionSummaryResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
 components:
   parameters:
     ExportId:
@@ -431,3 +615,138 @@ components:
           type: [string, 'null']
           format: date-time
           description: when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)
+    RegisterEmployeeRequest:
+      type: object
+      required: [employeeNo, fullName, hourlyRate]
+      properties:
+        employeeNo: { type: string, maxLength: 32 }
+        fullName: { type: string, maxLength: 200 }
+        nic: { type: [string, 'null'], maxLength: 20 }
+        epfNo: { type: [string, 'null'], maxLength: 32 }
+        hourlyRate: { type: number, minimum: 0 }
+        locationId: { type: [string, 'null'], format: uuid }
+    EmployeeResponse:
+      type: object
+      required: [employeeId, ownerEntityId, employeeNo, fullName, hourlyRate, status, createdAt, updatedAt]
+      properties:
+        employeeId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        employeeNo: { type: string }
+        fullName: { type: string }
+        nic: { type: [string, 'null'] }
+        epfNo: { type: [string, 'null'] }
+        hourlyRate: { type: number }
+        locationId: { type: [string, 'null'], format: uuid }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ImportAttendanceRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AttendanceImportItem' }
+    AttendanceImportItem:
+      type: object
+      required: [externalRecordId, employeeNo, deviceIdentifier, sourceProvider, businessDate, clockIn, clockOut]
+      properties:
+        externalRecordId: { type: string, maxLength: 128 }
+        employeeNo: { type: string, maxLength: 32 }
+        deviceIdentifier: { type: string, maxLength: 64 }
+        sourceProvider: { type: string, maxLength: 64 }
+        businessDate: { type: string, format: date }
+        clockIn: { type: string, format: date-time }
+        clockOut: { type: string, format: date-time }
+        rawPayload: { type: [string, 'null'] }
+    AttendanceImportResponse:
+      type: object
+      required: [imported, duplicate, rejected, recordIds, rejections]
+      properties:
+        imported: { type: integer }
+        duplicate: { type: integer }
+        rejected: { type: integer }
+        recordIds:
+          type: array
+          items: { type: string, format: uuid }
+        rejections:
+          type: array
+          items: { $ref: '#/components/schemas/AttendanceRejection' }
+    AttendanceRejection:
+      type: object
+      required: [externalRecordId, reason]
+      properties:
+        externalRecordId: { type: string }
+        reason: { type: string }
+    AttendanceRecordResponse:
+      type: object
+      required: [attendanceId, ownerEntityId, externalRecordId, employeeId, employeeNo, employeeName, deviceIdentifier, sourceProvider, businessDate, clockIn, clockOut, workedMinutes, status, createdAt]
+      properties:
+        attendanceId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        externalRecordId: { type: string }
+        employeeId: { type: string, format: uuid }
+        employeeNo: { type: string }
+        employeeName: { type: string }
+        deviceIdentifier: { type: string }
+        sourceProvider: { type: string }
+        businessDate: { type: string, format: date }
+        clockIn: { type: string, format: date-time }
+        clockOut: { type: string, format: date-time }
+        workedMinutes: { type: integer }
+        status: { type: string, enum: [RECORDED, VALIDATED, REJECTED] }
+        rejectionReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+    OvertimeCalculationResponse:
+      type: object
+      required: [calculationId, attendanceId, ownerEntityId, employeeId, employeeNo, employeeName, businessDate, workedMinutes, standardMinutes, qualifyingOtMinutes, calculatedOtMinutes, otMultiplier, calculatedAmount, status, createdAt]
+      properties:
+        calculationId: { type: string, format: uuid }
+        attendanceId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        employeeId: { type: string, format: uuid }
+        employeeNo: { type: string }
+        employeeName: { type: string }
+        businessDate: { type: string, format: date }
+        workedMinutes: { type: integer }
+        standardMinutes: { type: integer }
+        qualifyingOtMinutes: { type: integer }
+        calculatedOtMinutes: { type: integer }
+        otMultiplier: { type: number }
+        calculatedAmount: { type: number }
+        status: { type: string, enum: [PENDING_APPROVAL, APPROVED, REJECTED, NO_OT_EARNED] }
+        createdAt: { type: string, format: date-time }
+    ApproveOvertimeRequest:
+      type: object
+      required: [payrollPeriod]
+      properties:
+        payrollPeriod: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        notes: { type: [string, 'null'], maxLength: 500 }
+    PayrollContributionResponse:
+      type: object
+      required: [contributionId, ownerEntityId, employeeId, employeeNo, employeeName, calculationId, payrollPeriod, contributionType, approvedOtMinutes, approvedAmount, approvedBy, approvedAt, status, createdAt]
+      properties:
+        contributionId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        employeeId: { type: string, format: uuid }
+        employeeNo: { type: string }
+        employeeName: { type: string }
+        calculationId: { type: string, format: uuid }
+        payrollPeriod: { type: string }
+        contributionType: { type: string, enum: [OVERTIME, BONUS, ALLOWANCE] }
+        approvedOtMinutes: { type: integer }
+        approvedAmount: { type: number }
+        approvedBy: { type: string, format: uuid }
+        approvedAt: { type: string, format: date-time }
+        approvalNotes: { type: [string, 'null'] }
+        status: { type: string, enum: [APPROVED_PENDING_PAYROLL, POSTED_TO_PAYROLL, CANCELLED] }
+        createdAt: { type: string, format: date-time }
+    PayrollContributionSummaryResponse:
+      type: object
+      required: [payrollPeriod, totalEmployees, totalOtMinutes, totalApprovedAmount, contributionCount]
+      properties:
+        payrollPeriod: { type: string }
+        totalEmployees: { type: integer }
+        totalOtMinutes: { type: integer }
+        totalApprovedAmount: { type: number }
+        contributionCount: { type: integer }

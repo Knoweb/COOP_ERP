@@ -5,11 +5,15 @@
 |Spring components
 |_Services_
 
+* `l.c.k.m.query.ApprovedPayrollContributionQueries` (via `l.c.k.m.internal.queries.ApprovedPayrollContributionQueriesImpl`)
+* `l.c.k.m.query.AttendanceQueries` (via `l.c.k.m.internal.queries.AttendanceQueriesImpl`)
+* `l.c.k.m.query.EmployeeQueries` (via `l.c.k.m.internal.queries.EmployeeQueriesImpl`)
 * `l.c.k.m.query.IntegrationQueries` (via `l.c.k.m.internal.queries.IntegrationQueriesImpl`)
 |Bean references
-|* `l.c.k.k.api.Handles` (in Platform Kernel)
-* `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
-* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
+|* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
+* `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===
