@@ -13,7 +13,6 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
-import lk.coopfed.knoweb.kernel.api.NotificationChannel.FailureCategory;
 import lk.coopfed.knoweb.kernel.api.NotificationChannel.SendFailed;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -400,4 +399,3 @@ public class CentralNotificationGateway implements NotificationGateway {
         }
     }
 }
-

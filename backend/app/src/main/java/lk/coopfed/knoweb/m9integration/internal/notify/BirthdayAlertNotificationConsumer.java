@@ -123,4 +123,3 @@ public class BirthdayAlertNotificationConsumer {
         return contacts.isEmpty() ? "0770000003" : contacts.get(0);
     }
 }
-
