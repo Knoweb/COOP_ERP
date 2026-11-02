@@ -9,12 +9,12 @@ import { openServerFile } from "../../shell/api/openServerFile";
 import { useReportingApi } from "./reportingApi";
 import "./reporting.css";
 
-export function FinancePage() {
+export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports" | "goods" | "voucher" | "final-accounts" } = {}) {
   const t = useT();
   const formatDate = useFormatDate();
   const api = useReportingApi();
 
-  const [activeTab, setActiveTab] = useState<"exports" | "goods" | "voucher">("exports");
+  const [activeTab, setActiveTab] = useState<"exports" | "goods" | "voucher" | "final-accounts">(initialTab);
 
   // Tab 1: Exports Filters
   const [asOfDate, setAsOfDate] = useState<string>(businessToday());
@@ -32,6 +32,10 @@ export function FinancePage() {
   const [voucherInvoiceIdInput, setVoucherInvoiceIdInput] = useState<string>("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
   const [printingVoucher, setPrintingVoucher] = useState(false);
+
+  // Tab 4: Final Accounts Filters
+  const [finalAccountsPeriod, setFinalAccountsPeriod] = useState<string>(() => businessToday().substring(0, 7));
+  const [downloadingFinalAccounts, setDownloadingFinalAccounts] = useState(false);
 
   // Queries
   const debtorsQuery = useQuery({
@@ -67,6 +71,12 @@ export function FinancePage() {
     queryKey: ["reporting", "finance", "voucher", selectedInvoiceId],
     queryFn: () => api.getCreditVoucher(selectedInvoiceId),
     enabled: activeTab === "voucher" && Boolean(selectedInvoiceId)
+  });
+
+  const finalAccountsQuery = useQuery({
+    queryKey: ["reporting", "finance", "final-accounts", finalAccountsPeriod],
+    queryFn: () => api.getFinalAccounts(finalAccountsPeriod || undefined),
+    enabled: activeTab === "final-accounts"
   });
 
   // Download handlers
@@ -151,11 +161,28 @@ export function FinancePage() {
     }
   };
 
+  const handleDownloadFinalAccounts = async () => {
+    try {
+      setDownloadingFinalAccounts(true);
+      const csv = await api.exportFinalAccountsCsv(finalAccountsPeriod || undefined);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `final_accounts_${finalAccountsPeriod || "current"}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingFinalAccounts(false);
+    }
+  };
+
   const debtors = debtorsQuery.data;
   const creditors = creditorsQuery.data;
   const opening = openingQuery.data;
   const goods = goodsQuery.data;
   const voucher = voucherQuery.data;
+  const finalAccounts = finalAccountsQuery.data;
 
   return (
     <div className="reporting-page finance-page">
@@ -194,6 +221,15 @@ export function FinancePage() {
           onClick={() => setActiveTab("voucher")}
         >
           {t("reporting.finance.tab_voucher").text}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "final-accounts"}
+          className={`btn ${activeTab === "final-accounts" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => setActiveTab("final-accounts")}
+        >
+          {t("reporting.finance.tab_final_accounts").text}
         </button>
       </div>
 
@@ -595,7 +631,7 @@ export function FinancePage() {
                     {voucher.voucherNumber}
                   </div>
                   <div className="finance-voucher-date-ref">
-                    {t("reporting.finance.label_date").text} {formatDate(voucher.date)} | {t("reporting.finance.label_ref").text} {voucher.sourceTransactionReference}
+                    {t("reporting.finance.label_date").text} {voucher.date} | {t("reporting.finance.label_ref").text} {voucher.sourceTransactionReference}
                   </div>
                 </div>
                 <div>
@@ -685,6 +721,205 @@ export function FinancePage() {
             <div className="finance-placeholder-box">
               {t("reporting.finance.enter_invoice").text}
             </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "final-accounts" && (
+        <div className="final-accounts-tab finance-final-accounts-container">
+          {/* Period Filter & Download */}
+          <div className="filters-bar finance-filter-bar">
+            <label>
+              {t("reporting.finance.period").text}:
+              <input
+                type="month"
+                value={finalAccountsPeriod}
+                onChange={(e) => setFinalAccountsPeriod(e.target.value)}
+                className="input"
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={downloadingFinalAccounts}
+              onClick={handleDownloadFinalAccounts}
+            >
+              {t("reporting.finance.download_csv").text}
+            </button>
+          </div>
+
+          {finalAccountsQuery.isLoading && (
+            <div className="finance-placeholder-box">
+              {t("reporting.loading").text}
+            </div>
+          )}
+
+          {finalAccounts && (
+            <>
+              {/* Section 1: Final Accounts Statement Summary */}
+              <div className="finance-section card finance-section-card">
+                <div className="finance-section-header">
+                  <div>
+                    <h3>{t("reporting.finance.final_accounts_title").text} — {finalAccounts.period}</h3>
+                    {finalAccounts.statusReason && (
+                      <p className="finance-subtitle finance-status-subtitle">
+                        {finalAccounts.statusReason}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <StateChip
+                      state={finalAccounts.status === "COMPLETE" ? "issued" : "draft"}
+                    />
+                  </div>
+                </div>
+
+                <div className="finance-kpi-grid">
+                  <div className="kpi-card finance-kpi-card">
+                    <div className="finance-kpi-label">{t("reporting.finance.revenue").text}</div>
+                    <div className="finance-kpi-value"><MoneyDisplay amount={finalAccounts.revenue} /></div>
+                  </div>
+                  <div className="kpi-card finance-kpi-card">
+                    <div className="finance-kpi-label">{t("reporting.finance.cogs").text}</div>
+                    <div className="finance-kpi-value">
+                      {finalAccounts.cogs ? (
+                        <MoneyDisplay amount={finalAccounts.cogs} />
+                      ) : (
+                        <span className="finance-badge-phase3">{t("reporting.finance.pending").text}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="kpi-card finance-kpi-card highlight">
+                    <div className="finance-kpi-label">{t("reporting.finance.gross_profit").text}</div>
+                    <div className="finance-kpi-value brand">
+                      {finalAccounts.grossProfit ? (
+                        <>
+                          <MoneyDisplay amount={finalAccounts.grossProfit} />
+                          {finalAccounts.grossProfitMarginPercent && (
+                            <span className="finance-margin-percent">
+                              ({finalAccounts.grossProfitMarginPercent}%)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="finance-badge-phase3">{t("reporting.finance.pending").text}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="kpi-card finance-kpi-card">
+                    <div className="finance-kpi-label">{t("reporting.finance.payroll_expenses").text}</div>
+                    <div className="finance-kpi-value"><MoneyDisplay amount={finalAccounts.payrollExpenses} /></div>
+                  </div>
+                  <div className="kpi-card finance-kpi-card">
+                    <div className="finance-kpi-label">{t("reporting.finance.total_expenses").text}</div>
+                    <div className="finance-kpi-value">
+                      {finalAccounts.totalExpenses ? (
+                        <MoneyDisplay amount={finalAccounts.totalExpenses} />
+                      ) : (
+                        <span className="finance-badge-phase3">{t("reporting.finance.pending").text}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="kpi-card finance-kpi-card highlight">
+                    <div className="finance-kpi-label">{t("reporting.finance.operating_profit").text}</div>
+                    <div className="finance-kpi-value brand">
+                      {finalAccounts.operatingProfit ? (
+                        <>
+                          <MoneyDisplay amount={finalAccounts.operatingProfit} />
+                          {finalAccounts.operatingProfitMarginPercent && (
+                            <span className="finance-margin-percent">
+                              ({finalAccounts.operatingProfitMarginPercent}%)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="finance-badge-phase3">{t("reporting.finance.pending").text}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Operating Expense Classification */}
+              <div className="finance-section card finance-section-card">
+                <div className="finance-section-header">
+                  <h3>{t("reporting.finance.expense_breakdown").text}</h3>
+                </div>
+                <div className="table-responsive finance-table-responsive">
+                  <table className="table finance-table">
+                    <thead>
+                      <tr>
+                        <th>{t("reporting.finance.col_category").text}</th>
+                        <th>{t("reporting.finance.col_category_name").text}</th>
+                        <th className="finance-th-right">{t("reporting.finance.col_amount").text}</th>
+                        <th>{t("reporting.finance.col_status").text}</th>
+                        <th>{t("reporting.finance.col_notes").text}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finalAccounts.expenseCategories.map((cat) => (
+                        <tr key={cat.category}>
+                          <td className="finance-code-cell">{cat.category}</td>
+                          <td><strong>{cat.categoryName}</strong></td>
+                          <td className="finance-td-right">
+                            {cat.amount ? <MoneyDisplay amount={cat.amount} /> : "—"}
+                          </td>
+                          <td>
+                            <span className={cat.status === "APPROVED" ? "finance-badge-role" : "finance-badge-phase3"}>
+                              {cat.status}
+                            </span>
+                          </td>
+                          <td className="finance-notes-cell">{cat.notes || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 3: Approved Payroll Contributions Drilldown */}
+              <div className="finance-section card finance-section-card">
+                <div className="finance-section-header">
+                  <h3>{t("reporting.finance.payroll_contributions_title").text}</h3>
+                </div>
+                <div className="table-responsive finance-table-responsive">
+                  <table className="table finance-table">
+                    <thead>
+                      <tr>
+                        <th>{t("reporting.finance.col_emp_no").text}</th>
+                        <th>{t("reporting.finance.col_emp_name").text}</th>
+                        <th>{t("reporting.finance.col_contrib_type").text}</th>
+                        <th className="finance-th-right">{t("reporting.finance.col_ot_minutes").text}</th>
+                        <th className="finance-th-right">{t("reporting.finance.col_approved_amount").text}</th>
+                        <th>{t("reporting.finance.col_date").text}</th>
+                        <th>{t("reporting.finance.col_status").text}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finalAccounts.payrollContributions && finalAccounts.payrollContributions.length > 0 ? (
+                        finalAccounts.payrollContributions.map((item) => (
+                          <tr key={item.contributionId}>
+                            <td className="finance-code-cell">{item.employeeNo}</td>
+                            <td><strong>{item.employeeName}</strong></td>
+                            <td><span className="finance-badge-role">{item.contributionType}</span></td>
+                            <td className="finance-td-right">{item.approvedOtMinutes}</td>
+                            <td className="finance-td-right"><strong><MoneyDisplay amount={item.approvedAmount} /></strong></td>
+                            <td>{item.approvedAt ? formatDate(item.approvedAt.substring(0, 10)) : "—"}</td>
+                            <td><StateChip state="issued" /></td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="finance-empty-cell">
+                            {t("reporting.finance.no_payroll_contributions").text}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}

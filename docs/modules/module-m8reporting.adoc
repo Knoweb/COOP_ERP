@@ -19,6 +19,7 @@
 * `l.c.k.m.query.ExposureQueries` (in M4 Trading Documents)
 * `l.c.k.m.query.InvoiceQueries` (in M4 Trading Documents)
 * `l.c.k.m.query.OpeningReceivableQueries` (in M4 Trading Documents)
+* `l.c.k.m.query.ApprovedPayrollContributionQueries` (in M9 Integration)
 * `l.c.k.k.api.A4Renderer` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)

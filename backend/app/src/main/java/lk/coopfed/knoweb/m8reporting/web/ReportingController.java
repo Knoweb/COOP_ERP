@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,8 @@ import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
 import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsExpenses;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsReport;
 import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
 import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
@@ -67,6 +70,10 @@ import lk.coopfed.knoweb.m8reporting.web.generated.DashboardTile;
 import lk.coopfed.knoweb.m8reporting.web.generated.DebtorSummaryItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.DebtorsReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ExceptionItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.ExpenseCategoryResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.FinalAccountPayrollItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.FinalAccountsExpensesResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.FinalAccountsReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.GoodsSuppliedLineItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.GoodsSuppliedReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyDailyTrendItem;
@@ -1068,5 +1075,121 @@ class ReportingController implements ReportingApi {
                 line.taxRatePercent().toPlainString(),
                 line.taxAmount().toPlainString(),
                 line.lineTotal().toPlainString());
+    }
+
+    @Override
+    public ResponseEntity<FinalAccountsReportResponse> getFinalAccounts(String period) {
+        ScopeContext scope = currentScope.get();
+        FinalAccountsReport report = queries.finalAccounts(period, scope);
+        return ResponseEntity.ok(toFinalAccountsReportResponse(report));
+    }
+
+    @Override
+    public ResponseEntity<FinalAccountsExpensesResponse> getFinalAccountsExpenses(String period) {
+        ScopeContext scope = currentScope.get();
+        FinalAccountsExpenses expenses = queries.finalAccountsExpenses(period, scope);
+        return ResponseEntity.ok(toFinalAccountsExpensesResponse(expenses));
+    }
+
+    @Override
+    public ResponseEntity<String> exportFinalAccountsCsv(String period) {
+        ScopeContext scope = currentScope.get();
+        FinalAccountsReport report = queries.finalAccounts(period, scope);
+        Locale locale = scope != null && scope.lang() != null ? Locale.forLanguageTag(scope.lang()) : Locale.ENGLISH;
+        String csv = ReportCsv.writeFinalAccounts(report, messages, locale);
+        String filename = "final_accounts_" + report.period() + ".csv";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv);
+    }
+
+    private static FinalAccountsReportResponse toFinalAccountsReportResponse(FinalAccountsReport report) {
+        List<ExpenseCategoryResponse> catDtos = report.expenseCategories().stream()
+                .map(ReportingController::toExpenseCategoryResponse)
+                .toList();
+        List<FinalAccountPayrollItemResponse> payrollDtos = report.payrollContributions().stream()
+                .map(ReportingController::toFinalAccountPayrollItemResponse)
+                .toList();
+
+        FinalAccountsReportResponse.StatusEnum statusEnum =
+                FinalAccountsReportResponse.StatusEnum.fromValue(report.status());
+
+        FinalAccountsReportResponse res = new FinalAccountsReportResponse(
+                report.period(),
+                report.currency(),
+                statusEnum,
+                report.revenue().toPlainString(),
+                report.costPending(),
+                report.payrollExpenses().toPlainString(),
+                report.otherExpensesPending(),
+                catDtos,
+                payrollDtos);
+
+        res.setStatusReason(report.statusReason());
+        if (report.cogs() != null) {
+            res.setCogs(report.cogs().toPlainString());
+        }
+        if (report.grossProfit() != null) {
+            res.setGrossProfit(report.grossProfit().toPlainString());
+        }
+        if (report.grossProfitMarginPercent() != null) {
+            res.setGrossProfitMarginPercent(report.grossProfitMarginPercent().toPlainString());
+        }
+        if (report.otherExpenses() != null) {
+            res.setOtherExpenses(report.otherExpenses().toPlainString());
+        }
+        if (report.totalExpenses() != null) {
+            res.setTotalExpenses(report.totalExpenses().toPlainString());
+        }
+        if (report.operatingProfit() != null) {
+            res.setOperatingProfit(report.operatingProfit().toPlainString());
+        }
+        if (report.operatingProfitMarginPercent() != null) {
+            res.setOperatingProfitMarginPercent(
+                    report.operatingProfitMarginPercent().toPlainString());
+        }
+        return res;
+    }
+
+    private static ExpenseCategoryResponse toExpenseCategoryResponse(FinalAccountsReport.ExpenseCategoryItem item) {
+        ExpenseCategoryResponse res = new ExpenseCategoryResponse(item.category(), item.categoryName(), item.status());
+        if (item.amount() != null) {
+            res.setAmount(item.amount().toPlainString());
+        }
+        res.setNotes(item.notes());
+        return res;
+    }
+
+    private static FinalAccountPayrollItemResponse toFinalAccountPayrollItemResponse(
+            FinalAccountsReport.PayrollContributionLineItem item) {
+        FinalAccountPayrollItemResponse res = new FinalAccountPayrollItemResponse(
+                item.contributionId(),
+                item.employeeId(),
+                item.employeeNo(),
+                item.employeeName(),
+                item.contributionType(),
+                item.approvedAmount().toPlainString(),
+                item.approvedOtMinutes(),
+                item.status());
+        res.setApprovedAt(item.approvedAt());
+        return res;
+    }
+
+    private static FinalAccountsExpensesResponse toFinalAccountsExpensesResponse(FinalAccountsExpenses expenses) {
+        List<ExpenseCategoryResponse> catDtos = expenses.categories().stream()
+                .map(ReportingController::toExpenseCategoryResponse)
+                .toList();
+        List<FinalAccountPayrollItemResponse> payrollDtos = expenses.contributions().stream()
+                .map(ReportingController::toFinalAccountPayrollItemResponse)
+                .toList();
+
+        return new FinalAccountsExpensesResponse(
+                expenses.period(),
+                expenses.currency(),
+                expenses.totalPayrollExpenses().toPlainString(),
+                expenses.contributionCount(),
+                catDtos,
+                payrollDtos);
     }
 }

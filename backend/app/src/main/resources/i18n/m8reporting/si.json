@@ -165,5 +165,6 @@
   "m8.finance.voucher.tax": "වැට් මුදල",
   "m8.finance.voucher.gross": "මුළු මුදල",
   "m8.finance.invoice_not_found": "අවසර ලත් සීමාව තුළ බදු ඉන්වොයිසිය හමු නොවීය",
-  "m8.finance.print_not_ready": "මුද්‍රණය කළ හැකි වවුචර ලේඛනය තවම සූදානම් නැත"
+  "m8.finance.print_not_ready": "මුද්‍රණය කළ හැකි වවුචර ලේඛනය තවම සූදානම් නැත",
+  "m8.final_accounts.month_invalid": "මාසය YYYY-MM ආකෘතියෙන් තිබිය යුතුය"
 }
