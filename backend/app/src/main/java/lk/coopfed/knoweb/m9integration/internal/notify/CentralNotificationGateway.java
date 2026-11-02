@@ -313,7 +313,7 @@ public class CentralNotificationGateway implements NotificationGateway {
             return "unknown";
         }
         if (t instanceof SendFailed sf) {
-            return sf.category() + ": " + scrub(sf.getMessage());
+            return "SendFailed: " + sf.category() + ": " + scrub(sf.getMessage());
         }
         return scrub(t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
     }
