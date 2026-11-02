@@ -11,7 +11,7 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
 public record LoyaltyPolicyConfigured(
         UUID policyId,
         UUID ownerEntityId,
-        String policyName,
+        String policyCode,
         BigDecimal monthlySpendThreshold,
         int minMembershipMonths,
         int monthlyRewardPoints,

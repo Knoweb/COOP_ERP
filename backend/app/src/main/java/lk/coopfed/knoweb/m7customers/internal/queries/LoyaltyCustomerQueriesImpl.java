@@ -95,7 +95,7 @@ class LoyaltyCustomerQueriesImpl implements LoyaltyCustomerQueries {
         if (nic == null || nic.isBlank()) {
             return Optional.empty();
         }
-        Optional<String> canonical = NicNumbers.normalise(nic);
+        Optional<String> canonical = NicNumbers.canonical(nic);
         if (canonical.isEmpty()) {
             return Optional.empty();
         }
@@ -104,11 +104,11 @@ class LoyaltyCustomerQueriesImpl implements LoyaltyCustomerQueries {
             return Optional.empty();
         }
 
-        String placeholders = String.join(",", Collections.nCopies(hashCandidates.size(), "?"));
+        String[] candidateArray = hashCandidates.toArray(String[]::new);
         List<LoyaltyCustomerView> list = jdbc.query(
-                baseSelect() + " WHERE c.nic_hash IN (" + placeholders + ") ORDER BY lc.created_at DESC LIMIT 1",
+                baseSelect() + " WHERE c.nic_hash = ANY (cast(? as char(64)[])) ORDER BY lc.created_at DESC LIMIT 1",
                 (rs, rowNum) -> mapRow(rs),
-                hashCandidates.toArray());
+                (Object) candidateArray);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
