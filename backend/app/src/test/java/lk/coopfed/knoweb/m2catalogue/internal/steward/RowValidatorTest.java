@@ -438,11 +438,11 @@ class RowValidatorTest {
     }
 
     @Test
-    void rejectsDuplicateBarcodeAcrossDifferentRowsInSheet() {
+    void allowsDuplicateBarcodeAcrossDifferentRowsInSheetForDuplicateSuspectScoring() {
         ImportSkuRow row1 = new ImportSkuRow(
                 1,
-                "SKU-001",
-                "Item One",
+                null,
+                "Anchor Milk Powder 400g",
                 null,
                 null,
                 null,
@@ -455,16 +455,60 @@ class RowValidatorTest {
                 false,
                 null,
                 "STD",
-                null,
+                new BigDecimal("1080.00"),
                 List.of("4791000000003"),
-                null,
+                "anchor",
                 null,
                 null);
 
         ImportSkuRow row2 = new ImportSkuRow(
                 2,
-                "SKU-002",
-                "Item Two",
+                null,
+                "Anchor Full Cream Milk Powder 400g",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "EA",
+                false,
+                false,
+                false,
+                false,
+                null,
+                "STD",
+                new BigDecimal("1080.00"),
+                List.of("4791000000003"),
+                "anchor",
+                null,
+                null);
+
+        List<ValidationError> errors = validator.validateBatch(List.of(row1, row2), ctx);
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void allowsNewSkuMatchingExistingBarcodeForDuplicateSuspectScoring() {
+        ValidationContext richCtx = new ValidationContext(
+                Set.of("EA", "KG"),
+                Map.of("STD", UUID.randomUUID()),
+                Set.of("SKU-001"),
+                Set.of("4791000000003"),
+                Map.of(
+                        "sku-001",
+                        new RowValidator.ExistingSkuDetails(
+                                UUID.randomUUID(),
+                                "SKU-001",
+                                "Maliban Marie 300g",
+                                "EA",
+                                UUID.randomUUID(),
+                                Set.of("4791000000003"))));
+
+        // Incoming candidate SKU without an explicit code (new item) sharing barcode with existing SKU
+        ImportSkuRow candidateRow = new ImportSkuRow(
+                1,
+                null,
+                "Maliban Marie Biscuits 300g Pkt",
                 null,
                 null,
                 null,
@@ -479,11 +523,11 @@ class RowValidatorTest {
                 "STD",
                 null,
                 List.of("4791000000003"),
-                null,
+                "maliban",
                 null,
                 null);
 
-        List<ValidationError> errors = validator.validateBatch(List.of(row1, row2), ctx);
-        assertThat(errors).anyMatch(e -> "m2.barcode.duplicate_in_sheet".equals(e.code()));
+        List<ValidationError> errors = validator.validateBatch(List.of(candidateRow), richCtx);
+        assertThat(errors).isEmpty();
     }
 }

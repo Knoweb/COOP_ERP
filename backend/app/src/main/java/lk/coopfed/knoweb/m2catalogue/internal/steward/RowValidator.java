@@ -263,25 +263,23 @@ public class RowValidator {
                             "bulk.sku.barcode_duplicate_in_row",
                             "Duplicate barcode in item",
                             "barcode=" + barcode));
-                } else if (seenBarcodesInSheet != null && !seenBarcodesInSheet.add(barcode)) {
-                    errors.add(new ValidationError(
-                            rowNum,
-                            "barcodes",
-                            "m2.barcode.duplicate_in_sheet",
-                            "The barcode is duplicated within the import sheet",
-                            "barcode=" + barcode));
                 } else if (ctx.existingSkusByCode() != null
                         && !ctx.existingSkusByCode().isEmpty()) {
                     String code = row.skuCode() != null ? row.skuCode().strip().toLowerCase(Locale.ROOT) : null;
-                    for (ExistingSkuDetails otherSku : ctx.existingSkusByCode().values()) {
-                        if (otherSku.barcodes() != null && otherSku.barcodes().contains(barcode)) {
-                            if (code == null || !code.equalsIgnoreCase(otherSku.skuCode())) {
-                                errors.add(new ValidationError(
-                                        rowNum,
-                                        "barcodes",
-                                        "m2.sku.barcode_conflict",
-                                        "Barcode " + barcode + " is already registered to SKU " + otherSku.skuCode(),
-                                        "barcode=" + barcode));
+                    if (code != null) {
+                        for (ExistingSkuDetails otherSku :
+                                ctx.existingSkusByCode().values()) {
+                            if (otherSku.barcodes() != null
+                                    && otherSku.barcodes().contains(barcode)) {
+                                if (!code.equalsIgnoreCase(otherSku.skuCode())) {
+                                    errors.add(new ValidationError(
+                                            rowNum,
+                                            "barcodes",
+                                            "m2.sku.barcode_conflict",
+                                            "Barcode " + barcode + " is already registered to SKU "
+                                                    + otherSku.skuCode(),
+                                            "barcode=" + barcode));
+                                }
                             }
                         }
                     }
