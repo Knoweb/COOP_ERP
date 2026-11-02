@@ -87,6 +87,7 @@ describe("the stock view", () => {
     expect(chipOf("DRAFT")).toBe("draft");
     expect(chipOf("SIGNED_ENTITY")).toBe("draft");
     expect(chipOf("POSTED")).toBe("issued");
+    expect(chipOf("REJECTED")).toBe("void");
   });
 
   it("sends the batch as counted and leaves out what was not typed", () => {

@@ -53,6 +53,11 @@ audit_event_types:
     offline_capturable: false
     description_en: An opening stock balance was signed for the entity
 
+  - code: OPB_REJECTED
+    severity: WARN
+    offline_capturable: false
+    description_en: An opening stock balance was rejected by a higher officer
+
   - code: OPB_POSTED
     severity: INFO
     offline_capturable: false

@@ -23,9 +23,11 @@ import lk.coopfed.knoweb.m5inventory.api.OpeningStockRow;
 import lk.coopfed.knoweb.m5inventory.api.OverridePick;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
+import lk.coopfed.knoweb.m5inventory.api.RejectOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.RepriceStockLot;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.StockRepricingResult;
+import lk.coopfed.knoweb.m5inventory.internal.opening.OpeningStockTemplateGenerator;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
@@ -50,12 +52,18 @@ import lk.coopfed.knoweb.m5inventory.web.generated.PickReplacementCandidateRespo
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.RejectOpeningBalanceRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.RepriceStockLotRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockProblem;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockRepricingResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockRowPreview;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -77,6 +85,7 @@ class InventoryController implements InventoryApi {
     private final Handles<BulkImportOpeningStock, BulkOpeningStockReport> bulkImport;
     private final Handles<SignOpeningBalance, UUID> sign;
     private final Handles<CountersignOpeningBalance, UUID> countersign;
+    private final Handles<RejectOpeningBalance, UUID> reject;
     private final Handles<IssueTransfer, UUID> issueTransfer;
     private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
@@ -92,6 +101,7 @@ class InventoryController implements InventoryApi {
             Handles<BulkImportOpeningStock, BulkOpeningStockReport> bulkImport,
             Handles<SignOpeningBalance, UUID> sign,
             Handles<CountersignOpeningBalance, UUID> countersign,
+            Handles<RejectOpeningBalance, UUID> reject,
             Handles<IssueTransfer, UUID> issueTransfer,
             Handles<DispatchTransfer, UUID> dispatchTransfer,
             Handles<ReceiveTransfer, UUID> receiveTransfer,
@@ -105,6 +115,7 @@ class InventoryController implements InventoryApi {
         this.bulkImport = bulkImport;
         this.sign = sign;
         this.countersign = countersign;
+        this.reject = reject;
         this.issueTransfer = issueTransfer;
         this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
@@ -313,6 +324,18 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
+    public ResponseEntity<Resource> downloadOpeningStockTemplate() {
+        byte[] bytes = OpeningStockTemplateGenerator.generateWorkbook();
+        ByteArrayResource resource = new ByteArrayResource(bytes);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"opening_stock_template.xlsx\"")
+                .contentType(
+                        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentLength(bytes.length)
+                .body(resource);
+    }
+
+    @Override
     public ResponseEntity<BulkStockReport> bulkImportOpeningStock(
             String idempotencyKey, BulkImportStockRequest request) {
         ScopeContext scope = currentScope.get();
@@ -331,22 +354,59 @@ class InventoryController implements InventoryApi {
                                         : LotCondition.valueOf(
                                                 line.getCondition().getValue()),
                                 line.getQty(),
-                                line.getUnitCost()))
+                                line.getUnitCost(),
+                                line.getUom()))
                         .toList();
 
-        BulkOpeningStockReport report =
-                bulkImport.handle(new BulkImportOpeningStock(request.getLocationId(), request.getSheet(), rows), scope);
+        String mode = request.getMode() == null
+                ? BulkImportOpeningStock.MODE_COMMIT
+                : request.getMode().getValue();
+        BulkOpeningStockReport report = bulkImport.handle(
+                new BulkImportOpeningStock(request.getLocationId(), mode, request.getSheet(), rows), scope);
 
         BulkStockReport response = new BulkStockReport(
-                report.importId(),
-                report.openingBalanceId(),
-                BulkStockReport.StatusEnum.fromValue(report.status()),
-                report.totalRows(),
-                report.importedLines());
+                BulkStockReport.StatusEnum.fromValue(report.status()), report.totalRows(), report.importedLines());
+        response.setImportId(report.importId());
+        response.setOpeningBalanceId(report.openingBalanceId());
+        response.setValidRows(report.validRows());
+        response.setErrorRows(report.errorRows());
+        response.setTotalValuation(report.totalValuation());
+
         if (report.problems() != null && !report.problems().isEmpty()) {
             response.setProblems(report.problems().stream()
-                    .map(p -> new StockProblem(p.line(), p.message()).sku(p.sku()))
+                    .map(p ->
+                            new StockProblem(p.line(), p.message()).sku(p.sku()).field(p.field()))
                     .toList());
+        }
+        if (report.previewRows() != null && !report.previewRows().isEmpty()) {
+            response.setPreviewRows(report.previewRows().stream()
+                    .map(pr -> new StockRowPreview(pr.lineNo(), StockRowPreview.StatusEnum.fromValue(pr.status()))
+                            .sku(pr.sku())
+                            .skuId(pr.skuId())
+                            .skuCode(pr.skuCode())
+                            .itemName(pr.itemName())
+                            .baseUom(pr.baseUom())
+                            .batchNo(pr.batchNo())
+                            .expiryDate(pr.expiryDate())
+                            .printedMrp(pr.printedMrp())
+                            .condition(
+                                    pr.condition() == null
+                                            ? null
+                                            : StockRowPreview.ConditionEnum.fromValue(
+                                                    pr.condition().name()))
+                            .qty(pr.qty())
+                            .unitCost(pr.unitCost())
+                            .extendedCost(pr.extendedCost())
+                            .batchTracked(pr.batchTracked())
+                            .expiryTracked(pr.expiryTracked())
+                            .hasPrintedMrp(pr.hasPrintedMrp())
+                            .error(pr.error()))
+                    .toList());
+        }
+
+        if (BulkStockReport.StatusEnum.VALID.equals(response.getStatus())
+                || BulkStockReport.StatusEnum.REJECTED.equals(response.getStatus())) {
+            return ResponseEntity.ok(response);
         }
 
         return ResponseEntity.created(URI.create("/v1/inventory/opening-balances/" + report.openingBalanceId()))
@@ -366,6 +426,15 @@ class InventoryController implements InventoryApi {
             String idempotencyKey, UUID openingBalanceId) {
         ScopeContext scope = currentScope.get();
         countersign.handle(new CountersignOpeningBalance(openingBalanceId), scope);
+        return ResponseEntity.ok(
+                toResponse(queries.openingBalance(openingBalanceId, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<OpeningBalanceResponse> rejectOpeningBalance(
+            String idempotencyKey, UUID openingBalanceId, RejectOpeningBalanceRequest request) {
+        ScopeContext scope = currentScope.get();
+        reject.handle(new RejectOpeningBalance(openingBalanceId, request.getReason()), scope);
         return ResponseEntity.ok(
                 toResponse(queries.openingBalance(openingBalanceId, scope).orElseThrow()));
     }
@@ -520,6 +589,9 @@ class InventoryController implements InventoryApi {
                 .preparedBy(balance.preparedBy())
                 .signedEntityBy(balance.signedEntityBy())
                 .countersignedBy(balance.countersignedBy())
-                .documentId(balance.documentId());
+                .documentId(balance.documentId())
+                .rejectedBy(balance.rejectedBy())
+                .rejectedAt(balance.rejectedAt())
+                .rejectionReason(balance.rejectionReason());
     }
 }

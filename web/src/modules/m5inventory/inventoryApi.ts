@@ -13,6 +13,10 @@ export type LotBalance = components["schemas"]["LotBalanceResponse"];
 export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
+export type BulkStockReport = components["schemas"]["BulkStockReport"];
+export type StockProblem = components["schemas"]["StockProblem"];
+export type StockRowPreview = components["schemas"]["StockRowPreview"];
+export type StockRowRequest = components["schemas"]["StockRowRequest"];
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type PickList = components["schemas"]["PickListResponse"];
 export type PickReplacementCandidate = components["schemas"]["PickReplacementCandidateResponse"];
@@ -111,6 +115,39 @@ export function useInventoryApi() {
       async sign(id: string, idempotencyKey: string): Promise<OpeningBalance> {
         const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/sign", {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async downloadOpeningStockTemplate(): Promise<Blob> {
+        const { response } = await api.GET("/v1/inventory/opening-balances/template", {
+          parseAs: "blob"
+        });
+        return await response.blob();
+      },
+
+      async bulkImportOpeningStock(
+        locationId: string,
+        mode: "VALIDATE" | "COMMIT",
+        sheet: string | undefined,
+        lines: StockRowRequest[] | undefined,
+        idempotencyKey: string
+      ): Promise<BulkStockReport> {
+        const { data } = await api.POST("/v1/inventory/opening-balances/bulk", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId, mode, sheet, lines }
+        });
+        return data!;
+      },
+
+      async rejectOpeningBalance(
+        openingBalanceId: string,
+        reason: string,
+        idempotencyKey: string
+      ): Promise<OpeningBalance> {
+        const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/reject", {
+          params: { path: { openingBalanceId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
         });
         return data!;
       },

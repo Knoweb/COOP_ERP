@@ -269,6 +269,20 @@ paths:
               schema: { $ref: '#/components/schemas/BulkStockReport' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/template:
+    get:
+      tags: [Inventory]
+      operationId: downloadOpeningStockTemplate
+      summary: Download official opening stock Excel spreadsheet template
+      x-permission: inv.stock.view
+      responses:
+        '200':
+          description: Excel spreadsheet template (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /v1/inventory/opening-balances/{openingBalanceId}:
     get:
       tags: [Inventory]
@@ -333,6 +347,33 @@ paths:
       responses:
         '200':
           description: Posted, with the OPB document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/{openingBalanceId}/reject:
+    post:
+      tags: [Inventory]
+      operationId: rejectOpeningBalance
+      summary: A higher officer rejects a draft or signed opening balance with a documented reason
+      description: >
+        Rejects an opening balance in DRAFT or SIGNED_ENTITY status, recording the officer and
+        reason, freeing the location for re-preparation.
+      x-permission: inv.opening.sign
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: openingBalanceId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectOpeningBalanceRequest' }
+      responses:
+        '200':
+          description: Rejected, in status REJECTED
           content:
             application/json:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
@@ -1413,6 +1454,10 @@ components:
       required: [locationId]
       properties:
         locationId: { type: string, format: uuid }
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+          default: COMMIT
         sheet: { type: string }
         lines:
           type: array
@@ -1429,25 +1474,60 @@ components:
         condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
         qty: { type: number, exclusiveMinimum: 0 }
         unitCost: { type: number, minimum: 0 }
+        uom: { type: string }
     BulkStockReport:
       type: object
-      required: [importId, openingBalanceId, status, totalRows, importedLines]
+      required: [status, totalRows, importedLines]
       properties:
         importId: { type: string, format: uuid }
         openingBalanceId: { type: string, format: uuid }
-        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY] }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY, VALID] }
         totalRows: { type: integer }
         importedLines: { type: integer }
+        validRows: { type: integer }
+        errorRows: { type: integer }
+        totalValuation: { type: number }
         problems:
           type: array
           items: { $ref: '#/components/schemas/StockProblem' }
+        previewRows:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowPreview' }
     StockProblem:
       type: object
       required: [line, message]
       properties:
         line: { type: integer }
         sku: { type: string }
+        field: { type: string }
         message: { type: string }
+    StockRowPreview:
+      type: object
+      required: [lineNo, status]
+      properties:
+        lineNo: { type: integer }
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        itemName: { type: string }
+        baseUom: { type: string }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qty: { type: number }
+        unitCost: { type: number }
+        extendedCost: { type: number }
+        batchTracked: { type: boolean }
+        expiryTracked: { type: boolean }
+        hasPrintedMrp: { type: boolean }
+        status: { type: string, enum: [VALID, ERROR] }
+        error: { type: string }
+    RejectOpeningBalanceRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 500 }
     PrepareOpeningBalanceRequest:
       type: object
       required: [locationId, lines]
@@ -1480,10 +1560,13 @@ components:
       properties:
         openingBalanceId: { type: string, format: uuid }
         locationId: { type: string, format: uuid }
-        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED] }
+        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED, REJECTED] }
         preparedBy: { type: string, format: uuid }
         signedEntityBy: { type: string, format: uuid }
         countersignedBy: { type: string, format: uuid }
+        rejectedBy: { type: string, format: uuid }
+        rejectedAt: { type: string, format: date-time }
+        rejectionReason: { type: string }
         documentId: { type: string, format: uuid }
         lines:
           type: array

@@ -1,5 +1,8 @@
 package lk.coopfed.knoweb.m5inventory.internal.opening;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,17 +32,19 @@ import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceChanged;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
 import lk.coopfed.knoweb.m5inventory.api.OpeningStockBulkImported;
+import lk.coopfed.knoweb.m5inventory.api.OpeningStockPreviewRow;
+import lk.coopfed.knoweb.m5inventory.api.OpeningStockProblem;
 import lk.coopfed.knoweb.m5inventory.api.OpeningStockRow;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Bulk loader that imports opening stock from a spreadsheet file or row list (CAT-11).
+ * Bulk loader that imports opening stock from an Excel (.xlsx) file, CSV spreadsheet, or row list (CAT-11, PGL-M2-06).
  *
- * <p>The imported stock is not immediately active: it creates an opening balance document
- * explicitly in unconfirmed {@code DRAFT} state, awaiting the entity and Federation signatures
- * before lots and movements become active.
+ * <p>Supports {@code VALIDATE} mode for row-level diagnostics and preview without database mutation,
+ * and {@code COMMIT} mode which creates an immutable opening balance document in unconfirmed {@code DRAFT}
+ * state, awaiting entity and Federation signatures.
  */
 @Service
 @CommandHandler(permission = "inv.opening.prepare")
@@ -54,6 +59,7 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final Clock clock;
 
     public BulkOpeningStockImporter(
             OpeningBalanceStore store,
@@ -62,7 +68,8 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
             BatchQueries batches,
             JdbcTemplate jdbc,
             AuditFacade audit,
-            EventPublisher events) {
+            EventPublisher events,
+            Clock clock) {
         this.store = store;
         this.party = party;
         this.catalogue = catalogue;
@@ -70,6 +77,7 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
+        this.clock = clock;
     }
 
     @Override
@@ -102,42 +110,168 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
 
         List<OpeningStockRow> rows = command.rows();
         if (command.sheet() != null && !command.sheet().isBlank()) {
-            rows = BulkOpeningStockCsvParser.parse(command.sheet());
+            rows = BulkOpeningStockExcelParser.parse(command.sheet());
         }
         if (rows == null || rows.isEmpty()) {
             throw new ProblemException("m5.opening.lines_required");
         }
 
+        boolean isValidateOnly = BulkImportOpeningStock.MODE_VALIDATE.equalsIgnoreCase(command.mode());
+
         List<OpeningBalanceLine> lines = new ArrayList<>();
         List<BatchView> knownBatches = new ArrayList<>();
         List<UUID> resolvedSkuIds = new ArrayList<>();
         List<UUID> resolvedBatchIds = new ArrayList<>();
+        List<OpeningStockProblem> problems = new ArrayList<>();
+        List<OpeningStockPreviewRow> previewRows = new ArrayList<>();
+        BigDecimal totalValuation = BigDecimal.ZERO;
+        int validRows = 0;
+        int errorRows = 0;
 
         for (int i = 0; i < rows.size(); i++) {
+            int lineNo = i + 1;
             OpeningStockRow row = rows.get(i);
-            requireRow(row);
+            String rowError = null;
 
             UUID batchId = row.batchId();
             UUID skuId = row.skuId();
             BatchView batch = null;
+            SkuView skuView = null;
 
+            if (row == null) {
+                rowError = "m5.opening.line_invalid";
+                problems.add(new OpeningStockProblem(lineNo, null, "row", rowError));
+                if (!isValidateOnly) {
+                    throw new ProblemException(rowError);
+                }
+                errorRows++;
+                previewRows.add(errorPreviewRow(lineNo, null, rowError));
+                continue;
+            }
+
+            // 1. Validate Quantity
+            if (row.qty() == null
+                    || row.qty().signum() <= 0
+                    || row.qty().stripTrailingZeros().scale() > 3) {
+                rowError = "m5.opening.line_invalid";
+                problems.add(new OpeningStockProblem(lineNo, row.sku(), "qty", rowError));
+                if (!isValidateOnly) {
+                    throw new ProblemException(rowError);
+                }
+            }
+
+            // 2. Validate Unit Cost
+            if (row.unitCost() == null
+                    || row.unitCost().signum() < 0
+                    || row.unitCost().stripTrailingZeros().scale() > 4) {
+                rowError = "m5.opening.line_invalid";
+                problems.add(new OpeningStockProblem(lineNo, row.sku(), "unitCost", rowError));
+                if (!isValidateOnly) {
+                    throw new ProblemException(rowError);
+                }
+            }
+
+            // 3. Resolve Batch or SKU
             if (batchId != null) {
-                batch = batches.getBatch(batchId, scope)
-                        .orElseThrow(() -> new ProblemException("m5.batch.not_found", Map.of("batchId", batchId)));
-                skuId = batch.skuId();
+                Optional<BatchView> foundBatch = batches.getBatch(batchId, scope);
+                if (foundBatch.isEmpty()) {
+                    rowError = "m5.batch.not_found";
+                    problems.add(new OpeningStockProblem(lineNo, row.sku(), "batchId", rowError));
+                    if (!isValidateOnly) {
+                        throw new ProblemException(rowError, Map.of("batchId", batchId));
+                    }
+                } else {
+                    batch = foundBatch.get();
+                    skuId = batch.skuId();
+                }
             } else {
                 if (skuId == null && row.sku() != null && !row.sku().isBlank()) {
                     skuId = resolveSku(row.sku().strip(), location, scope);
                 }
                 if (skuId == null) {
-                    throw new ProblemException("m5.opening.sku_not_found", Map.of("row", i + 1));
+                    rowError = "m5.opening.sku_not_found";
+                    problems.add(new OpeningStockProblem(lineNo, row.sku(), "sku", rowError));
+                    if (!isValidateOnly) {
+                        throw new ProblemException(rowError, Map.of("row", lineNo));
+                    }
                 }
-                final UUID effectiveSkuId = skuId;
-                catalogue
-                        .getSku(effectiveSkuId, scope)
-                        .orElseThrow(() ->
-                                new ProblemException("m5.opening.sku_not_found", Map.of("skuId", effectiveSkuId)));
             }
+
+            if (skuId != null && rowError == null) {
+                Optional<SkuView> foundSku = catalogue.getSku(skuId, scope);
+                if (foundSku.isEmpty()) {
+                    rowError = "m5.opening.sku_not_found";
+                    problems.add(new OpeningStockProblem(lineNo, row.sku(), "skuId", rowError));
+                    if (!isValidateOnly) {
+                        throw new ProblemException(rowError, Map.of("skuId", skuId));
+                    }
+                } else {
+                    skuView = foundSku.get();
+                }
+            }
+
+            // 4. Batch & Expiry Rules against SKU catalog definition
+            if (skuView != null && rowError == null) {
+                if (skuView.batchTracked() && batch == null) {
+                    if (row.batchNo() == null || row.batchNo().isBlank()) {
+                        rowError = "m5.opening.batch_required";
+                        problems.add(new OpeningStockProblem(lineNo, row.sku(), "batchNo", rowError));
+                    } else if (row.batchNo().length() > 40) {
+                        rowError = "m5.opening.batch_no_too_long";
+                        problems.add(new OpeningStockProblem(lineNo, row.sku(), "batchNo", rowError));
+                    }
+                }
+
+                if (skuView.expiryTracked() && batch == null) {
+                    if (row.expiryDate() == null) {
+                        rowError = "m5.opening.expiry_required";
+                        problems.add(new OpeningStockProblem(lineNo, row.sku(), "expiryDate", rowError));
+                    }
+                }
+
+                if (skuView.hasPrintedMrp() && batch == null) {
+                    if (row.printedMrp() == null || row.printedMrp().signum() <= 0) {
+                        rowError = "m5.opening.mrp_required";
+                        problems.add(new OpeningStockProblem(lineNo, row.sku(), "printedMrp", rowError));
+                    }
+                }
+
+                if (row.uom() != null && !row.uom().isBlank()) {
+                    if (!row.uom().equalsIgnoreCase(skuView.baseUomCode())) {
+                        rowError = "m5.opening.uom_mismatch";
+                        problems.add(new OpeningStockProblem(lineNo, row.sku(), "uom", rowError));
+                    }
+                }
+            }
+
+            if (rowError != null) {
+                errorRows++;
+                previewRows.add(new OpeningStockPreviewRow(
+                        lineNo,
+                        row.sku(),
+                        skuId,
+                        skuView == null ? null : skuView.skuCode(),
+                        skuView == null ? null : skuView.nameEn(),
+                        skuView == null ? row.uom() : skuView.baseUomCode(),
+                        batch == null ? row.batchNo() : batch.batchNo(),
+                        batch == null ? row.expiryDate() : batch.expiryDate(),
+                        batch == null ? row.printedMrp() : batch.printedMrp(),
+                        row.condition() == null ? LotCondition.GOOD : row.condition(),
+                        row.qty(),
+                        row.unitCost(),
+                        null,
+                        skuView != null && skuView.batchTracked(),
+                        skuView != null && skuView.expiryTracked(),
+                        skuView != null && skuView.hasPrintedMrp(),
+                        "ERROR",
+                        rowError));
+                continue;
+            }
+
+            // Valid line
+            validRows++;
+            BigDecimal extendedCost = row.qty().multiply(row.unitCost()).setScale(2, RoundingMode.HALF_UP);
+            totalValuation = totalValuation.add(extendedCost);
 
             resolvedSkuIds.add(skuId);
             resolvedBatchIds.add(batchId);
@@ -153,6 +287,38 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
                     batch == null ? row.expiryDate() : batch.expiryDate(),
                     batch == null ? row.printedMrp() : batch.printedMrp());
             lines.add(line);
+
+            previewRows.add(new OpeningStockPreviewRow(
+                    lineNo,
+                    row.sku(),
+                    skuId,
+                    skuView.skuCode(),
+                    skuView.nameEn(),
+                    skuView.baseUomCode(),
+                    batch == null ? row.batchNo() : batch.batchNo(),
+                    batch == null ? row.expiryDate() : batch.expiryDate(),
+                    batch == null ? row.printedMrp() : batch.printedMrp(),
+                    line.condition(),
+                    row.qty(),
+                    row.unitCost(),
+                    extendedCost,
+                    skuView.batchTracked(),
+                    skuView.expiryTracked(),
+                    skuView.hasPrintedMrp(),
+                    "VALID",
+                    null));
+        }
+
+        // VALIDATE MODE: Zero DB writes, zero audits, zero events
+        if (isValidateOnly) {
+            String status = problems.isEmpty() ? BulkOpeningStockReport.VALID : BulkOpeningStockReport.REJECTED;
+            return new BulkOpeningStockReport(
+                    null, null, status, rows.size(), 0, validRows, errorRows, totalValuation, problems, previewRows);
+        }
+
+        // COMMIT MODE: If any problem exists, fail before inserting
+        if (!problems.isEmpty()) {
+            throw new ProblemException("m5.opening.line_invalid");
         }
 
         UUID openingBalanceId = Ids.next();
@@ -210,7 +376,9 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
                         "totalRows",
                         rows.size(),
                         "importedLines",
-                        lines.size()),
+                        lines.size(),
+                        "totalValuation",
+                        totalValuation),
                 scope);
 
         events.publish(new OpeningBalanceChanged(openingBalanceId, scope.entityId(), location, "DRAFT"));
@@ -218,7 +386,38 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
                 importId, scope.entityId(), location, openingBalanceId, rows.size(), lines.size()));
 
         return new BulkOpeningStockReport(
-                importId, openingBalanceId, BulkOpeningStockReport.IMPORTED, rows.size(), lines.size(), List.of());
+                importId,
+                openingBalanceId,
+                BulkOpeningStockReport.IMPORTED,
+                rows.size(),
+                lines.size(),
+                validRows,
+                0,
+                totalValuation,
+                List.of(),
+                previewRows);
+    }
+
+    private static OpeningStockPreviewRow errorPreviewRow(int lineNo, String sku, String error) {
+        return new OpeningStockPreviewRow(
+                lineNo,
+                sku,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                LotCondition.GOOD,
+                null,
+                null,
+                null,
+                false,
+                false,
+                false,
+                "ERROR",
+                error);
     }
 
     private UUID resolveSku(String text, UUID locationId, ScopeContext scope) {
@@ -248,21 +447,5 @@ public class BulkOpeningStockImporter implements Handles<BulkImportOpeningStock,
         }
 
         return null;
-    }
-
-    private static void requireRow(OpeningStockRow row) {
-        boolean valid = row != null
-                && (row.batchId() != null
-                        || row.skuId() != null
-                        || (row.sku() != null && !row.sku().isBlank()))
-                && row.qty() != null
-                && row.qty().signum() > 0
-                && row.qty().stripTrailingZeros().scale() <= 3
-                && row.unitCost() != null
-                && row.unitCost().signum() >= 0
-                && row.unitCost().stripTrailingZeros().scale() <= 4;
-        if (!valid) {
-            throw new ProblemException("m5.opening.line_invalid");
-        }
     }
 }
