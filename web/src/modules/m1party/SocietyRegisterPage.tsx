@@ -148,6 +148,123 @@ function StatusDropdown(props: {
   );
 }
 
+/** Custom District dropdown with styled selection, checkmark, custom hover and scrollable list */
+function DistrictDropdown(props: {
+  value: string;
+  onChange: (value: string) => void;
+  anyLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+
+  const options: { value: string; label: string }[] = [
+    { value: "", label: props.anyLabel },
+    ...DISTRICTS.map((name) => ({
+      value: name,
+      label: name
+    }))
+  ];
+
+  const currentOption = options.find((opt) => opt.value === props.value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open && menuRef.current) {
+      const selected = menuRef.current.querySelector<HTMLElement>(".custom-status-dropdown__option--selected");
+      if (selected) {
+        selected.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [open]);
+
+  return (
+    <div className="custom-status-dropdown" ref={containerRef}>
+      <button
+        type="button"
+        className="custom-status-dropdown__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span className="custom-status-dropdown__label">{currentOption.label}</span>
+        <svg
+          className="custom-status-dropdown__arrow"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="m7 9 5 5 5-5" />
+        </svg>
+      </button>
+
+      {open && (
+        <ul ref={menuRef} className="custom-status-dropdown__menu custom-status-dropdown__menu--scrollable" role="listbox">
+          {options.map((opt) => {
+            const isSelected = props.value === opt.value;
+            return (
+              <li key={opt.value} role="presentation">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={
+                    isSelected
+                      ? "custom-status-dropdown__option custom-status-dropdown__option--selected"
+                      : "custom-status-dropdown__option"
+                  }
+                  onClick={() => {
+                    props.onChange(opt.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="custom-status-dropdown__option-label">{opt.label}</span>
+                  {isSelected && (
+                    <span className="custom-status-dropdown__check" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
  * governs, as a list a clerk can narrow. Status, district and the search box all go to the
@@ -167,7 +284,7 @@ export function SocietyRegisterPage() {
 
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
-  const [districtSearch, setDistrictSearch] = useState("");
+
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -262,33 +379,16 @@ export function SocietyRegisterPage() {
                 anyLabel={t("party.filter.status.any").text}
               />
             </div>
-            <label className="modern-field">
+            <div className="modern-field">
               <span className="modern-field__label party-filter-label">
                 {t("party.filter.district").text}
               </span>
-              <input
-                type="text"
-                list="society-district-options"
-                value={districtSearch}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setDistrictSearch(value);
-
-                  const match = DISTRICTS.find(
-                    (name) => name.toLowerCase() === value.trim().toLowerCase()
-                  );
-
-                  setDistrict(match ?? "");
-                }}
-                className="party-filter-input"
-                autoComplete="off"
+              <DistrictDropdown
+                value={district}
+                onChange={(val) => setDistrict(val)}
+                anyLabel={t("party.filter.district.any").text}
               />
-              <datalist id="society-district-options">
-                {DISTRICTS.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
-            </label>
+            </div>
           </form>
         )}
       </div>
@@ -338,6 +438,7 @@ export function SocietyRegisterPage() {
     </main>
   );
 }
+
 /** The legal name in the user's language, or in English with the EN tag when not translated. */
 export function SocietyName({ society, locale }: { society: Society; locale: string }) {
   const translated = legalNameIn(society, locale);
