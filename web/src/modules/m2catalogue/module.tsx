@@ -15,12 +15,21 @@ import { TaxRatesPage } from "./TaxRatesPage";
 import { BatchPage } from "./BatchPage";
 import { SuppliersPage } from "./SuppliersPage";
 import { DuplicateSuspectsPage } from "./DuplicateSuspectsPage";
+import { DepartmentCategoriesPage } from "./DepartmentCategoriesPage";
 
 export const catalogueModule: ModuleDefinition = {
   id: "catalogue",
 
   routes: [
     { path: "catalogue", element: <CataloguePage /> },
+    {
+      path: "catalogue/departments",
+      element: (
+        <RequirePermission anyOf={["cat.department.manage", "cat.sku.view"]}>
+          <DepartmentCategoriesPage />
+        </RequirePermission>
+      )
+    },
     {
       path: "catalogue/tax-rates",
       element: (
@@ -68,6 +77,7 @@ export const catalogueModule: ModuleDefinition = {
   // The label is a message id of catalogue.messages.json, never literal text.
   navItems: [
     { labelId: "catalogue.nav", to: "/catalogue" },
+    { labelId: "catalogue.departments.nav", to: "/catalogue/departments" },
     { labelId: "catalogue.tax.nav", to: "/catalogue/tax-rates" },
     { labelId: "catalogue.suppliers.nav", to: "/catalogue/suppliers" },
     { labelId: "catalogue.suspects.nav", to: "/catalogue/suspects" }
@@ -84,6 +94,7 @@ export const catalogueModule: ModuleDefinition = {
     "cat.supplier.manage",
     "cat.image.manage",
     "cat.import.run",
-    "cat.tax.publish"
+    "cat.tax.publish",
+    "cat.department.manage"
   ]
 };

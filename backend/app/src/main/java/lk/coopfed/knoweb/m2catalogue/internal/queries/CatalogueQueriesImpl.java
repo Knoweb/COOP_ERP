@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.ConversionView;
+import lk.coopfed.knoweb.m2catalogue.query.DepartmentCategoryView;
 import lk.coopfed.knoweb.m2catalogue.query.DuplicateSuspectView;
 import lk.coopfed.knoweb.m2catalogue.query.ImageView;
 import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
@@ -56,6 +57,7 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                 tax_category_id,
                 multi_mrp_policy,
                 origin_kind,
+                department_id,
                 attributes::text as attributes_json
             from catalogue.sku
             """;
@@ -382,7 +384,8 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                 rs.getObject("tax_category_id", UUID.class),
                 rs.getString("multi_mrp_policy"),
                 rs.getString("origin_kind"),
-                attributes);
+                attributes,
+                rs.getObject("department_id", UUID.class));
     }
 
     @Override
@@ -469,5 +472,53 @@ class CatalogueQueriesImpl implements CatalogueQueries {
             current = canonical;
         }
         return current;
+    }
+
+    @Override
+    public List<DepartmentCategoryView> departmentCategories(ScopeContext scope) {
+        if (scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        return jdbc.query(
+                """
+                select department_id, code, name_en, name_si, name_ta, description, display_order, status
+                  from catalogue.department_category
+                 order by display_order, code
+                """,
+                (rs, row) -> new DepartmentCategoryView(
+                        rs.getObject("department_id", UUID.class),
+                        rs.getString("code"),
+                        rs.getString("name_en"),
+                        rs.getString("name_si"),
+                        rs.getString("name_ta"),
+                        rs.getString("description"),
+                        rs.getInt("display_order"),
+                        rs.getString("status")));
+    }
+
+    @Override
+    public Optional<DepartmentCategoryView> getDepartmentCategory(UUID departmentId, ScopeContext scope) {
+        if (departmentId == null || scope == null || !scope.hasActiveScope()) {
+            return Optional.empty();
+        }
+        return jdbc
+                .query(
+                        """
+                select department_id, code, name_en, name_si, name_ta, description, display_order, status
+                  from catalogue.department_category
+                 where department_id = ?
+                """,
+                        (rs, row) -> new DepartmentCategoryView(
+                                rs.getObject("department_id", UUID.class),
+                                rs.getString("code"),
+                                rs.getString("name_en"),
+                                rs.getString("name_si"),
+                                rs.getString("name_ta"),
+                                rs.getString("description"),
+                                rs.getInt("display_order"),
+                                rs.getString("status")),
+                        departmentId)
+                .stream()
+                .findFirst();
     }
 }

@@ -1220,6 +1220,132 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/departments:
+
+    get:
+      tags: [Department]
+      operationId: listDepartmentCategories
+      summary: List all merchandise department categories
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: List of department categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Department]
+      operationId: defineDepartmentCategory
+      summary: Define a new merchandise department category
+      x-permission: cat.department.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineDepartmentCategoryRequest'
+
+      responses:
+        '201':
+          description: Department category defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/departments/{departmentId}:
+
+    parameters:
+      - in: path
+        name: departmentId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Department]
+      operationId: getDepartmentCategory
+      summary: Get a department category by id
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: Department category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.department.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+    put:
+      tags: [Department]
+      operationId: updateDepartmentCategory
+      summary: Update an existing merchandise department category
+      x-permission: cat.department.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentCategoryRequest'
+
+      responses:
+        '200':
+          description: Department category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.department.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
   /v1/catalogue/tax/categories:
 
     get:
@@ -1408,6 +1534,10 @@ components:
           type: string
           format: uuid
 
+        departmentId:
+          type: string
+          format: uuid
+
         multiMrpPolicy:
           type: string
           enum:
@@ -1539,6 +1669,10 @@ components:
           type: integer
 
         taxCategoryId:
+          type: string
+          format: uuid
+
+        departmentId:
           type: string
           format: uuid
 
@@ -1680,7 +1814,7 @@ components:
 
     CatalogueReferenceResponse:
       type: object
-      required: [units, taxCategories]
+      required: [units, taxCategories, departments]
       properties:
         units:
           type: array
@@ -1690,6 +1824,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TaxCategoryResponse'
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+
+    DepartmentCategoryResponse:
+      type: object
+      required:
+        - departmentId
+        - code
+        - nameEn
+        - displayOrder
+        - status
+      properties:
+        departmentId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+
+
+    DefineDepartmentCategoryRequest:
+      type: object
+      required:
+        - code
+        - nameEn
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+
+
+    UpdateDepartmentCategoryRequest:
+      type: object
+      required:
+        - nameEn
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
 
 
     RegisterBarcodeRequest:
