@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-
 export type DropdownOption<T extends string = string> = {
   value: T;
   label: string;
@@ -22,6 +21,7 @@ type CatalogueDropdownProps<T extends string = string> = {
  * vertical indicator bar on selected option, and keyboard/click-outside dismissal.
  */
 export function CatalogueDropdown<T extends string = string>({
+  id,
   label,
   value,
   onChange,
@@ -77,18 +77,25 @@ export function CatalogueDropdown<T extends string = string>({
       style={{ position: "relative" }}
     >
       {label && (
-        <span className="catalogue-filter-label" style={{ display: "flex", gap: "var(--space-half)" }}>
+        <label
+          htmlFor={id}
+          className="catalogue-filter-label"
+          style={{ display: "flex", gap: "var(--space-half)" }}
+        >
           <span>{label}</span>
           {required && <span className="register-field-required">*</span>}
-        </span>
+        </label>
       )}
 
       <button
+        id={id}
         type="button"
-        className="register-dropdown-trigger"
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={label}
         disabled={disabled}
+        className="register-dropdown-trigger"
         onClick={() => setOpen(!open)}
       >
         <span className="custom-status-dropdown__label">{currentLabel}</span>

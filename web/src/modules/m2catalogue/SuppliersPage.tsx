@@ -287,7 +287,7 @@ export function SuppliersPage() {
       )}
 
       {activeTab === "import" && canManage && (
-        <section className="catalogue-section">
+        <section className="catalogue-section supplier-import-section">
           <h2>{t("catalogue.suppliers.import.title").text}</h2>
           <p className="catalogue-import-subtitle" style={{ marginBottom: "var(--space-3)" }}>
             {t("catalogue.suppliers.import.description").text}
@@ -307,7 +307,7 @@ export function SuppliersPage() {
               }}
               aria-label={t("catalogue.suppliers.import.dropzone").text}
             >
-              <svg className="catalogue-dropzone__icon" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg className="catalogue-dropzone__icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
                 <path d="M12 12v9" />
                 <path d="m8 16 4-4 4 4" />
