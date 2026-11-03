@@ -7,6 +7,7 @@ import "./inventory.css";
 import { inLocale } from "../../shell/i18n/localName";
 import { errorText } from "./stockView";
 import { useInventoryApi, type Location } from "./inventoryApi";
+import { CustomSelect } from "./CustomSelect";
 
 function nameOf(location: Location, locale: string): string {
   return inLocale(locale, location.nameEn, location.nameSi, location.nameTa);
@@ -39,20 +40,20 @@ export function LocationPicker({ value, onChange }: { value: string; onChange: (
     return <p role="alert">{errorText(locations.error, t("inventory.location.list_refused").text)}</p>;
   }
 
+  const options = (locations.data ?? []).map((location) => ({
+    value: location.locationId,
+    label: `${location.locationCode} ${nameOf(location, intl.locale)}`,
+  }));
+
   return (
     <label className="inventory-form-field">
-      {t("inventory.field.location").text}
-      <select
-        aria-label={t("inventory.field.location").text}
+      <span className="inventory-form-field__label">{t("inventory.field.location").text}</span>
+      <CustomSelect
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {(locations.data ?? []).map((location) => (
-          <option key={location.locationId} value={location.locationId}>
-            {`${location.locationCode} ${nameOf(location, intl.locale)}`}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        ariaLabel={t("inventory.field.location").text}
+        options={options}
+      />
     </label>
   );
 }
