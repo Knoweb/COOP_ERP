@@ -367,6 +367,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/integration/delivery/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Real-time GPS location update for a delivery vehicle or mobile device */
+        post: operations["recordVehicleLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/vehicles/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest GPS locations for all active delivery vehicles */
+        get: operations["listLiveVehicleLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/vehicles/{vehicleId}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest GPS location for a specific vehicle */
+        get: operations["getLiveVehicleLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/vehicles/{vehicleId}/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** End-of-day GPS route history for a vehicle on a given date */
+        get: operations["getVehicleRouteHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create and schedule a delivery trip */
+        post: operations["createDeliveryTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/trips/{tripId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete an end-of-day delivery trip with final odometer reading */
+        post: operations["completeDeliveryTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/trips/{tripId}/drops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Schedule a package drop on a delivery trip */
+        post: operations["recordDeliveryDrop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/drops/{deliveryId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update status of a package drop */
+        post: operations["updateDeliveryStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/reports/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** End-of-day delivery summary report for a given date */
+        get: operations["getDailyDeliverySummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/delivery/reports/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Month-end routine delivery report reconciling trips and drops */
+        get: operations["getMonthlyDeliveryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -661,6 +831,191 @@ export interface components {
             totalOtMinutes: number;
             totalApprovedAmount: number;
             contributionCount: number;
+        };
+        RecordVehicleLocationRequest: {
+            vehicleId: string;
+            deviceId: string;
+            /** Format: uuid */
+            tripId?: string | null;
+            latitude: number;
+            longitude: number;
+            speedKmh?: number;
+            headingDegrees?: number | null;
+            batteryPercentage?: number | null;
+            /** Format: date-time */
+            recordedAt?: string | null;
+        };
+        VehicleLocationResponse: {
+            /** Format: uuid */
+            updateId: string;
+            vehicleId: string;
+            deviceId: string;
+            /** Format: uuid */
+            tripId?: string | null;
+            latitude: number;
+            longitude: number;
+            speedKmh: number;
+            headingDegrees?: number | null;
+            batteryPercentage?: number | null;
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: date-time */
+            receivedAt: string;
+        };
+        LiveVehicleLocationResponse: {
+            vehicleId: string;
+            deviceId: string;
+            /** Format: uuid */
+            tripId?: string | null;
+            latitude: number;
+            longitude: number;
+            speedKmh: number;
+            headingDegrees?: number | null;
+            batteryPercentage?: number | null;
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: date-time */
+            receivedAt?: string | null;
+        };
+        VehicleRoutePointResponse: {
+            /** Format: date-time */
+            recordedAt: string;
+            latitude: number;
+            longitude: number;
+            speedKmh: number;
+            headingDegrees?: number | null;
+        };
+        VehicleRouteHistoryResponse: {
+            vehicleId: string;
+            /** Format: date */
+            date: string;
+            pointsCount: number;
+            points: components["schemas"]["VehicleRoutePointResponse"][];
+        };
+        CreateDeliveryTripRequest: {
+            tripReference: string;
+            vehicleId: string;
+            /** Format: uuid */
+            driverUserId?: string | null;
+            driverCode?: string | null;
+            /** Format: uuid */
+            originLocationId: string;
+            /** Format: uuid */
+            destinationLocationId?: string | null;
+            /** Format: date */
+            tripDate: string;
+            startOdometerKm?: number | null;
+        };
+        DeliveryTripResponse: {
+            /** Format: uuid */
+            tripId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            tripReference: string;
+            vehicleId: string;
+            driverCode?: string | null;
+            /** Format: uuid */
+            originLocationId: string;
+            /** Format: uuid */
+            destinationLocationId?: string | null;
+            /** Format: date */
+            tripDate: string;
+            /** @enum {string} */
+            tripStatus: "PLANNED" | "IN_TRANSIT" | "COMPLETED" | "CANCELLED";
+            totalDistanceKm: number;
+            totalDrops: number;
+            deliveredDrops: number;
+            failedDrops: number;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            completedAt?: string | null;
+        };
+        CompleteDeliveryTripRequest: {
+            endOdometerKm?: number | null;
+            totalDistanceKm?: number | null;
+        };
+        RecordDeliveryDropRequest: {
+            deliveryReference: string;
+            /** Format: uuid */
+            destinationLocationId: string;
+            recipientRef?: string | null;
+            /** @default 1 */
+            packagesCount: number;
+            /** @default 0 */
+            weightKg: number;
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            notes?: string | null;
+        };
+        DeliveryDropResponse: {
+            /** Format: uuid */
+            deliveryId: string;
+            /** Format: uuid */
+            tripId: string;
+            deliveryReference: string;
+            /** Format: uuid */
+            destinationLocationId: string;
+            recipientRef?: string | null;
+            packagesCount: number;
+            weightKg: number;
+            /** @enum {string} */
+            status: "PENDING" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "CANCELLED";
+            /** Format: date-time */
+            scheduledAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
+            failureReason?: string | null;
+            notes?: string | null;
+        };
+        UpdateDeliveryStatusRequest: {
+            /** @enum {string} */
+            status: "IN_TRANSIT" | "DELIVERED" | "FAILED" | "CANCELLED";
+            failureReason?: string | null;
+            notes?: string | null;
+        };
+        DailyDeliverySummaryResponse: {
+            /** Format: date */
+            date: string;
+            totalTrips: number;
+            completedTrips: number;
+            totalDeliveries: number;
+            deliveredCount: number;
+            failedCount: number;
+            pendingCount: number;
+            completionRatePercent: number;
+            totalDistanceKm: number;
+            activeVehiclesCount: number;
+            trips: components["schemas"]["DeliveryTripResponse"][];
+        };
+        DailyDeliveryBreakdownItem: {
+            /** Format: date */
+            date: string;
+            totalTrips: number;
+            totalDeliveries: number;
+            deliveredCount: number;
+            failedCount: number;
+            totalDistanceKm: number;
+        };
+        VehicleDeliveryBreakdownItem: {
+            vehicleId: string;
+            totalTrips: number;
+            totalDeliveries: number;
+            deliveredCount: number;
+            failedCount: number;
+            totalDistanceKm: number;
+        };
+        MonthlyDeliveryReportResponse: {
+            periodMonth: string;
+            totalTrips: number;
+            completedTrips: number;
+            totalDeliveries: number;
+            deliveredCount: number;
+            failedCount: number;
+            deliverySuccessRate: number;
+            totalDistanceKm: number;
+            dailyBreakdown: components["schemas"]["DailyDeliveryBreakdownItem"][];
+            vehicleBreakdown: components["schemas"]["VehicleDeliveryBreakdownItem"][];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1282,6 +1637,271 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    recordVehicleLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordVehicleLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Location recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleLocationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    listLiveVehicleLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of latest vehicle locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveVehicleLocationResponse"][];
+                };
+            };
+        };
+    };
+    getLiveVehicleLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Latest vehicle location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveVehicleLocationResponse"];
+                };
+            };
+            /** @description Vehicle not found or no location recorded */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getVehicleRouteHistory: {
+        parameters: {
+            query: {
+                date: string;
+            };
+            header?: never;
+            path: {
+                vehicleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Route history points */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleRouteHistoryResponse"];
+                };
+            };
+        };
+    };
+    createDeliveryTrip: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeliveryTripRequest"];
+            };
+        };
+        responses: {
+            /** @description Trip scheduled */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryTripResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    completeDeliveryTrip: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CompleteDeliveryTripRequest"];
+            };
+        };
+        responses: {
+            /** @description Trip completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryTripResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    recordDeliveryDrop: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordDeliveryDropRequest"];
+            };
+        };
+        responses: {
+            /** @description Delivery drop scheduled */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryDropResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    updateDeliveryStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeliveryStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Delivery status updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryDropResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getDailyDeliverySummary: {
+        parameters: {
+            query: {
+                date: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily delivery summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyDeliverySummaryResponse"];
+                };
+            };
+        };
+    };
+    getMonthlyDeliveryReport: {
+        parameters: {
+            query: {
+                period: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly delivery report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyDeliveryReportResponse"];
+                };
+            };
         };
     };
 }
