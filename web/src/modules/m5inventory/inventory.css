@@ -252,14 +252,239 @@
   margin-bottom: var(--space-3);
 }
 
-.stock-positions-filters .modern-location-picker,
-.modern-filter-panel--stock .modern-location-picker {
-  width: 100%;
-  max-width: calc(var(--space-8) * 4);
+.modern-filter-panel--stock:not(.stock-positions-filters) {
+  display: flex !important;
+  flex-direction: column !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  gap: var(--space-half) !important;
+  background: var(--color-polish-22) !important;
+  padding: var(--space-1) calc(var(--space-1) + var(--space-half)) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-23) !important;
+  margin-bottom: var(--space-3) !important;
 }
 
-.stock-positions-filters .modern-location-picker select {
-  max-width: 100%;
+.modern-location-picker {
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+.modern-filter-panel--stock .inventory-form-field,
+.modern-location-picker .inventory-form-field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: calc(var(--space-half) / 2) !important;
+  line-height: 1.2 !important;
+}
+
+.modern-filter-panel--stock .inventory-form-field__label,
+.modern-location-picker .inventory-form-field__label {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  color: var(--color-brand-dark) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown,
+.modern-location-picker .custom-dropdown {
+  position: relative !important;
+  width: auto !important;
+  min-width: calc(var(--space-8) * 3 + var(--space-6)) !important;
+  max-width: 100% !important;
+  text-transform: none !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__trigger,
+.modern-location-picker .custom-dropdown__trigger {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-1) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-surface) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-text) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-1) !important;
+  cursor: pointer !important;
+  outline: none !important;
+  text-align: left !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__trigger:hover,
+.modern-location-picker .custom-dropdown__trigger:hover {
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown--open .custom-dropdown__trigger,
+.modern-location-picker .custom-dropdown--open .custom-dropdown__trigger,
+.modern-filter-panel--stock .custom-dropdown__trigger:focus-visible,
+.modern-location-picker .custom-dropdown__trigger:focus-visible {
+  border-color: var(--color-accent) !important;
+  background-color: var(--color-surface) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__value,
+.modern-location-picker .custom-dropdown__value {
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-text) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  padding-left: var(--space-half) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__arrow,
+.modern-location-picker .custom-dropdown__arrow {
+  width: calc(var(--space-2) - var(--space-half) / 2) !important;
+  height: calc(var(--space-2) - var(--space-half) / 2) !important;
+  stroke: var(--color-accent) !important;
+  stroke-width: var(--border-width-strong) !important;
+  fill: none !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__arrow--open,
+.modern-location-picker .custom-dropdown__arrow--open {
+  transform: rotate(180deg) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__menu,
+.modern-location-picker .custom-dropdown__menu {
+  position: absolute !important;
+  top: calc(100% + var(--space-half)) !important;
+  left: 0 !important;
+  right: 0 !important;
+  min-width: 100% !important;
+  width: max-content !important;
+  max-width: calc(var(--space-8) * 5) !important;
+  z-index: 100 !important;
+  margin: 0 !important;
+  padding: var(--space-half) 0 !important;
+  list-style: none !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-21), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
+  overflow-y: auto !important;
+  max-height: calc(var(--space-8) * 4) !important;
+  animation: customDropdownFadeIn 0.15s ease-out !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown--up .custom-dropdown__menu,
+.modern-location-picker .custom-dropdown--up .custom-dropdown__menu {
+  top: auto !important;
+  bottom: calc(100% + var(--space-half)) !important;
+  animation: customDropdownFadeInUp 0.15s ease-out !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__item,
+.modern-location-picker .custom-dropdown__item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-2) !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-2) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-text) !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+  user-select: none !important;
+  border-left: var(--border-width-strong) solid transparent !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__item:hover,
+.modern-location-picker .custom-dropdown__item:hover {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__item--selected,
+.modern-location-picker .custom-dropdown__item--selected {
+  background-color: var(--color-polish-31) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
+  border-left: var(--border-width-strong) solid var(--color-accent) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__item--selected:hover,
+.modern-location-picker .custom-dropdown__item--selected:hover {
+  background-color: var(--color-polish-31) !important;
+  color: var(--color-accent) !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__item-label,
+.modern-location-picker .custom-dropdown__item-label {
+  flex: 1 !important;
+}
+
+.modern-filter-panel--stock .custom-dropdown__checkmark,
+.modern-location-picker .custom-dropdown__checkmark {
+  width: calc(var(--space-2) - var(--space-half) / 2) !important;
+  height: calc(var(--space-2) - var(--space-half) / 2) !important;
+  stroke: var(--color-accent) !important;
+  fill: none !important;
+  stroke-width: var(--border-width-strong) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  flex-shrink: 0 !important;
+  margin-left: var(--space-1) !important;
+}
+
+.modern-filter-panel--stock select,
+.modern-location-picker select {
+  box-sizing: border-box !important;
+  min-height: calc(var(--space-4) + var(--space-half)) !important;
+  padding-top: var(--space-half) !important;
+  padding-bottom: var(--space-half) !important;
+  padding-left: var(--space-2) !important;
+  padding-right: calc(var(--space-4) + var(--space-half)) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  background-color: var(--color-surface) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E0E5B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right var(--space-2) center !important;
+  background-size: calc(var(--space-2) - var(--space-half) / 2) calc(var(--space-2) - var(--space-half) / 2) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-text) !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  cursor: pointer !important;
+  width: auto !important;
+  min-width: calc(var(--space-8) * 3 + var(--space-4)) !important;
+  outline: none !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+}
+
+.modern-filter-panel--stock select:hover,
+.modern-location-picker select:hover {
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.modern-filter-panel--stock select:focus,
+.modern-location-picker select:focus {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .modern-filter-panel--stock .inventory-control-links,
