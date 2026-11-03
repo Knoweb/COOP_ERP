@@ -127,3 +127,4 @@ CREATE POLICY ext_view ON integration.vehicle_location_update FOR SELECT TO app_
     USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
 
 GRANT SELECT, INSERT ON integration.vehicle_location_update TO app_rw;
+
