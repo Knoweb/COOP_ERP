@@ -8,22 +8,24 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.LocationView;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.api.InventoryCandidateQuery;
 import lk.coopfed.knoweb.m3pricing.api.InventoryCandidateQuery.NearExpiryCandidate;
 import lk.coopfed.knoweb.m3pricing.api.InventoryCandidateQuery.SlowMovingCandidate;
 import lk.coopfed.knoweb.m3pricing.internal.queries.RetailPriceResolution;
+import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +36,10 @@ import org.springframework.stereotype.Component;
  * {@link InventoryCandidateQuery} and applies
  * configurable markdown policies with priority conflict resolution and safety
  * ceilings.
+ *
+ * <p>Eligibility != Activation: Inventory candidates represent eligible items, but
+ * markdowns are only active when an explicitly authored and active rule exists in
+ * {@link RuleStore}.
  */
 @Component
 public class ExpirySlowMovingDiscountCalculator {
@@ -56,6 +62,8 @@ public class ExpirySlowMovingDiscountCalculator {
     private final InventoryCandidateQuery inventoryCandidates;
     private final RetailPriceResolution retailResolution;
     private final CatalogueQueries catalogue;
+    private final PartyQueries party;
+    private final RuleStore ruleStore;
     private final ConfigRegistry config;
     private final Clock clock;
     private final ZoneId businessZone;
@@ -64,12 +72,16 @@ public class ExpirySlowMovingDiscountCalculator {
             InventoryCandidateQuery inventoryCandidates,
             RetailPriceResolution retailResolution,
             CatalogueQueries catalogue,
+            PartyQueries party,
+            RuleStore ruleStore,
             ConfigRegistry config,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
         this.inventoryCandidates = inventoryCandidates;
         this.retailResolution = retailResolution;
         this.catalogue = catalogue;
+        this.party = party;
+        this.ruleStore = ruleStore;
         this.config = config;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
@@ -88,25 +100,30 @@ public class ExpirySlowMovingDiscountCalculator {
         BigDecimal slowVelocityPct = configPercent(KEY_SLOW_VELOCITY_PERCENT, DEFAULT_SLOW_VELOCITY_PERCENT, scope);
         BigDecimal maxMarkdownPct = configPercent(KEY_MAX_MARKDOWN_PERCENT, DEFAULT_MAX_MARKDOWN_PERCENT, scope);
 
+        // Resolve owner entity id
+        UUID ownerEntityId = null;
+        if (party != null && locationId != null) {
+            ownerEntityId = party.getLocation(locationId, scope)
+                    .map(LocationView::ownerEntityId)
+                    .orElse(scope.entityId());
+        } else {
+            ownerEntityId = scope.entityId();
+        }
+
+        // Active rules in force for this owner entity
+        List<RuleView> activeRules = List.of();
+        if (ruleStore != null) {
+            final UUID owner = ownerEntityId;
+            activeRules = ruleStore.activeOnOrAfter(today).stream()
+                    .filter(r -> owner == null || r.ownerEntityId().equals(owner))
+                    .filter(r -> !today.isBefore(r.validFrom()) && (r.validTo() == null || !today.isAfter(r.validTo())))
+                    .toList();
+        }
+
         Map<UUID, ExpirySlowMovingDiscountView> calculatedByLot = new HashMap<>();
 
         // 1. Evaluate near-expiry candidates
         List<NearExpiryCandidate> nearExpiryLots = inventoryCandidates.nearExpiryCandidates(locationId, scope);
-
-        // Identify SKUs whose on-hand lots are strictly expired (CR-23A-1 item 4)
-        Set<UUID> skusWithExpiredLots = new HashSet<>();
-        Set<UUID> skusWithInDateLots = new HashSet<>();
-        for (NearExpiryCandidate lot : nearExpiryLots) {
-            if (lot.qtyOnHand() != null && lot.qtyOnHand().signum() > 0) {
-                if (lot.daysToExpiry() >= 0 && !"EXPIRED".equalsIgnoreCase(lot.urgencyTier())) {
-                    skusWithInDateLots.add(lot.skuId());
-                } else {
-                    skusWithExpiredLots.add(lot.skuId());
-                }
-            }
-        }
-        skusWithExpiredLots.removeAll(skusWithInDateLots);
-
         for (NearExpiryCandidate lot : nearExpiryLots) {
             // Guard: excluded expired, healthy, zero or negative stock
             if (lot.qtyOnHand() == null || lot.qtyOnHand().signum() <= 0) {
@@ -116,8 +133,27 @@ public class ExpirySlowMovingDiscountCalculator {
                 continue;
             }
 
+            // Must match an active EXPIRY_MARKDOWN rule for this SKU and days to expiry
+            Optional<RuleView> matchedRule = activeRules.stream()
+                    .filter(r -> "EXPIRY_MARKDOWN".equalsIgnoreCase(r.kind()))
+                    .filter(r -> lot.skuId().equals(r.predicate().skuId()))
+                    .filter(r -> r.predicate().daysToExpiry() == null
+                            || (lot.daysToExpiry() <= r.predicate().daysToExpiry() && lot.daysToExpiry() >= 0))
+                    .findFirst();
+
+            if (matchedRule.isEmpty()) {
+                // Eligibility != Activation: Candidate is not active without an active rule
+                continue;
+            }
+
+            RuleView rule = matchedRule.get();
+
             BigDecimal markdownPct;
-            if ("CRITICAL".equalsIgnoreCase(lot.urgencyTier())) {
+            if (rule.benefit() != null
+                    && rule.benefit().value() != null
+                    && rule.benefit().value().signum() > 0) {
+                markdownPct = rule.benefit().value();
+            } else if ("CRITICAL".equalsIgnoreCase(lot.urgencyTier())) {
                 markdownPct = criticalPct;
             } else if ("WARNING".equalsIgnoreCase(lot.urgencyTier())) {
                 markdownPct = warningPct;
@@ -133,12 +169,14 @@ public class ExpirySlowMovingDiscountCalculator {
 
             BigDecimal basePrice = resolveBasePrice(lot.locationId(), lot.skuId(), lot.unitCost(), today, scope);
             if (basePrice == null || basePrice.compareTo(MIN_PRICE) <= 0) {
-                // Base price is null or already at/below the minimum valid positive price (0.01)
+                // Base price is null or already at/below the minimum valid positive price
+                // (0.01)
                 continue;
             }
 
             BigDecimal discountAmount = basePrice.multiply(markdownPct).divide(HUNDRED, 2, RoundingMode.HALF_UP);
             BigDecimal tentativePrice = basePrice.subtract(discountAmount);
+
             BigDecimal discountedPrice;
             BigDecimal effectiveMarkdownPct;
 
@@ -155,6 +193,12 @@ public class ExpirySlowMovingDiscountCalculator {
             Optional<SkuView> sku = catalogue.getSku(lot.skuId(), scope);
             String skuCode = sku.map(SkuView::skuCode).orElse(lot.skuId().toString());
 
+            LocalDate validTo = rule.validTo() != null
+                    ? (lot.expiryDate() != null && lot.expiryDate().isBefore(rule.validTo())
+                            ? lot.expiryDate()
+                            : rule.validTo())
+                    : lot.expiryDate();
+
             ExpirySlowMovingDiscountView view = new ExpirySlowMovingDiscountView(
                     lot.skuId(),
                     skuCode,
@@ -165,13 +209,13 @@ public class ExpirySlowMovingDiscountCalculator {
                     "NEAR_EXPIRY",
                     lot.urgencyTier().toUpperCase(),
                     basePrice,
-                    effectiveMarkdownPct,
+                    markdownPct,
                     discountedPrice,
                     lot.qtyOnHand(),
                     lot.expiryDate(),
                     lot.daysToExpiry(),
                     today,
-                    lot.expiryDate(),
+                    validTo,
                     "ACTIVE");
 
             calculatedByLot.put(lot.stockLotId(), view);
@@ -184,13 +228,26 @@ public class ExpirySlowMovingDiscountCalculator {
                 continue;
             }
 
-            // Exclude items whose on-hand inventory is expired (CR-23A-1 item 4)
-            if (skusWithExpiredLots.contains(item.skuId())) {
+            // Must match an active TIME_LIMITED_PRICE or SLOW_MOVING rule for this SKU
+            Optional<RuleView> matchedRule = activeRules.stream()
+                    .filter(r ->
+                            "TIME_LIMITED_PRICE".equalsIgnoreCase(r.kind()) || "SLOW_MOVING".equalsIgnoreCase(r.kind()))
+                    .filter(r -> item.skuId().equals(r.predicate().skuId()))
+                    .findFirst();
+
+            if (matchedRule.isEmpty()) {
+                // Eligibility != Activation: Candidate is not active without an active rule
                 continue;
             }
 
+            RuleView rule = matchedRule.get();
+
             BigDecimal markdownPct;
-            if ("STAGNANT".equalsIgnoreCase(item.classification())) {
+            if (rule.benefit() != null
+                    && rule.benefit().value() != null
+                    && rule.benefit().value().signum() > 0) {
+                markdownPct = rule.benefit().value();
+            } else if ("STAGNANT".equalsIgnoreCase(item.classification())) {
                 markdownPct = stagnantPct;
             } else if ("SLOW_VELOCITY".equalsIgnoreCase(item.classification())) {
                 markdownPct = slowVelocityPct;
@@ -206,7 +263,8 @@ public class ExpirySlowMovingDiscountCalculator {
 
             BigDecimal basePrice = resolveBasePrice(item.locationId(), item.skuId(), item.unitCost(), today, scope);
             if (basePrice == null || basePrice.compareTo(MIN_PRICE) <= 0) {
-                // Base price is null or already at/below the minimum valid positive price (0.01)
+                // Base price is null or already at/below the minimum valid positive price
+                // (0.01)
                 continue;
             }
 
@@ -217,7 +275,8 @@ public class ExpirySlowMovingDiscountCalculator {
             BigDecimal effectiveMarkdownPct = markdownPct;
 
             if (tentativePrice.compareTo(MIN_PRICE) < 0) {
-                // Positive price invariant (CR-23A-1 item 5): selling price cannot be 0.00 or negative
+                // Positive price invariant (CR-23A-1 item 5): selling price cannot be 0.00 or
+                // negative
                 discountedPrice = MIN_PRICE;
                 discountAmount = basePrice.subtract(MIN_PRICE);
                 effectiveMarkdownPct = discountAmount.multiply(HUNDRED).divide(basePrice, 2, RoundingMode.HALF_UP);
@@ -228,6 +287,8 @@ public class ExpirySlowMovingDiscountCalculator {
 
             Optional<SkuView> sku = catalogue.getSku(item.skuId(), scope);
             String skuCode = sku.map(SkuView::skuCode).orElse(item.skuId().toString());
+
+            LocalDate validTo = rule.validTo();
 
             ExpirySlowMovingDiscountView slowView = new ExpirySlowMovingDiscountView(
                     item.skuId(),
@@ -245,7 +306,7 @@ public class ExpirySlowMovingDiscountCalculator {
                     null,
                     null,
                     today,
-                    null,
+                    validTo,
                     "ACTIVE");
 
             // 3. Conflict resolution & non-stacking (Section 6)
@@ -255,8 +316,7 @@ public class ExpirySlowMovingDiscountCalculator {
 
             if (skuHasNearExpiry) {
                 // If the near-expiry is CRITICAL, imminent perishability takes precedence.
-                // Otherwise if slow-moving offers a stronger markdown, update matching lot
-                // views.
+                // Otherwise if slow-moving offers a stronger markdown, update matching lot views.
                 for (Map.Entry<UUID, ExpirySlowMovingDiscountView> entry : calculatedByLot.entrySet()) {
                     ExpirySlowMovingDiscountView current = entry.getValue();
                     if (current.skuId().equals(item.skuId())) {

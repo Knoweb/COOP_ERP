@@ -13,7 +13,6 @@ import lk.coopfed.knoweb.engine.Basket;
 import lk.coopfed.knoweb.engine.BasketResolver;
 import lk.coopfed.knoweb.engine.BasketResult;
 import lk.coopfed.knoweb.engine.BatchCandidate;
-import lk.coopfed.knoweb.engine.BenefitKind;
 import lk.coopfed.knoweb.engine.Ceiling;
 import lk.coopfed.knoweb.engine.EngineVersionKt;
 import lk.coopfed.knoweb.engine.LineInput;
@@ -24,7 +23,6 @@ import lk.coopfed.knoweb.engine.PricingSnapshotIndex;
 import lk.coopfed.knoweb.engine.Quantity;
 import lk.coopfed.knoweb.engine.RetailLine;
 import lk.coopfed.knoweb.engine.Rule;
-import lk.coopfed.knoweb.engine.RuleKind;
 import lk.coopfed.knoweb.engine.SkuFacts;
 import lk.coopfed.knoweb.engine.StackingPolicy;
 import lk.coopfed.knoweb.engine.TenderKind;
@@ -323,41 +321,6 @@ public class RetailPriceResolution {
                         lk.coopfed.knoweb.engine.BenefitKind.valueOf(r.benefit().kind()),
                         r.benefit().value()))
                 .toList());
-
-        ExpirySlowMovingDiscountCalculator calculator =
-                discountCalculatorProvider != null ? discountCalculatorProvider.getIfAvailable() : null;
-        if (calculator != null) {
-            List<ExpirySlowMovingDiscountView> activeMarkdowns =
-                    calculator.calculate(locationId, null, "ACTIVE", scope);
-            for (ExpirySlowMovingDiscountView m : activeMarkdowns) {
-                if (m.discountedPrice() == null
-                        || m.markdownPercent() == null
-                        || m.markdownPercent().signum() <= 0) {
-                    continue;
-                }
-                RuleKind kind = "NEAR_EXPIRY".equalsIgnoreCase(m.reason())
-                        ? RuleKind.EXPIRY_MARKDOWN
-                        : RuleKind.TIME_LIMITED_PRICE;
-                int priority = "NEAR_EXPIRY".equalsIgnoreCase(m.reason()) ? 1 : 2;
-                UUID ruleId = UUID.nameUUIDFromBytes(
-                        ("markdown_" + m.locationId() + "_" + m.skuId() + "_" + m.batchId()).getBytes());
-
-                engineRules.add(new Rule(
-                        ruleId,
-                        kind,
-                        priority,
-                        m.validFrom(),
-                        m.validTo(),
-                        m.skuId(),
-                        null,
-                        null,
-                        null,
-                        m.daysToExpiry(),
-                        null,
-                        BenefitKind.PERCENT_OFF,
-                        m.markdownPercent()));
-            }
-        }
 
         PricingSnapshotIndex index = new PricingSnapshotIndex(
                 0L,

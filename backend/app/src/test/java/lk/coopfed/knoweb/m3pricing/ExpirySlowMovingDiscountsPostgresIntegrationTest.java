@@ -44,7 +44,7 @@ import org.springframework.context.annotation.Import;
 class ExpirySlowMovingDiscountsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e750-0000-7000-8000-000000000002");
-    private static final UUID STRANGER = UUID.fromString("0190e750-0000-7000-8000-000000000003");
+    private static final UUID STRANGER = UUID.fromString("0190e750-0000-7000-8000-000000000088");
 
     @Autowired
     EvaluateExpirySlowMovingDiscountsHandler evaluateHandler;
@@ -70,6 +70,8 @@ class ExpirySlowMovingDiscountsPostgresIntegrationTest extends PostgresIntegrati
     void setUp() {
         fixture = new InventoryFixture(superuserJdbc());
         fixture.clean();
+        superuserJdbc()
+                .execute("truncate table pricing.price_list_line, pricing.price_list, pricing.discount_rule cascade");
         fixture.entity(MPCS, "M3P1", "MPCS");
         fixture.entity(STRANGER, "M3ST", "MPCS");
         shop = fixture.location(MPCS, "SHOP");
@@ -80,6 +82,8 @@ class ExpirySlowMovingDiscountsPostgresIntegrationTest extends PostgresIntegrati
 
     @AfterEach
     void tearDown() {
+        superuserJdbc()
+                .execute("truncate table pricing.price_list_line, pricing.price_list, pricing.discount_rule cascade");
         fixture.clean();
     }
 
@@ -132,6 +136,11 @@ class ExpirySlowMovingDiscountsPostgresIntegrationTest extends PostgresIntegrati
         UUID sku4 = fixture.sku(MPCS, "M3_BISCUIT_SLOW");
         UUID batch4 = fixture.batch(sku4, MPCS, "B-SLOW-01", null);
         postReceipt(shop, batch4, "50.000", "200.00", MPCS);
+
+        // Author active discount rules for sku1, sku2, and sku4 (Eligibility != Activation)
+        insertRule(MPCS, "Milk Expiry Rule", "EXPIRY_MARKDOWN", sku1, 30, "30.00", today.minusDays(5), null);
+        insertRule(MPCS, "Bread Expiry Rule", "EXPIRY_MARKDOWN", sku2, 30, "15.00", today.minusDays(5), null);
+        insertRule(MPCS, "Biscuit Slow Rule", "TIME_LIMITED_PRICE", sku4, null, "20.00", today.minusDays(5), null);
 
         // Act: Execute discount evaluation handler
         ExpirySlowMovingEvaluationResult result =
@@ -235,6 +244,7 @@ class ExpirySlowMovingDiscountsPostgresIntegrationTest extends PostgresIntegrati
         UUID sku = fixture.sku(MPCS, "M3_TEA_FED");
         UUID batch = fixture.batch(sku, MPCS, "B-FED-01", today.plusDays(4));
         postReceipt(shop, batch, "10.000", "300.00", MPCS);
+        insertRule(MPCS, "Tea Rule", "EXPIRY_MARKDOWN", sku, 30, "20.00", today.minusDays(5), null);
 
         UUID fedEntity = UUID.fromString("0190e750-0000-7000-8000-000000000001");
         ScopeContext fedViewScope = viewer(fedEntity);
@@ -310,5 +320,82 @@ class ExpirySlowMovingDiscountsPostgresIntegrationTest extends PostgresIntegrati
                 .filter(type::isInstance)
                 .map(type::cast)
                 .toList();
+    }
+
+    @Test
+    void eligibleCandidateWithoutActiveRuleIsNotActivatedAndRetainsBasePrice() {
+        ScopeContext scope = InventoryFixture.own(MPCS);
+
+        // Near-expiry candidate with 3 days to expiry
+        UUID sku = fixture.sku(MPCS, "M3_CANDIDATE_NO_RULE");
+        UUID batch = fixture.batch(sku, MPCS, "B-NORULE-01", today.plusDays(3));
+        postReceipt(shop, batch, "10.000", "150.00", MPCS);
+
+        // Published retail price list in force for sku (shelf price 250.00)
+        UUID listId = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into pricing.price_list (price_list_id, root_price_list_id, owner_entity_id, kind, name, version, status, apply_from)"
+                                + " values (?, ?, ?, 'RETAIL', 'Shelf', 1, 'DRAFT', ?)",
+                        listId,
+                        listId,
+                        MPCS,
+                        today.minusDays(10));
+        superuserJdbc()
+                .update(
+                        "insert into pricing.price_list_line (line_id, price_list_id, sku_id, uom_code, tier_from_qty, price, effective_from, owner_entity_id)"
+                                + " values (?, ?, ?, 'EA', 0.000, 250.00, ?, ?)",
+                        Ids.next(),
+                        listId,
+                        sku,
+                        today.minusDays(10),
+                        MPCS);
+        superuserJdbc()
+                .update(
+                        "update pricing.price_list set status = 'PUBLISHED', published_at = now() where price_list_id = ?",
+                        listId);
+
+        // Notice: NO active discount rule authored for this SKU!
+
+        // Query active markdowns: must NOT include this candidate (Eligibility != Activation)
+        List<ExpirySlowMovingDiscountView> activeDiscounts =
+                pricingQueries.listExpirySlowMovingDiscounts(shop, null, "ACTIVE", scope);
+        assertThat(activeDiscounts).noneMatch(d -> d.skuId().equals(sku));
+
+        // Retail price resolution: retains base price (250.00) unchanged
+        Optional<lk.coopfed.knoweb.m3pricing.query.RetailPrice> price =
+                pricingQueries.resolveRetailPrice(shop, sku, "EA", BigDecimal.ONE, today, scope);
+        assertThat(price).isPresent();
+        assertThat(price.get().unitPrice()).isEqualByComparingTo("250.00");
+    }
+
+    private void insertRule(
+            UUID owner,
+            String name,
+            String kind,
+            UUID skuId,
+            Integer daysToExpiry,
+            String percentOff,
+            LocalDate from,
+            LocalDate to) {
+        UUID ruleId = Ids.next();
+        String predicateJson = daysToExpiry != null
+                ? String.format(Locale.ROOT, "{\"sku_id\":\"%s\",\"days_to_expiry\":%d}", skuId, daysToExpiry)
+                : String.format(Locale.ROOT, "{\"sku_id\":\"%s\"}", skuId);
+        String benefitJson = String.format(Locale.ROOT, "{\"kind\":\"PERCENT_OFF\",\"value\":\"%s\"}", percentOff);
+        superuserJdbc()
+                .update(
+                        """
+                        insert into pricing.discount_rule (rule_id, owner_entity_id, name, kind, predicate, benefit, priority, valid_from, valid_to, status)
+                        values (?, ?, ?, ?, ?::jsonb, ?::jsonb, 100, ?, ?, 'ACTIVE')
+                        """,
+                        ruleId,
+                        owner,
+                        name,
+                        kind,
+                        predicateJson,
+                        benefitJson,
+                        java.sql.Date.valueOf(from),
+                        to == null ? null : java.sql.Date.valueOf(to));
     }
 }

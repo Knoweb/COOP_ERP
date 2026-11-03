@@ -17,14 +17,20 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.LocationView;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.api.InventoryCandidateQuery;
 import lk.coopfed.knoweb.m3pricing.api.InventoryCandidateQuery.NearExpiryCandidate;
 import lk.coopfed.knoweb.m3pricing.api.InventoryCandidateQuery.SlowMovingCandidate;
+import lk.coopfed.knoweb.m3pricing.api.RuleBenefit;
+import lk.coopfed.knoweb.m3pricing.api.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.internal.queries.RetailPriceResolution;
+import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +40,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
     private InventoryCandidateQuery inventoryCandidates;
     private RetailPriceResolution retailResolution;
     private CatalogueQueries catalogue;
+    private PartyQueries party;
+    private RuleStore ruleStore;
     private ConfigRegistry config;
     private Clock clock;
     private ScopeContext scope;
@@ -48,9 +56,15 @@ class ExpirySlowMovingDiscountCalculatorTest {
         inventoryCandidates = mock(InventoryCandidateQuery.class);
         retailResolution = mock(RetailPriceResolution.class);
         catalogue = mock(CatalogueQueries.class);
+        party = mock(PartyQueries.class);
+        ruleStore = mock(RuleStore.class);
         config = mock(ConfigRegistry.class);
         clock = Clock.fixed(Instant.parse("2026-11-02T06:00:00Z"), ZoneOffset.UTC);
         scope = ScopeContext.dev(UUID.randomUUID(), entityId, locationId);
+
+        LocationView locationView = mock(LocationView.class);
+        when(locationView.ownerEntityId()).thenReturn(entityId);
+        when(party.getLocation(eq(locationId), any())).thenReturn(Optional.of(locationView));
 
         // Default configs enabled
         when(config.getBoolean(eq(ExpirySlowMovingDiscountCalculator.KEY_ENABLED), any(), eq(true)))
@@ -67,7 +81,7 @@ class ExpirySlowMovingDiscountCalculatorTest {
                 .thenReturn(Optional.of("50.00"));
 
         calculator = new ExpirySlowMovingDiscountCalculator(
-                inventoryCandidates, retailResolution, catalogue, config, clock, "UTC");
+                inventoryCandidates, retailResolution, catalogue, party, ruleStore, config, clock, "UTC");
     }
 
     @Test
@@ -82,7 +96,7 @@ class ExpirySlowMovingDiscountCalculatorTest {
     }
 
     @Test
-    @DisplayName("Near-expiry calculates critical and warning tiers with base price resolution")
+    @DisplayName("Near-expiry calculates critical and warning tiers when matching active rule exists")
     void nearExpiryCriticalAndWarningTiers() {
         UUID sku1 = UUID.randomUUID();
         UUID sku2 = UUID.randomUUID();
@@ -96,6 +110,11 @@ class ExpirySlowMovingDiscountCalculatorTest {
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("200.00"))));
         when(retailResolution.resolveBase(eq(locationId), eq(sku2), eq("PCS"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku2, new BigDecimal("100.00"))));
+
+        when(ruleStore.activeOnOrAfter(any()))
+                .thenReturn(List.of(
+                        mockRule(sku1, "EXPIRY_MARKDOWN", 30, "30.00"),
+                        mockRule(sku2, "EXPIRY_MARKDOWN", 30, "15.00")));
 
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(
@@ -151,10 +170,78 @@ class ExpirySlowMovingDiscountCalculatorTest {
     }
 
     @Test
+    @DisplayName("Activation Matrix B: Candidate exists without active rule -> not activated")
+    void candidateWithoutActiveRuleIsNotActivated() {
+        UUID sku1 = UUID.randomUUID();
+        UUID lot1 = UUID.randomUUID();
+
+        when(catalogue.getSku(eq(sku1), any())).thenReturn(Optional.of(mockSku(sku1, "SKU-01", "KG")));
+        when(retailResolution.resolveBase(eq(locationId), eq(sku1), eq("KG"), any(), any(), any()))
+                .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("200.00"))));
+
+        // No active rules
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of());
+
+        when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
+                .thenReturn(List.of(new NearExpiryCandidate(
+                        lot1,
+                        locationId,
+                        sku1,
+                        UUID.randomUUID(),
+                        "B-001",
+                        today.plusDays(3),
+                        3,
+                        new BigDecimal("10.000"),
+                        new BigDecimal("120.0000"),
+                        "CRITICAL",
+                        true)));
+        when(inventoryCandidates.slowMovingCandidates(eq(locationId), any())).thenReturn(List.of());
+
+        List<ExpirySlowMovingDiscountView> results = calculator.calculate(locationId, null, "ACTIVE", scope);
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Activation Matrix C: Active rule exists but candidate does not meet predicate -> not activated")
+    void activeRuleExistsButCandidateNotEligible() {
+        UUID sku1 = UUID.randomUUID();
+        UUID lot1 = UUID.randomUUID();
+
+        when(catalogue.getSku(eq(sku1), any())).thenReturn(Optional.of(mockSku(sku1, "SKU-01", "KG")));
+        when(retailResolution.resolveBase(eq(locationId), eq(sku1), eq("KG"), any(), any(), any()))
+                .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("200.00"))));
+
+        // Rule requires days_to_expiry <= 2
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku1, "EXPIRY_MARKDOWN", 2, "30.00")));
+
+        // Candidate has days_to_expiry = 5 (> 2)
+        when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
+                .thenReturn(List.of(new NearExpiryCandidate(
+                        lot1,
+                        locationId,
+                        sku1,
+                        UUID.randomUUID(),
+                        "B-001",
+                        today.plusDays(5),
+                        5,
+                        new BigDecimal("10.000"),
+                        new BigDecimal("120.0000"),
+                        "CRITICAL",
+                        true)));
+        when(inventoryCandidates.slowMovingCandidates(eq(locationId), any())).thenReturn(List.of());
+
+        List<ExpirySlowMovingDiscountView> results = calculator.calculate(locationId, null, "ACTIVE", scope);
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
     @DisplayName("Expired and zero-stock lots are excluded from automated markdowns")
     void expiredAndZeroStockLotsExcluded() {
         UUID sku1 = UUID.randomUUID();
         when(catalogue.getSku(eq(sku1), any())).thenReturn(Optional.of(mockSku(sku1, "SKU-01", "KG")));
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku1, "EXPIRY_MARKDOWN", 30, "30.00")));
 
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(
@@ -190,7 +277,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
     }
 
     @Test
-    @DisplayName("Slow-moving inventory calculates stagnant and slow velocity discounts")
+    @DisplayName(
+            "Slow-moving inventory calculates stagnant and slow velocity discounts when matching active rules exist")
     void slowMovingStagnantAndSlowVelocity() {
         UUID sku1 = UUID.randomUUID();
         UUID sku2 = UUID.randomUUID();
@@ -202,6 +290,11 @@ class ExpirySlowMovingDiscountCalculatorTest {
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("500.00"))));
         when(retailResolution.resolveBase(eq(locationId), eq(sku2), eq("PCS"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku2, new BigDecimal("300.00"))));
+
+        when(ruleStore.activeOnOrAfter(any()))
+                .thenReturn(List.of(
+                        mockRule(sku1, "TIME_LIMITED_PRICE", null, "20.00"),
+                        mockRule(sku2, "TIME_LIMITED_PRICE", null, "10.00")));
 
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any())).thenReturn(List.of());
         when(inventoryCandidates.slowMovingCandidates(eq(locationId), any()))
@@ -260,6 +353,11 @@ class ExpirySlowMovingDiscountCalculatorTest {
         when(retailResolution.resolveBase(eq(locationId), eq(sku1), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("100.00"))));
 
+        when(ruleStore.activeOnOrAfter(any()))
+                .thenReturn(List.of(
+                        mockRule(sku1, "EXPIRY_MARKDOWN", 30, "30.00"),
+                        mockRule(sku1, "TIME_LIMITED_PRICE", null, "20.00")));
+
         // Near-expiry candidate is CRITICAL (30%)
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(new NearExpiryCandidate(
@@ -311,6 +409,11 @@ class ExpirySlowMovingDiscountCalculatorTest {
         when(retailResolution.resolveBase(eq(locationId), eq(sku1), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("100.00"))));
 
+        when(ruleStore.activeOnOrAfter(any()))
+                .thenReturn(List.of(
+                        mockRule(sku1, "EXPIRY_MARKDOWN", 30, "15.00"),
+                        mockRule(sku1, "TIME_LIMITED_PRICE", null, "20.00")));
+
         // Near-expiry is WARNING (15%)
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(new NearExpiryCandidate(
@@ -360,6 +463,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
         when(retailResolution.resolveBase(eq(locationId), eq(sku1), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku1, new BigDecimal("100.00"))));
 
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku1, "EXPIRY_MARKDOWN", 30, "30.00")));
+
         // Max markdown capped at 25%
         when(config.get(eq(ExpirySlowMovingDiscountCalculator.KEY_MAX_MARKDOWN_PERCENT), any()))
                 .thenReturn(Optional.of("25.00"));
@@ -394,6 +499,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
         // Base shelf price: 100.00, Unit cost: 85.00
         when(retailResolution.resolveBase(eq(locationId), eq(sku), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku, new BigDecimal("100.00"))));
+
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku, "TIME_LIMITED_PRICE", null, "20.00")));
 
         // Stagnant stock: 20% markdown yields 80.00 (below cost of 85.00).
         // Since no cost floor rule exists, below-cost discount is not blocked.
@@ -431,6 +538,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
         when(retailResolution.resolveBase(eq(locationId), eq(sku), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku, new BigDecimal("0.01"))));
 
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku, "EXPIRY_MARKDOWN", 30, "30.00")));
+
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(new NearExpiryCandidate(
                         UUID.randomUUID(),
@@ -461,7 +570,10 @@ class ExpirySlowMovingDiscountCalculatorTest {
         when(retailResolution.resolveBase(eq(locationId), eq(sku), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku, new BigDecimal("100.00"))));
 
-        // Critical near-expiry (30% markdown -> 70.00). Below cost of 85.00, but permitted for perishables.
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku, "EXPIRY_MARKDOWN", 30, "30.00")));
+
+        // Critical near-expiry (30% markdown -> 70.00). Below cost of 85.00, but
+        // permitted for perishables.
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(new NearExpiryCandidate(
                         lot,
@@ -483,7 +595,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
         ExpirySlowMovingDiscountView item = results.get(0);
         assertThat(item.basePrice()).isEqualByComparingTo("100.00");
         assertThat(item.discountedPrice()).isEqualByComparingTo("70.00");
-        assertThat(item.discountedPrice()).isLessThan(new BigDecimal("85.00")); // Below cost permitted for salvage
+        assertThat(item.discountedPrice()).isLessThan(new BigDecimal("85.00")); // Below cost permitted for
+        // salvage
         assertThat(item.markdownPercent()).isEqualByComparingTo("30.00");
     }
 
@@ -495,6 +608,8 @@ class ExpirySlowMovingDiscountCalculatorTest {
         // Base shelf price: 0.02
         when(retailResolution.resolveBase(eq(locationId), eq(sku), eq("KG"), any(), any(), any()))
                 .thenReturn(Optional.of(mockRetailPrice(locationId, sku, new BigDecimal("0.02"))));
+
+        when(ruleStore.activeOnOrAfter(any())).thenReturn(List.of(mockRule(sku, "EXPIRY_MARKDOWN", 30, "30.00")));
 
         when(inventoryCandidates.nearExpiryCandidates(eq(locationId), any()))
                 .thenReturn(List.of(new NearExpiryCandidate(
@@ -559,5 +674,20 @@ class ExpirySlowMovingDiscountCalculatorTest {
                 "AUTO_LOWEST",
                 null,
                 "v1");
+    }
+
+    private RuleView mockRule(UUID skuId, String kind, Integer daysToExpiry, String percentOff) {
+        return new RuleView(
+                UUID.randomUUID(),
+                entityId,
+                "Rule for " + skuId,
+                kind,
+                new RulePredicate(skuId, null, null, daysToExpiry, null),
+                new RuleBenefit("PERCENT_OFF", new BigDecimal(percentOff)),
+                100,
+                today.minusDays(5),
+                today.plusDays(30),
+                "ACTIVE",
+                Instant.now());
     }
 }

@@ -2433,6 +2433,12 @@ select.pricing-select option:focus {
   color: var(--color-brand-success);
 }
 
+.pricing-markdown-original-price {
+  font-size: var(--font-size-xs);
+  text-decoration: line-through;
+  color: var(--color-ink-subtle);
+}
+
 
 
 
