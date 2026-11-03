@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n/useT";
 
 /**
@@ -33,16 +33,48 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
   // and the empty-code check below stop a Confirm without a choice.
   const [code, setCode] = useState("");
   const [text, setText] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !pending) {
-        onCancel();
+      if (e.key === "Escape") {
+        if (dropdownOpen) {
+          setDropdownOpen(false);
+        } else if (!pending) {
+          onCancel();
+        }
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel, pending]);
+  }, [dropdownOpen, onCancel, pending]);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
+  useEffect(() => {
+    if (dropdownOpen && menuRef.current) {
+      const selected = menuRef.current.querySelector<HTMLElement>(".register-dropdown-option--selected, .register-dropdown-option--active");
+      if (selected) {
+        selected.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [dropdownOpen]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -50,6 +82,18 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
       return;
     }
     onConfirm(code, text.trim() === "" ? null : text.trim());
+  };
+
+  const selectedOption = codes.find((item) => item.code === code);
+
+  const toggleDropdown = () => {
+    setDropdownOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setHoveredCode(code || codes[0]?.code || null);
+      }
+      return next;
+    });
   };
 
   return (
@@ -61,35 +105,150 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
         }
       }}
     >
-      <form className="reason-capture" role="dialog" aria-labelledby="reason-capture-title" onSubmit={submit}>
+      <form
+        className="reason-capture"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reason-capture-title"
+        onSubmit={submit}
+      >
         <h2 id="reason-capture-title" className="reason-capture__title">
           {title}
         </h2>
-        <label className="reason-capture__field">
-          {t("shell.reason.code").text}
-          <select value={code} onChange={(event) => setCode(event.target.value)} required>
-            <option value="">{t("shell.reason.choose").text}</option>
-            {codes.map((option) => (
-              <option key={option.code} value={option.code}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="reason-capture__field">
-          {t("shell.reason.text").text}
+
+        <div className="reason-capture__field reason-capture__field--select" ref={containerRef}>
+          <label htmlFor="reason-capture-code-btn" className="reason-capture__label">
+            {t("shell.reason.code").text}
+          </label>
+          <div className="reason-capture__control-wrap">
+            <select
+              id="reason-capture-code"
+              className="visually-hidden"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              required
+              tabIndex={-1}
+              aria-hidden="true"
+            >
+              <option value="">{t("shell.reason.choose").text}</option>
+              {codes.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              id="reason-capture-code-btn"
+              className="register-dropdown-trigger custom-status-dropdown__trigger reason-dropdown-trigger"
+              aria-haspopup="listbox"
+              aria-expanded={dropdownOpen}
+              onClick={toggleDropdown}
+            >
+              <span className="custom-status-dropdown__label">
+                {selectedOption ? selectedOption.label : t("shell.reason.choose").text}
+              </span>
+              <svg
+                className="custom-status-dropdown__arrow"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {dropdownOpen && (
+              <ul
+                ref={menuRef}
+                className="register-dropdown-menu custom-status-dropdown__menu reason-dropdown-menu"
+                role="listbox"
+              >
+                {codes.map((option) => {
+                  const isSelected = code === option.code;
+                  const isActive = isSelected || (!code && (hoveredCode === option.code || (!hoveredCode && codes[0]?.code === option.code)));
+                  return (
+                    <li key={option.code} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={
+                          isSelected
+                            ? "custom-status-dropdown__option custom-status-dropdown__option--selected register-dropdown-option register-dropdown-option--selected"
+                            : isActive
+                              ? "custom-status-dropdown__option custom-status-dropdown__option--active register-dropdown-option register-dropdown-option--active"
+                              : "custom-status-dropdown__option register-dropdown-option"
+                        }
+                        onMouseEnter={() => setHoveredCode(option.code)}
+                        onClick={() => {
+                          setCode(option.code);
+                          setHoveredCode(option.code);
+                          setDropdownOpen(false);
+                        }}
+                      >
+                        <span className="register-dropdown-option-label custom-status-dropdown__option-label">
+                          {option.label}
+                        </span>
+                        {isSelected && (
+                          <span className="custom-status-dropdown__check" aria-hidden="true">
+                            <svg
+                              viewBox="0 0 24 24"
+                              width="16"
+                              height="16"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="reason-capture__field">
+          <label htmlFor="reason-capture-text" className="reason-capture__label">
+            {t("shell.reason.text").text}
+          </label>
           <textarea
+            id="reason-capture-text"
             value={text}
             onChange={(event) => setText(event.target.value)}
-            rows={2}
+            rows={3}
             className="reason-capture__textarea"
           />
-        </label>
+        </div>
+
         <div className="reason-capture__actions">
-          <button type="submit" className="approval-bar__button approval-bar__button--primary" disabled={pending || !code}>
+          <button
+            type="submit"
+            className="approval-bar__button approval-bar__button--primary"
+            disabled={pending || !code}
+          >
             {t("shell.reason.confirm").text}
           </button>
-          <button type="button" className="approval-bar__button" onClick={onCancel} disabled={pending}>
+          <button
+            type="button"
+            className="approval-bar__button"
+            onClick={onCancel}
+            disabled={pending}
+          >
             {t("shell.reason.cancel").text}
           </button>
         </div>
