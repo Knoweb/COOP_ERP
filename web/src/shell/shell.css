@@ -10545,7 +10545,7 @@ textarea {
   opacity: 0 !important;
   content: none !important;
 }
-.dropdown-unused-cleanup-1 {
+/*
   display: none !important;
 }
 .dropdown-unused-cleanup-2 {
@@ -10582,7 +10582,7 @@ textarea {
   opacity: 1 !important;
 }
 
-.catalogue-form-field .register-dropdown-option:hover,
+*/ .catalogue-form-field .register-dropdown-option:hover,
 .catalogue-form-field .register-dropdown-option--active,
 .register-dropdown-menu .register-dropdown-option:hover,
 .register-dropdown-menu .register-dropdown-option--active {
