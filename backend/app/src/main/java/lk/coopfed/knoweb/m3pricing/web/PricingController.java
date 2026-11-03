@@ -18,6 +18,8 @@ import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.CreatePriceList;
 import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.EnterControlPrice;
+import lk.coopfed.knoweb.m3pricing.api.EvaluateExpirySlowMovingDiscounts;
+import lk.coopfed.knoweb.m3pricing.api.ExpirySlowMovingEvaluationResult;
 import lk.coopfed.knoweb.m3pricing.api.PrintShelfLabels;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.RescindControlPrice;
@@ -34,11 +36,13 @@ import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.WithdrawDraftHandler;
+import lk.coopfed.knoweb.m3pricing.internal.markdown.EvaluateExpirySlowMovingDiscountsHandler;
 import lk.coopfed.knoweb.m3pricing.internal.policy.SetMrpPolicyHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
@@ -52,6 +56,9 @@ import lk.coopfed.knoweb.m3pricing.web.generated.BatchCandidate;
 import lk.coopfed.knoweb.m3pricing.web.generated.ControlPriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.EvaluateExpirySlowMovingDiscountsRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingDiscountResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingEvaluationResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.LabelJobResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineResult;
@@ -101,6 +108,7 @@ class PricingController implements PricingApi {
     private final RescindControlPriceHandler rescindControlPrice;
     private final SetMrpPolicyHandler setMrpPolicy;
     private final PrintShelfLabelsHandler printShelfLabels;
+    private final EvaluateExpirySlowMovingDiscountsHandler evaluateExpirySlowMovingDiscounts;
     private final PricingQueries queries;
     private final CurrentScope currentScope;
     private final ObjectProvider<A4Renderer> renderer;
@@ -119,6 +127,7 @@ class PricingController implements PricingApi {
             RescindControlPriceHandler rescindControlPrice,
             SetMrpPolicyHandler setMrpPolicy,
             PrintShelfLabelsHandler printShelfLabels,
+            EvaluateExpirySlowMovingDiscountsHandler evaluateExpirySlowMovingDiscounts,
             PricingQueries queries,
             CurrentScope currentScope,
             ObjectProvider<A4Renderer> renderer) {
@@ -126,6 +135,7 @@ class PricingController implements PricingApi {
         this.rescindControlPrice = rescindControlPrice;
         this.setMrpPolicy = setMrpPolicy;
         this.printShelfLabels = printShelfLabels;
+        this.evaluateExpirySlowMovingDiscounts = evaluateExpirySlowMovingDiscounts;
         this.create = create;
         this.draftNewVersion = draftNewVersion;
         this.setLines = setLines;
@@ -658,5 +668,55 @@ class PricingController implements PricingApi {
             result.add(item);
         }
         return ResponseEntity.ok(result);
+    }
+
+    // ---- PGL-M1-07: Expiry / Slow-Moving Discounts ---------------------------------------------
+
+    @Override
+    public ResponseEntity<ExpirySlowMovingEvaluationResponse> evaluateExpirySlowMovingDiscounts(
+            String idempotencyKey, EvaluateExpirySlowMovingDiscountsRequest request) {
+        ScopeContext scope = currentScope.get();
+        ExpirySlowMovingEvaluationResult result = evaluateExpirySlowMovingDiscounts.handle(
+                new EvaluateExpirySlowMovingDiscounts(request.getLocationId()), scope);
+        return ResponseEntity.ok(new ExpirySlowMovingEvaluationResponse(
+                result.locationId(),
+                result.totalEvaluated(),
+                result.markdownsActive(),
+                result.nearExpiryCount(),
+                result.slowMovingCount(),
+                result.evaluatedAt()));
+    }
+
+    @Override
+    public ResponseEntity<List<ExpirySlowMovingDiscountResponse>> listExpirySlowMovingDiscounts(
+            UUID locationId, String reason, String status) {
+        ScopeContext scope = currentScope.get();
+        List<ExpirySlowMovingDiscountResponse> responses =
+                queries.listExpirySlowMovingDiscounts(locationId, reason, status, scope).stream()
+                        .map(PricingController::toResponse)
+                        .toList();
+        return ResponseEntity.ok(responses);
+    }
+
+    private static ExpirySlowMovingDiscountResponse toResponse(ExpirySlowMovingDiscountView view) {
+        ExpirySlowMovingDiscountResponse res = new ExpirySlowMovingDiscountResponse(
+                view.skuId(),
+                view.skuCode(),
+                view.locationId(),
+                ExpirySlowMovingDiscountResponse.ReasonEnum.fromValue(view.reason()),
+                view.tierOrClassification(),
+                view.basePrice(),
+                view.markdownPercent(),
+                view.discountedPrice(),
+                view.qtyOnHand(),
+                ExpirySlowMovingDiscountResponse.StatusEnum.fromValue(view.status()));
+        res.setStockLotId(view.stockLotId());
+        res.setBatchId(view.batchId());
+        res.setBatchNo(view.batchNo());
+        res.setExpiryDate(view.expiryDate());
+        res.setDaysToExpiry(view.daysToExpiry());
+        res.setValidFrom(view.validFrom());
+        res.setValidTo(view.validTo());
+        return res;
     }
 }

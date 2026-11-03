@@ -123,4 +123,13 @@ public interface PricingQueries {
 
     /** ListAdjustmentTypes: all registered adjustment types. */
     List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope);
+
+    // ---- PGL-M1-07: Expiry / Slow-Moving Discounts -------------------------------------------
+
+    /**
+     * List active expiry and slow-moving discount markdowns for a location (PGL-M1-07).
+     * Filters by reason (NEAR_EXPIRY, SLOW_MOVING) and status (ACTIVE) when provided.
+     */
+    List<ExpirySlowMovingDiscountView> listExpirySlowMovingDiscounts(
+            UUID locationId, String reason, String status, ScopeContext scope);
 }

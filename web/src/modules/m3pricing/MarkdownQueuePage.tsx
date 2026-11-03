@@ -1,31 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
 import { inLocale } from "../../shell/i18n/localName";
-import { businessToday, formatMoneyDigits, useFormatDate } from "../../shell/i18n/formats";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { useScope } from "../../shell/scope/useScope";
+import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
-import type { Rule } from "./pricingApi";
+import type { ExpirySlowMovingDiscount } from "./pricingApi";
 import { SkuName } from "./SkuPicker";
 import { errorText } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
 import { PricingSelect } from "./PricingSelect";
 import "./pricing.css";
 
-function daysBetween(fromIsoDate: string, toIsoDate: string): number {
-  const fromMs = Date.parse(fromIsoDate);
-  const toMs = Date.parse(toIsoDate);
-  return Math.round((toMs - fromMs) / (1000 * 60 * 60 * 24));
-}
+type ReasonFilter = "ALL" | "NEAR_EXPIRY" | "SLOW_MOVING";
+type StatusFilter = "ALL" | "ACTIVE";
 
 /**
- * The markdown queue (/pricing/markdown; 23A section 8; doc 23 section 4.3; M3-10).
- * Joins M5 near-expiry lot balance data with active M3 EXPIRY_MARKDOWN rules.
+ * The markdown queue (/pricing/markdown; 23A section 8; PGL-M1-07).
+ * Displays authoritative active near-expiry and slow-moving discount markdowns
+ * calculated from inventory facts and configurable rules.
  */
 export function MarkdownQueuePage() {
   const t = useT();
@@ -33,9 +31,14 @@ export function MarkdownQueuePage() {
   const formatDate = useFormatDate();
   const api = usePricingApi();
   const scope = useScope();
-  const today = businessToday();
+  const queryClient = useQueryClient();
+  const idempotencyKey = useIdempotencyKey();
 
   const [locationId, setLocationId] = useState<string>("");
+  const [reasonFilter, setReasonFilter] = useState<ReasonFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const locationsQuery = useQuery({
     queryKey: ["pricing", "locations"],
@@ -44,67 +47,52 @@ export function MarkdownQueuePage() {
 
   useEffect(() => {
     if (!locationId && locationsQuery.data && locationsQuery.data.length > 0) {
-      const preferred = scope.locationId && locationsQuery.data.some((l) => l.locationId === scope.locationId)
-        ? scope.locationId
-        : locationsQuery.data[0].locationId;
+      const preferred =
+        scope.locationId && locationsQuery.data.some((l) => l.locationId === scope.locationId)
+          ? scope.locationId
+          : locationsQuery.data[0].locationId;
       setLocationId(preferred);
     }
   }, [locationId, locationsQuery.data, scope.locationId]);
 
-  const balancesQuery = useQuery({
-    queryKey: ["pricing", "markdown", "balances", locationId],
-    queryFn: () => api.listBalances(locationId),
+  const discountsQuery = useQuery({
+    queryKey: ["pricing", "markdowns", locationId, reasonFilter, statusFilter],
+    queryFn: () =>
+      api.listExpirySlowMovingDiscounts(
+        locationId,
+        reasonFilter === "ALL" ? undefined : reasonFilter,
+        statusFilter === "ALL" ? undefined : statusFilter
+      ),
     enabled: Boolean(locationId)
   });
 
-  const rulesQuery = useQuery({
-    queryKey: ["pricing", "markdown", "rules"],
-    queryFn: () => api.listRules({ kind: "EXPIRY_MARKDOWN", status: "ACTIVE" })
+  const evaluateMutation = useMutation({
+    mutationFn: () => api.evaluateExpirySlowMovingDiscounts(locationId, idempotencyKey.current()),
+    onSuccess: (result) => {
+      idempotencyKey.next();
+      queryClient.invalidateQueries({ queryKey: ["pricing", "markdowns"] });
+      setFeedbackMessage(
+        t("pricing.markdown.evaluated_success", undefined, { count: result.markdownsActive }).text
+      );
+    }
   });
 
-  const activeMarkdownRules = useMemo(() => {
-    const list = rulesQuery.data ?? [];
-    return [...list].sort((a, b) => a.priority - b.priority);
-  }, [rulesQuery.data]);
-
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const queueItems = useMemo(() => {
-    const balances = balancesQuery.data ?? [];
-    return balances
-      .filter((b) => b.expiryDate && b.qtyOnHand > 0)
-      .map((lot) => {
-        const daysRemaining = daysBetween(today, lot.expiryDate!);
-        const matchedRule = activeMarkdownRules.find(
-          (rule) =>
-            rule.predicate.skuId === lot.skuId &&
-            rule.predicate.daysToExpiry != null &&
-            daysRemaining <= rule.predicate.daysToExpiry &&
-            daysRemaining >= 0
-        );
-        return {
-          lot,
-          daysRemaining,
-          matchedRule
-        };
-      })
-      .sort((a, b) => a.daysRemaining - b.daysRemaining);
-  }, [balancesQuery.data, today, activeMarkdownRules]);
+  const discounts: ExpirySlowMovingDiscount[] = useMemo(
+    () => discountsQuery.data ?? [],
+    [discountsQuery.data]
+  );
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return queueItems;
-    return queueItems.filter(({ lot, daysRemaining, matchedRule }) => {
-      const matchBatch = lot.batchNo ? lot.batchNo.toLowerCase().includes(q) : false;
-      const matchCondition = lot.condition ? lot.condition.toLowerCase().includes(q) : false;
-      const matchRule = matchedRule?.name ? matchedRule.name.toLowerCase().includes(q) : false;
-      const matchSku = lot.skuId ? lot.skuId.toLowerCase().includes(q) : false;
-      const matchExpiry = lot.expiryDate ? lot.expiryDate.toLowerCase().includes(q) : false;
-      const matchDays = String(daysRemaining).includes(q);
-      const matchQty = String(lot.qtyOnHand).includes(q);
-      return matchBatch || matchCondition || matchRule || matchSku || matchExpiry || matchDays || matchQty;
+    if (!q) return discounts;
+    return discounts.filter((item) => {
+      const matchSku = item.skuCode ? item.skuCode.toLowerCase().includes(q) : false;
+      const matchBatch = item.batchNo ? item.batchNo.toLowerCase().includes(q) : false;
+      const matchReason = item.reason ? item.reason.toLowerCase().includes(q) : false;
+      const matchTier = item.tierOrClassification ? item.tierOrClassification.toLowerCase().includes(q) : false;
+      return matchSku || matchBatch || matchReason || matchTier;
     });
-  }, [queueItems, searchQuery]);
+  }, [discounts, searchQuery]);
 
   return (
     <main className="shell-page">
@@ -130,10 +118,35 @@ export function MarkdownQueuePage() {
             />
           </label>
 
+          <label className="pricing-form-field">
+            <span>{t("pricing.markdown.filter_reason").text}</span>
+            <PricingSelect
+              aria-label={t("pricing.markdown.filter_reason").text}
+              value={reasonFilter}
+              onChange={(val) => setReasonFilter(val as ReasonFilter)}
+              options={[
+                { value: "ALL", label: t("pricing.markdown.reason.all").text },
+                { value: "NEAR_EXPIRY", label: t("pricing.markdown.reason.near_expiry").text },
+                { value: "SLOW_MOVING", label: t("pricing.markdown.reason.slow_moving").text }
+              ]}
+            />
+          </label>
+
+          <label className="pricing-form-field">
+            <span>{t("pricing.markdown.filter_status").text}</span>
+            <PricingSelect
+              aria-label={t("pricing.markdown.filter_status").text}
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val as StatusFilter)}
+              options={[
+                { value: "ACTIVE", label: t("pricing.markdown.status.active").text },
+                { value: "ALL", label: t("pricing.markdown.status.all").text }
+              ]}
+            />
+          </label>
+
           <label className="pricing-form-field pricing-markdown-search-field">
-            <span style={{ color: "var(--color-brand-dark)", fontWeight: "var(--font-weight-strong)" }}>
-              {t("pricing.markdown.search_label").text}
-            </span>
+            <span>{t("pricing.markdown.search_label").text}</span>
             <div className="pricing-markdown-search-wrapper">
               <svg
                 className="pricing-markdown-search-icon"
@@ -181,16 +194,36 @@ export function MarkdownQueuePage() {
               )}
             </div>
           </label>
+
+          <div className="pricing-markdown-action-cell">
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={!locationId || evaluateMutation.isPending}
+              onClick={() => evaluateMutation.mutate()}
+            >
+              {evaluateMutation.isPending
+                ? t("pricing.markdown.evaluating").text
+                : t("pricing.markdown.evaluate").text}
+            </button>
+          </div>
         </div>
 
-        {balancesQuery.isLoading && <p>{t("pricing.list.loading").text}</p>}
-        {balancesQuery.isError && (
-          <p role="alert">{errorText(balancesQuery.error, t("pricing.error.generic").text)}</p>
+        {feedbackMessage && (
+          <div className="pricing-alert-box pricing-alert-box--success pricing-markdown-feedback">
+            <p>{feedbackMessage}</p>
+          </div>
         )}
-        {queueItems.length === 0 && !balancesQuery.isLoading && (
+
+        {discountsQuery.isLoading && <p>{t("pricing.list.loading").text}</p>}
+        {discountsQuery.isError && (
+          <p role="alert">{errorText(discountsQuery.error, t("pricing.error.generic").text)}</p>
+        )}
+
+        {discounts.length === 0 && !discountsQuery.isLoading && (
           <div className="modern-empty-state">{t("pricing.markdown.empty").text}</div>
         )}
-        {queueItems.length > 0 && filteredItems.length === 0 && !balancesQuery.isLoading && (
+        {discounts.length > 0 && filteredItems.length === 0 && !discountsQuery.isLoading && (
           <div className="modern-empty-state">{t("pricing.markdown.no_match").text}</div>
         )}
 
@@ -198,62 +231,71 @@ export function MarkdownQueuePage() {
           <div className="modern-table-card pricing-markdown-table-card">
             <div className="modern-table-scroll pricing-markdown-table-scroll">
               <table className="modern-table pricing-markdown-table">
-                <colgroup>
-                  <col className="pricing-col-item" />
-                  <col className="pricing-col-batch" />
-                  <col className="pricing-col-expiry" />
-                  <col className="pricing-col-days" />
-                  <col className="pricing-col-qty" />
-                  <col className="pricing-col-condition" />
-                  <col className="pricing-col-rule" />
-                </colgroup>
                 <thead>
                   <tr>
                     <th className="pricing-th-item">{t("pricing.markdown.column.item").text}</th>
+                    <th>{t("pricing.markdown.column.reason").text}</th>
+                    <th>{t("pricing.markdown.column.classification").text}</th>
                     <th className="pricing-th-batch">{t("pricing.markdown.column.batch").text}</th>
-                    <th className="pricing-th-expiry">{t("pricing.markdown.column.expiry").text}</th>
-                    <th className="pricing-th-days">{t("pricing.markdown.column.days_remaining").text}</th>
                     <th className="pricing-th-qty">{t("pricing.markdown.column.qty_on_hand").text}</th>
-                    <th className="pricing-th-condition">{t("pricing.markdown.column.condition").text}</th>
-                    <th className="pricing-th-rule">{t("pricing.markdown.column.applicable_rule").text}</th>
+                    <th>{t("pricing.markdown.column.base_price").text}</th>
+                    <th>{t("pricing.markdown.column.discount").text}</th>
+                    <th>{t("pricing.markdown.column.discounted_price").text}</th>
+                    <th>{t("pricing.markdown.column.status").text}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map(({ lot, daysRemaining, matchedRule }) => (
-                    <tr key={lot.stockLotId}>
+                  {filteredItems.map((item, idx) => (
+                    <tr key={item.stockLotId ?? `${item.skuId}_${idx}`}>
                       <td className="pricing-cell-item">
-                        <SkuName skuId={lot.skuId} />
+                        <SkuName skuId={item.skuId} />
                       </td>
-                      <td className="pricing-cell-batch">
-                        <span className="pricing-markdown-batch">{lot.batchNo}</span>
-                      </td>
-                      <td className="pricing-cell-expiry">
-                        <span className="pricing-markdown-date">{formatDate(lot.expiryDate!)}</span>
-                      </td>
-                      <td className="pricing-cell-days">
-                        <DaysBadge days={daysRemaining} />
-                      </td>
-                      <td className="pricing-cell-qty">{lot.qtyOnHand}</td>
-                      <td className="pricing-cell-condition">
+                      <td>
                         <StateChip
-                          state={lot.condition === "GOOD" ? "issued" : "alert"}
-                          label={lot.condition}
+                          state={item.reason === "NEAR_EXPIRY" ? "alert" : "issued"}
+                          label={
+                            item.reason === "NEAR_EXPIRY"
+                              ? t("pricing.markdown.reason.near_expiry").text
+                              : t("pricing.markdown.reason.slow_moving").text
+                          }
                         />
                       </td>
-                      <td className="pricing-cell-rule">
-                        {matchedRule ? (
-                          <div className="pricing-markdown-rule-badge">
-                            <StateChip state="issued" label={matchedRule.name} />
-                            <MarkdownBenefit benefit={matchedRule.benefit} />
+                      <td>
+                        <strong>{item.tierOrClassification}</strong>
+                      </td>
+                      <td className="pricing-cell-batch">
+                        {item.batchNo ? (
+                          <div>
+                            <span className="pricing-markdown-batch">{item.batchNo}</span>
+                            {item.expiryDate && (
+                              <div>
+                                <span className="pricing-markdown-date">{formatDate(item.expiryDate)}</span>
+                                {item.daysToExpiry != null && (
+                                  <div className="pricing-markdown-days-wrapper">
+                                    <DaysBadge days={item.daysToExpiry} />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <div className="pricing-header-row">
-                            <span className="pricing-muted">{t("pricing.markdown.no_rule").text}</span>
-                            <Link to="/pricing/rules" className="btn btn--secondary btn--sm">
-                              {t("pricing.markdown.author_rule").text}
-                            </Link>
-                          </div>
+                          <span className="pricing-muted">{t("pricing.markdown.sku_level").text}</span>
                         )}
+                      </td>
+                      <td className="pricing-cell-qty">{item.qtyOnHand}</td>
+                      <td>
+                        <MoneyDisplay amount={item.basePrice} />
+                      </td>
+                      <td>
+                        <strong>{item.markdownPercent}%</strong>
+                      </td>
+                      <td>
+                        <strong className="pricing-markdown-discounted-price">
+                          <MoneyDisplay amount={item.discountedPrice} />
+                        </strong>
+                      </td>
+                      <td>
+                        <StateChip state="issued" label={item.status} />
                       </td>
                     </tr>
                   ))}
@@ -284,30 +326,4 @@ function DaysBadge({ days }: { days: number }) {
       <strong>{days}</strong> {t("pricing.rules.days").text}
     </span>
   );
-}
-
-function MarkdownBenefit({ benefit }: { benefit: Rule["benefit"] }) {
-  const t = useT();
-  if (benefit.kind === "PERCENT_OFF") {
-    return (
-      <span className="pricing-markdown-benefit">
-        ({t("pricing.rules.benefit.percent_off", undefined, { percent: benefit.value }).text})
-      </span>
-    );
-  }
-  if (benefit.kind === "FIXED_PRICE") {
-    return (
-      <span className="pricing-markdown-benefit">
-        ({t("pricing.rules.benefit.fixed").text} <MoneyDisplay amount={benefit.value} />)
-      </span>
-    );
-  }
-  if (benefit.kind === "AMOUNT_OFF") {
-    return (
-      <span className="pricing-markdown-benefit">
-        ({t("pricing.rules.benefit.amount_off", undefined, { amount: formatMoneyDigits(benefit.value)?.digits ?? benefit.value }).text})
-      </span>
-    );
-  }
-  return <span>({benefit.value})</span>;
 }

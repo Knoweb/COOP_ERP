@@ -441,6 +441,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/expiry-slow-moving-discounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+         * @description Returns active markdown discounts calculated deterministically from authoritative inventory near-expiry and slow-moving facts. Filterable by reason (NEAR_EXPIRY, SLOW_MOVING) and status (ACTIVE).
+         */
+        get: operations["listExpirySlowMovingDiscounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/expiry-slow-moving-discounts/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate near-expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+         * @description Triggers evaluation of inventory near-expiry and slow-moving candidates against configured markdown rules, records audit EXPIRY_SLOW_MOVING_DISCOUNTS_EVALUATED, publishes pricing.expiry_slow_moving_discounts_evaluated.v1, and returns evaluation summary.
+         */
+        post: operations["evaluateExpirySlowMovingDiscounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -819,6 +859,48 @@ export interface components {
             skuName?: string | null;
             skuCode?: string | null;
             details?: Record<string, never>;
+        };
+        ExpirySlowMovingDiscountResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            /** Format: uuid */
+            stockLotId?: string | null;
+            /** Format: uuid */
+            batchId?: string | null;
+            batchNo?: string | null;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            reason: "NEAR_EXPIRY" | "SLOW_MOVING";
+            tierOrClassification: string;
+            basePrice: number;
+            markdownPercent: number;
+            discountedPrice: number;
+            qtyOnHand: number;
+            /** Format: date */
+            expiryDate?: string | null;
+            daysToExpiry?: number | null;
+            /** Format: date */
+            validFrom?: string | null;
+            /** Format: date */
+            validTo?: string | null;
+            /** @enum {string} */
+            status: "ACTIVE";
+        };
+        EvaluateExpirySlowMovingDiscountsRequest: {
+            /** Format: uuid */
+            locationId: string;
+        };
+        ExpirySlowMovingEvaluationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            totalEvaluated: number;
+            markdownsActive: number;
+            nearExpiryCount: number;
+            slowMovingCount: number;
+            /** Format: date-time */
+            evaluatedAt: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1613,6 +1695,59 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewItem"][];
                 };
             };
+        };
+    };
+    listExpirySlowMovingDiscounts: {
+        parameters: {
+            query: {
+                locationId: string;
+                reason?: "ALL" | "NEAR_EXPIRY" | "SLOW_MOVING";
+                status?: "ALL" | "ACTIVE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of active expiry and slow-moving discount markdowns */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpirySlowMovingDiscountResponse"][];
+                };
+            };
+        };
+    };
+    evaluateExpirySlowMovingDiscounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateExpirySlowMovingDiscountsRequest"];
+            };
+        };
+        responses: {
+            /** @description Evaluation result summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpirySlowMovingEvaluationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
 }
