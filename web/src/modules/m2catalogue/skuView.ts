@@ -48,6 +48,7 @@ export type SkuForm = {
   descriptionTa: string;
   baseUomCode: string;
   taxCategoryId: string;
+  departmentId: string;
   soldByWeight: boolean;
   batchTracked: boolean;
   expiryTracked: boolean;
@@ -66,6 +67,7 @@ export const EMPTY_FORM: SkuForm = {
   descriptionTa: "",
   baseUomCode: "EA",
   taxCategoryId: "",
+  departmentId: "",
   soldByWeight: false,
   batchTracked: false,
   expiryTracked: false,
@@ -85,6 +87,7 @@ export function formOf(sku: Sku): SkuForm {
     descriptionTa: sku.descriptionTa ?? "",
     baseUomCode: sku.baseUomCode,
     taxCategoryId: sku.taxCategoryId,
+    departmentId: sku.departmentId ?? "",
     soldByWeight: sku.soldByWeight,
     batchTracked: sku.batchTracked,
     expiryTracked: sku.expiryTracked,
@@ -115,6 +118,7 @@ export function requestOf(form: SkuForm, existing?: Sku): SkuDetailsRequest {
     hasPrintedMrp: form.hasPrintedMrp,
     expiryWarningDays: expiryDays != null && !isNaN(expiryDays) ? expiryDays : existing?.expiryWarningDays,
     taxCategoryId: form.taxCategoryId,
+    departmentId: optional(form.departmentId),
     multiMrpPolicy: form.multiMrpPolicy ?? (existing?.multiMrpPolicy as MultiMrpPolicy) ?? "AUTO_LOWEST",
     originKind: form.originKind ?? (existing?.originKind as OriginKind) ?? "PURCHASED",
     attributes: existing?.attributes

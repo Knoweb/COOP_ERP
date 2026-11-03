@@ -84,7 +84,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         }))}
       />
 
-      {/* Row 3: Tax category | MRP resolution policy */}
+      {/* Row 3: Tax category | Department category */}
       <CatalogueDropdown
         label={t("catalogue.field.tax_category").text}
         required
@@ -99,6 +99,19 @@ export function SkuFields({ form, onChange, disabled }: Props) {
       />
 
       <CatalogueDropdown
+        label={t("catalogue.field.department").text}
+        disabled={disabled}
+        value={form.departmentId}
+        placeholder={t("catalogue.field.choose").text}
+        onChange={(val) => onChange({ departmentId: val })}
+        options={(reference.data?.departments ?? []).map((department) => ({
+          value: department.departmentId,
+          label: `${department.code} - ${nameIn(department, language)}`
+        }))}
+      />
+
+      {/* Row 4: MRP policy | Item origin */}
+      <CatalogueDropdown
         label={t("catalogue.field.multi_mrp_policy").text}
         disabled={disabled}
         value={form.multiMrpPolicy}
@@ -110,7 +123,6 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         ]}
       />
 
-      {/* Row 4: Item origin | Expiry warning window (days) */}
       <CatalogueDropdown
         label={t("catalogue.field.origin_kind").text}
         disabled={disabled}
@@ -123,6 +135,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         ]}
       />
 
+      {/* Row 5: Expiry warning window (days) */}
       <label className="catalogue-form-field">
         <span>{t("catalogue.field.expiry_warning_days").text}</span>
         <input
@@ -135,7 +148,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         />
       </label>
 
-      {/* Rows 5 & 6: 4 Checkboxes (2 per row) */}
+      {/* Rows 6 & 7: 4 Checkboxes (2 per row) */}
       <div className="catalogue-flags-grid">
         {flag("soldByWeight", "catalogue.field.sold_by_weight")}
         {flag("batchTracked", "catalogue.field.batch_tracked")}
@@ -143,7 +156,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         {flag("hasPrintedMrp", "catalogue.field.printed_mrp")}
       </div>
 
-      {/* Row 7: Description English | Description Sinhala */}
+      {/* Row 8: Description English | Description Sinhala */}
       <label className="catalogue-form-field">
         <span>{t("catalogue.field.description_en").text}</span>
         <textarea
@@ -163,7 +176,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         />
       </label>
 
-      {/* Row 8: Description Tamil */}
+      {/* Row 9: Description Tamil */}
       <label className="catalogue-form-field">
         <span>{t("catalogue.field.description_ta").text}</span>
         <textarea

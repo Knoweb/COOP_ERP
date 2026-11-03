@@ -19,6 +19,17 @@ class SkuReferenceData {
         return count != null && count > 0;
     }
 
+    boolean departmentCategoryExists(UUID departmentId) {
+        if (departmentId == null) {
+            return false;
+        }
+        Integer count = jdbc.queryForObject(
+                "select count(*) from catalogue.department_category where department_id = ? and status = 'ACTIVE'",
+                Integer.class,
+                departmentId);
+        return count != null && count > 0;
+    }
+
     boolean taxCategoryExists(UUID taxCategoryId) {
         Integer count = jdbc.queryForObject(
                 "select count(*) from catalogue.tax_category where tax_category_id = ?", Integer.class, taxCategoryId);

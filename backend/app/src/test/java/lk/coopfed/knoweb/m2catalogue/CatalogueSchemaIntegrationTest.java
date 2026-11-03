@@ -55,7 +55,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0010 (CAT-03): sku_alias.
             Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")),
             // V0011 (CAT-06): location_assortment.
-            Map.entry("location_assortment", with("own_update", "own_delete")));
+            Map.entry("location_assortment", with("own_update", "own_delete")),
+            // PGL-M2-08: department_category.
+            Map.entry("department_category", Set.of("authenticated_read", "governed_write", "governed_update")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";

@@ -81,6 +81,9 @@ class Sku implements Persistable<UUID> {
     @Column(name = "tax_category_id", nullable = false)
     private UUID taxCategoryId;
 
+    @Column(name = "department_id")
+    private UUID departmentId;
+
     @Column(name = "multi_mrp_policy", nullable = false)
     private String multiMrpPolicy;
 
@@ -228,6 +231,7 @@ class Sku implements Persistable<UUID> {
             throw new ProblemException("request.field.required", Map.of("field", "taxCategoryId"));
         }
         taxCategoryId = details.taxCategoryId();
+        departmentId = details.departmentId();
 
         multiMrpPolicy =
                 details.multiMrpPolicy() == null || details.multiMrpPolicy().isBlank()
@@ -298,6 +302,10 @@ class Sku implements Persistable<UUID> {
         return expiryTracked;
     }
 
+    UUID departmentId() {
+        return departmentId;
+    }
+
     UUID taxCategoryId() {
         return taxCategoryId;
     }
@@ -343,6 +351,7 @@ class Sku implements Persistable<UUID> {
         state.put("hasPrintedMrp", hasPrintedMrp);
         state.put("expiryWarningDays", expiryWarningDays);
         state.put("taxCategoryId", taxCategoryId);
+        state.put("departmentId", departmentId);
         state.put("multiMrpPolicy", multiMrpPolicy);
         state.put("originKind", originKind);
         state.put("attributes", new LinkedHashMap<>(attributes));

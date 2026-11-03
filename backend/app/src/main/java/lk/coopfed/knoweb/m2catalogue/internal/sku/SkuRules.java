@@ -44,6 +44,10 @@ class SkuRules {
             throw new ProblemException("request.field.required", Map.of("field", "taxCategoryId"));
         }
 
+        if (details.departmentId() != null && !references.departmentCategoryExists(details.departmentId())) {
+            throw new ProblemException("m2.sku.department_unknown", Map.of("departmentId", details.departmentId()));
+        }
+
         if (!references.taxCategoryExists(details.taxCategoryId())) {
             throw new ProblemException("m2.sku.tax_category_unknown", Map.of("taxCategoryId", details.taxCategoryId()));
         }
