@@ -104,10 +104,10 @@ export function UsersPage() {
               <tbody>
                 {shown.map((user) => (
                   <tr key={user.userId}>
-                    <td>
+                    <td title={user.username}>
                       <Link to={`/party/users/${user.userId}`}>{user.username}</Link>
                     </td>
-                    <td>{user.displayName}</td>
+                    <td title={user.displayName}>{user.displayName}</td>
                     <td>{t(`party.user.kind.${user.userKind}`).text}</td>
                     <td>{t(`party.language.${user.language}`).text}</td>
                     <td>
