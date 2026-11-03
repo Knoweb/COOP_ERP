@@ -290,11 +290,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                         Boolean.class))
                 .isTrue();
 
-         
         // PGL-M2-08: Department category migration and RLS.
-        assertThat(admin.queryForObject(
-                        "select to_regclass('catalogue.department_category')::text",
-                        String.class))
+        assertThat(admin.queryForObject("select to_regclass('catalogue.department_category')::text", String.class))
                 .isEqualTo("catalogue.department_category");
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity"
@@ -303,9 +300,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isTrue();
 
         // PGL-M3-03: Loyalty rewards and insurance.
-        assertThat(admin.queryForObject(
-                        "select to_regclass('customers.loyalty_reward_policy')::text",
-                        String.class))
+        assertThat(admin.queryForObject("select to_regclass('customers.loyalty_reward_policy')::text", String.class))
                 .isEqualTo("customers.loyalty_reward_policy");
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity"

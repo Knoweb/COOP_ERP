@@ -8,8 +8,8 @@ CREATE TABLE catalogue.department_category (
     department_id   uuid         PRIMARY KEY,
     code            varchar(32)  NOT NULL,
     name_en         text         NOT NULL,
-    name_si         text         NOT NULL,
-    name_ta         text         NOT NULL,
+    name_si         text,
+    name_ta         text,
     description     text,
     display_order   smallint     NOT NULL DEFAULT 0,
     status          varchar(16)  NOT NULL DEFAULT 'ACTIVE'

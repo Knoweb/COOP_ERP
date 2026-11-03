@@ -171,4 +171,32 @@ class UpdateDepartmentCategoryHandlerTest {
         assertThat(published.nameTa()).isEqualTo("பானம்");
         assertThat(published.status()).isEqualTo("INACTIVE");
     }
+
+    @Test
+    void nullOptionalFieldsPreservesExistingValues() {
+        Map<String, Object> existing = new LinkedHashMap<>();
+        existing.put("code", "BEV");
+        existing.put("nameEn", "Beverage");
+        existing.put("nameSi", "බීම වර්ග");
+        existing.put("nameTa", "பானங்கள்");
+        existing.put("description", "Old desc");
+        existing.put("displayOrder", 10);
+        existing.put("status", "ACTIVE");
+
+        when(jdbc.query(anyString(), any(ResultSetExtractor.class), eq(DEPT_ID)))
+                .thenReturn(existing);
+
+        handler.handle(new UpdateDepartmentCategory(DEPT_ID, "Beverages Updated", null, null, null, null, null), scope);
+
+        verify(jdbc)
+                .update(
+                        anyString(),
+                        eq("Beverages Updated"),
+                        eq("බීම වර්ග"),
+                        eq("பானங்கள்"),
+                        eq("Old desc"),
+                        eq(10),
+                        eq("ACTIVE"),
+                        eq(DEPT_ID));
+    }
 }

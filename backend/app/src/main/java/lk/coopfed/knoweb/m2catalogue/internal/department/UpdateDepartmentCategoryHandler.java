@@ -95,16 +95,17 @@ public class UpdateDepartmentCategoryHandler implements Handles<UpdateDepartment
         }
 
         String nameEn = command.nameEn().strip();
-        String nameSi = (command.nameSi() == null || command.nameSi().isBlank())
-                ? null
-                : command.nameSi().strip();
-        String nameTa = (command.nameTa() == null || command.nameTa().isBlank())
-                ? null
-                : command.nameTa().strip();
-        String description =
-                (command.description() == null || command.description().isBlank())
+        String nameSi = command.nameSi() == null
+                ? (String) existing.get("nameSi")
+                : (command.nameSi().isBlank() ? null : command.nameSi().strip());
+        String nameTa = command.nameTa() == null
+                ? (String) existing.get("nameTa")
+                : (command.nameTa().isBlank() ? null : command.nameTa().strip());
+        String description = command.description() == null
+                ? (String) existing.get("description")
+                : (command.description().isBlank()
                         ? null
-                        : command.description().strip();
+                        : command.description().strip());
         int displayOrder =
                 command.displayOrder() == null ? (Integer) existing.get("displayOrder") : command.displayOrder();
 

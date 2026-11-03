@@ -312,8 +312,21 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
                     "catalogue.department_category",
-                    "authenticated_read (PGL-M2-08): reference data every class but NONE reads",
-                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+                    "authenticated_read and governed_write/update (PGL-M2-08): reference data every class but"
+                            + " NONE reads; only Federation writes and updates (governed_write, governed_update),"
+                            + " so an entity's own INSERT is refused, and UPDATE and MOVE are hidden",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return everyClassButNoneReadsEverything(check);
+                        }
+                        if (check.op() == Op.INSERT) {
+                            return REFUSED;
+                        }
+                        if (check.op() == Op.UPDATE || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        return null;
+                    }),
             new Departure(
                     "catalogue.tax_rate",
                     "authenticated_read (M2-01): reference data every class but NONE reads",

@@ -66,6 +66,8 @@ class DepartmentCategoryPostgresIntegrationTest extends PostgresIntegrationTest 
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.department_category where code = ?", TEST_DEPT_CODE);
+        admin.update(
+                "delete from catalogue.tax_category where code = 'STD_TEST' or tax_category_id = '00000000-0000-0000-0000-000000000100'::uuid");
     }
 
     @Test
@@ -96,7 +98,7 @@ class DepartmentCategoryPostgresIntegrationTest extends PostgresIntegrationTest 
 
         // Verify audit and event
         assertThat(audit("DEPARTMENT_CATEGORY_DEFINED")).singleElement().satisfies(record -> {
-            assertThat(record.subject().id()).isEqualTo(deptId.toString());
+            assertThat(record.subject().id()).isEqualTo(deptId);
         });
         assertThat(events(DepartmentCategoryDefined.class)).singleElement().satisfies(event -> {
             assertThat(event.departmentId()).isEqualTo(deptId);
@@ -135,7 +137,7 @@ class DepartmentCategoryPostgresIntegrationTest extends PostgresIntegrationTest 
         assertThat(updatedView.status()).isEqualTo("INACTIVE");
 
         assertThat(audit("DEPARTMENT_CATEGORY_UPDATED")).singleElement().satisfies(record -> {
-            assertThat(record.subject().id()).isEqualTo(deptId.toString());
+            assertThat(record.subject().id()).isEqualTo(deptId);
         });
         assertThat(events(DepartmentCategoryUpdated.class)).singleElement().satisfies(event -> {
             assertThat(event.departmentId()).isEqualTo(deptId);
@@ -244,7 +246,8 @@ class DepartmentCategoryPostgresIntegrationTest extends PostgresIntegrationTest 
                         TEST_DEPT_CODE, "Test Beverages", "පරීක්ෂණ බීම", "சோதனை பானங்கள்", null, 10),
                 own(FEDERATION));
         updateHandler.handle(
-                new UpdateDepartmentCategory(deptId, "Test Beverages", null, null, null, 10, "INACTIVE"),
+                new UpdateDepartmentCategory(
+                        deptId, "Test Beverages", "පරීක්ෂණ බීම", "சோதனை பானங்கள்", null, 10, "INACTIVE"),
                 own(FEDERATION));
 
         SkuDetails detailsInactive = new SkuDetails(
