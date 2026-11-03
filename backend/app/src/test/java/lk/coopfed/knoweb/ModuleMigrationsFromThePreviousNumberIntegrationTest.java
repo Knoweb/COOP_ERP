@@ -198,7 +198,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
-                .containsEntry("m2catalogue", 12)
+                .containsEntry("m2catalogue", 13)
                 .containsEntry("m3pricing", 11)
                 .containsEntry("m5inventory", 20)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
@@ -286,6 +286,14 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isTrue();
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'customers.loyalty_permitted_location'::regclass",
+                        Boolean.class))
+                .isTrue();
+
+        // PGL-M2-08: m2catalogue V0013 (department_category).
+        assertThat(admin.queryForObject("select to_regclass('catalogue.department_category')::text", String.class))
+                .isEqualTo("catalogue.department_category");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'catalogue.department_category'::regclass",
                         Boolean.class))
                 .isTrue();
 

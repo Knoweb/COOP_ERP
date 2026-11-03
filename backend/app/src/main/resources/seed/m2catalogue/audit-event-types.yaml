@@ -140,3 +140,13 @@ audit_event_types:
     offline_capturable: false
     description_en: Assortment maintainer reconcile detected and repaired drift
 
+  - code: DEPARTMENT_CATEGORY_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Merchandise department category defined
+
+  - code: DEPARTMENT_CATEGORY_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Merchandise department category updated
+

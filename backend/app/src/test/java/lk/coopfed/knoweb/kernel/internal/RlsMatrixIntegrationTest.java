@@ -311,6 +311,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "catalogue.department_category",
+                    "authenticated_read (PGL-M2-08): reference data every class but NONE reads",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_rate",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),

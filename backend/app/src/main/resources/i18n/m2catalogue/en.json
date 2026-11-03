@@ -86,5 +86,8 @@
   "m2.supplier.name_conflict": "Supplier name is already assigned to a different supplier code",
   "m2.supplier.csv_parse_failed": "The supplier import file could not be parsed",
   "m2.sku.code_conflict": "SKU code is already registered with conflicting attributes",
-  "m2.sku.barcode_conflict": "Barcode is already registered to a different SKU"
+  "m2.sku.barcode_conflict": "Barcode is already registered to a different SKU",
+  "m2.department.not_found": "The merchandise department category was not found",
+  "m2.department.code_exists": "A department category with this code already exists",
+  "m2.sku.department_unknown": "The selected merchandise department category is not defined or inactive"
 }
