@@ -2610,6 +2610,11 @@ textarea {
   overflow: hidden;
 }
 
+.custom-status-dropdown__menu--scrollable {
+  max-height: 280px !important;
+  overflow-y: auto !important;
+}
+
 .custom-status-dropdown__menu li {
   margin: 0;
   padding: 0;
