@@ -153,50 +153,69 @@
 }
 
 .stock-search-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  width: calc(var(--space-8) * 3 + var(--space-4) + var(--space-1));
-  max-width: 100%;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  flex: 0 1 calc(var(--space-8) * 3 + var(--space-6) + var(--space-half)) !important;
+  width: calc(var(--space-8) * 3 + var(--space-6) + var(--space-half)) !important;
+  max-width: 100% !important;
 }
 
 .stock-search-control {
-  width: 100%;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
 }
 
 .stock-search-control .modern-control__leading-icon {
-  left: var(--space-1);
-  top: 50%;
-  transform: translateY(-50%);
-  width: calc(var(--space-2) - var(--space-half) / 2);
-  height: calc(var(--space-2) - var(--space-half) / 2);
+  position: absolute !important;
+  left: var(--space-1) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-brand-dark) !important;
+  fill: none !important;
+  pointer-events: none !important;
+  flex-shrink: 0 !important;
+  z-index: 2 !important;
 }
 
+.shell-page input.stock-search-input,
+.shell-page .stock-search-input,
 .stock-search-input {
-  width: 100%;
-  min-height: calc(var(--space-4) + var(--space-half));
-  padding-top: var(--space-half);
-  padding-bottom: var(--space-half);
-  padding-left: calc(var(--space-3) - var(--space-half) / 2);
-  padding-right: calc(var(--space-1) + var(--space-half) / 2);
-  border: var(--border-width) solid var(--color-border-control);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  font-size: var(--font-size-sm);
-  line-height: 1.2;
-  color: var(--color-text);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding-top: var(--space-1) !important;
+  padding-bottom: var(--space-1) !important;
+  padding-left: calc(var(--space-3) + var(--space-half)) !important;
+  padding-right: calc(var(--space-1) + var(--space-half)) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  background-color: var(--color-polish-24) !important;
+  font-size: var(--font-size-sm) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-text) !important;
+  outline: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
 }
 
+.shell-page input.stock-search-input:hover,
+.shell-page .stock-search-input:hover,
 .stock-search-input:hover {
-  border-color: var(--color-accent);
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
 }
 
+.shell-page input.stock-search-input:focus,
+.shell-page .stock-search-input:focus,
 .stock-search-input:focus {
-  border-color: var(--color-accent);
-  outline: none;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-18);
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .stock-search-clear {
@@ -271,13 +290,24 @@
 .stock-card-sku {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-half) calc(var(--space-1) + var(--space-half));
-  background: var(--color-surface-subtle);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius);
+  gap: var(--space-1);
+  min-height: calc(var(--space-3) + var(--space-half));
+  padding: calc(var(--space-half) / 2) var(--space-2);
+  background: var(--color-polish-31);
+  border: var(--border-width) solid var(--color-polish-6);
+  border-radius: var(--radius-pill);
   width: fit-content;
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-accent);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+}
+
+.stock-card-sku__icon {
+  width: calc(var(--space-2) - var(--space-half) / 2);
+  height: calc(var(--space-2) - var(--space-half) / 2);
+  color: var(--color-accent);
+  flex-shrink: 0;
 }
 
 /* ---------- Table Container & Scrolling ------------------------------------ */
