@@ -21,5 +21,21 @@
   "m9.overtime.not_found": "Overtime calculation {0} not found",
   "m9.overtime.already_processed": "Overtime calculation {0} has already been processed",
   "m9.overtime.not_qualifying": "Overtime calculation {0} does not qualify for overtime approval",
-  "m9.overtime.period_invalid": "Payroll period format must be YYYY-MM"
+  "m9.overtime.period_invalid": "Payroll period format must be YYYY-MM",
+  "m9.delivery.vehicle_id_required": "Vehicle identifier is required",
+  "m9.delivery.device_id_required": "Device identifier is required",
+  "m9.delivery.coordinates_invalid": "GPS coordinates are invalid; latitude must be -90..90 and longitude -180..180",
+  "m9.delivery.trip_not_found": "Delivery trip not found",
+  "m9.delivery.trip_reference_required": "Trip reference is required",
+  "m9.delivery.trip_reference_duplicate": "Trip reference already exists for this entity",
+  "m9.delivery.trip_completed": "Delivery trip is already completed or cancelled",
+  "m9.delivery.origin_location_required": "Trip origin location is required",
+  "m9.delivery.trip_date_required": "Trip date is required",
+  "m9.delivery.odometer_invalid": "End odometer reading must not be less than start odometer",
+  "m9.delivery.delivery_not_found": "Delivery record not found",
+  "m9.delivery.delivery_reference_required": "Delivery reference is required",
+  "m9.delivery.destination_location_required": "Destination location is required",
+  "m9.delivery.status_invalid": "Delivery status is invalid",
+  "m9.delivery.failure_reason_required": "Failure reason is required when delivery fails",
+  "m9.delivery.period_invalid": "Month-end period must be in YYYY-MM format"
 }

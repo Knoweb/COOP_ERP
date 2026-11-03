@@ -451,6 +451,224 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PayrollContributionSummaryResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/integration/delivery/locations:
+    post:
+      tags: [Integration]
+      operationId: recordVehicleLocation
+      summary: Real-time GPS location update for a delivery vehicle or mobile device
+      x-permission: int.delivery.track
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordVehicleLocationRequest' }
+      responses:
+        '201':
+          description: Location recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleLocationResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/integration/delivery/vehicles/live:
+    get:
+      tags: [Integration]
+      operationId: listLiveVehicleLocations
+      summary: Latest GPS locations for all active delivery vehicles
+      x-permission: int.delivery.view
+      responses:
+        '200':
+          description: List of latest vehicle locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LiveVehicleLocationResponse' }
+
+  /v1/integration/delivery/vehicles/{vehicleId}/live:
+    get:
+      tags: [Integration]
+      operationId: getLiveVehicleLocation
+      summary: Latest GPS location for a specific vehicle
+      x-permission: int.delivery.view
+      parameters:
+        - in: path
+          name: vehicleId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Latest vehicle location
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveVehicleLocationResponse' }
+        '404':
+          description: Vehicle not found or no location recorded
+
+  /v1/integration/delivery/vehicles/{vehicleId}/route:
+    get:
+      tags: [Integration]
+      operationId: getVehicleRouteHistory
+      summary: End-of-day GPS route history for a vehicle on a given date
+      x-permission: int.delivery.view
+      parameters:
+        - in: path
+          name: vehicleId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Route history points
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleRouteHistoryResponse' }
+
+  /v1/integration/delivery/trips:
+    post:
+      tags: [Integration]
+      operationId: createDeliveryTrip
+      summary: Create and schedule a delivery trip
+      x-permission: int.delivery.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDeliveryTripRequest' }
+      responses:
+        '201':
+          description: Trip scheduled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryTripResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/integration/delivery/trips/{tripId}/complete:
+    post:
+      tags: [Integration]
+      operationId: completeDeliveryTrip
+      summary: Complete an end-of-day delivery trip with final odometer reading
+      x-permission: int.delivery.manage
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteDeliveryTripRequest' }
+      responses:
+        '200':
+          description: Trip completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryTripResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/integration/delivery/trips/{tripId}/drops:
+    post:
+      tags: [Integration]
+      operationId: recordDeliveryDrop
+      summary: Schedule a package drop on a delivery trip
+      x-permission: int.delivery.manage
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordDeliveryDropRequest' }
+      responses:
+        '201':
+          description: Delivery drop scheduled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryDropResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/integration/delivery/drops/{deliveryId}/status:
+    post:
+      tags: [Integration]
+      operationId: updateDeliveryStatus
+      summary: Update status of a package drop
+      x-permission: int.delivery.manage
+      parameters:
+        - in: path
+          name: deliveryId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDeliveryStatusRequest' }
+      responses:
+        '200':
+          description: Delivery status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryDropResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/integration/delivery/reports/daily:
+    get:
+      tags: [Integration]
+      operationId: getDailyDeliverySummary
+      summary: End-of-day delivery summary report for a given date
+      x-permission: int.delivery.view
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: locationId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Daily delivery summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyDeliverySummaryResponse' }
+
+  /v1/integration/delivery/reports/monthly:
+    get:
+      tags: [Integration]
+      operationId: getMonthlyDeliveryReport
+      summary: Month-end routine delivery report reconciling trips and drops
+      x-permission: int.delivery.view
+      parameters:
+        - in: query
+          name: period
+          required: true
+          schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        - in: query
+          name: locationId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Monthly delivery report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyDeliveryReportResponse' }
 components:
   parameters:
     ExportId:
@@ -750,3 +968,189 @@ components:
         totalOtMinutes: { type: integer }
         totalApprovedAmount: { type: number }
         contributionCount: { type: integer }
+    RecordVehicleLocationRequest:
+      type: object
+      required: [vehicleId, deviceId, latitude, longitude]
+      properties:
+        vehicleId: { type: string, minLength: 1, maxLength: 64 }
+        deviceId: { type: string, minLength: 1, maxLength: 64 }
+        tripId: { type: [string, 'null'], format: uuid }
+        latitude: { type: number, minimum: -90.0, maximum: 90.0 }
+        longitude: { type: number, minimum: -180.0, maximum: 180.0 }
+        speedKmh: { type: number, minimum: 0 }
+        headingDegrees: { type: [integer, 'null'], minimum: 0, maximum: 360 }
+        batteryPercentage: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        recordedAt: { type: [string, 'null'], format: date-time }
+    VehicleLocationResponse:
+      type: object
+      required: [updateId, vehicleId, deviceId, latitude, longitude, speedKmh, recordedAt, receivedAt]
+      properties:
+        updateId: { type: string, format: uuid }
+        vehicleId: { type: string }
+        deviceId: { type: string }
+        tripId: { type: [string, 'null'], format: uuid }
+        latitude: { type: number }
+        longitude: { type: number }
+        speedKmh: { type: number }
+        headingDegrees: { type: [integer, 'null'] }
+        batteryPercentage: { type: [integer, 'null'] }
+        recordedAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
+    LiveVehicleLocationResponse:
+      type: object
+      required: [vehicleId, deviceId, latitude, longitude, speedKmh, recordedAt]
+      properties:
+        vehicleId: { type: string }
+        deviceId: { type: string }
+        tripId: { type: [string, 'null'], format: uuid }
+        latitude: { type: number }
+        longitude: { type: number }
+        speedKmh: { type: number }
+        headingDegrees: { type: [integer, 'null'] }
+        batteryPercentage: { type: [integer, 'null'] }
+        recordedAt: { type: string, format: date-time }
+        receivedAt: { type: [string, 'null'], format: date-time }
+    VehicleRoutePointResponse:
+      type: object
+      required: [recordedAt, latitude, longitude, speedKmh]
+      properties:
+        recordedAt: { type: string, format: date-time }
+        latitude: { type: number }
+        longitude: { type: number }
+        speedKmh: { type: number }
+        headingDegrees: { type: [integer, 'null'] }
+    VehicleRouteHistoryResponse:
+      type: object
+      required: [vehicleId, date, pointsCount, points]
+      properties:
+        vehicleId: { type: string }
+        date: { type: string, format: date }
+        pointsCount: { type: integer }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/VehicleRoutePointResponse' }
+    CreateDeliveryTripRequest:
+      type: object
+      required: [tripReference, vehicleId, originLocationId, tripDate]
+      properties:
+        tripReference: { type: string, minLength: 1, maxLength: 64 }
+        vehicleId: { type: string, minLength: 1, maxLength: 64 }
+        driverUserId: { type: [string, 'null'], format: uuid }
+        driverCode: { type: [string, 'null'], maxLength: 32 }
+        originLocationId: { type: string, format: uuid }
+        destinationLocationId: { type: [string, 'null'], format: uuid }
+        tripDate: { type: string, format: date }
+        startOdometerKm: { type: [number, 'null'], minimum: 0 }
+    DeliveryTripResponse:
+      type: object
+      required: [tripId, ownerEntityId, tripReference, vehicleId, originLocationId, tripDate, tripStatus, totalDistanceKm, totalDrops, deliveredDrops, failedDrops]
+      properties:
+        tripId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        tripReference: { type: string }
+        vehicleId: { type: string }
+        driverCode: { type: [string, 'null'] }
+        originLocationId: { type: string, format: uuid }
+        destinationLocationId: { type: [string, 'null'], format: uuid }
+        tripDate: { type: string, format: date }
+        tripStatus: { type: string, enum: [PLANNED, IN_TRANSIT, COMPLETED, CANCELLED] }
+        totalDistanceKm: { type: number }
+        totalDrops: { type: integer }
+        deliveredDrops: { type: integer }
+        failedDrops: { type: integer }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+    CompleteDeliveryTripRequest:
+      type: object
+      properties:
+        endOdometerKm: { type: [number, 'null'], minimum: 0 }
+        totalDistanceKm: { type: [number, 'null'], minimum: 0 }
+    RecordDeliveryDropRequest:
+      type: object
+      required: [deliveryReference, destinationLocationId]
+      properties:
+        deliveryReference: { type: string, minLength: 1, maxLength: 64 }
+        destinationLocationId: { type: string, format: uuid }
+        recipientRef: { type: [string, 'null'], maxLength: 64 }
+        packagesCount: { type: integer, minimum: 1, default: 1 }
+        weightKg: { type: number, minimum: 0, default: 0 }
+        scheduledAt: { type: [string, 'null'], format: date-time }
+        notes: { type: [string, 'null'], maxLength: 500 }
+    DeliveryDropResponse:
+      type: object
+      required: [deliveryId, tripId, deliveryReference, destinationLocationId, packagesCount, weightKg, status]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        deliveryReference: { type: string }
+        destinationLocationId: { type: string, format: uuid }
+        recipientRef: { type: [string, 'null'] }
+        packagesCount: { type: integer }
+        weightKg: { type: number }
+        status: { type: string, enum: [PENDING, IN_TRANSIT, DELIVERED, FAILED, CANCELLED] }
+        scheduledAt: { type: [string, 'null'], format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        failureReason: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+    UpdateDeliveryStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [IN_TRANSIT, DELIVERED, FAILED, CANCELLED] }
+        failureReason: { type: [string, 'null'], maxLength: 500 }
+        notes: { type: [string, 'null'], maxLength: 500 }
+    DailyDeliverySummaryResponse:
+      type: object
+      required: [date, totalTrips, completedTrips, totalDeliveries, deliveredCount, failedCount, pendingCount, completionRatePercent, totalDistanceKm, activeVehiclesCount, trips]
+      properties:
+        date: { type: string, format: date }
+        totalTrips: { type: integer }
+        completedTrips: { type: integer }
+        totalDeliveries: { type: integer }
+        deliveredCount: { type: integer }
+        failedCount: { type: integer }
+        pendingCount: { type: integer }
+        completionRatePercent: { type: number }
+        totalDistanceKm: { type: number }
+        activeVehiclesCount: { type: integer }
+        trips:
+          type: array
+          items: { $ref: '#/components/schemas/DeliveryTripResponse' }
+    DailyDeliveryBreakdownItem:
+      type: object
+      required: [date, totalTrips, totalDeliveries, deliveredCount, failedCount, totalDistanceKm]
+      properties:
+        date: { type: string, format: date }
+        totalTrips: { type: integer }
+        totalDeliveries: { type: integer }
+        deliveredCount: { type: integer }
+        failedCount: { type: integer }
+        totalDistanceKm: { type: number }
+    VehicleDeliveryBreakdownItem:
+      type: object
+      required: [vehicleId, totalTrips, totalDeliveries, deliveredCount, failedCount, totalDistanceKm]
+      properties:
+        vehicleId: { type: string }
+        totalTrips: { type: integer }
+        totalDeliveries: { type: integer }
+        deliveredCount: { type: integer }
+        failedCount: { type: integer }
+        totalDistanceKm: { type: number }
+    MonthlyDeliveryReportResponse:
+      type: object
+      required: [periodMonth, totalTrips, completedTrips, totalDeliveries, deliveredCount, failedCount, deliverySuccessRate, totalDistanceKm, dailyBreakdown, vehicleBreakdown]
+      properties:
+        periodMonth: { type: string }
+        totalTrips: { type: integer }
+        completedTrips: { type: integer }
+        totalDeliveries: { type: integer }
+        deliveredCount: { type: integer }
+        failedCount: { type: integer }
+        deliverySuccessRate: { type: number }
+        totalDistanceKm: { type: number }
+        dailyBreakdown:
+          type: array
+          items: { $ref: '#/components/schemas/DailyDeliveryBreakdownItem' }
+        vehicleBreakdown:
+          type: array
+          items: { $ref: '#/components/schemas/VehicleDeliveryBreakdownItem' }
