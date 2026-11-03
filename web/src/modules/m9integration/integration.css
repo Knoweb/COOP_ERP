@@ -6,6 +6,170 @@
   margin-bottom: var(--space-4);
 }
 
+.modern-filter-panel--notifications {
+  display: flex;
+  width: fit-content;
+  max-width: calc(var(--space-8) * 3 + var(--space-1));
+  flex-direction: column;
+  box-sizing: border-box;
+  gap: var(--space-half);
+  background: var(--color-polish-22);
+  padding: var(--space-1) calc(var(--space-1) + var(--space-half));
+  border-radius: calc(var(--radius) * 2.5);
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-23);
+  margin-bottom: var(--space-2);
+  border: var(--border-width) solid var(--color-polish-14);
+}
+
+.modern-filter-panel--notifications .modern-field--select {
+  width: calc(var(--space-8) * 2 + var(--space-4) + var(--space-half));
+  max-width: 100%;
+  gap: var(--space-half);
+}
+
+.modern-filter-panel--notifications .modern-field__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+  line-height: var(--line-height);
+  text-transform: uppercase;
+}
+
+/* Custom Dropdown (Matching Users page filter style) */
+.modern-filter-panel--notifications .integration-custom-dropdown {
+  position: relative;
+  width: 100%;
+  max-width: calc(var(--space-8) * 2 + var(--space-4) + var(--space-half));
+}
+
+.integration-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--space-4) + var(--space-half));
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half));
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: calc(var(--radius) * 2);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height);
+  cursor: pointer;
+  text-align: left;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.integration-dropdown-trigger:hover,
+.integration-dropdown-trigger:focus,
+.integration-dropdown-trigger--open {
+  border-color: var(--color-accent);
+  background-color: var(--color-surface);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
+}
+
+.integration-dropdown-arrow {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: var(--color-accent);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-left: var(--space-1);
+}
+
+.integration-dropdown-arrow--open {
+  transform: rotate(180deg);
+}
+
+.integration-dropdown-menu {
+  position: absolute;
+  top: calc(100% + var(--space-half));
+  left: 0;
+  width: 100%;
+  min-width: calc(var(--space-8) * 2 + var(--space-4) + var(--space-half));
+  box-sizing: border-box;
+  padding: var(--space-half) 0;
+  margin: 0;
+  list-style: none;
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.integration-dropdown-item {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: auto !important;
+  min-width: auto !important;
+  height: auto !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.integration-dropdown-item:hover,
+.integration-dropdown-item:focus {
+  background-color: var(--color-polish-29) !important;
+  outline: none;
+}
+
+.integration-dropdown-item--selected {
+  color: var(--color-polish-25);
+  font-weight: var(--font-weight-strong);
+}
+
+.integration-dropdown-item__bar {
+  width: var(--border-width-strong);
+  height: var(--space-2);
+  background-color: var(--color-polish-25);
+  border-radius: var(--radius-pill);
+  margin-right: var(--space-1);
+  flex-shrink: 0;
+}
+
+.integration-dropdown-item__spacer {
+  width: var(--border-width-strong);
+  margin-right: var(--space-1);
+  flex-shrink: 0;
+}
+
+.integration-dropdown-item__label {
+  flex: 1;
+}
+
+.integration-dropdown-item__check {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: var(--color-polish-25);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .integration-label {
   display: block;
   margin-bottom: var(--space-half);
@@ -44,40 +208,398 @@
   color: var(--color-text-muted);
 }
 
+/* Notifications Page Sections & Rules */
+.notifications-section {
+  margin-bottom: var(--space-6);
+}
+
+.notifications-section h2 {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+}
+
+.notifications-section .modern-table-card {
+  border: var(--border-width-strong) solid var(--color-polish-21);
+}
+
+.notifications-section .modern-table th {
+  border-bottom: var(--border-width) solid var(--color-polish-21);
+}
+
+.notifications-section .modern-table td {
+  border-bottom: var(--border-width) solid var(--color-polish-21);
+}
+
+.notifications-section .modern-table th:not(:last-child),
+.notifications-section .modern-table td:not(:last-child) {
+  border-right: var(--border-width) solid var(--color-polish-21);
+}
+
+.notifications-section .modern-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.notification-rules-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+.notification-log-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.shell-page table.notification-rules-table,
+.shell-page .notification-rules-table,
+.notification-rules-table {
+  width: 100%;
+  min-width: calc(var(--space-8) * 8);
+  table-layout: auto;
+  border-collapse: collapse !important;
+}
+
+.shell-page .notification-rules-table th,
+.notification-rules-table th {
+  padding: var(--space-2) var(--space-2) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+
+.shell-page .notification-rules-table td,
+.notification-rules-table td {
+  padding: var(--space-2) var(--space-2) !important;
+  font-size: var(--font-size-sm) !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+
+.shell-page .notification-rules-table th:first-child,
+.shell-page .notification-rules-table td:first-child,
+.notification-rules-table th:first-child,
+.notification-rules-table td:first-child {
+  min-width: 0 !important;
+  padding-left: var(--space-3) !important;
+}
+
+.shell-page .notification-rules-table th:last-child,
+.shell-page .notification-rules-table td:last-child,
+.notification-rules-table th:last-child,
+.notification-rules-table td:last-child {
+  padding-right: var(--space-3) !important;
+  text-align: right;
+  white-space: nowrap !important;
+  width: 1%;
+}
+
+/* Col 1: Name */
+.shell-page .notification-rules-table th:nth-child(1),
+.shell-page .notification-rules-table td:nth-child(1),
+.notification-rules-table td:nth-child(1) {
+  font-weight: var(--font-weight-strong);
+  color: var(--color-polish-25);
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0 !important;
+}
+
+/* Col 2: Event */
+.shell-page .notification-rules-table th:nth-child(2),
+.shell-page .notification-rules-table td:nth-child(2),
+.notification-rules-table td:nth-child(2) {
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0 !important;
+}
+
+/* Col 3: Audience */
+.shell-page .notification-rules-table th:nth-child(3),
+.shell-page .notification-rules-table td:nth-child(3),
+.notification-rules-table td:nth-child(3) {
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0 !important;
+}
+
+/* Col 4: Channels */
+.shell-page .notification-rules-table th:nth-child(4),
+.shell-page .notification-rules-table td:nth-child(4),
+.notification-rules-table td:nth-child(4) {
+  white-space: nowrap !important;
+  width: 1%;
+  min-width: 0 !important;
+}
+
+/* Col 5: Status */
+.shell-page .notification-rules-table th:nth-child(5),
+.shell-page .notification-rules-table td:nth-child(5),
+.notification-rules-table td:nth-child(5) {
+  white-space: nowrap !important;
+  width: 1%;
+  min-width: 0 !important;
+  text-align: center;
+}
+
+.notification-rule-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: auto !important;
+  min-width: auto !important;
+  height: auto !important;
+  padding: 0 var(--space-2) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  line-height: var(--line-height) !important;
+  border-radius: var(--radius-pill) !important;
+  box-sizing: border-box !important;
+}
+
+/* Templates Horizontal Compact Cards */
 .integration-templates {
   list-style: none;
   padding: 0;
-  display: grid;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
 .integration-template {
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  background-color: var(--color-surface);
+}
+
+.integration-template__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.integration-template__identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.integration-template__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-polish-25);
+}
+
+.integration-template__channel {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  background-color: var(--color-surface-card);
+  color: var(--color-polish-25);
+  text-transform: uppercase;
 }
 
 .integration-subject {
   font-weight: var(--font-weight-strong);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0;
 }
 
-.notification-log-table {
-  min-width: var(--integration-log-table-min);
+.integration-subject::before {
+  content: "— ";
+  color: var(--color-text-muted);
 }
 
-.notification-log-table td:nth-child(1) {
-  min-width: var(--integration-log-date-min);
-  white-space: nowrap;
-}
-
-.notification-log-table td:nth-child(2),
-.notification-log-table td:nth-child(4),
-.notification-log-table td:nth-child(8) {
-  min-width: var(--integration-log-detail-min);
-  max-width: var(--integration-log-detail-max);
+.integration-template p,
+.integration-template__body {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height);
+  color: var(--color-text-muted);
   overflow-wrap: anywhere;
 }
 
-.notification-log-table th:nth-child(7),
-.notification-log-table td:nth-child(7) {
+.integration-placeholders {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  font-size: var(--font-size-xs);
+}
+
+/* Delivery Log Table */
+.shell-page table.notification-log-table,
+.shell-page .notification-log-table,
+.notification-log-table {
+  width: 100%;
+  min-width: calc(var(--space-8) * 13 + var(--space-2));
+  table-layout: auto;
+  border-collapse: collapse !important;
+}
+
+.shell-page .notification-log-table th,
+.notification-log-table th {
+  padding: var(--space-2) var(--space-1) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+
+.shell-page .notification-log-table td,
+.notification-log-table td {
+  padding: var(--space-2) var(--space-1) !important;
+  font-size: var(--font-size-sm) !important;
+  vertical-align: middle;
+  line-height: var(--line-height);
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+
+.shell-page .notification-log-table th:first-child,
+.shell-page .notification-log-table td:first-child,
+.notification-log-table th:first-child,
+.notification-log-table td:first-child {
+  min-width: 0 !important;
+  padding-left: var(--space-2) !important;
+}
+
+.shell-page .notification-log-table th:last-child,
+.shell-page .notification-log-table td:last-child,
+.notification-log-table th:last-child,
+.notification-log-table td:last-child {
+  padding-right: var(--space-2) !important;
+}
+
+/* Col 1: When - shrink-to-fit timestamp with zero empty whitespace */
+.notification-log-table col.log-col-when,
+.notification-log-table th.log-col-when,
+.notification-log-table td.log-col-when,
+.shell-page .notification-log-table th:nth-child(1),
+.shell-page .notification-log-table td:nth-child(1) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  padding-right: var(--space-half) !important;
+  text-align: left !important;
+}
+
+/* Col 2: Template - natural balanced width */
+.notification-log-table col.log-col-template,
+.notification-log-table th.log-col-template,
+.notification-log-table td.log-col-template,
+.shell-page .notification-log-table th:nth-child(2),
+.shell-page .notification-log-table td:nth-child(2) {
+  width: calc(var(--space-8) * 2 + var(--space-4));
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* Col 3: Channel - shrink-to-fit badge */
+.notification-log-table col.log-col-channel,
+.notification-log-table th.log-col-channel,
+.notification-log-table td.log-col-channel,
+.shell-page .notification-log-table th:nth-child(3),
+.shell-page .notification-log-table td:nth-child(3) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  text-align: left;
+}
+
+/* Col 4: Recipient - balanced comfortable width */
+.notification-log-table col.log-col-recipient,
+.notification-log-table th.log-col-recipient,
+.notification-log-table td.log-col-recipient,
+.shell-page .notification-log-table th:nth-child(4),
+.shell-page .notification-log-table td:nth-child(4) {
+  width: calc(var(--space-8) * 3);
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* Col 5: Language - shrink-to-fit */
+.notification-log-table col.log-col-language,
+.notification-log-table th.log-col-language,
+.notification-log-table td.log-col-language,
+.shell-page .notification-log-table th:nth-child(5),
+.shell-page .notification-log-table td:nth-child(5) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  text-align: left;
+}
+
+/* Col 6: Status - shrink-to-fit chip */
+.notification-log-table col.log-col-status,
+.notification-log-table th.log-col-status,
+.notification-log-table td.log-col-status,
+.shell-page .notification-log-table th:nth-child(6),
+.shell-page .notification-log-table td:nth-child(6) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
   text-align: center;
-  white-space: nowrap;
+}
+
+/* Col 7: Attempts - shrink-to-fit count */
+.notification-log-table col.log-col-attempts,
+.notification-log-table th.log-col-attempts,
+.notification-log-table td.log-col-attempts,
+.shell-page .notification-log-table th:nth-child(7),
+.shell-page .notification-log-table td:nth-child(7) {
+  width: 1%;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  text-align: center;
+  padding-left: var(--space-half) !important;
+  padding-right: var(--space-half) !important;
+}
+
+/* Col 8: Note - balanced readable space */
+.notification-log-table col.log-col-note,
+.notification-log-table th.log-col-note,
+.notification-log-table td.log-col-note,
+.shell-page .notification-log-table th:nth-child(8),
+.shell-page .notification-log-table td:nth-child(8) {
+  width: calc(var(--space-8) * 4);
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.integration-empty-card {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
 }

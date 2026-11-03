@@ -148,7 +148,6 @@ function StatusDropdown(props: {
   );
 }
 
-/**
 /** Custom District dropdown with styled selection, checkmark, custom hover and scrollable list */
 function DistrictDropdown(props: {
   value: string;
@@ -266,6 +265,7 @@ function DistrictDropdown(props: {
   );
 }
 
+/**
  * The society register (21A section 8, "Society register"): every entity the Federation
  * governs, as a list a clerk can narrow. Status, district and the search box all go to the
  * SERVER, which filters and pages: the register will hold hundreds of societies, a hundred to
@@ -379,7 +379,7 @@ export function SocietyRegisterPage() {
                 anyLabel={t("party.filter.status.any").text}
               />
             </div>
-            <label className="modern-field">
+            <div className="modern-field">
               <span className="modern-field__label party-filter-label">
                 {t("party.filter.district").text}
               </span>
@@ -388,32 +388,7 @@ export function SocietyRegisterPage() {
                 onChange={(val) => setDistrict(val)}
                 anyLabel={t("party.filter.district.any").text}
               />
-              <div style={{ display: "none" }}>
-                <span>
-              </span>
-              <input
-                type="text"
-                list="society-district-options"
-                value=""
-                onChange={(event) => {
-                  const value = event.target.value;
-                  // no-op
-
-                  const match = DISTRICTS.find(
-                    (name) => name.toLowerCase() === value.trim().toLowerCase()
-                  );
-
-                  setDistrict(match ?? "");
-                }}
-                className="party-filter-input"
-                autoComplete="off"
-              />
-
-
-
-
-              </div>
-            </label>
+            </div>
           </form>
         )}
       </div>
@@ -449,7 +424,6 @@ export function SocietyRegisterPage() {
                     </td>
                   </tr>
                 ))}
-
               </tbody>
             </table>
           </div>
@@ -464,6 +438,7 @@ export function SocietyRegisterPage() {
     </main>
   );
 }
+
 /** The legal name in the user's language, or in English with the EN tag when not translated. */
 export function SocietyName({ society, locale }: { society: Society; locale: string }) {
   const translated = legalNameIn(society, locale);

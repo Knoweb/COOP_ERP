@@ -39,3 +39,33 @@
 .trading-warning {
   font-weight: 600;
 }
+
+/* MNY-05: exposure warning banner on delivery notes; warns and never blocks (ADR-12). */
+.trading-warning-banner {
+  background-color: var(--color-disputed-bg);
+  color: var(--color-disputed-text);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
+  display: grid;
+  gap: var(--space-1);
+}
+
+.trading-warning-banner p {
+  margin: 0;
+}
+
+.trading-warning-banner__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  align-items: center;
+}
+
+.trading-warning-banner__freshness {
+  color: var(--color-text-muted);
+}
+

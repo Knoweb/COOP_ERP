@@ -391,7 +391,8 @@ jobs:
   # distributable (CR-30-1: one Kotlin Multiplatform codebase). Its own
   # job, because it shares nothing with the backend build and took fifty seconds of the
   # critical path when it ran after it.
-  # On a pull request that touches neither till/ nor the shared engine the steps are skipped
+  # On a pull request that touches neither till/, the shared engine nor the root build entry point
+  # the steps are skipped
   # and the job still reports success, so the check stays green and required. The filter is
   # inside the job, not on the workflow, for that reason. Push to main and the nightly run build
   # it always.
@@ -415,6 +416,7 @@ jobs:
             till:
               - 'till/**'
               - 'backend/shared-engine/**'
+              - 'Makefile'
               - '.github/workflows/ci.yml'
 
       - name: Set up Java 21

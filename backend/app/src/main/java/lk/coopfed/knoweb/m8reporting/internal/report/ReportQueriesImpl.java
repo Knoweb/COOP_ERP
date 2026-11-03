@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m8reporting.internal.report;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -11,16 +12,23 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.Formats;
+import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -28,29 +36,62 @@ import lk.coopfed.knoweb.m1party.query.LocationFilter;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.SkuView;
+import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
+import lk.coopfed.knoweb.m4trading.query.ExposureView;
+import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
+import lk.coopfed.knoweb.m4trading.query.InvoiceView;
+import lk.coopfed.knoweb.m4trading.query.OpeningReceivableQueries;
+import lk.coopfed.knoweb.m4trading.query.OpeningReceivableView;
+import lk.coopfed.knoweb.m4trading.query.OrderQueries;
+import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
 import lk.coopfed.knoweb.m8reporting.internal.report.ReportCatalogue.Definition;
 import lk.coopfed.knoweb.m8reporting.internal.report.TileCatalogue.TileDefinition;
+import lk.coopfed.knoweb.m8reporting.query.AssetFilter;
+import lk.coopfed.knoweb.m8reporting.query.AssetView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherLineView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorsReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
+import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsExpenses;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsReport;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyDailyTrendItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportSummary;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalanceItemView;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalancesReport;
+import lk.coopfed.knoweb.m8reporting.query.ProfitCenterPnlItem;
+import lk.coopfed.knoweb.m8reporting.query.ProfitCenterView;
 import lk.coopfed.knoweb.m8reporting.query.ReportDefinitionView;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimatePlan;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimateResult;
 import lk.coopfed.knoweb.m8reporting.query.ShopPerformanceState;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceRow;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
+import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -94,6 +135,15 @@ class ReportQueriesImpl implements ReportingQueries {
     private final ConfigRegistry config;
     private final Clock clock;
     private final ZoneId zone;
+    private final InventoryQueries inventoryQueries;
+    private final PricingQueries pricing;
+    private final ExposureQueries exposureQueries;
+    private final InvoiceQueries invoiceQueries;
+    private final OpeningReceivableQueries openingReceivableQueries;
+    private final ApprovedPayrollContributionQueries payrollQueries;
+    private final Formats formats;
+    private final Messages messages;
+    private final ObjectProvider<A4Renderer> a4RendererProvider;
 
     /**
      * What a dashboard depends on: the caller's whole visibility, as the policies of M8 read it
@@ -129,7 +179,16 @@ class ReportQueriesImpl implements ReportingQueries {
             ExceptionQueue exceptions,
             ConfigRegistry config,
             Clock clock,
-            @Value("${coop-erp.business-timezone}") String zone) {
+            @Value("${coop-erp.business-timezone}") String zone,
+            InventoryQueries inventoryQueries,
+            PricingQueries pricing,
+            ExposureQueries exposureQueries,
+            InvoiceQueries invoiceQueries,
+            OpeningReceivableQueries openingReceivableQueries,
+            ApprovedPayrollContributionQueries payrollQueries,
+            Formats formats,
+            Messages messages,
+            ObjectProvider<A4Renderer> a4RendererProvider) {
         this.jdbc = jdbc;
         this.party = party;
         this.catalogue = catalogue;
@@ -141,6 +200,15 @@ class ReportQueriesImpl implements ReportingQueries {
         this.config = config;
         this.clock = clock;
         this.zone = ZoneId.of(zone);
+        this.inventoryQueries = inventoryQueries;
+        this.pricing = pricing;
+        this.exposureQueries = exposureQueries;
+        this.invoiceQueries = invoiceQueries;
+        this.openingReceivableQueries = openingReceivableQueries;
+        this.payrollQueries = payrollQueries;
+        this.formats = formats;
+        this.messages = messages;
+        this.a4RendererProvider = a4RendererProvider;
     }
 
     @Override
@@ -939,5 +1007,1057 @@ class ReportQueriesImpl implements ReportingQueries {
                 "LKR");
 
         return new MonthlyShopReport(summary, new ArrayList<>(dailyTrendMap.values()), items);
+    }
+
+    @Override
+    public List<ProfitCenterView> listProfitCenters(ScopeContext scope) {
+        Names names = new Names(party, catalogue, scope);
+        return jdbc.query(
+                """
+                select profit_center_id, owner_entity_id, code, name, category, location_id,
+                       status, created_at
+                  from reporting.profit_center
+                 where status = 'ACTIVE'
+                 order by code
+                """,
+                (rs, n) -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    String locName = locId != null ? names.location(locId) : null;
+                    return new ProfitCenterView(
+                            rs.getObject("profit_center_id", UUID.class),
+                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getString("code"),
+                            rs.getString("name"),
+                            rs.getString("category"),
+                            locId,
+                            locName,
+                            rs.getString("status"),
+                            rs.getTimestamp("created_at").toInstant());
+                });
+    }
+
+    @Override
+    public MonthlyProfitCenterPnlReport monthlyProfitCenterPnl(
+            String yearMonth, UUID profitCenterId, ScopeContext scope) {
+        YearMonth ym;
+        if (yearMonth == null || yearMonth.isBlank()) {
+            ym = YearMonth.now(clock);
+        } else {
+            try {
+                ym = YearMonth.parse(yearMonth);
+            } catch (Exception e) {
+                throw new ProblemException("m8.profit_center.month_invalid");
+            }
+        }
+        LocalDate periodStart = ym.atDay(1);
+        LocalDate periodEnd = ym.atEndOfMonth();
+
+        List<ProfitCenterView> allCenters = listProfitCenters(scope);
+        if (profitCenterId != null) {
+            allCenters = allCenters.stream()
+                    .filter(c -> c.profitCenterId().equals(profitCenterId))
+                    .toList();
+            if (allCenters.isEmpty()) {
+                throw new ProblemException("m8.profit_center.not_found");
+            }
+        }
+
+        record LocationSales(UUID locationId, BigDecimal netSales, long txnCount) {}
+        Map<UUID, LocationSales> salesByLocation = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select location_id,
+                       coalesce(sum(net), 0) as net_sales,
+                       count(receipt_id) as txn_count
+                  from reporting.shop_sale_fact
+                 where business_date between ? and ?
+                 group by location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    salesByLocation.put(
+                            locId, new LocationSales(locId, rs.getBigDecimal("net_sales"), rs.getLong("txn_count")));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd));
+
+        Map<UUID, LocationSalesCost> costByLocation =
+                inventoryQueries.locationsSalesCost(periodStart, periodEnd, scope);
+
+        Set<UUID> mappedLocations = new HashSet<>();
+        List<ProfitCenterPnlItem> items = new ArrayList<>();
+
+        for (ProfitCenterView pc : allCenters) {
+            UUID locId = pc.locationId();
+            BigDecimal revenue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            long txnCount = 0;
+            if (locId != null) {
+                mappedLocations.add(locId);
+                LocationSales ls = salesByLocation.get(locId);
+                if (ls != null) {
+                    revenue = ls.netSales() != null ? ls.netSales().setScale(2, RoundingMode.HALF_UP) : revenue;
+                    txnCount = ls.txnCount();
+                }
+            }
+
+            LocationSalesCost lc = locId != null ? costByLocation.get(locId) : null;
+            boolean costPending = false;
+            BigDecimal cogs = null;
+            BigDecimal grossProfit = null;
+            BigDecimal marginPercent = null;
+
+            if (locId != null) {
+                if (revenue.compareTo(BigDecimal.ZERO) > 0 && (lc == null || lc.movementCount() == 0)) {
+                    // Revenue exists but no inventory movement cost recognized -> flag pending
+                    costPending = true;
+                } else if (lc != null && lc.costPending()) {
+                    costPending = true;
+                } else {
+                    cogs = (lc != null && lc.recognizedCost() != null)
+                            ? lc.recognizedCost().setScale(2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    grossProfit = revenue.subtract(cogs).setScale(2, RoundingMode.HALF_UP);
+                    marginPercent = revenue.compareTo(BigDecimal.ZERO) > 0
+                            ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(revenue, 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                }
+            } else {
+                cogs = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                grossProfit = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                marginPercent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            }
+
+            items.add(new ProfitCenterPnlItem(
+                    pc.profitCenterId(),
+                    pc.code(),
+                    pc.name(),
+                    pc.category(),
+                    locId,
+                    pc.locationName(),
+                    revenue,
+                    cogs,
+                    grossProfit,
+                    marginPercent,
+                    costPending,
+                    txnCount));
+        }
+
+        ProfitCenterPnlItem unallocated = null;
+        BigDecimal unallocatedRev = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal unallocatedCost = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        long unallocatedTxns = 0;
+        boolean unallocatedPending = false;
+
+        if (profitCenterId == null) {
+            Set<UUID> allActiveLocations = new HashSet<>();
+            allActiveLocations.addAll(salesByLocation.keySet());
+            allActiveLocations.addAll(costByLocation.keySet());
+            allActiveLocations.removeAll(mappedLocations);
+
+            if (!allActiveLocations.isEmpty()) {
+                for (UUID unmappedLoc : allActiveLocations) {
+                    LocationSales ls = salesByLocation.get(unmappedLoc);
+                    if (ls != null) {
+                        if (ls.netSales() != null) {
+                            unallocatedRev = unallocatedRev.add(ls.netSales());
+                        }
+                        unallocatedTxns += ls.txnCount();
+                    }
+                    LocationSalesCost lc = costByLocation.get(unmappedLoc);
+                    if (ls != null
+                            && ls.netSales() != null
+                            && ls.netSales().compareTo(BigDecimal.ZERO) > 0
+                            && (lc == null || lc.movementCount() == 0)) {
+                        unallocatedPending = true;
+                    } else if (lc != null && lc.costPending()) {
+                        unallocatedPending = true;
+                    } else if (lc != null && lc.recognizedCost() != null) {
+                        unallocatedCost = unallocatedCost.add(lc.recognizedCost());
+                    }
+                }
+                BigDecimal unallocProfit = !unallocatedPending ? unallocatedRev.subtract(unallocatedCost) : null;
+                BigDecimal unallocMargin = (!unallocatedPending && unallocatedRev.compareTo(BigDecimal.ZERO) > 0)
+                        ? unallocProfit
+                                .multiply(BigDecimal.valueOf(100))
+                                .divide(unallocatedRev, 2, RoundingMode.HALF_UP)
+                        : (!unallocatedPending ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : null);
+
+                unallocated = new ProfitCenterPnlItem(
+                        null,
+                        "UNALLOCATED",
+                        "Unallocated / General",
+                        "GENERAL",
+                        null,
+                        null,
+                        unallocatedRev.setScale(2, RoundingMode.HALF_UP),
+                        !unallocatedPending ? unallocatedCost.setScale(2, RoundingMode.HALF_UP) : null,
+                        unallocProfit != null ? unallocProfit.setScale(2, RoundingMode.HALF_UP) : null,
+                        unallocMargin != null ? unallocMargin.setScale(2, RoundingMode.HALF_UP) : null,
+                        unallocatedPending,
+                        unallocatedTxns);
+            }
+        }
+
+        BigDecimal totalRevenue = items.stream()
+                .map(ProfitCenterPnlItem::revenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .add(unallocated != null ? unallocated.revenue() : BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        boolean totalCostPending = items.stream().anyMatch(ProfitCenterPnlItem::costPending)
+                || (unallocated != null && unallocated.costPending());
+
+        BigDecimal totalCost = null;
+        BigDecimal grossProfit = null;
+        BigDecimal marginPercent = null;
+
+        if (!totalCostPending) {
+            BigDecimal itemsCost = items.stream()
+                    .map(ProfitCenterPnlItem::cost)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (unallocated != null && unallocated.cost() != null) {
+                itemsCost = itemsCost.add(unallocated.cost());
+            }
+            totalCost = itemsCost.setScale(2, RoundingMode.HALF_UP);
+            grossProfit = totalRevenue.subtract(totalCost).setScale(2, RoundingMode.HALF_UP);
+            marginPercent = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                    ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        MonthlyProfitCenterPnlReport.Summary summary = new MonthlyProfitCenterPnlReport.Summary(
+                totalRevenue, totalCost, grossProfit, marginPercent, totalCostPending);
+
+        return new MonthlyProfitCenterPnlReport(ym.toString(), "LKR", summary, items, unallocated);
+    }
+
+    @Override
+    public List<AssetView> listAssets(AssetFilter filter, ScopeContext scope) {
+        Names names = new Names(party, catalogue, scope);
+        StringBuilder sql = new StringBuilder(
+                """
+                select asset_id, owner_entity_id, asset_code, name, description, asset_type,
+                       location_id, acquisition_date, acquisition_cost, status, created_at
+                  from reporting.asset
+                 where 1=1
+                """);
+        List<Object> params = new ArrayList<>();
+        if (filter != null) {
+            if (filter.locationId() != null) {
+                sql.append(" and location_id = ?");
+                params.add(filter.locationId());
+            }
+            if (filter.assetType() != null && !filter.assetType().isBlank()) {
+                sql.append(" and asset_type = ?");
+                params.add(filter.assetType().toUpperCase());
+            }
+            if (filter.status() != null && !filter.status().isBlank()) {
+                sql.append(" and status = ?");
+                params.add(filter.status().toUpperCase());
+            }
+        }
+        sql.append(" order by asset_code");
+
+        return jdbc.query(
+                sql.toString(),
+                (rs, n) -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    String locName = locId != null ? names.location(locId) : null;
+                    Date acqDate = rs.getDate("acquisition_date");
+                    return new AssetView(
+                            rs.getObject("asset_id", UUID.class),
+                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getString("asset_code"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("asset_type"),
+                            locId,
+                            locName,
+                            acqDate != null ? acqDate.toLocalDate() : null,
+                            rs.getBigDecimal("acquisition_cost"),
+                            rs.getString("status"),
+                            rs.getTimestamp("created_at").toInstant());
+                },
+                params.toArray());
+    }
+
+    @Override
+    public Optional<AssetView> getAsset(UUID assetId, ScopeContext scope) {
+        if (assetId == null) {
+            return Optional.empty();
+        }
+        Names names = new Names(party, catalogue, scope);
+        List<AssetView> found = jdbc.query(
+                """
+                select asset_id, owner_entity_id, asset_code, name, description, asset_type,
+                       location_id, acquisition_date, acquisition_cost, status, created_at
+                  from reporting.asset
+                 where asset_id = ?
+                """,
+                (rs, n) -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    String locName = locId != null ? names.location(locId) : null;
+                    Date acqDate = rs.getDate("acquisition_date");
+                    return new AssetView(
+                            rs.getObject("asset_id", UUID.class),
+                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getString("asset_code"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getString("asset_type"),
+                            locId,
+                            locName,
+                            acqDate != null ? acqDate.toLocalDate() : null,
+                            rs.getBigDecimal("acquisition_cost"),
+                            rs.getString("status"),
+                            rs.getTimestamp("created_at").toInstant());
+                },
+                assetId);
+        return found.isEmpty() ? Optional.empty() : Optional.of(found.get(0));
+    }
+
+    @Override
+    public RevenueEstimateResult estimateRevenue(RevenueEstimatePlan plan, ScopeContext scope) {
+        if (scope.policyClass() == PolicyClass.NONE) {
+            throw new ProblemException("permission.denied");
+        }
+        if (plan.targetRevenue() == null || plan.targetRevenue().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ProblemException("m8.estimator.target_revenue_invalid");
+        }
+        if (plan.items() == null || plan.items().isEmpty()) {
+            throw new ProblemException("m8.estimator.mix_empty");
+        }
+
+        Set<UUID> seenSkus = new HashSet<>();
+        for (RevenueEstimatePlan.MixItem item : plan.items()) {
+            if (item.skuId() == null || !seenSkus.add(item.skuId())) {
+                throw new ProblemException("m8.estimator.duplicate_sku");
+            }
+            if (item.mixPercent() == null || item.mixPercent().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ProblemException("m8.estimator.mix_must_equal_100");
+            }
+        }
+
+        BigDecimal totalMix = plan.items().stream()
+                .map(RevenueEstimatePlan.MixItem::mixPercent)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        if (totalMix.compareTo(new BigDecimal("100.00")) != 0) {
+            throw new ProblemException("m8.estimator.mix_must_equal_100");
+        }
+
+        UUID locationId = plan.locationId();
+        if (scope.locationId() != null) {
+            if (locationId != null && !scope.locationId().equals(locationId)) {
+                throw new ProblemException("m8.estimator.location_forbidden");
+            }
+            locationId = scope.locationId();
+        }
+        if (locationId == null) {
+            throw new ProblemException("m8.estimator.location_required");
+        }
+
+        Optional<LocationView> locOpt = party.getLocation(locationId, scope);
+        if (locOpt.isEmpty()) {
+            throw new ProblemException("m8.estimator.location_unknown");
+        }
+
+        LocalDate businessDate =
+                plan.businessDate() != null ? plan.businessDate() : LocalDate.now(clock.withZone(zone));
+        String priceType = "COMMERCIAL".equalsIgnoreCase(plan.priceType()) ? "COMMERCIAL" : "RETAIL";
+
+        List<RevenueEstimateResult.EstimatedItem> calculatedItems = new ArrayList<>();
+        BigDecimal totalEstimatedRevenue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        Names names = new Names(party, catalogue, scope);
+
+        for (RevenueEstimatePlan.MixItem item : plan.items()) {
+            Optional<SkuView> skuOpt = catalogue.getSku(item.skuId(), scope);
+            if (skuOpt.isEmpty() || "INACTIVE".equalsIgnoreCase(skuOpt.get().status())) {
+                throw new ProblemException(
+                        "m8.estimator.sku_not_found",
+                        Map.of("skuId", item.skuId().toString()));
+            }
+            SkuView sku = skuOpt.get();
+
+            Optional<RetailPrice> priceOpt;
+            if ("COMMERCIAL".equals(priceType)) {
+                priceOpt = pricing.resolveCommercialPrice(
+                        locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, businessDate, scope);
+            } else {
+                priceOpt = pricing.resolveRetailPrice(
+                        locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, businessDate, scope);
+            }
+
+            if (priceOpt.isEmpty()
+                    || !priceOpt.get().sellable()
+                    || priceOpt.get().unitPrice() == null
+                    || priceOpt.get().unitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ProblemException(
+                        "m8.estimator.unresolved_price",
+                        Map.of("skuId", item.skuId().toString(), "skuCode", sku.skuCode()));
+            }
+
+            RetailPrice resolved = priceOpt.get();
+            BigDecimal unitPrice = resolved.unitPrice().setScale(4, RoundingMode.HALF_UP);
+
+            BigDecimal targetShare = plan.targetRevenue()
+                    .multiply(item.mixPercent())
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+            BigDecimal rawQty = targetShare.divide(unitPrice, 4, RoundingMode.HALF_UP);
+
+            BigDecimal roundedQty;
+            if (sku.soldByWeight()) {
+                roundedQty = rawQty.setScale(3, RoundingMode.HALF_UP);
+            } else {
+                roundedQty = rawQty.setScale(0, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal estimatedRevenue = roundedQty.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal roundingVariance = estimatedRevenue.subtract(targetShare).setScale(2, RoundingMode.HALF_UP);
+
+            totalEstimatedRevenue = totalEstimatedRevenue.add(estimatedRevenue);
+
+            String skuName = names.skuName(sku.skuId());
+            String priceSource = resolved.capReason() != null ? resolved.capReason() : priceType;
+
+            calculatedItems.add(new RevenueEstimateResult.EstimatedItem(
+                    sku.skuId(),
+                    sku.skuCode(),
+                    skuName,
+                    sku.baseUomCode(),
+                    unitPrice,
+                    priceSource,
+                    item.mixPercent().setScale(2, RoundingMode.HALF_UP),
+                    targetShare,
+                    rawQty,
+                    roundedQty,
+                    estimatedRevenue,
+                    roundingVariance));
+        }
+
+        BigDecimal targetVariance =
+                totalEstimatedRevenue.subtract(plan.targetRevenue().setScale(2, RoundingMode.HALF_UP));
+
+        RevenueEstimateResult.Assumptions assumptions = new RevenueEstimateResult.Assumptions(
+                plan.targetRevenue().setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                locationId,
+                priceType,
+                businessDate.toString(),
+                "HALF_UP to unit precision (discrete items: integer, weighted items: 3 decimals)",
+                "COMMERCIAL".equals(priceType)
+                        ? "Commercial list in force with retail fallback, bounded by MRP and control price"
+                        : "Retail list in force, bounded by in-stock MRP and control price");
+
+        return new RevenueEstimateResult(
+                plan.targetRevenue().setScale(2, RoundingMode.HALF_UP),
+                totalEstimatedRevenue,
+                targetVariance,
+                totalMix,
+                "LKR",
+                locationId,
+                priceType,
+                businessDate,
+                calculatedItems,
+                assumptions);
+    }
+
+    @Override
+    public DebtorsReport debtorsReport(LocalDate asOf, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new DebtorsReport(
+                    asOf != null ? asOf : today(),
+                    List.of(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+        }
+        LocalDate date = asOf != null ? asOf : today();
+        List<ExposureView> exposures = exposureQueries.listExposures(OrderQueries.Role.SELLER, scope);
+        List<DebtorSummaryItemView> items = new ArrayList<>();
+        BigDecimal totalOpenInvoices = BigDecimal.ZERO;
+        BigDecimal totalUnappliedReceipts = BigDecimal.ZERO;
+        BigDecimal totalUnappliedCredits = BigDecimal.ZERO;
+        BigDecimal totalNetExposure = BigDecimal.ZERO;
+
+        for (ExposureView exp : exposures) {
+            UUID debtorId = exp.buyerEntityId();
+            String code = partyCode(debtorId, scope);
+            String name = partyName(debtorId, scope);
+            BigDecimal openInv = exp.openInvoices() != null ? exp.openInvoices() : BigDecimal.ZERO;
+            BigDecimal unappRec = exp.unappliedReceipts() != null ? exp.unappliedReceipts() : BigDecimal.ZERO;
+            BigDecimal unappCred = exp.unappliedCredits() != null ? exp.unappliedCredits() : BigDecimal.ZERO;
+            BigDecimal netExp = exp.amount() != null ? exp.amount() : BigDecimal.ZERO;
+            BigDecimal accNotInvoiced = exp.acceptedNotInvoiced() != null ? exp.acceptedNotInvoiced() : BigDecimal.ZERO;
+
+            items.add(new DebtorSummaryItemView(
+                    debtorId,
+                    code,
+                    name,
+                    exp.creditLimit(),
+                    openInv,
+                    accNotInvoiced,
+                    unappRec,
+                    unappCred,
+                    netExp,
+                    exp.warnThresholdPercent()));
+
+            totalOpenInvoices = totalOpenInvoices.add(openInv);
+            totalUnappliedReceipts = totalUnappliedReceipts.add(unappRec);
+            totalUnappliedCredits = totalUnappliedCredits.add(unappCred);
+            totalNetExposure = totalNetExposure.add(netExp);
+        }
+
+        items.sort(Comparator.comparing(DebtorSummaryItemView::counterpartyName));
+
+        return new DebtorsReport(
+                date, items, totalOpenInvoices, totalUnappliedReceipts, totalUnappliedCredits, totalNetExposure);
+    }
+
+    @Override
+    public CreditorsReport creditorsReport(LocalDate asOf, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new CreditorsReport(
+                    asOf != null ? asOf : today(),
+                    List.of(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+        }
+        LocalDate date = asOf != null ? asOf : today();
+        List<ExposureView> exposures = exposureQueries.listExposures(OrderQueries.Role.BUYER, scope);
+        List<CreditorSummaryItemView> items = new ArrayList<>();
+        BigDecimal totalOpenInvoices = BigDecimal.ZERO;
+        BigDecimal totalUnappliedPayments = BigDecimal.ZERO;
+        BigDecimal totalUnappliedCredits = BigDecimal.ZERO;
+        BigDecimal totalNetLiability = BigDecimal.ZERO;
+
+        for (ExposureView exp : exposures) {
+            UUID creditorId = exp.sellerEntityId();
+            String code = partyCode(creditorId, scope);
+            String name = partyName(creditorId, scope);
+            BigDecimal openInv = exp.openInvoices() != null ? exp.openInvoices() : BigDecimal.ZERO;
+            BigDecimal unappPay = exp.unappliedReceipts() != null ? exp.unappliedReceipts() : BigDecimal.ZERO;
+            BigDecimal unappCred = exp.unappliedCredits() != null ? exp.unappliedCredits() : BigDecimal.ZERO;
+            BigDecimal netLiab = exp.amount() != null ? exp.amount() : BigDecimal.ZERO;
+            BigDecimal accNotInvoiced = exp.acceptedNotInvoiced() != null ? exp.acceptedNotInvoiced() : BigDecimal.ZERO;
+
+            items.add(new CreditorSummaryItemView(
+                    creditorId, code, name, openInv, accNotInvoiced, unappPay, unappCred, netLiab));
+
+            totalOpenInvoices = totalOpenInvoices.add(openInv);
+            totalUnappliedPayments = totalUnappliedPayments.add(unappPay);
+            totalUnappliedCredits = totalUnappliedCredits.add(unappCred);
+            totalNetLiability = totalNetLiability.add(netLiab);
+        }
+
+        items.sort(Comparator.comparing(CreditorSummaryItemView::counterpartyName));
+
+        return new CreditorsReport(
+                date, items, totalOpenInvoices, totalUnappliedPayments, totalUnappliedCredits, totalNetLiability);
+    }
+
+    @Override
+    public OpeningBalancesReport openingBalancesReport(UUID counterpartyId, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new OpeningBalancesReport(List.of(), BigDecimal.ZERO);
+        }
+        List<OpeningReceivableView> list = openingReceivableQueries.listOpeningReceivables(counterpartyId, scope);
+        List<OpeningBalanceItemView> items = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (OpeningReceivableView row : list) {
+            UUID cpartyId;
+            String role;
+            if (scope.entityId().equals(row.sellerEntityId())) {
+                role = "SELLER";
+                cpartyId = row.buyerEntityId();
+            } else {
+                role = "BUYER";
+                cpartyId = row.sellerEntityId();
+            }
+            String code = partyCode(cpartyId, scope);
+            String name = partyName(cpartyId, scope);
+            BigDecimal amt = row.amount() != null ? row.amount() : BigDecimal.ZERO;
+            Instant signedAt = row.sellerSignedAt() != null ? row.sellerSignedAt() : row.buyerSignedAt();
+
+            items.add(new OpeningBalanceItemView(
+                    row.openingReceivableId(),
+                    row.docNumberDisplay(),
+                    cpartyId,
+                    code,
+                    name,
+                    role,
+                    amt,
+                    row.referenceNo(),
+                    row.notes(),
+                    signedAt,
+                    row.createdAt()));
+
+            totalAmount = totalAmount.add(amt);
+        }
+
+        return new OpeningBalancesReport(items, totalAmount);
+    }
+
+    @Override
+    public GoodsSuppliedReport goodsSuppliedReport(
+            LocalDate from, LocalDate to, UUID societyId, UUID locationId, ScopeContext scope) {
+        if (scope == null || scope.entityId() == null) {
+            return new GoodsSuppliedReport(
+                    from,
+                    to,
+                    societyId,
+                    locationId,
+                    List.of(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    0);
+        }
+
+        Map<UUID, InvoiceView> invoiceMap = new LinkedHashMap<>();
+        for (InvoiceView inv : invoiceQueries.listInvoices(OrderQueries.Role.SELLER, scope)) {
+            invoiceMap.put(inv.invoiceId(), inv);
+        }
+        for (InvoiceView inv : invoiceQueries.listInvoices(OrderQueries.Role.BUYER, scope)) {
+            invoiceMap.putIfAbsent(inv.invoiceId(), inv);
+        }
+
+        List<GoodsSuppliedLineItemView> lines = new ArrayList<>();
+        BigDecimal totalQty = BigDecimal.ZERO;
+        BigDecimal totalNet = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal totalGross = BigDecimal.ZERO;
+
+        for (InvoiceView inv : invoiceMap.values()) {
+            if ("CANCELLED".equalsIgnoreCase(inv.status())) {
+                continue;
+            }
+            if (from != null && inv.taxPointDate() != null && inv.taxPointDate().isBefore(from)) {
+                continue;
+            }
+            if (to != null && inv.taxPointDate() != null && inv.taxPointDate().isAfter(to)) {
+                continue;
+            }
+            if (societyId != null
+                    && !societyId.equals(inv.buyerEntityId())
+                    && !societyId.equals(inv.sellerEntityId())) {
+                continue;
+            }
+
+            String societyName = partyName(inv.buyerEntityId(), scope);
+
+            for (InvoiceView.InvoiceLineView line : inv.lines()) {
+                var skuOpt = catalogue.getSku(line.skuId(), scope);
+                String skuCode = skuOpt.map(SkuView::skuCode).orElse("");
+                String skuName = skuOpt.map(s -> {
+                            String lang = scope.lang();
+                            if ("si".equalsIgnoreCase(lang)
+                                    && s.nameSi() != null
+                                    && !s.nameSi().isBlank()) return s.nameSi();
+                            if ("ta".equalsIgnoreCase(lang)
+                                    && s.nameTa() != null
+                                    && !s.nameTa().isBlank()) return s.nameTa();
+                            return s.nameEn() != null ? s.nameEn() : "";
+                        })
+                        .orElse(line.skuId().toString());
+
+                BigDecimal lineNet = line.qty().multiply(line.unitPrice()).setScale(2, RoundingMode.HALF_UP);
+                lines.add(new GoodsSuppliedLineItemView(
+                        inv.invoiceId(),
+                        inv.docNumberDisplay(),
+                        inv.taxPointDate(),
+                        inv.buyerEntityId(),
+                        societyName,
+                        line.skuId(),
+                        skuCode,
+                        skuName,
+                        line.uomCode(),
+                        line.qty(),
+                        line.unitPrice(),
+                        line.taxRatePercent(),
+                        line.taxAmount(),
+                        line.lineTotal()));
+
+                totalQty = totalQty.add(line.qty());
+                totalNet = totalNet.add(lineNet);
+                totalTax = totalTax.add(line.taxAmount());
+                totalGross = totalGross.add(line.lineTotal());
+            }
+        }
+
+        return new GoodsSuppliedReport(
+                from, to, societyId, locationId, lines, totalQty, totalNet, totalTax, totalGross, lines.size());
+    }
+
+    @Override
+    public Optional<CreditVoucherView> getCreditVoucher(UUID invoiceId, ScopeContext scope) {
+        if (invoiceId == null || scope == null) {
+            return Optional.empty();
+        }
+        return invoiceQueries.getInvoice(invoiceId, scope).map(inv -> {
+            String voucherNumber = "CPV-" + inv.docNumberDisplay();
+            String buyerName = partyName(inv.buyerEntityId(), scope);
+            String buyerCode = partyCode(inv.buyerEntityId(), scope);
+            String sellerName = partyName(inv.sellerEntityId(), scope);
+            String sellerCode = partyCode(inv.sellerEntityId(), scope);
+
+            List<CreditVoucherLineView> lines = new ArrayList<>();
+            for (InvoiceView.InvoiceLineView line : inv.lines()) {
+                var skuOpt = catalogue.getSku(line.skuId(), scope);
+                String skuCode = skuOpt.map(SkuView::skuCode).orElse("");
+                String skuName = skuOpt.map(s -> {
+                            String lang = scope.lang();
+                            if ("si".equalsIgnoreCase(lang)
+                                    && s.nameSi() != null
+                                    && !s.nameSi().isBlank()) return s.nameSi();
+                            if ("ta".equalsIgnoreCase(lang)
+                                    && s.nameTa() != null
+                                    && !s.nameTa().isBlank()) return s.nameTa();
+                            return s.nameEn() != null ? s.nameEn() : "";
+                        })
+                        .orElse(line.skuId().toString());
+
+                lines.add(new CreditVoucherLineView(
+                        line.lineNo(),
+                        line.skuId(),
+                        skuCode,
+                        skuName,
+                        line.uomCode(),
+                        line.qty(),
+                        line.unitPrice(),
+                        line.taxRatePercent(),
+                        line.taxAmount(),
+                        line.lineTotal()));
+            }
+
+            return new CreditVoucherView(
+                    voucherNumber,
+                    inv.invoiceId(),
+                    inv.docNumberDisplay(),
+                    inv.taxPointDate(),
+                    inv.buyerEntityId(),
+                    buyerName,
+                    buyerCode,
+                    inv.sellerEntityId(),
+                    sellerName,
+                    sellerCode,
+                    inv.sellerVatNo(),
+                    inv.buyerVatNo(),
+                    inv.docNumberDisplay(),
+                    inv.netAmount(),
+                    inv.taxAmount(),
+                    inv.grossAmount(),
+                    inv.status(),
+                    null,
+                    lines);
+        });
+    }
+
+    @Override
+    public URI renderCreditVoucher(UUID invoiceId, ScopeContext scope) {
+        CreditVoucherView voucher = getCreditVoucher(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m8.finance.invoice_not_found"));
+
+        A4Renderer pdfRenderer = a4RendererProvider.getIfAvailable();
+        if (pdfRenderer == null) {
+            throw new ProblemException("report.renderer_unavailable");
+        }
+
+        try {
+            Map<String, Object> model = buildVoucherPrintModel(voucher, scope);
+            A4Renderer.Rendered rendered = pdfRenderer.render(A4Renderer.DOCUMENT_A4, model, scope.locale(), scope);
+            return rendered.url();
+        } catch (ProblemException pe) {
+            if ("report.renderer_unavailable".equals(pe.getMessage())) {
+                Optional<String> objectKey = invoiceQueries.printObjectKey(invoiceId, scope);
+                if (objectKey.isPresent()) {
+                    if (voucher.sellerEntityId().equals(scope.entityId())) {
+                        return pdfRenderer.presignGet(objectKey.get(), scope);
+                    } else {
+                        return pdfRenderer.presignGetOfParty(objectKey.get(), voucher.sellerEntityId(), scope);
+                    }
+                }
+                throw new ProblemException("m8.finance.print_not_ready");
+            }
+            throw pe;
+        }
+    }
+
+    private Map<String, Object> buildVoucherPrintModel(CreditVoucherView voucher, ScopeContext scope) {
+        Locale locale = scope.locale();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("title", messages.t("m8.finance.voucher.title", locale));
+        data.put("number", voucher.voucherNumber());
+        data.put("date", voucher.date() != null ? formats.date(voucher.date()) : "");
+        data.put("from", partyBox(voucher.sellerName(), voucher.sellerCode(), voucher.sellerVatNo()));
+        data.put("to", partyBox(voucher.buyerName(), voucher.buyerCode(), voucher.buyerVatNo()));
+        data.put(
+                "references",
+                List.of(
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.invoice_ref", locale),
+                                "value",
+                                voucher.invoiceDocNumber()),
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.type", locale),
+                                "value",
+                                messages.t("m8.finance.voucher.credit_purchase", locale))));
+
+        List<Map<String, Object>> lines = new ArrayList<>();
+        for (CreditVoucherLineView line : voucher.lines()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put(
+                    "description",
+                    (line.skuCode().isEmpty() ? "" : line.skuCode() + " ") + line.skuName() + " (" + line.uomCode()
+                            + ")");
+            row.put("quantity", formats.quantity(line.quantity(), locale));
+            row.put("unitPrice", formats.money(line.unitPrice(), locale));
+            row.put("amount", formats.money(line.lineTotal(), locale));
+            lines.add(row);
+        }
+        data.put("lines", lines);
+
+        data.put(
+                "totals",
+                List.of(
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.net", locale),
+                                "value",
+                                formats.money(voucher.netAmount(), locale)),
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.tax", locale),
+                                "value",
+                                formats.money(voucher.taxAmount(), locale)),
+                        Map.of(
+                                "label",
+                                messages.t("m8.finance.voucher.gross", locale),
+                                "value",
+                                formats.money(voucher.grossAmount(), locale))));
+        return data;
+    }
+
+    private Map<String, Object> partyBox(String name, String code, String vatNo) {
+        Map<String, Object> box = new LinkedHashMap<>();
+        box.put("title", name != null ? name : "");
+        String details = (code != null && !code.isBlank() ? code : "");
+        if (vatNo != null && !vatNo.isBlank()) {
+            details = details.isEmpty() ? "VAT: " + vatNo : details + " | VAT: " + vatNo;
+        }
+        box.put("lines", details);
+        return box;
+    }
+
+    private String partyName(UUID entityId, ScopeContext scope) {
+        if (entityId == null) {
+            return "";
+        }
+        return party.getEntity(entityId, scope)
+                .map(e -> {
+                    String lang = scope != null && scope.lang() != null ? scope.lang() : "en";
+                    if ("si".equalsIgnoreCase(lang)
+                            && e.legalNameSi() != null
+                            && !e.legalNameSi().isBlank()) {
+                        return e.legalNameSi();
+                    }
+                    if ("ta".equalsIgnoreCase(lang)
+                            && e.legalNameTa() != null
+                            && !e.legalNameTa().isBlank()) {
+                        return e.legalNameTa();
+                    }
+                    if (e.legalNameEn() != null && !e.legalNameEn().isBlank()) {
+                        return e.legalNameEn();
+                    }
+                    return e.entityCode() != null ? e.entityCode() : entityId.toString();
+                })
+                .orElse(entityId.toString());
+    }
+
+    private String partyCode(UUID entityId, ScopeContext scope) {
+        if (entityId == null) {
+            return "";
+        }
+        return party.getEntity(entityId, scope)
+                .map(e -> e.entityCode() != null ? e.entityCode() : "")
+                .orElse("");
+    }
+
+    @Override
+    public FinalAccountsReport finalAccounts(String yearMonth, ScopeContext scope) {
+        YearMonth ym;
+        if (yearMonth == null || yearMonth.isBlank()) {
+            ym = YearMonth.now(clock);
+        } else {
+            try {
+                ym = YearMonth.parse(yearMonth);
+            } catch (Exception e) {
+                throw new ProblemException("m8.final_accounts.month_invalid");
+            }
+        }
+        LocalDate periodStart = ym.atDay(1);
+        LocalDate periodEnd = ym.atEndOfMonth();
+
+        record LocationSales(UUID locationId, BigDecimal netSales, long txnCount) {}
+        Map<UUID, LocationSales> salesByLocation = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select location_id,
+                       coalesce(sum(net), 0) as net_sales,
+                       count(receipt_id) as txn_count
+                  from reporting.shop_sale_fact
+                 where business_date between ? and ?
+                 group by location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    salesByLocation.put(
+                            locId, new LocationSales(locId, rs.getBigDecimal("net_sales"), rs.getLong("txn_count")));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd));
+
+        Map<UUID, LocationSalesCost> costByLocation =
+                inventoryQueries.locationsSalesCost(periodStart, periodEnd, scope);
+
+        BigDecimal totalRevenue = salesByLocation.values().stream()
+                .map(LocationSales::netSales)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        boolean costPending = false;
+        BigDecimal totalCogs = BigDecimal.ZERO;
+        for (Map.Entry<UUID, LocationSales> entry : salesByLocation.entrySet()) {
+            UUID locId = entry.getKey();
+            LocationSales ls = entry.getValue();
+            LocationSalesCost lc = costByLocation.get(locId);
+            if (ls.netSales() != null
+                    && ls.netSales().compareTo(BigDecimal.ZERO) > 0
+                    && (lc == null || lc.movementCount() == 0)) {
+                costPending = true;
+            } else if (lc != null && lc.costPending()) {
+                costPending = true;
+            }
+        }
+        for (LocationSalesCost lc : costByLocation.values()) {
+            if (lc.costPending()) {
+                costPending = true;
+            } else if (lc.recognizedCost() != null) {
+                totalCogs = totalCogs.add(lc.recognizedCost());
+            }
+        }
+
+        BigDecimal grossProfit = null;
+        BigDecimal grossProfitMargin = null;
+        BigDecimal recognizedCogs = null;
+        if (!costPending) {
+            recognizedCogs = totalCogs.setScale(2, RoundingMode.HALF_UP);
+            grossProfit = totalRevenue.subtract(recognizedCogs).setScale(2, RoundingMode.HALF_UP);
+            grossProfitMargin = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                    ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        List<ApprovedPayrollContributionQueries.ApprovedPayrollContributionView> contributions =
+                payrollQueries.listApprovedContributions(ym.toString(), scope);
+
+        List<FinalAccountsReport.PayrollContributionLineItem> payrollLines = new ArrayList<>();
+        BigDecimal payrollExpenses = BigDecimal.ZERO;
+        int totalOtMinutes = 0;
+        Set<UUID> countedContributions = new HashSet<>();
+        for (ApprovedPayrollContributionQueries.ApprovedPayrollContributionView c : contributions) {
+            if (!"CANCELLED".equalsIgnoreCase(c.status()) && countedContributions.add(c.contributionId())) {
+                BigDecimal amt = c.approvedAmount() != null ? c.approvedAmount() : BigDecimal.ZERO;
+                payrollExpenses = payrollExpenses.add(amt);
+                totalOtMinutes += c.approvedOtMinutes();
+                payrollLines.add(new FinalAccountsReport.PayrollContributionLineItem(
+                        c.contributionId(),
+                        c.employeeId(),
+                        c.employeeNo(),
+                        c.employeeName(),
+                        c.contributionType(),
+                        amt.setScale(2, RoundingMode.HALF_UP),
+                        c.approvedOtMinutes(),
+                        c.approvedAt(),
+                        c.status()));
+            }
+        }
+        payrollExpenses = payrollExpenses.setScale(2, RoundingMode.HALF_UP);
+
+        List<FinalAccountsReport.ExpenseCategoryItem> categories = new ArrayList<>();
+        categories.add(new FinalAccountsReport.ExpenseCategoryItem(
+                "STAFF_PAYROLL",
+                "Staff & Payroll Costs",
+                payrollExpenses,
+                "APPROVED",
+                "Approved biometric attendance and overtime contributions from M9 (" + payrollLines.size()
+                        + " contribution(s), " + totalOtMinutes + " approved OT minutes)"));
+        categories.add(
+                new FinalAccountsReport.ExpenseCategoryItem(
+                        "OTHER_OPERATING",
+                        "Other Operating Expenses",
+                        null,
+                        "UNAVAILABLE",
+                        "Non-payroll operating expenses (rent, utilities, transport, maintenance) require general ledger / cashbook journal integration, which arrives in Phase 3"));
+
+        BigDecimal otherExpenses = null;
+        boolean otherExpensesPending = true;
+
+        // When mandatory other operating expenses are unavailable, total operating expenses,
+        // operating profit, and operating margin cannot be determined without fabricating figures.
+        BigDecimal totalExpenses = null;
+        BigDecimal operatingProfit = null;
+        BigDecimal operatingMarginPercent = null;
+
+        String status = FinalAccountsReport.STATUS_PARTIAL;
+        String statusReason;
+        if (costPending) {
+            statusReason =
+                    "Cost of Goods Sold is pending inventory cost resolution; non-payroll operating expenses (rent, utilities) pending Phase 3 general ledger integration";
+        } else {
+            statusReason =
+                    "Non-payroll operating expenses (rent, utilities) pending Phase 3 general ledger integration; total operating expenses and operating profit are unavailable";
+        }
+
+        return new FinalAccountsReport(
+                ym.toString(),
+                "LKR",
+                status,
+                statusReason,
+                totalRevenue,
+                recognizedCogs,
+                costPending,
+                grossProfit,
+                grossProfitMargin,
+                payrollExpenses,
+                otherExpenses,
+                otherExpensesPending,
+                totalExpenses,
+                operatingProfit,
+                operatingMarginPercent,
+                categories,
+                payrollLines);
+    }
+
+    @Override
+    public FinalAccountsExpenses finalAccountsExpenses(String yearMonth, ScopeContext scope) {
+        FinalAccountsReport report = finalAccounts(yearMonth, scope);
+        return new FinalAccountsExpenses(
+                report.period(),
+                report.currency(),
+                report.payrollExpenses(),
+                report.payrollContributions().size(),
+                report.expenseCategories(),
+                report.payrollContributions());
     }
 }

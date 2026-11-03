@@ -15,7 +15,11 @@ export function InventoryPoliciesPage() {
   const t = useT();
   return (
     <main className="shell-page">
-      <PageHeader icon="stock" title={t("inventory.policy.title").text} actions={<Link className="action-link" to="/inventory">{t("inventory.back").text}</Link>} />
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
+      <PageHeader icon="stock" title={t("inventory.policy.title").text} />
       <p className="modern-intro-text">{t("inventory.policy.intro").text}</p>
       <p className="inventory-policy-notice" role="status">{t("inventory.policy.read_unavailable").text}</p>
       <section className="inventory-policy-grid">

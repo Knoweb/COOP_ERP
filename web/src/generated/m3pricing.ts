@@ -113,6 +113,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/lists/{listId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw an unpublished price-list draft
+         * @description Only the owning entity may withdraw a DRAFT. A reason is required. Published versions cannot be withdrawn.
+         */
+        post: operations["withdrawDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/resolve/trade": {
         parameters: {
             query?: never;
@@ -485,6 +507,9 @@ export interface components {
              * @description The first business date the version applies
              */
             applyFrom: string;
+        };
+        WithdrawDraftRequest: {
+            reason: string;
         };
         SetLinesRequest: {
             lines: components["schemas"]["PriceListLineInput"][];
@@ -1012,6 +1037,37 @@ export interface operations {
         };
         responses: {
             /** @description The published version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    withdrawDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description The withdrawn draft */
             200: {
                 headers: {
                     [name: string]: unknown;

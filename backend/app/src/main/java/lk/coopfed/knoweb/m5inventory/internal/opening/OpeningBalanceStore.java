@@ -93,7 +93,7 @@ class OpeningBalanceStore {
 
     boolean openBalanceAt(UUID locationId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
-                "select exists (select 1 from inventory.opening_balance where location_id = ? and status <> 'POSTED')",
+                "select exists (select 1 from inventory.opening_balance where location_id = ? and status in ('DRAFT', 'SIGNED_ENTITY'))",
                 Boolean.class,
                 locationId));
     }

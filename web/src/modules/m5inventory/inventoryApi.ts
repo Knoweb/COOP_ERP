@@ -13,11 +13,18 @@ export type LotBalance = components["schemas"]["LotBalanceResponse"];
 export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
+export type BulkStockReport = components["schemas"]["BulkStockReport"];
+export type StockProblem = components["schemas"]["StockProblem"];
+export type StockRowPreview = components["schemas"]["StockRowPreview"];
+export type StockRowRequest = components["schemas"]["StockRowRequest"];
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type PickList = components["schemas"]["PickListResponse"];
-export type Transfer =components["schemas"]["TransferResponse"];
+export type PickReplacementCandidate = components["schemas"]["PickReplacementCandidateResponse"];
+export type OverridePickRequest = components["schemas"]["OverridePickRequest"];
+export type Transfer = components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
 export type ReceiveTransferRequest = components["schemas"]["ReceiveTransferRequest"];
+export type CancelTransferRequest = components["schemas"]["CancelTransferRequest"];
 export type Count = components["schemas"]["CountResponse"];
 export type ScheduleCountRequest = components["schemas"]["ScheduleCountRequest"];
 export type CountLineRequest = components["schemas"]["CountLineRequest"];
@@ -33,6 +40,14 @@ export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type Batch = catalogueComponents["schemas"]["BatchResponse"];
 export type TransferRequest = tradingComponents["schemas"]["TransferRequestResponse"];
 export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
+export type ReorderControl = components["schemas"]["ReorderControlResponse"];
+export type ConfigureReorderControlRequest = components["schemas"]["ConfigureReorderControlRequest"];
+export type RepriceStockLotRequest = components["schemas"]["RepriceStockLotRequest"];
+export type StockRepricingResponse = components["schemas"]["StockRepricingResponse"];
+export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockResponse"];
+export type ExpiryAlertItem = components["schemas"]["ExpiryAlertItemResponse"];
+export type SlowMovingStock = components["schemas"]["SlowMovingStockResponse"];
+export type ExpiryAlertScan = components["schemas"]["ExpiryAlertScanResponse"];
 
 export function useInventoryApi() {
   const api = useApiClient<paths>();
@@ -104,6 +119,39 @@ export function useInventoryApi() {
         return data!;
       },
 
+      async downloadOpeningStockTemplate(): Promise<Blob> {
+        const { response } = await api.GET("/v1/inventory/opening-balances/template", {
+          parseAs: "blob"
+        });
+        return await response.blob();
+      },
+
+      async bulkImportOpeningStock(
+        locationId: string,
+        mode: "VALIDATE" | "COMMIT",
+        sheet: string | undefined,
+        lines: StockRowRequest[] | undefined,
+        idempotencyKey: string
+      ): Promise<BulkStockReport> {
+        const { data } = await api.POST("/v1/inventory/opening-balances/bulk", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId, mode, sheet, lines }
+        });
+        return data!;
+      },
+
+      async rejectOpeningBalance(
+        openingBalanceId: string,
+        reason: string,
+        idempotencyKey: string
+      ): Promise<OpeningBalance> {
+        const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/reject", {
+          params: { path: { openingBalanceId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
+        });
+        return data!;
+      },
+
       async stockCard(locationId: string, skuId: string): Promise<StockCardLine[]> {
         const { data } = await api.GET("/v1/inventory/locations/{locationId}/movements", {
           params: { path: { locationId }, query: { skuId } }
@@ -116,6 +164,32 @@ export function useInventoryApi() {
           params: { path: { deliveryNoteId } }
         });
         return data!;
+      },
+
+      async pickReplacementCandidates(
+        deliveryNoteId: string,
+        pickLineId: string
+      ): Promise<PickReplacementCandidate[]> {
+        const { data } = await api.GET(
+          "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates",
+          { params: { path: { deliveryNoteId, pickLineId } } }
+        );
+        return data ?? [];
+      },
+
+      async overridePick(
+        deliveryNoteId: string,
+        pickLineId: string,
+        request: OverridePickRequest,
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.POST("/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override", {
+          params: {
+            path: { deliveryNoteId, pickLineId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: request
+        });
       },
 
       async transfers(locationId: string): Promise<Transfer[]> {
@@ -131,12 +205,31 @@ export function useInventoryApi() {
         return data!;
       },
 
+      async dispatchTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
+        const { data } = await api.POST("/v1/inventory/transfers/{transferId}/dispatch", {
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
       async receiveTransfer(
         transferId: string,
         idempotencyKey: string,
         request?: ReceiveTransferRequest
       ): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async cancelTransfer(
+        transferId: string,
+        request: CancelTransferRequest,
+        idempotencyKey: string
+      ): Promise<Transfer> {
+        const { data } = await api.POST("/v1/inventory/transfers/{transferId}/cancel", {
           params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
           body: request
         });
@@ -346,6 +439,111 @@ export function useInventoryApi() {
         const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/countersign", {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
         });
+        return data!;
+      },
+
+      async listReorderControls(locationId: string, skuId?: string): Promise<ReorderControl[]> {
+        const { data } = await api.GET("/v1/inventory/reorder-controls", {
+          params: { query: { locationId, skuId } }
+        });
+        return data ?? [];
+      },
+
+      async configureReorderControl(request: ConfigureReorderControlRequest, idempotencyKey: string): Promise<ReorderControl> {
+        const { data } = await api.PUT("/v1/inventory/reorder-controls", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async deleteReorderControl(locationId: string, skuId: string, idempotencyKey: string): Promise<void> {
+        await api.DELETE("/v1/inventory/reorder-controls", {
+          params: {
+            header: { "Idempotency-Key": idempotencyKey },
+            query: { locationId, skuId }
+          }
+        });
+      },
+
+      async evaluateLowStock(locationId: string, skuId: string | undefined, idempotencyKey: string): Promise<EvaluateLowStockResponse> {
+        const { data } = await api.POST("/v1/inventory/reorder-controls/evaluate", {
+          params: {
+            header: { "Idempotency-Key": idempotencyKey },
+            query: { locationId, skuId }
+          }
+        });
+        return data!;
+      },
+
+      async repriceStockLot(stockLotId: string, req: RepriceStockLotRequest, idempotencyKey: string): Promise<StockRepricingResponse> {
+        const { data, error } = await api.POST("/v1/inventory/lots/{stockLotId}/reprice", {
+          params: {
+            path: { stockLotId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: req
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async repricings(locationId: string, skuId?: string): Promise<StockRepricingResponse[]> {
+        const { data, error } = await api.GET("/v1/inventory/repricings", {
+          params: { query: { locationId, skuId } }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async expiryFeed(
+        locationId: string,
+        windowDays?: number,
+        tier?: "ALL" | "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED"
+      ): Promise<ExpiryAlertItem[]> {
+        const { data, error } = await api.GET("/v1/inventory/locations/{locationId}/expiry-feed", {
+          params: {
+            path: { locationId },
+            query: { windowDays, tier }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async slowMovingStock(
+        locationId: string,
+        evaluationDays?: number,
+        thresholdDaysOfSupply?: number
+      ): Promise<SlowMovingStock[]> {
+        const { data, error } = await api.GET("/v1/inventory/locations/{locationId}/slow-moving", {
+          params: {
+            path: { locationId },
+            query: { evaluationDays, thresholdDaysOfSupply }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async scanExpiryAlerts(locationId: string, idempotencyKey: string): Promise<ExpiryAlertScan> {
+        const { data, error } = await api.POST("/v1/inventory/locations/{locationId}/expiry-alerts/scan", {
+          params: {
+            path: { locationId },
+            header: { "Idempotency-Key": idempotencyKey }
+          }
+        });
+        if (error) {
+          throw error;
+        }
         return data!;
       }
     }),

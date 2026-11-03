@@ -4,6 +4,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import lk.coopfed.knoweb.m8reporting.query.CreditorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorsReport;
+import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsReport;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalanceItemView;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalancesReport;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 
@@ -49,7 +58,304 @@ final class ReportCsv {
         return csv.toString();
     }
 
+    static String writeDebtors(DebtorsReport report, Messages messages, Locale locale) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(quote(text(messages.t("m8.finance.debtor.code", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.name", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.limit", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.open_invoices", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.accepted_not_invoiced", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.unapplied_receipts", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.unapplied_credits", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.debtor.net_exposure", locale))))
+                .append("\r\n");
+
+        for (DebtorSummaryItemView item : report.items()) {
+            csv.append(quote(text(item.counterpartyCode())))
+                    .append(',')
+                    .append(quote(text(item.counterpartyName())))
+                    .append(',')
+                    .append(quote(
+                            item.creditLimit() != null ? item.creditLimit().toPlainString() : ""))
+                    .append(',')
+                    .append(quote(item.openInvoices().toPlainString()))
+                    .append(',')
+                    .append(quote(item.acceptedNotInvoiced().toPlainString()))
+                    .append(',')
+                    .append(quote(item.unappliedReceipts().toPlainString()))
+                    .append(',')
+                    .append(quote(item.unappliedCredits().toPlainString()))
+                    .append(',')
+                    .append(quote(item.netExposure().toPlainString()))
+                    .append("\r\n");
+        }
+        return csv.toString();
+    }
+
+    static String writeCreditors(CreditorsReport report, Messages messages, Locale locale) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(quote(text(messages.t("m8.finance.creditor.code", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.creditor.name", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.creditor.open_invoices", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.creditor.accepted_not_invoiced", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.creditor.unapplied_payments", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.creditor.unapplied_credits", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.creditor.net_liability", locale))))
+                .append("\r\n");
+
+        for (CreditorSummaryItemView item : report.items()) {
+            csv.append(quote(text(item.counterpartyCode())))
+                    .append(',')
+                    .append(quote(text(item.counterpartyName())))
+                    .append(',')
+                    .append(quote(item.openInvoices().toPlainString()))
+                    .append(',')
+                    .append(quote(item.acceptedNotInvoiced().toPlainString()))
+                    .append(',')
+                    .append(quote(item.unappliedPayments().toPlainString()))
+                    .append(',')
+                    .append(quote(item.unappliedCredits().toPlainString()))
+                    .append(',')
+                    .append(quote(item.netLiability().toPlainString()))
+                    .append("\r\n");
+        }
+        return csv.toString();
+    }
+
+    static String writeOpeningBalances(OpeningBalancesReport report, Messages messages, Locale locale) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(quote(text(messages.t("m8.finance.opening.doc_number", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.counterparty_code", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.counterparty_name", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.role", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.amount", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.reference_no", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.notes", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.opening.created_at", locale))))
+                .append("\r\n");
+
+        for (OpeningBalanceItemView item : report.items()) {
+            csv.append(quote(text(item.docNumberDisplay())))
+                    .append(',')
+                    .append(quote(text(item.counterpartyCode())))
+                    .append(',')
+                    .append(quote(text(item.counterpartyName())))
+                    .append(',')
+                    .append(quote(text(item.role())))
+                    .append(',')
+                    .append(quote(item.amount().toPlainString()))
+                    .append(',')
+                    .append(quote(text(item.referenceNo() != null ? item.referenceNo() : "")))
+                    .append(',')
+                    .append(quote(text(item.notes() != null ? item.notes() : "")))
+                    .append(',')
+                    .append(quote(item.createdAt() != null ? item.createdAt().toString() : ""))
+                    .append("\r\n");
+        }
+        return csv.toString();
+    }
+
+    static String writeGoodsSupplied(GoodsSuppliedReport report, Messages messages, Locale locale) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(quote(text(messages.t("m8.finance.goods.invoice_no", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.date", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.society", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.sku_code", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.sku_name", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.uom", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.quantity", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.unit_price", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.tax_rate", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.tax_amount", locale))))
+                .append(',')
+                .append(quote(text(messages.t("m8.finance.goods.line_total", locale))))
+                .append("\r\n");
+
+        for (GoodsSuppliedLineItemView line : report.lines()) {
+            csv.append(quote(text(line.invoiceDocNumber())))
+                    .append(',')
+                    .append(quote(
+                            line.invoiceDate() != null ? line.invoiceDate().toString() : ""))
+                    .append(',')
+                    .append(quote(text(line.societyName())))
+                    .append(',')
+                    .append(quote(text(line.skuCode())))
+                    .append(',')
+                    .append(quote(text(line.skuName())))
+                    .append(',')
+                    .append(quote(text(line.uomCode())))
+                    .append(',')
+                    .append(quote(line.quantity().toPlainString()))
+                    .append(',')
+                    .append(quote(line.unitPrice().toPlainString()))
+                    .append(',')
+                    .append(quote(line.taxRatePercent().toPlainString()))
+                    .append(',')
+                    .append(quote(line.taxAmount().toPlainString()))
+                    .append(',')
+                    .append(quote(line.lineTotal().toPlainString()))
+                    .append("\r\n");
+        }
+        return csv.toString();
+    }
+
+    static String writeFinalAccounts(FinalAccountsReport report, Messages messages, Locale locale) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(quote("FINAL ACCOUNTS STATEMENT")).append("\r\n");
+        csv.append(quote("Period")).append(',').append(quote(report.period())).append("\r\n");
+        csv.append(quote("Currency"))
+                .append(',')
+                .append(quote(report.currency()))
+                .append("\r\n");
+        csv.append(quote("Status")).append(',').append(quote(report.status())).append("\r\n");
+        if (report.statusReason() != null) {
+            csv.append(quote("Status Reason"))
+                    .append(',')
+                    .append(quote(report.statusReason()))
+                    .append("\r\n");
+        }
+        csv.append(quote("Revenue"))
+                .append(',')
+                .append(report.revenue().toPlainString())
+                .append("\r\n");
+        csv.append(quote("Cost of Goods Sold"))
+                .append(',')
+                .append(report.cogs() != null ? report.cogs().toPlainString() : "PENDING")
+                .append("\r\n");
+        csv.append(quote("Gross Profit"))
+                .append(',')
+                .append(report.grossProfit() != null ? report.grossProfit().toPlainString() : "PENDING")
+                .append("\r\n");
+        csv.append(quote("Gross Profit Margin %"))
+                .append(',')
+                .append(
+                        report.grossProfitMarginPercent() != null
+                                ? report.grossProfitMarginPercent().toPlainString()
+                                : "PENDING")
+                .append("\r\n");
+        csv.append(quote("Approved Payroll Expenses"))
+                .append(',')
+                .append(report.payrollExpenses().toPlainString())
+                .append("\r\n");
+        csv.append(quote("Other Operating Expenses"))
+                .append(',')
+                .append("UNAVAILABLE")
+                .append("\r\n");
+        csv.append(quote("Total Operating Expenses"))
+                .append(',')
+                .append(report.totalExpenses() != null ? report.totalExpenses().toPlainString() : "UNAVAILABLE")
+                .append("\r\n");
+        csv.append(quote("Operating Profit"))
+                .append(',')
+                .append(
+                        report.operatingProfit() != null
+                                ? report.operatingProfit().toPlainString()
+                                : "UNAVAILABLE")
+                .append("\r\n");
+        csv.append(quote("Operating Profit Margin %"))
+                .append(',')
+                .append(
+                        report.operatingProfitMarginPercent() != null
+                                ? report.operatingProfitMarginPercent().toPlainString()
+                                : "UNAVAILABLE")
+                .append("\r\n");
+        csv.append("\r\n");
+
+        csv.append(quote("EXPENSE CATEGORIES")).append("\r\n");
+        csv.append(quote("Category"))
+                .append(',')
+                .append(quote("Category Name"))
+                .append(',')
+                .append(quote("Amount"))
+                .append(',')
+                .append(quote("Status"))
+                .append(',')
+                .append(quote("Notes"))
+                .append("\r\n");
+
+        for (FinalAccountsReport.ExpenseCategoryItem cat : report.expenseCategories()) {
+            csv.append(quote(cat.category()))
+                    .append(',')
+                    .append(quote(cat.categoryName()))
+                    .append(',')
+                    .append(cat.amount() != null ? cat.amount().toPlainString() : "UNAVAILABLE")
+                    .append(',')
+                    .append(quote(cat.status()))
+                    .append(',')
+                    .append(quote(cat.notes() != null ? cat.notes() : ""))
+                    .append("\r\n");
+        }
+        csv.append("\r\n");
+
+        csv.append(quote("APPROVED PAYROLL CONTRIBUTIONS")).append("\r\n");
+        csv.append(quote("Contribution ID"))
+                .append(',')
+                .append(quote("Employee No"))
+                .append(',')
+                .append(quote("Employee Name"))
+                .append(',')
+                .append(quote("Type"))
+                .append(',')
+                .append(quote("OT Minutes"))
+                .append(',')
+                .append(quote("Approved Amount"))
+                .append(',')
+                .append(quote("Status"))
+                .append("\r\n");
+
+        for (FinalAccountsReport.PayrollContributionLineItem item : report.payrollContributions()) {
+            csv.append(quote(item.contributionId().toString()))
+                    .append(',')
+                    .append(quote(item.employeeNo() != null ? item.employeeNo() : ""))
+                    .append(',')
+                    .append(quote(item.employeeName() != null ? item.employeeName() : ""))
+                    .append(',')
+                    .append(quote(item.contributionType()))
+                    .append(',')
+                    .append(item.approvedOtMinutes())
+                    .append(',')
+                    .append(item.approvedAmount().toPlainString())
+                    .append(',')
+                    .append(quote(item.status()))
+                    .append("\r\n");
+        }
+
+        return csv.toString();
+    }
+
     private static String text(String value) {
+        if (value == null) {
+            return "";
+        }
         if (!value.isEmpty() && FORMULA_START.indexOf(value.charAt(0)) >= 0) {
             return "'" + value;
         }
@@ -57,6 +363,9 @@ final class ReportCsv {
     }
 
     private static String quote(String value) {
+        if (value == null) {
+            return "";
+        }
         if (value.indexOf(',') < 0 && value.indexOf('"') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0) {
             return value;
         }

@@ -57,10 +57,17 @@ input {
   font-family: inherit;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body.login-pf-page {
   margin: 0;
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  position: relative;
   font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', Arial, sans-serif;
   
   display: flex;
@@ -652,6 +659,11 @@ summary.language-selector::-webkit-details-marker {
 ======================== */
 
 @media (max-width: 650px) {
+  .language-position {
+    top: 16px;
+    right: 16px;
+  }
+
   .login-card {
     max-width: 94%;
     padding: 35px 25px 40px;
@@ -675,6 +687,7 @@ summary.language-selector::-webkit-details-marker {
   }
 
   .login-options {
+    flex-wrap: wrap;
     gap: 10px;
   }
 
@@ -683,3 +696,26 @@ summary.language-selector::-webkit-details-marker {
     font-size: 13px;
   }
 }
+
+@media (max-width: 380px) {
+  body.login-pf-page {
+    padding: 20px 10px;
+  }
+
+  .language-position {
+    top: 12px;
+    right: 12px;
+  }
+
+  .login-card {
+    padding: 28px 16px 32px;
+    border-radius: 18px;
+  }
+
+  .login-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+

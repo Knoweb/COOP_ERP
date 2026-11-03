@@ -2,15 +2,21 @@ package lk.coopfed.knoweb.m4trading.web;
 
 import java.util.List;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.AddDiscrepancyPhoto;
 import lk.coopfed.knoweb.m4trading.api.SettleDiscrepancy;
+import lk.coopfed.knoweb.m4trading.internal.dispute.AddDiscrepancyPhotoHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.SettleDiscrepancyHandler;
 import lk.coopfed.knoweb.m4trading.query.DiscrepancyQueries;
 import lk.coopfed.knoweb.m4trading.query.DiscrepancyView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyLineResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyPhotoRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyPhotoResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyPhotoStatusResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.DisputeApi;
 import lk.coopfed.knoweb.m4trading.web.generated.SettleDiscrepancyRequest;
@@ -27,12 +33,28 @@ class DisputeController implements DisputeApi {
 
     private final DiscrepancyQueries queries;
     private final SettleDiscrepancyHandler settle;
+    private final AddDiscrepancyPhotoHandler photo;
     private final CurrentScope currentScope;
 
-    DisputeController(DiscrepancyQueries queries, SettleDiscrepancyHandler settle, CurrentScope currentScope) {
+    DisputeController(
+            DiscrepancyQueries queries,
+            SettleDiscrepancyHandler settle,
+            AddDiscrepancyPhotoHandler photo,
+            CurrentScope currentScope) {
         this.queries = queries;
         this.settle = settle;
+        this.photo = photo;
         this.currentScope = currentScope;
+    }
+
+    @Override
+    public ResponseEntity<DiscrepancyPhotoResponse> addDiscrepancyPhoto(
+            String idempotencyKey, UUID discrepancyId, DiscrepancyPhotoRequest request) {
+        Attachments.PresignedUpload upload = photo.handle(
+                new AddDiscrepancyPhoto(discrepancyId, request.getContentType(), request.getContentLength()),
+                currentScope.get());
+        return ResponseEntity.ok(
+                new DiscrepancyPhotoResponse(upload.attachmentId(), upload.url().toString(), upload.expiresAt()));
     }
 
     @Override
@@ -94,6 +116,12 @@ class DisputeController implements DisputeApi {
         response.setSettledAt(view.settledAt());
         response.setSettledByUserId(view.settledByUserId());
         response.setSettlementReason(view.settlementReason());
+        if (view.photos() != null) {
+            response.setPhotos(view.photos().stream()
+                    .map(p -> new DiscrepancyPhotoStatusResponse(
+                            p.attachmentId(), DiscrepancyPhotoStatusResponse.StatusEnum.fromValue(p.status())))
+                    .toList());
+        }
         return response;
     }
 }

@@ -1067,6 +1067,43 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/suppliers/import:
+
+    post:
+      tags: [Supplier]
+      operationId: importSuppliers
+      summary: Bulk import suppliers from CSV or structured rows
+      description: >
+        Validates (dry-run) or commits a bulk batch of suppliers for the caller's entity.
+        Idempotently skips identical existing suppliers and rejects conflicting records.
+      x-permission: cat.supplier.manage
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportSuppliersRequest'
+
+      responses:
+        '200':
+          description: Import report with validation errors and created/skipped counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierImportReportResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
   /v1/catalogue/import:
 
     post:
@@ -1991,6 +2028,83 @@ components:
           enum:
             - ACTIVE
             - INACTIVE
+
+        supplierCode:
+          type: string
+
+
+    BulkImportSuppliersRequest:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+        csvContent:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierImportRowItem'
+
+    SupplierImportRowItem:
+      type: object
+      required:
+        - rowNumber
+        - name
+      properties:
+        rowNumber:
+          type: integer
+        name:
+          type: string
+        supplierCode:
+          type: string
+
+    SupplierImportReportResponse:
+      type: object
+      required:
+        - status
+        - rows
+        - created
+        - skipped
+        - rejected
+        - errors
+      properties:
+        status:
+          type: string
+          enum: [VALIDATED, ACCEPTED, REJECTED]
+        rows:
+          type: integer
+        created:
+          type: integer
+        skipped:
+          type: integer
+        rejected:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierValidationError'
+
+    SupplierValidationError:
+      type: object
+      required:
+        - rowNumber
+        - field
+        - code
+        - message
+      properties:
+        rowNumber:
+          type: integer
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        rejectedValue:
+          type: string
 
 
     BulkImportSkusRequest:

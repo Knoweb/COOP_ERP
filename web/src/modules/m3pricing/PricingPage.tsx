@@ -7,6 +7,7 @@ import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import { chipOf, errorText } from "./priceListState";
@@ -54,34 +55,52 @@ export function PricingPage() {
 
   return (
     <main className="shell-page">
-      <div className="page-heading">
-        <div className="page-heading__icon">
-          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-        </div>
-        <div className="page-heading__copy">
-          <h1>{t("pricing.title").text}</h1>
-        </div>
-      </div>
+      <PageHeader icon="pricing" title={t("pricing.title").text} />
 
       <PricingTabs />
 
       {canAuthor && (
-        <form onSubmit={submit} className="pricing-filter-bar">
-          <label className="modern-field">
-            <span className="modern-field__label pricing-filter-label">{t("pricing.field.name").text}</span>
-            <input type="text" value={name} maxLength={120} required onChange={(event) => setName(event.target.value)} />
-          </label>
-          <button type="submit" className="modern-btn modern-btn--primary" disabled={create.isPending || !name.trim()}>
-            {t("pricing.create").text}
-          </button>
-          {create.isError && <p role="alert">{errorText(create.error, t("pricing.error.generic").text)}</p>}
-        </form>
+        <section className="pricing-card pricing-create-card">
+          <form onSubmit={submit} className="pricing-filter-bar">
+            <label className="modern-field pricing-create-field">
+              <span className="modern-field__label pricing-filter-label">{t("pricing.field.name").text}</span>
+              <input
+                type="text"
+                className="pricing-input"
+                value={name}
+                maxLength={120}
+                required
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <button type="submit" className="modern-btn modern-btn--primary" disabled={create.isPending || !name.trim()}>
+              {t("pricing.create").text}
+            </button>
+            {create.isError && (
+              <p role="alert" className="pricing-alert-box pricing-alert-box--error">
+                {errorText(create.error, t("pricing.error.generic").text)}
+              </p>
+            )}
+          </form>
+        </section>
       )}
 
-      <section>
-        {priceLists.isLoading && <p>{t("pricing.list.loading").text}</p>}
-        {priceLists.isError && <p role="alert">{errorText(priceLists.error, t("pricing.error.generic").text)}</p>}
-        {priceLists.data?.length === 0 && <p>{t("pricing.list.empty").text}</p>}
+      <section className="pricing-section">
+        {priceLists.isLoading && (
+          <div className="pricing-card pricing-loading-card">
+            <p className="pricing-muted">{t("pricing.list.loading").text}</p>
+          </div>
+        )}
+        {priceLists.isError && (
+          <div className="pricing-alert-box pricing-alert-box--error" role="alert">
+            <p>{errorText(priceLists.error, t("pricing.error.generic").text)}</p>
+          </div>
+        )}
+        {priceLists.data?.length === 0 && (
+          <div className="pricing-card pricing-empty-card">
+            <p className="pricing-muted">{t("pricing.list.empty").text}</p>
+          </div>
+        )}
         {priceLists.data && priceLists.data.length > 0 && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">
@@ -89,7 +108,7 @@ export function PricingPage() {
                 <thead>
                   <tr>
                     <th>{t("pricing.column.name").text}</th>
-                    <th>{t("pricing.column.version").text}</th>
+                    <th className="pricing-cell-center">{t("pricing.column.version").text}</th>
                     <th>{t("pricing.column.status").text}</th>
                     <th>{t("pricing.column.apply_from").text}</th>
                   </tr>
@@ -97,14 +116,16 @@ export function PricingPage() {
                 <tbody>
                   {priceLists.data.map((list) => (
                     <tr key={list.priceListId}>
-                      <td>
-                        <Link to={`/pricing/lists/${list.priceListId}`}>{list.name}</Link>
+                      <td className="pricing-cell-item">
+                        <Link to={`/pricing/lists/${list.priceListId}`} className="pricing-list-link">
+                          {list.name}
+                        </Link>
                       </td>
-                      <td>{list.version}</td>
+                      <td className="pricing-cell-center pricing-version-text">{list.version}</td>
                       <td>
                         <StateChip state={chipOf(list.status)} label={t(`pricing.status.${list.status.toLowerCase()}`).text} />
                       </td>
-                      <td>{list.applyFrom ? formatDate(list.applyFrom) : ""}</td>
+                      <td className="pricing-cell-date">{list.applyFrom ? formatDate(list.applyFrom) : ""}</td>
                     </tr>
                   ))}
                 </tbody>

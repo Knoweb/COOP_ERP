@@ -75,5 +75,16 @@
   "m2.tax.category_not_found": "The tax category was not found",
   "m2.tax.rate_invalid": "The tax rate percent must be between 0 and 100",
   "m2.tax.apply_from_in_past": "The tax rate effective date cannot be in the past",
-  "m2.tax.rate_conflict": "A tax rate is already scheduled for or after this effective date"
+  "m2.tax.rate_conflict": "A tax rate is already scheduled for or after this effective date",
+  "m2.supplier.empty_payload": "The supplier import file contains no data rows",
+  "m2.supplier.name_required": "Supplier name is required",
+  "m2.supplier.name_too_long": "Supplier name exceeds maximum length",
+  "m2.supplier.code_invalid": "Supplier code must be 64 characters or fewer",
+  "m2.supplier.code_conflict_in_sheet": "Supplier code is duplicated within the import file",
+  "m2.supplier.name_conflict_in_sheet": "Supplier name is duplicated within the import file",
+  "m2.supplier.code_conflict": "Supplier code is already assigned to a different supplier",
+  "m2.supplier.name_conflict": "Supplier name is already assigned to a different supplier code",
+  "m2.supplier.csv_parse_failed": "The supplier import file could not be parsed",
+  "m2.sku.code_conflict": "SKU code is already registered with conflicting attributes",
+  "m2.sku.barcode_conflict": "Barcode is already registered to a different SKU"
 }

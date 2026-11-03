@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
@@ -31,10 +32,12 @@ class DiscrepancyQueriesImpl implements DiscrepancyQueries {
 
     private final JdbcTemplate jdbc;
     private final DocumentBaseRepository documents;
+    private final Attachments attachments;
 
-    DiscrepancyQueriesImpl(JdbcTemplate jdbc, DocumentBaseRepository documents) {
+    DiscrepancyQueriesImpl(JdbcTemplate jdbc, DocumentBaseRepository documents, Attachments attachments) {
         this.jdbc = jdbc;
         this.documents = documents;
+        this.attachments = attachments;
     }
 
     @Override
@@ -101,6 +104,14 @@ class DiscrepancyQueriesImpl implements DiscrepancyQueries {
         lines.sort(java.util.Comparator.comparing(
                 view -> view.skuId() == null ? "" : view.skuId().toString()));
 
+        List<UUID> photoIds = jdbc.queryForList(
+                "select attachment_id from trading.discrepancy_photo where discrepancy_document_id = ? order by added_at, attachment_id",
+                UUID.class,
+                discrepancyId);
+        List<DiscrepancyView.Photo> photos = photoIds.stream()
+                .map(id -> new DiscrepancyView.Photo(id, attachments.status(id).orElse("PENDING")))
+                .toList();
+
         DocumentRecord disc = header.get();
         return Optional.of(new DiscrepancyView(
                 disc.id(),
@@ -125,6 +136,7 @@ class DiscrepancyQueriesImpl implements DiscrepancyQueries {
                 settled == null ? null : ((Timestamp) settled.get("settled_at")).toInstant(),
                 settled == null ? null : (UUID) settled.get("settled_by"),
                 settled == null ? null : (String) settled.get("reason"),
+                List.copyOf(photos),
                 List.copyOf(lines)));
     }
 

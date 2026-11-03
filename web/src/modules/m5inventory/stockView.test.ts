@@ -8,6 +8,7 @@ import {
   requestLinesOf,
   rowReady,
   sourceFor,
+  transferChip,
   transferLinesOf,
   type CountedRow
 } from "./stockView";
@@ -74,10 +75,19 @@ const ROW: CountedRow = {
 };
 
 describe("the stock view", () => {
+
+  it("shows transfer statuses with their semantic chips", () => {
+    expect(transferChip("ISSUED")).toBe("draft");
+    expect(transferChip("IN_TRANSIT")).toBe("alert");
+    expect(transferChip("RECEIVED")).toBe("issued");
+    expect(transferChip("CANCELLED")).toBe("void");
+  });
+
   it("shows a posted opening balance as issued and the rest as a draft", () => {
     expect(chipOf("DRAFT")).toBe("draft");
     expect(chipOf("SIGNED_ENTITY")).toBe("draft");
     expect(chipOf("POSTED")).toBe("issued");
+    expect(chipOf("REJECTED")).toBe("void");
   });
 
   it("sends the batch as counted and leaves out what was not typed", () => {

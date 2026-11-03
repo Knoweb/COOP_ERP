@@ -13,6 +13,7 @@
 * `l.c.k.m.query.ExposureQueries` (via `l.c.k.m.internal.queries.ExposureQueriesImpl`)
 * `l.c.k.m.query.GrnQueries` (via `l.c.k.m.internal.queries.GrnQueriesImpl`)
 * `l.c.k.m.query.InvoiceQueries` (via `l.c.k.m.internal.queries.InvoiceQueriesImpl`)
+* `l.c.k.m.query.OpeningReceivableQueries` (via `l.c.k.m.internal.queries.OpeningReceivableQueriesImpl`)
 * `l.c.k.m.query.OrderQueries` (via `l.c.k.m.internal.queries.OrderQueriesImpl`)
 * `l.c.k.m.query.PaymentQueries` (via `l.c.k.m.internal.queries.PaymentQueriesImpl`)
 * `l.c.k.m.query.TransferRequestQueries` (via `l.c.k.m.internal.queries.TransferRequestQueriesImpl`)

@@ -115,6 +115,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Discrepancy raised by a goods received note confirmation
 
+  - code: DISCREPANCY_PHOTO_ADDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A photograph authorised for upload on a discrepancy
+
   - code: INVOICE_ISSUED
     severity: INFO
     offline_capturable: false
@@ -231,3 +236,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The society rejected a transfer request, with a reason
+
+  # CAT-12 Opening receivables bulk import
+  - code: RECEIVABLE_OPENING_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Inter-entity receivable opening balance imported with two-party signatures
+
+  - code: RECEIVABLES_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Inter-entity receivable opening balances bulk imported

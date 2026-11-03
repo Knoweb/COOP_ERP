@@ -5,13 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { StateChip, type ChipState } from "../../shell/components/StateChip";
+import { type ChipState } from "../../shell/components/StateChip";
+import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi, type Batch } from "./catalogueApi";
 import { errorText } from "./skuView";
-import "./catalogue.css";
 
 /**
  * Batch card with correction functionality (22A section 8, "Batch card").
@@ -71,11 +71,26 @@ export function BatchPage() {
   if (batchQuery.isError || !batchQuery.data) {
     return (
       <main className="shell-page">
+        <div style={{ marginBottom: "var(--space-2)" }}>
+          <Link className="back-pill-btn" to="/catalogue">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+            {t("catalogue.back").text}
+          </Link>
+        </div>
         <p role="alert">{errorText(batchQuery.error, t("catalogue.error.not_found").text)}</p>
-        <Link className="back-link" to="/catalogue">
-          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-          {t("catalogue.back").text}
-        </Link>
       </main>
     );
   }
@@ -98,24 +113,34 @@ export function BatchPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to={`/catalogue/skus/${batch.skuId}`}>
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("catalogue.batch.back_to_sku").text}
-      </Link>
-
-      <div className="catalogue-header-row">
-        <h1>{batch.batchNo}</h1>
-        <StateChip state={chipState} label={t(`catalogue.batch.status.${batch.status}`).text} />
+      <div style={{ marginBottom: "var(--space-2)" }}>
+        <Link className="back-pill-btn" to={`/catalogue/skus/${batch.skuId}`}>
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("catalogue.batch.back_to_sku").text}
+        </Link>
       </div>
 
       {batch.status === "SUPERSEDED" && (
-        <div className="import-alert import-alert--warning" role="status">
+        <div className="import-alert import-alert--warning" role="status" style={{ marginBottom: "var(--space-2)" }}>
           <span>{t("catalogue.batch.superseded_notice").text}</span>
         </div>
       )}
 
       {batch.correctsBatchId && (
-        <div className="batch-chain-notice">
+        <div className="batch-chain-notice" style={{ marginBottom: "var(--space-2)" }}>
           <span>
             {t("catalogue.batch.corrects_chain", undefined, { batchNo: batch.correctsBatchId.slice(0, 8) }).text}
           </span>{" "}
@@ -126,7 +151,7 @@ export function BatchPage() {
       )}
 
       {replacementBatch && (
-        <div className="import-alert import-alert--success" role="status">
+        <div className="import-alert import-alert--success" role="status" style={{ marginBottom: "var(--space-2)" }}>
           <span>{t("catalogue.batch.success.corrected").text} </span>
           <Link to={`/catalogue/batches/${replacementBatch.batchId}`}>
             {replacementBatch.batchNo} ({replacementBatch.batchId.slice(0, 8)})
@@ -134,55 +159,57 @@ export function BatchPage() {
         </div>
       )}
 
-      {/* Details Card */}
-      <section className="catalogue-section">
-        <h2>{t("catalogue.batch.title").text}</h2>
-        <div className="batch-details-grid">
-          <div className="batch-detail-item">
-            <span className="batch-detail-label">{t("catalogue.column.batch_no").text}</span>
-            <span className="batch-detail-value">{batch.batchNo}</span>
-          </div>
-          <div className="batch-detail-item">
-            <span className="batch-detail-label">{t("catalogue.column.mrp").text}</span>
-            <span className="batch-detail-value batch-detail-value--mrp">
-              {batch.printedMrp != null ? <MoneyDisplay amount={batch.printedMrp} /> : "—"}
-            </span>
-          </div>
-          <div className="batch-detail-item">
-            <span className="batch-detail-label">{t("catalogue.column.expiry").text}</span>
-            <span className="batch-detail-value">
-              {batch.expiryDate ? formatDate(batch.expiryDate) : "—"}
-            </span>
-          </div>
-          <div className="batch-detail-item">
-            <span className="batch-detail-label">{t("catalogue.column.from").text}</span>
-            <span className="batch-detail-value">
-              {batch.manufactureDate ? formatDate(batch.manufactureDate) : "—"}
-            </span>
-          </div>
-          <div className="batch-detail-item">
-            <span className="batch-detail-label">{t("catalogue.column.status").text}</span>
-            <span className="batch-detail-value">{t(`catalogue.batch.status.${batch.status}`).text}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Correction Form / Action */}
-      {batch.status === "REGISTERED" && canCorrect && (
-        <section className="catalogue-section">
-          {!isCorrecting ? (
+      {/* Main Details Card matching SocietyCardPage (DocumentHeader) */}
+      <DocumentHeader
+        code="BATCH"
+        title={batch.batchNo}
+        subtitle={<h2 className="document-header__subtitle" style={{ margin: 0, fontSize: "inherit", fontWeight: "inherit", display: "inline" }}>{t("catalogue.batch.title").text}</h2>}
+        state={{ look: chipState, label: t(`catalogue.batch.status.${batch.status}`).text }}
+        facts={[
+          { label: t("catalogue.column.batch_no").text, value: batch.batchNo },
+          {
+            label: t("catalogue.column.mrp").text,
+            value: batch.printedMrp != null ? (
+              <span className="batch-detail-value--mrp">
+                <MoneyDisplay amount={batch.printedMrp} />
+              </span>
+            ) : undefined
+          },
+          {
+            label: t("catalogue.column.expiry").text,
+            value: batch.expiryDate ? formatDate(batch.expiryDate) : undefined
+          },
+          {
+            label: t("catalogue.column.from").text,
+            value: batch.manufactureDate ? formatDate(batch.manufactureDate) : undefined
+          },
+          {
+            label: t("catalogue.column.status").text,
+            value: t(`catalogue.batch.status.${batch.status}`).text
+          }
+        ]}
+      >
+        {batch.status === "REGISTERED" && canCorrect && !isCorrecting && (
+          <div className="batch-card-actions" style={{ paddingTop: "var(--space-2)" }}>
             <button
               type="button"
-              className="action-button action-button--primary"
+              className="action-btn--correct-batch"
               onClick={handleStartCorrection}
             >
               {t("catalogue.batch.correct").text}
             </button>
-          ) : (
-            <form onSubmit={handleCorrectSubmit} className="batch-correction-form">
-              <h3>{t("catalogue.batch.correct.title").text}</h3>
+          </div>
+        )}
+      </DocumentHeader>
+
+      {/* Correction Form Card */}
+      {batch.status === "REGISTERED" && canCorrect && isCorrecting && (
+        <div className="batch-correction-card">
+          <form onSubmit={handleCorrectSubmit} className="batch-correction-form">
+            <h3 className="batch-correction-title">{t("catalogue.batch.correct.title").text}</h3>
+            <div className="batch-correction-grid">
               <label className="catalogue-form-field">
-                {t("catalogue.batch.field.mrp").text}
+                <span>{t("catalogue.batch.field.mrp").text}</span>
                 <input
                   type="number"
                   step="0.01"
@@ -194,7 +221,7 @@ export function BatchPage() {
               </label>
 
               <label className="catalogue-form-field">
-                {t("catalogue.batch.field.expiry").text}
+                <span>{t("catalogue.batch.field.expiry").text}</span>
                 <input
                   type="date"
                   value={newExpiry}
@@ -203,8 +230,13 @@ export function BatchPage() {
               </label>
 
               <label className="catalogue-form-field">
-                {t("shell.reason.code").text}
-                <select value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
+                <span>{t("shell.reason.code").text}</span>
+                <select
+                  value={reasonCode}
+                  onChange={(e) => setReasonCode(e.target.value)}
+                  required
+                >
+                  <option value="">{t("shell.reason.choose").text}</option>
                   <option value="MISKEYED_MRP">{t("catalogue.batch.reason.miskeyed").text}</option>
                   <option value="SUPPLIER_AMENDMENT">{t("catalogue.batch.reason.supplier_amendment").text}</option>
                   <option value="LABEL_ERROR">{t("catalogue.batch.reason.label_error").text}</option>
@@ -212,41 +244,41 @@ export function BatchPage() {
                 </select>
               </label>
 
-              <label className="catalogue-form-field">
-                {t("shell.reason.text").text || "Explanation"}
+              <label className="catalogue-form-field" style={{ gridColumn: "1 / -1" }}>
+                <span>{t("shell.reason.text").text}</span>
                 <textarea
                   rows={2}
                   value={reasonText}
                   onChange={(e) => setReasonText(e.target.value)}
                 />
               </label>
+            </div>
 
-              <div className="catalogue-action-bar">
-                <button
-                  type="submit"
-                  className="action-button action-button--primary"
-                  disabled={correctMutation.isPending || !newMrp}
-                >
-                  {t("catalogue.batch.correct.submit").text}
-                </button>
-                <button
-                  type="button"
-                  className="action-button action-button--secondary"
-                  onClick={() => setIsCorrecting(false)}
-                  disabled={correctMutation.isPending}
-                >
-                  {t("shell.reason.cancel").text || "Cancel"}
-                </button>
-              </div>
+            <div className="catalogue-action-bar" style={{ marginTop: "var(--space-2)" }}>
+              <button
+                type="submit"
+                className="action-button action-button--primary"
+                disabled={correctMutation.isPending || !newMrp}
+              >
+                {t("catalogue.batch.correct.submit").text}
+              </button>
+              <button
+                type="button"
+                className="action-button action-button--secondary"
+                onClick={() => setIsCorrecting(false)}
+                disabled={correctMutation.isPending}
+              >
+                {t("shell.reason.cancel").text || "Cancel"}
+              </button>
+            </div>
 
-              {correctMutation.isError && (
-                <p role="alert" className="error-text">
-                  {errorText(correctMutation.error, t("catalogue.error.generic").text)}
-                </p>
-              )}
-            </form>
-          )}
-        </section>
+            {correctMutation.isError && (
+              <p role="alert" className="error-text">
+                {errorText(correctMutation.error, t("catalogue.error.generic").text)}
+              </p>
+            )}
+          </form>
+        </div>
       )}
     </main>
   );

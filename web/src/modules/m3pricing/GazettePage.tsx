@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
@@ -12,6 +12,7 @@ import { usePricingApi } from "./pricingApi";
 import type { ControlPrice, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { controlPriceChip, controlPriceState, errorText } from "./priceListState";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -29,12 +30,63 @@ export function GazettePage() {
   const queryClient = useQueryClient();
   const canEnter = useHasPermission("prc.controlprice.enter");
   const today = businessToday();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const rows = useQuery({ queryKey: ["pricing", "controlPrices"], queryFn: () => api.listControlPrices() });
 
+  const skuQueries = useQueries({
+    queries: (rows.data ?? []).map((r) => ({
+      queryKey: ["pricing", "sku", r.skuId],
+      queryFn: () => api.getSku(r.skuId),
+      staleTime: Infinity,
+      enabled: Boolean(r.skuId)
+    }))
+  });
+
+  const skusById = useMemo(() => {
+    const map = new Map<string, Sku>();
+    for (const q of skuQueries) {
+      if (q.data) {
+        map.set(q.data.skuId, q.data);
+      }
+    }
+    return map;
+  }, [skuQueries]);
+
+  const filteredRows = useMemo(() => {
+    const all = rows.data ?? [];
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return all;
+
+    return all.filter((row) => {
+      const sku = skusById.get(row.skuId);
+      const matchGazetteRef = row.gazetteReference ? row.gazetteReference.toLowerCase().includes(q) : false;
+      const matchSkuCode = sku?.skuCode ? sku.skuCode.toLowerCase().includes(q) : false;
+      const matchNameEn = sku?.nameEn ? sku.nameEn.toLowerCase().includes(q) : false;
+      const matchNameSi = sku?.nameSi ? sku.nameSi.toLowerCase().includes(q) : false;
+      const matchNameTa = sku?.nameTa ? sku.nameTa.toLowerCase().includes(q) : false;
+      const matchSkuId = row.skuId ? row.skuId.toLowerCase().includes(q) : false;
+      const matchPrice =
+        row.ceilingPrice != null
+          ? String(row.ceilingPrice).toLowerCase().includes(q) || row.ceilingPrice.toFixed(2).includes(q)
+          : false;
+      const matchUom = row.ceilingUomCode ? row.ceilingUomCode.toLowerCase().includes(q) : false;
+      return (
+        matchGazetteRef ||
+        matchSkuCode ||
+        matchNameEn ||
+        matchNameSi ||
+        matchNameTa ||
+        matchSkuId ||
+        matchPrice ||
+        matchUom
+      );
+    });
+  }, [rows.data, searchQuery, skusById]);
+
   return (
     <main className="shell-page">
-      <h1>{t("pricing.gazette.title").text}</h1>
+      <PageHeader icon="gazette" title={t("pricing.gazette.title").text} />
       <PricingTabs />
       <p className="pricing-muted">{t("pricing.gazette.intro").text}</p>
 
@@ -45,56 +97,125 @@ export function GazettePage() {
         {rows.isError && <p role="alert">{errorText(rows.error, t("pricing.error.generic").text)}</p>}
         {rows.data?.length === 0 && <p>{t("pricing.gazette.empty").text}</p>}
         {rows.data && rows.data.length > 0 && (
-          <div className="modern-table-card">
-            <div className="modern-table-scroll">
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>{t("pricing.column.item").text}</th>
-                    <th>{t("pricing.column.ceiling_price").text}</th>
-                    <th>{t("pricing.column.unit").text}</th>
-                    <th>{t("pricing.column.from").text}</th>
-                    <th>{t("pricing.column.to").text}</th>
-                    <th>{t("pricing.column.gazette").text}</th>
-                    <th>{t("pricing.column.status").text}</th>
-                    {canEnter && <th />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.data.map((row) => {
-                    const state = controlPriceState(row, today);
-                    return (
-                      <tr key={row.controlPriceId}>
-                        <td>
-                          <SkuName skuId={row.skuId} />
-                        </td>
-                        <td>
-                          <MoneyDisplay amount={row.ceilingPrice} />
-                        </td>
-                        <td>{row.ceilingUomCode}</td>
-                        <td>{formatDate(row.effectiveFrom)}</td>
-                        <td>{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
-                        <td>{row.gazetteReference}</td>
-                        <td>
-                          <StateChip state={controlPriceChip(state)} label={t(`pricing.gazette.state.${state}`).text} />
-                        </td>
-                        {canEnter && (
-                          <td>
-                            {state !== "ended" && (
-                              <RescindForm
-                                row={row}
-                                onRescinded={() => queryClient.invalidateQueries({ queryKey: ["pricing"] })}
-                              />
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <>
+            <div className="pricing-gazette-toolbar">
+              <div className="pricing-gazette-search-wrapper">
+                <svg
+                  className="pricing-gazette-search-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="search"
+                  className="pricing-gazette-search-input"
+                  placeholder={t("pricing.gazette.search_placeholder").text}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSearchQuery("");
+                    }
+                  }}
+                  aria-label={t("pricing.gazette.search_placeholder").text}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    className="pricing-gazette-search-clear"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSearchQuery("");
+                    }}
+                    aria-label={t("pricing.search.clear").text}
+                    title={t("pricing.search.clear").text}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+
+            <div className="modern-table-card pricing-gazette-table-card">
+              <div className="modern-table-scroll pricing-gazette-table-scroll">
+                <table className="modern-table pricing-gazette-table">
+                  <colgroup>
+                    <col className="pricing-gazette-col-item" />
+                    <col className="pricing-gazette-col-price" />
+                    <col className="pricing-gazette-col-unit" />
+                    <col className="pricing-gazette-col-from" />
+                    <col className="pricing-gazette-col-to" />
+                    <col className="pricing-gazette-col-ref" />
+                    <col className="pricing-gazette-col-status" />
+                    {canEnter && <col className="pricing-gazette-col-actions" />}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="pricing-gazette-th-item">{t("pricing.column.item").text}</th>
+                      <th className="pricing-gazette-th-price">{t("pricing.column.ceiling_price").text}</th>
+                      <th className="pricing-gazette-th-unit">{t("pricing.column.unit").text}</th>
+                      <th className="pricing-gazette-th-from">{t("pricing.column.from").text}</th>
+                      <th className="pricing-gazette-th-to">{t("pricing.column.to").text}</th>
+                      <th className="pricing-gazette-th-ref">{t("pricing.column.gazette").text}</th>
+                      <th className="pricing-gazette-th-status">{t("pricing.column.status").text}</th>
+                      {canEnter && <th className="pricing-gazette-th-actions" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={canEnter ? 8 : 7} className="pricing-cell-empty-search">
+                          <p>{t("pricing.gazette.no_match").text}</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRows.map((row) => {
+                        const state = controlPriceState(row, today);
+                        return (
+                          <tr key={row.controlPriceId}>
+                            <td className="pricing-cell-item pricing-gazette-cell-item">
+                              <SkuName skuId={row.skuId} />
+                            </td>
+                            <td className="pricing-cell-numeric pricing-gazette-cell-price">
+                              <MoneyDisplay amount={row.ceilingPrice} />
+                            </td>
+                            <td className="pricing-cell-center pricing-gazette-cell-unit">{row.ceilingUomCode}</td>
+                            <td className="pricing-cell-center pricing-gazette-cell-from">{formatDate(row.effectiveFrom)}</td>
+                            <td className="pricing-cell-center pricing-gazette-cell-to">{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
+                            <td className="pricing-cell-center pricing-gazette-cell-ref">{row.gazetteReference}</td>
+                            <td className="pricing-cell-center pricing-gazette-cell-status">
+                              <StateChip state={controlPriceChip(state)} label={t(`pricing.gazette.state.${state}`).text} />
+                            </td>
+                            {canEnter && (
+                              <td className="pricing-cell-center pricing-gazette-cell-actions">
+                                {state !== "ended" && (
+                                  <RescindForm
+                                    row={row}
+                                    onRescinded={() => queryClient.invalidateQueries({ queryKey: ["pricing"] })}
+                                  />
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
       </section>
     </main>

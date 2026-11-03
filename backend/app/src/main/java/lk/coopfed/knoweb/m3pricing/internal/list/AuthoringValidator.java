@@ -18,6 +18,7 @@ import lk.coopfed.knoweb.m2catalogue.query.BatchFilter;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.ConversionView;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
 import lk.coopfed.knoweb.m3pricing.api.SetLinesResult.Outcome;
@@ -41,9 +42,9 @@ import org.springframework.stereotype.Component;
  * line per unit, whatever the quantity). An ADVISORY list is the Federation's and has no stock, so
  * only the control price binds it.
  *
- * <p>What it does not check yet, deferred: units other than the SKU's base unit (M2 publishes no
- * query of a SKU's conversions; a line is priced in the base unit until it does), and so no unit
- * conversion of a ceiling either (23A section 11).
+ * <p>TRADE lines may use a non-base UOM when M2 has a conversion in force on the
+ * authoring or publication date. Printed-MRP reviews compare prices in that unit.
+ * Shelf lists remain base-unit-only until ceiling conversions are supported.
  */
 @Component
 class AuthoringValidator {
@@ -78,6 +79,7 @@ class AuthoringValidator {
     List<Outcome> check(String kind, List<SetLines.Line> lines, LocalDate onDate, ScopeContext scope) {
         boolean shelfList = !PriceListStore.TRADE.equals(kind);
         Map<UUID, Optional<SkuView>> skus = new HashMap<>();
+        Map<UUID, List<ConversionView>> conversions = new HashMap<>();
         Map<UUID, Optional<BigDecimal>> lowestMrp = new HashMap<>();
         Map<UUID, Optional<ShelfBatches.Shelved>> lowestInStock = new HashMap<>();
         List<UUID> locations = (PriceListStore.RETAIL.equals(kind) || PriceListStore.COMMERCIAL.equals(kind))
@@ -95,6 +97,8 @@ class AuthoringValidator {
                     shelfList,
                     PriceListStore.RETAIL.equals(kind) || PriceListStore.COMMERCIAL.equals(kind),
                     skus,
+                    conversions,
+                    onDate,
                     tierFaults,
                     occurrences,
                     scope);
@@ -106,7 +110,20 @@ class AuthoringValidator {
                 BigDecimal mrp = lowestMrp
                         .computeIfAbsent(line.skuId(), sku -> lowestPrintedMrp(sku, scope))
                         .orElse(null);
-                // doc 23 section 3.4 and doc 10 A-04: a review, not a block.
+                // Printed MRP is per base unit. Compare a CASE price against
+                // the MRP of all base units in that CASE.
+                if (mrp != null) {
+                    BigDecimal factor = factorFor(
+                                    skus.get(line.skuId()).orElseThrow(),
+                                    line.skuId(),
+                                    line.uomCode(),
+                                    onDate,
+                                    conversions,
+                                    scope)
+                            .orElseThrow();
+                    mrp = mrp.multiply(factor);
+                }
+                // A TRADE price above printed MRP raises a review, not a block.
                 boolean above = mrp != null && line.price().compareTo(mrp) > 0;
                 outcomes.add(new Outcome(
                         line.skuId(),
@@ -177,6 +194,8 @@ class AuthoringValidator {
             boolean shelfList,
             boolean retail,
             Map<UUID, Optional<SkuView>> skus,
+            Map<UUID, List<ConversionView>> conversions,
+            LocalDate onDate,
             Map<String, String> tierFaults,
             Map<String, Long> occurrences,
             ScopeContext scope) {
@@ -206,13 +225,41 @@ class AuthoringValidator {
         if (sku.isEmpty() || !ACTIVE.contains(sku.get().status())) {
             return "m3.price_list.line.sku_not_active";
         }
-        if (!sku.get().baseUomCode().equals(line.uomCode())) {
+        if (shelfList && !sku.get().baseUomCode().equals(line.uomCode())) {
+            return "m3.price_list.line.uom_invalid";
+        }
+        if (!shelfList
+                && factorFor(sku.get(), line.skuId(), line.uomCode(), onDate, conversions, scope)
+                        .isEmpty()) {
             return "m3.price_list.line.uom_invalid";
         }
         if (occurrences.getOrDefault(key(line), 0L) > 1) {
             return "m3.price_list.line.duplicate";
         }
         return tierFaults.get(line.skuId() + "/" + line.uomCode());
+    }
+
+    /**
+     * Factor of the authored unit to the SKU's base unit.
+     * Historical and future conversions are not valid outside their dates.
+     */
+    private Optional<BigDecimal> factorFor(
+            SkuView sku,
+            UUID skuId,
+            String uom,
+            LocalDate onDate,
+            Map<UUID, List<ConversionView>> conversions,
+            ScopeContext scope) {
+        if (sku.baseUomCode().equals(uom)) {
+            return Optional.of(BigDecimal.ONE);
+        }
+        return conversions.computeIfAbsent(skuId, id -> catalogue.conversions(id, scope)).stream()
+                .filter(c -> uom.equals(c.uomCode()))
+                .filter(c -> c.effectiveFrom() != null && !onDate.isBefore(c.effectiveFrom()))
+                .filter(c -> c.effectiveTo() == null || !onDate.isAfter(c.effectiveTo()))
+                .filter(c -> c.factorToBase() != null && c.factorToBase().signum() > 0)
+                .map(ConversionView::factorToBase)
+                .findFirst();
     }
 
     /** doc 23 flow 6.2: the tiers of one SKU and unit start at 0 and rise ("descending tiers refused"). */

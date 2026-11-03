@@ -81,7 +81,9 @@ public class StockOnHand {
                 select coalesce(sum(p.qty), 0)
                   from inventory.pick_list_line p
                   join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
-                  join inventory.stock_lot l on l.stock_lot_id = p.stock_lot_id
+                   left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                  join inventory.stock_lot l
+                    on l.stock_lot_id = coalesce(o.replacement_stock_lot_id, p.stock_lot_id)
                  where pl.status = 'OPEN' and l.location_id = ? and l.batch_id = ? and l.condition = ?
                 """,
                 BigDecimal.class,

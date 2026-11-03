@@ -187,8 +187,12 @@ class DeviceSequenceGapIntegrationTest extends PostgresIntegrationTest {
         List<GapCheck.DeviceGap> gaps = system.inScope(SystemScope.federationView(), gapCheck::findDeviceGaps);
         assertThat(gaps).isEmpty();
 
+        // Nightly checks numbering gaps as well as device gaps.
+        // Other integration tests may have left numbering series behind.
+        int numberingGaps =
+                system.inScope(SystemScope.federationView(), gapCheck::findGaps).size();
         int processed = gapCheck.nightly(jobExecution(TEST_FEDERATION));
-        assertThat(processed).isZero();
+        assertThat(processed).isEqualTo(numberingGaps);
     }
 
     @Test
@@ -207,8 +211,10 @@ class DeviceSequenceGapIntegrationTest extends PostgresIntegrationTest {
         assertThat(gap.foundCount()).isEqualTo(2);
         assertThat(gap.firstMissing()).isEqualTo(2);
 
+        int numberingGaps =
+                system.inScope(SystemScope.federationView(), gapCheck::findGaps).size();
         int processed = gapCheck.nightly(jobExecution(TEST_FEDERATION));
-        assertThat(processed).isEqualTo(1);
+        assertThat(processed).isEqualTo(numberingGaps + 1);
 
         ScopeContext fedScope = SystemScope.own(TEST_FEDERATION, null);
         boolean reviewExists = reviews.reviewExists(GapCheck.AUDIT_DEVICE_GAP, deviceId, "firstMissing", "2", fedScope);

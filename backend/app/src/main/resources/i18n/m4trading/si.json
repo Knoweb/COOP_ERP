@@ -174,5 +174,12 @@
   "m4.adjustment.exceeds_max_amount": "ගැලපුම් මුදල අවසර ලත් උපරිමය ඉක්මවයි",
   "m4.adjustment.exceeds_max_percent": "ගැලපුම් වට්ටම අවසර ලත් උපරිම ප්‍රතිශතය ඉක්මවයි",
   "m4.adjustment.already_recorded": "මෙම වර්ගයේ ගැලපීමක් මෙම ඇණවුම සඳහා දැනටමත් වාර්තා කර ඇත",
-  "m4.adjustment.permission_denied": "මෙම ගැලපුම් වර්ගය වාර්තා කිරීමට ඔබට අවසර නැත"
+  "m4.adjustment.permission_denied": "මෙම ගැලපුම් වර්ගය වාර්තා කිරීමට ඔබට අවසර නැත",
+  "m4.receivable.lines_required": "අවම වශයෙන් එක් ලැබිය යුතු ආරම්භක ශේෂ පේළියක්වත් අවශ්‍ය වේ",
+  "m4.receivable.buyer_not_found": "ගැනුම්කාර පාර්ශ්වය හමු නොවීය",
+  "m4.receivable.amount_invalid": "ලැබිය යුතු මුදල ශුන්‍යයට වඩා වැඩි විය යුතු අතර උපරිම දශමස්ථාන දෙකක් තිබිය යුතුය",
+  "m4.receivable.same_entity": "විකුණුම්කරු සහ ගැනුම්කරු එකම පාර්ශ්වයක් විය නොහැක",
+  "m4.receivable.no_relationship": "විකුණුම්කරු සහ ගැනුම්කරු අතර සක්‍රිය වෙළඳ සම්බන්ධතාවක් නොමැත",
+  "m4.receivable.buyer_signature_required": "ආරම්භක ශේෂයන් සඳහා විකුණුම්කරු සහ ගැනුම්කරු යන දෙපාර්ශ්වයේම අත්සන් අවශ්‍ය වේ",
+  "m4.receivable.not_found": "ලැබිය යුතු ආරම්භක ශේෂය හමු නොවීය"
 }

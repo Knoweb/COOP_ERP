@@ -1,9 +1,13 @@
 package lk.coopfed.knoweb.m7customers.web;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import lk.coopfed.knoweb.m7customers.query.AccountQueries;
 import lk.coopfed.knoweb.m7customers.query.AccountView;
 import lk.coopfed.knoweb.m7customers.query.CustomerCard;
 import lk.coopfed.knoweb.m7customers.query.CustomerSummary;
+import lk.coopfed.knoweb.m7customers.query.LoyaltyCustomerView;
+import lk.coopfed.knoweb.m7customers.query.LoyaltyEligibility;
 import lk.coopfed.knoweb.m7customers.query.PrivacyQueries;
 import lk.coopfed.knoweb.m7customers.web.generated.Account;
 import lk.coopfed.knoweb.m7customers.web.generated.AccountAgeing;
@@ -12,6 +16,8 @@ import lk.coopfed.knoweb.m7customers.web.generated.Adjustment;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerCardConsentsInner;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerCardPhonesInner;
 import lk.coopfed.knoweb.m7customers.web.generated.Language;
+import lk.coopfed.knoweb.m7customers.web.generated.LoyaltyCustomerResponse;
+import lk.coopfed.knoweb.m7customers.web.generated.LoyaltyEligibilityResponse;
 import lk.coopfed.knoweb.m7customers.web.generated.PrivacyRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.Statement;
 import lk.coopfed.knoweb.m7customers.web.generated.StatementLinesInner;
@@ -150,5 +156,163 @@ final class CustomerResponses {
                 .outcome(view.outcome())
                 .exportSha256(view.exportSha256())
                 .refusalGround(view.refusalGround());
+    }
+
+    static lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport bulkReport(
+            lk.coopfed.knoweb.m7customers.api.BulkMemberReport report) {
+        return new lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport()
+                .importId(report.importId())
+                .status(lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerReport.StatusEnum.fromValue(
+                        report.status()))
+                .totalRows(report.totalRows())
+                .registeredCount(report.registeredCount())
+                .updatedCount(report.updatedCount())
+                .failedCount(report.failedCount())
+                .problems(report.problems().stream()
+                        .map(p -> new lk.coopfed.knoweb.m7customers.web.generated.MemberProblem()
+                                .rowNumber(p.rowNumber())
+                                .nameOrPhone(p.nameOrPhone())
+                                .field(p.field())
+                                .reason(p.reason()))
+                        .toList());
+    }
+
+    static LoyaltyCustomerResponse toLoyaltyCustomerResponse(LoyaltyCustomerView view) {
+        if (view == null) {
+            return null;
+        }
+        LoyaltyCustomerResponse res = new LoyaltyCustomerResponse();
+        res.setLoyaltyId(view.loyaltyId());
+        res.setCustomerId(view.customerId());
+        res.setOwnerEntityId(view.ownerEntityId());
+        res.setDisplayName(view.displayName());
+        res.setDisplayNameSi(view.displayNameSi());
+        res.setDisplayNameTa(view.displayNameTa());
+        res.setPhone(view.phone());
+        res.setNicLast4(view.nicLast4());
+        res.setRegisteredLocationId(view.registeredLocationId());
+        res.setRegionCode(view.regionCode());
+        res.setRegionalMemberNo(view.regionalMemberNo());
+        res.setLoyaltyTier(view.loyaltyTier());
+        res.setStatus(view.status());
+        res.setIsMember(view.isMember());
+        res.setAllLocationsPermitted(view.allLocationsPermitted());
+        res.setPermittedLocationIds(new ArrayList<>(view.permittedLocationIds()));
+        res.setRegionalAttributes(
+                view.regionalAttributes() != null ? new HashMap<>(view.regionalAttributes()) : new HashMap<>());
+        res.setEnrolledAt(view.enrolledAt());
+        res.setUpdatedAt(view.updatedAt());
+        return res;
+    }
+
+    static LoyaltyEligibilityResponse toLoyaltyEligibilityResponse(LoyaltyEligibility eligibility) {
+        if (eligibility == null) {
+            return null;
+        }
+        LoyaltyEligibilityResponse res = new LoyaltyEligibilityResponse();
+        res.setEligible(eligibility.eligible());
+        res.setStatus(eligibility.status());
+        res.setReason(eligibility.reason());
+        res.setIsMember(eligibility.isMember());
+        res.setMemberNo(eligibility.memberNo());
+        res.setCustomerId(eligibility.customerId());
+        res.setLocationId(eligibility.locationId());
+        res.setLoyaltyTier(eligibility.loyaltyTier());
+        res.setCustomer(toLoyaltyCustomerResponse(eligibility.customer()));
+        return res;
+    }
+
+    static lk.coopfed.knoweb.m7customers.web.generated.LoyaltyRewardPolicyResponse toLoyaltyRewardPolicyResponse(
+            lk.coopfed.knoweb.m7customers.query.LoyaltyRewardPolicyView view) {
+        if (view == null) {
+            return null;
+        }
+        lk.coopfed.knoweb.m7customers.web.generated.LoyaltyRewardPolicyResponse res =
+                new lk.coopfed.knoweb.m7customers.web.generated.LoyaltyRewardPolicyResponse();
+        res.setPolicyId(view.policyId());
+        res.setOwnerEntityId(view.ownerEntityId());
+        res.setPolicyName(view.policyName());
+        res.setMonthlySpendThreshold(view.monthlySpendThreshold());
+        res.setMinMembershipMonths(view.minMembershipMonths());
+        res.setMonthlyRewardPoints(view.monthlyRewardPoints());
+        res.setInsuranceBenefitAmount(view.insuranceBenefitAmount());
+        res.setActive(view.active());
+        res.setCreatedAt(view.createdAt());
+        res.setUpdatedAt(view.updatedAt());
+        return res;
+    }
+
+    static lk.coopfed.knoweb.m7customers.web.generated.LoyaltyMonthlyRewardResponse toLoyaltyMonthlyRewardResponse(
+            lk.coopfed.knoweb.m7customers.query.LoyaltyMonthlyRewardView view) {
+        if (view == null) {
+            return null;
+        }
+        lk.coopfed.knoweb.m7customers.web.generated.LoyaltyMonthlyRewardResponse res =
+                new lk.coopfed.knoweb.m7customers.web.generated.LoyaltyMonthlyRewardResponse();
+        res.setRewardId(view.rewardId());
+        res.setOwnerEntityId(view.ownerEntityId());
+        res.setLoyaltyId(view.loyaltyId());
+        res.setCustomerId(view.customerId());
+        res.setPeriodMonth(view.periodMonth());
+        res.setQualifyingSpend(view.qualifyingSpend());
+        res.setSpendThreshold(view.spendThreshold());
+        res.setMembershipMonths(view.membershipMonths());
+        res.setMinMembershipMonths(view.minMembershipMonths());
+        res.setPointsAwarded(view.pointsAwarded());
+        res.setInsuranceEligible(view.insuranceEligible());
+        res.setRewardStatus(
+                lk.coopfed.knoweb.m7customers.web.generated.LoyaltyMonthlyRewardResponse.RewardStatusEnum.fromValue(
+                        view.rewardStatus()));
+        res.setDisqualificationReason(view.disqualificationReason());
+        res.setEvaluatedAt(view.evaluatedAt());
+        return res;
+    }
+
+    static lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceEligibilityResponse
+            toLoyaltyInsuranceEligibilityResponse(
+                    lk.coopfed.knoweb.m7customers.query.LoyaltyInsuranceEligibilityView view) {
+        if (view == null) {
+            return null;
+        }
+        lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceEligibilityResponse res =
+                new lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceEligibilityResponse();
+        res.setLoyaltyId(view.loyaltyId());
+        res.setCustomerId(view.customerId());
+        res.setEligible(view.eligible());
+        res.setReason(view.reason());
+        res.setMonthlyQualifyingSpend(view.monthlyQualifyingSpend());
+        res.setSpendThreshold(view.spendThreshold());
+        res.setMembershipMonths(view.membershipMonths());
+        res.setMinMembershipMonths(view.minMembershipMonths());
+        res.setInsuranceBenefitAmount(view.insuranceBenefitAmount());
+        res.setEvaluatedAsOf(view.evaluatedAsOf());
+        return res;
+    }
+
+    static lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceClaimResponse toLoyaltyInsuranceClaimResponse(
+            lk.coopfed.knoweb.m7customers.query.LoyaltyInsuranceClaimView view) {
+        if (view == null) {
+            return null;
+        }
+        lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceClaimResponse res =
+                new lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceClaimResponse();
+        res.setClaimId(view.claimId());
+        res.setOwnerEntityId(view.ownerEntityId());
+        res.setLoyaltyId(view.loyaltyId());
+        res.setCustomerId(view.customerId());
+        res.setClaimType(view.claimType());
+        res.setClaimStatus(
+                lk.coopfed.knoweb.m7customers.web.generated.LoyaltyInsuranceClaimResponse.ClaimStatusEnum.fromValue(
+                        view.claimStatus()));
+        res.setPolicyBenefitAmount(view.policyBenefitAmount());
+        res.setIncidentDate(view.incidentDate());
+        res.setClaimantRelationship(view.claimantRelationship());
+        res.setSupportingDocumentRef(view.supportingDocumentRef());
+        res.setEligibilityVerified(view.eligibilityVerified());
+        res.setEligibilitySnapshotJson(view.eligibilitySnapshotJson());
+        res.setRejectionReason(view.rejectionReason());
+        res.setSubmittedAt(view.submittedAt());
+        res.setUpdatedAt(view.updatedAt());
+        return res;
     }
 }

@@ -395,6 +395,15 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "no fed_view or ext_view (m7customers V0003, CR-18-2): its notes and outcome are free text about"
                             + " the person, redacted at an erasure and read by the society alone until then",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            // PGL-M3-01: loyalty customers and permitted branch locations belong to the society
+            new Departure(
+                    "customers.loyalty_customer",
+                    "no fed_view or ext_view (PGL-M3-01): member loyalty personal data is the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.loyalty_permitted_location",
+                    "no fed_view or ext_view (PGL-M3-01): permitted branch locations are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "integration.notification_contact",
                     "own_* only (m9integration V0003, fed_view dropped by V0006; wave 2, M9-06 and"
@@ -654,6 +663,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             "a correcting document links the issued original; a kernel row, not a module's extension table",
             "trading.claim_photo",
             "photographs may be added to an issued claim, as attachments (decision (1))",
+            "trading.discrepancy_photo",
+            "photographs may be added to an issued discrepancy, as attachments (decision (1))",
             "trading.payment_allocation",
             "an insert-only fact about an issued receipt, not an extension row (decision (2))",
             "trading.cheque",
@@ -691,6 +702,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         "trading.doc_order",
                         "trading.doc_grn_line",
                         "trading.claim_photo",
+                        "trading.discrepancy_photo",
                         "trading.payment_allocation");
         assertThat(WRITTEN_AFTER_ISSUE.keySet())
                 .as("every table written after issue is a row of a document")

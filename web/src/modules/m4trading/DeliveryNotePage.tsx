@@ -8,6 +8,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
 import { deliveryChip, errorText } from "./tradingView";
@@ -35,6 +36,14 @@ export function DeliveryNotePage() {
   const [driverName, setDriverName] = useState("");
 
   const note = useQuery({ queryKey: ["trading", "note", deliveryNoteId], queryFn: () => api.deliveryNote(deliveryNoteId) });
+  const isSeller = note.data !== undefined && note.data.sellerEntityId === scope.entityId;
+  const isBuyer = note.data !== undefined && note.data.buyerEntityId === scope.entityId;
+  const exposures = useQuery({
+    queryKey: ["trading", "exposures", "SELLER"],
+    queryFn: () => api.exposures("SELLER"),
+    enabled: isSeller
+  });
+
   useEffect(() => {
     if (note.data) {
       setVehicleRef((current) => current || note.data.vehicleRef || "");
@@ -75,8 +84,12 @@ export function DeliveryNotePage() {
   }
 
   const n = note.data;
-  const isSeller = n.sellerEntityId === scope.entityId;
-  const isBuyer = n.buyerEntityId === scope.entityId;
+  const exposure = exposures.data?.find((row) => row.buyerEntityId === n.buyerEntityId);
+  const isOverLimit =
+    isSeller &&
+    exposure?.creditLimit !== undefined &&
+    exposure.creditLimit !== null &&
+    exposure.amount > exposure.creditLimit;
   const failed = [issue, dispatch].find((m) => m.isError);
 
   return (
@@ -99,6 +112,32 @@ export function DeliveryNotePage() {
           { label: t("trading.field.dispatched_at").text, value: n.dispatchedAt && formatInstant(n.dispatchedAt) }
         ]}
       />
+
+      {isSeller && isOverLimit && exposure && (
+        <aside
+          role="status"
+          data-testid="exposure-warning-banner"
+          className="trading-warning-banner"
+          aria-label={t("trading.note.exposure_warning").text}
+        >
+          <p className="trading-warning">
+            {t("trading.note.exposure_warning").text}
+          </p>
+          <div className="trading-warning-banner__details">
+            <span>
+              {t("trading.exposure.amount").text}: <MoneyDisplay amount={exposure.amount} />
+            </span>
+            <span>·</span>
+            <span>
+              {t("trading.exposure.limit").text}: <MoneyDisplay amount={exposure.creditLimit!} />
+            </span>
+            <span>·</span>
+            <span className="trading-warning-banner__freshness">
+              {t("trading.note.exposure_freshness", undefined, { when: formatInstant(exposure.asOf) }).text}
+            </span>
+          </div>
+        </aside>
+      )}
 
       {isSeller && n.status === "ISSUED" && <p>{t("trading.note.reserved").text}</p>}
       {n.status === "IN_TRANSIT" && <p>{t("trading.note.in_transit").text}</p>}

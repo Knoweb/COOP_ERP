@@ -29,10 +29,14 @@ public record DiscrepancyView(
         Instant settledAt,
         UUID settledByUserId,
         String settlementReason,
+        List<Photo> photos,
         List<DiscrepancyLineView> lines) {
 
     public static final String RAISED = "RAISED";
     public static final String SETTLED = "SETTLED";
+
+    /** A photograph and its upload state: PENDING, COMPLETE or FAILED. */
+    public record Photo(UUID attachmentId, String status) {}
 
     /** A varying GRN line: {@code varianceQty} is received less expected (negative when short). */
     public record DiscrepancyLineView(

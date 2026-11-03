@@ -110,7 +110,7 @@ export function requestOf(form: SkuForm, existing?: Sku): SkuDetailsRequest {
     descriptionTa: optional(form.descriptionTa) ?? existing?.descriptionTa,
     baseUomCode: form.baseUomCode,
     soldByWeight: form.soldByWeight,
-    batchTracked: form.batchTracked,
+    batchTracked: form.batchTracked || form.expiryTracked,
     expiryTracked: form.expiryTracked,
     hasPrintedMrp: form.hasPrintedMrp,
     expiryWarningDays: expiryDays != null && !isNaN(expiryDays) ? expiryDays : existing?.expiryWarningDays,

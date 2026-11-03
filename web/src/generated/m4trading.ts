@@ -629,6 +629,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/discrepancies/{discrepancyId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise the upload of one photograph for a discrepancy
+         * @description Answers a URL the client PUTs the bytes to, with the content type given here. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, attachment.content_type_not_allowed, attachment.too_large.
+         */
+        post: operations["addDiscrepancyPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/discrepancies/{discrepancyId}/settle": {
         parameters: {
             query?: never;
@@ -986,6 +1008,45 @@ export interface paths {
          * @description Problems: m4.transfer.request_not_found, m4.transfer.decided.
          */
         post: operations["rejectTransferRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/opening-receivables/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk import inter-entity receivable opening balances from a sheet or rows
+         * @description Parses inter-entity receivable opening balances and registers them as authorized two-party signed invoices and opening receivable records.
+         */
+        post: operations["bulkImportReceivables"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/opening-receivables/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One opening receivable record with two-party signatures */
+        get: operations["getOpeningReceivable"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1509,6 +1570,7 @@ export interface components {
             /** Format: uuid */
             settledByUserId?: string;
             settlementReason?: string;
+            photos?: components["schemas"]["DiscrepancyPhotoStatusResponse"][];
             lines: components["schemas"]["DiscrepancyLineResponse"][];
         };
         DiscrepancyLineResponse: {
@@ -1696,6 +1758,24 @@ export interface components {
             grnLineId: string;
             qty: components["schemas"]["Quantity"];
         };
+        DiscrepancyPhotoRequest: {
+            contentType: string;
+            /** Format: int64 */
+            contentLength?: number;
+        };
+        DiscrepancyPhotoResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DiscrepancyPhotoStatusResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETE" | "FAILED";
+        };
         ClaimPhotoRequest: {
             contentType: string;
             /** Format: int64 */
@@ -1843,6 +1923,81 @@ export interface components {
             /** Format: uuid */
             skuId: string;
             qty: number;
+        };
+        BulkImportReceivablesRequest: {
+            /** Format: uuid */
+            sellerEntityId?: string;
+            sheet?: string;
+            rows?: components["schemas"]["ReceivableOpeningRowRequest"][];
+            /** @default false */
+            simulateSignatures: boolean;
+        };
+        ReceivableOpeningRowRequest: {
+            /** Format: uuid */
+            sellerEntityId?: string;
+            sellerCode?: string;
+            /** Format: uuid */
+            buyerEntityId?: string;
+            buyerCode?: string;
+            amount: number;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: date */
+            asOfDate?: string;
+            referenceNo?: string;
+            /** Format: uuid */
+            sellerSignedBy?: string;
+            sellerSigner?: string;
+            /** Format: uuid */
+            buyerSignedBy?: string;
+            buyerSigner?: string;
+            notes?: string;
+        };
+        BulkReceivableReport: {
+            /** Format: uuid */
+            importId: string;
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED";
+            totalRows: number;
+            importedCount: number;
+            documentIds: string[];
+            problems: components["schemas"]["ReceivableProblemResponse"][];
+        };
+        ReceivableProblemResponse: {
+            row: number;
+            code: string;
+            message: string;
+        };
+        OpeningReceivableResponse: {
+            /** Format: uuid */
+            openingReceivableId: string;
+            /** Format: uuid */
+            documentId: string;
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            sellerCode?: string;
+            sellerName?: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            buyerCode?: string;
+            buyerName?: string;
+            amount: number;
+            referenceNo?: string;
+            /** Format: uuid */
+            sellerSignedBy: string;
+            sellerSignerName?: string;
+            /** Format: date-time */
+            sellerSignedAt: string;
+            /** Format: uuid */
+            buyerSignedBy: string;
+            buyerSignerName?: string;
+            /** Format: date-time */
+            buyerSignedAt: string;
+            notes?: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -2935,6 +3090,37 @@ export interface operations {
             };
         };
     };
+    addDiscrepancyPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscrepancyPhotoRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorised */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyPhotoResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
     settleDiscrepancy: {
         parameters: {
             query?: never;
@@ -3488,8 +3674,66 @@ export interface operations {
                     "application/json": components["schemas"]["TransferRequestResponse"];
                 };
             };
+        };
+    };
+    bulkImportReceivables: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportReceivablesRequest"];
+            };
+        };
+        responses: {
+            /** @description Opening receivables imported */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReceivableReport"];
+                };
+            };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    getOpeningReceivable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The opening receivable */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningReceivableResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
 }

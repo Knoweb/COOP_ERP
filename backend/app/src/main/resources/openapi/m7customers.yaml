@@ -60,6 +60,288 @@ paths:
               schema: { $ref: '#/components/schemas/CustomerCard' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/bulk:
+    post:
+      tags: [Customers]
+      operationId: bulkImportCustomers
+      summary: Import customers/members in bulk from a sheet or payload
+      description: >
+        Loads members in bulk from a CSV sheet or list of member rows (CAT-10). Honours reuse detection
+        for recently released phone numbers when confirmedIdentity/confirmedReuse is set; otherwise
+        returns m7.customer.phone_reuse_confirm. Handles existing members matching NIC or phone.
+      x-permission: cus.customer.register
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkImportCustomersRequest' }
+      responses:
+        '200':
+          description: Import completed successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkCustomerReport' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty:
+    post:
+      tags: [Customers]
+      operationId: registerLoyaltyCustomer
+      summary: Register or enroll a customer in centralized loyalty with regional registration
+      description: >
+        Enrolls an existing customer or registers a new member with centralized loyalty identity
+        and regional registration details (PGL-M3-01). Preserves tenant and location scope isolation.
+      x-permission: cus.customer.register
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterLoyaltyCustomerRequest' }
+      responses:
+        '201':
+          description: Enrolled in loyalty; the loyalty profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyCustomerResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty/lookup:
+    get:
+      tags: [Customers]
+      operationId: lookupLoyaltyCustomer
+      summary: Look up a centralized loyalty customer by phone, NIC, member number, or customer ID across permitted branches
+      x-permission: cus.customer.view
+      x-federation-view: false
+      parameters:
+        - { in: query, name: phone, required: false, schema: { type: string, maxLength: 20 } }
+        - { in: query, name: nic, required: false, schema: { type: string, maxLength: 20 } }
+        - { in: query, name: customerId, required: false, schema: { type: string, format: uuid } }
+        - { in: query, name: memberNo, required: false, schema: { type: string, maxLength: 60 } }
+      responses:
+        '200':
+          description: The loyalty customer profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyCustomerResponse' }
+        '404':
+          description: Not found, or caller scope is not permitted to access this customer
+  /v1/customers/loyalty/eligibility:
+    get:
+      tags: [Customers]
+      operationId: checkLoyaltyEligibility
+      summary: Check loyalty eligibility and tier for a customer at a specified branch/location
+      x-permission: cus.customer.view
+      x-federation-view: false
+      parameters:
+        - { in: query, name: identifier, required: true, schema: { type: string, maxLength: 100 } }
+        - { in: query, name: locationId, required: false, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Eligibility evaluation result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyEligibilityResponse' }
+  /v1/customers/{customerId}/regional-registration:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Customers]
+      operationId: updateRegionalRegistration
+      summary: Update regional registration details and permitted branch access
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRegionalRegistrationRequest' }
+      responses:
+        '200':
+          description: Updated regional registration; returns loyalty profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyCustomerResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty/policy:
+    put:
+      tags: [Customers]
+      operationId: configureLoyaltyPolicy
+      summary: Configure or update the society loyalty reward and insurance policy
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfigureLoyaltyPolicyRequest' }
+      responses:
+        '200':
+          description: Policy configured successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyRewardPolicyResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+    get:
+      tags: [Customers]
+      operationId: getActiveLoyaltyPolicy
+      summary: Get the society active loyalty reward and insurance policy
+      x-permission: cus.customer.view
+      x-federation-view: false
+      responses:
+        '200':
+          description: Active loyalty policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyRewardPolicyResponse' }
+        '404':
+          description: No active policy found
+  /v1/customers/loyalty/spend:
+    post:
+      tags: [Customers]
+      operationId: recordLoyaltySpend
+      summary: Record qualifying customer spend transaction
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordLoyaltySpendRequest' }
+      responses:
+        '201':
+          description: Spend recorded successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecordLoyaltySpendResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty/rewards/calculate:
+    post:
+      tags: [Customers]
+      operationId: calculateMonthlyLoyaltyRewards
+      summary: Calculate monthly qualifying spend, rewards and insurance eligibility
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CalculateMonthlyLoyaltyRewardsRequest' }
+      responses:
+        '200':
+          description: Monthly evaluation completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalculateMonthlyLoyaltyRewardsResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty/{loyaltyId}/rewards:
+    parameters:
+      - { in: path, name: loyaltyId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Customers]
+      operationId: getLoyaltyRewards
+      summary: Get monthly reward records for a loyalty customer
+      x-permission: cus.customer.view
+      x-federation-view: false
+      parameters:
+        - { in: query, name: periodMonth, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' } }
+      responses:
+        '200':
+          description: Reward evaluations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LoyaltyMonthlyRewardResponse' }
+  /v1/customers/loyalty/{loyaltyId}/insurance-eligibility:
+    parameters:
+      - { in: path, name: loyaltyId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Customers]
+      operationId: checkInsuranceEligibility
+      summary: Evaluate insurance benefit eligibility for a customer as of a date
+      x-permission: cus.customer.view
+      x-federation-view: false
+      parameters:
+        - { in: query, name: asOfDate, required: false, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Insurance eligibility evaluation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyInsuranceEligibilityResponse' }
+  /v1/customers/loyalty/insurance-claims:
+    post:
+      tags: [Customers]
+      operationId: submitInsuranceClaim
+      summary: Submit a loyalty insurance benefit claim
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitInsuranceClaimRequest' }
+      responses:
+        '201':
+          description: Claim submitted and eligibility verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyInsuranceClaimResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/loyalty/insurance-claims/{claimId}:
+    parameters:
+      - { in: path, name: claimId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Customers]
+      operationId: getInsuranceClaim
+      summary: Get a loyalty insurance claim by claim ID
+      x-permission: cus.customer.view
+      x-federation-view: false
+      responses:
+        '200':
+          description: The insurance claim
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyInsuranceClaimResponse' }
+        '404':
+          description: Claim not found
+  /v1/customers/loyalty/insurance-claims/{claimId}/status:
+    parameters:
+      - { in: path, name: claimId, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Customers]
+      operationId: updateInsuranceClaimStatus
+      summary: Update the lifecycle status of an insurance claim
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateInsuranceClaimStatusRequest' }
+      responses:
+        '200':
+          description: Claim status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyInsuranceClaimResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/customers/{customerId}:
     parameters:
       - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
@@ -891,3 +1173,253 @@ components:
         allocated: { type: number }
         unallocated: { type: number }
         balance: { type: number, description: The account's balance after the payment }
+    BulkImportCustomersRequest:
+      type: object
+      properties:
+        sheet: { type: string }
+        confirmedReuse: { type: boolean, default: false }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/MemberRowRequest' }
+    MemberRowRequest:
+      type: object
+      required: [displayName, phone]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        displayNameSi: { type: [string, 'null'], maxLength: 120 }
+        displayNameTa: { type: [string, 'null'], maxLength: 120 }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: string, minLength: 9, maxLength: 20 }
+        nic: { type: [string, 'null'], maxLength: 20 }
+        creditLimit: { type: [number, 'null'], minimum: 0 }
+        termsDays: { type: [integer, 'null'], minimum: 1 }
+        offlineCap: { type: [number, 'null'], minimum: 0 }
+        tags:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 40 }
+        consents:
+          type: array
+          maxItems: 2
+          items: { type: string, enum: [CREDIT_ACCOUNT, STATEMENTS_NOTIFICATIONS] }
+        confirmedIdentity: { type: boolean, default: false }
+    BulkCustomerReport:
+      type: object
+      required: [importId, status, totalRows, registeredCount, updatedCount, failedCount, problems]
+      properties:
+        importId: { type: string, format: uuid }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY] }
+        totalRows: { type: integer }
+        registeredCount: { type: integer }
+        updatedCount: { type: integer }
+        failedCount: { type: integer }
+        problems:
+          type: array
+          items: { $ref: '#/components/schemas/MemberProblem' }
+    MemberProblem:
+      type: object
+      required: [rowNumber, nameOrPhone, field, reason]
+      properties:
+        rowNumber: { type: integer }
+        nameOrPhone: { type: string }
+        field: { type: string }
+        reason: { type: string }
+    RegisterLoyaltyCustomerRequest:
+      type: object
+      required: [registeredLocationId, regionCode]
+      properties:
+        customerId: { type: [string, 'null'], format: uuid }
+        displayName: { type: [string, 'null'], maxLength: 120 }
+        displayNameSi: { type: [string, 'null'], maxLength: 120 }
+        displayNameTa: { type: [string, 'null'], maxLength: 120 }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: [string, 'null'], maxLength: 20 }
+        nic: { type: [string, 'null'], maxLength: 20 }
+        registeredLocationId: { type: string, format: uuid }
+        regionCode: { type: string, maxLength: 32 }
+        regionalMemberNo: { type: [string, 'null'], maxLength: 60 }
+        loyaltyTier: { type: string, enum: [STANDARD, SILVER, GOLD, PLATINUM, MEMBER], default: STANDARD }
+        allLocationsPermitted: { type: boolean, default: true }
+        permittedLocationIds:
+          type: array
+          items: { type: string, format: uuid }
+        regionalAttributes:
+          type: object
+          additionalProperties: { type: string }
+    UpdateRegionalRegistrationRequest:
+      type: object
+      required: [registeredLocationId, regionCode]
+      properties:
+        registeredLocationId: { type: string, format: uuid }
+        regionCode: { type: string, maxLength: 32 }
+        regionalMemberNo: { type: [string, 'null'], maxLength: 60 }
+        loyaltyTier: { type: string, enum: [STANDARD, SILVER, GOLD, PLATINUM, MEMBER], default: STANDARD }
+        status: { type: string, enum: [ACTIVE, SUSPENDED, INACTIVE], default: ACTIVE }
+        allLocationsPermitted: { type: boolean, default: true }
+        permittedLocationIds:
+          type: array
+          items: { type: string, format: uuid }
+        regionalAttributes:
+          type: object
+          additionalProperties: { type: string }
+    LoyaltyCustomerResponse:
+      type: object
+      required: [loyaltyId, customerId, ownerEntityId, registeredLocationId, regionCode, loyaltyTier, status, allLocationsPermitted, isMember]
+      properties:
+        loyaltyId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        displayName: { type: [string, 'null'] }
+        displayNameSi: { type: [string, 'null'] }
+        displayNameTa: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        nicLast4: { type: [string, 'null'] }
+        registeredLocationId: { type: string, format: uuid }
+        regionCode: { type: string }
+        regionalMemberNo: { type: [string, 'null'] }
+        loyaltyTier: { type: string }
+        status: { type: string }
+        isMember: { type: boolean }
+        allLocationsPermitted: { type: boolean }
+        permittedLocationIds:
+          type: array
+          items: { type: string, format: uuid }
+        regionalAttributes:
+          type: object
+          additionalProperties: { type: string }
+        enrolledAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    LoyaltyEligibilityResponse:
+      type: object
+      required: [eligible, status, reason, isMember]
+      properties:
+        eligible: { type: boolean }
+        status: { type: string }
+        reason: { type: string }
+        isMember: { type: boolean }
+        memberNo: { type: [string, 'null'] }
+        customerId: { type: [string, 'null'], format: uuid }
+        locationId: { type: [string, 'null'], format: uuid }
+        loyaltyTier: { type: [string, 'null'] }
+        customer: { $ref: '#/components/schemas/LoyaltyCustomerResponse', nullable: true }
+    ConfigureLoyaltyPolicyRequest:
+      type: object
+      required: [policyName]
+      properties:
+        policyName: { type: string, maxLength: 100 }
+        monthlySpendThreshold: { type: number, minimum: 0 }
+        minMembershipMonths: { type: integer, minimum: 0 }
+        monthlyRewardPoints: { type: integer, minimum: 0 }
+        insuranceBenefitAmount: { type: number, minimum: 0 }
+        active: { type: boolean, default: true }
+    LoyaltyRewardPolicyResponse:
+      type: object
+      required: [policyId, ownerEntityId, policyName, monthlySpendThreshold, minMembershipMonths, monthlyRewardPoints, insuranceBenefitAmount, active]
+      properties:
+        policyId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        policyName: { type: string }
+        monthlySpendThreshold: { type: number }
+        minMembershipMonths: { type: integer }
+        monthlyRewardPoints: { type: integer }
+        insuranceBenefitAmount: { type: number }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RecordLoyaltySpendRequest:
+      type: object
+      required: [loyaltyId, amount]
+      properties:
+        loyaltyId: { type: string, format: uuid }
+        locationId: { type: [string, 'null'], format: uuid }
+        spendDate: { type: [string, 'null'], format: date }
+        amount: { type: number, minimum: 0.01 }
+        receiptNumber: { type: [string, 'null'], maxLength: 64 }
+    RecordLoyaltySpendResponse:
+      type: object
+      required: [spendId, loyaltyId, amount]
+      properties:
+        spendId: { type: string, format: uuid }
+        loyaltyId: { type: string, format: uuid }
+        amount: { type: number }
+    CalculateMonthlyLoyaltyRewardsRequest:
+      type: object
+      required: [periodMonth]
+      properties:
+        periodMonth: { type: string, pattern: '^\d{4}-\d{2}$' }
+        customerId: { type: [string, 'null'], format: uuid }
+    CalculateMonthlyLoyaltyRewardsResponse:
+      type: object
+      required: [periodMonth, evaluatedCount, rewardIds]
+      properties:
+        periodMonth: { type: string }
+        evaluatedCount: { type: integer }
+        rewardIds:
+          type: array
+          items: { type: string, format: uuid }
+    LoyaltyMonthlyRewardResponse:
+      type: object
+      required: [rewardId, loyaltyId, customerId, periodMonth, qualifyingSpend, spendThreshold, membershipMonths, minMembershipMonths, pointsAwarded, insuranceEligible, rewardStatus]
+      properties:
+        rewardId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        loyaltyId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        periodMonth: { type: string }
+        qualifyingSpend: { type: number }
+        spendThreshold: { type: number }
+        membershipMonths: { type: integer }
+        minMembershipMonths: { type: integer }
+        pointsAwarded: { type: integer }
+        insuranceEligible: { type: boolean }
+        rewardStatus: { type: string, enum: [AWARDED, DISQUALIFIED] }
+        disqualificationReason: { type: [string, 'null'] }
+        evaluatedAt: { type: string, format: date-time }
+    LoyaltyInsuranceEligibilityResponse:
+      type: object
+      required: [loyaltyId, eligible, reason, monthlyQualifyingSpend, spendThreshold, membershipMonths, minMembershipMonths, insuranceBenefitAmount, evaluatedAsOf]
+      properties:
+        loyaltyId: { type: string, format: uuid }
+        customerId: { type: [string, 'null'], format: uuid }
+        eligible: { type: boolean }
+        reason: { type: string }
+        monthlyQualifyingSpend: { type: number }
+        spendThreshold: { type: number }
+        membershipMonths: { type: integer }
+        minMembershipMonths: { type: integer }
+        insuranceBenefitAmount: { type: number }
+        evaluatedAsOf: { type: string, format: date }
+    SubmitInsuranceClaimRequest:
+      type: object
+      required: [loyaltyId, claimType, incidentDate, claimantRelationship, supportingDocumentRef]
+      properties:
+        loyaltyId: { type: string, format: uuid }
+        claimType: { type: string, enum: [DEATH_BENEFIT, HOSPITALIZATION, CRITICAL_ILLNESS, ACCIDENT, OTHER] }
+        incidentDate: { type: string, format: date }
+        claimantRelationship: { type: string, maxLength: 64 }
+        supportingDocumentRef: { type: string, maxLength: 100 }
+    LoyaltyInsuranceClaimResponse:
+      type: object
+      required: [claimId, loyaltyId, customerId, claimType, claimStatus, policyBenefitAmount, incidentDate, claimantRelationship, supportingDocumentRef, eligibilityVerified]
+      properties:
+        claimId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        loyaltyId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        claimType: { type: string }
+        claimStatus: { type: string, enum: [SUBMITTED, ELIGIBLE_SUPPORTED, APPROVED, REJECTED, SETTLED_EXTERNALLY] }
+        policyBenefitAmount: { type: number }
+        incidentDate: { type: string, format: date }
+        claimantRelationship: { type: string }
+        supportingDocumentRef: { type: string }
+        eligibilityVerified: { type: boolean }
+        eligibilitySnapshotJson: { type: [string, 'null'] }
+        rejectionReason: { type: [string, 'null'] }
+        submittedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UpdateInsuranceClaimStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [SUBMITTED, ELIGIBLE_SUPPORTED, APPROVED, REJECTED, SETTLED_EXTERNALLY] }
+        rejectionReason: { type: [string, 'null'] }

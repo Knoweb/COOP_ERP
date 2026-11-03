@@ -156,6 +156,67 @@ paths:
               schema: { $ref: '#/components/schemas/PickListResponse' }
         '404':
           description: No pick list for this delivery note, or the caller's scope may not see it
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override:
+    post:
+      tags: [Inventory]
+      operationId: overridePick
+      summary: Replace one FEFO-suggested lot before dispatch
+      description: >
+        The original pick line remains immutable. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid,
+        m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found,
+        m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original,
+        m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch,
+        m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+      x-permission: whs.pick
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OverridePickRequest' }
+      responses:
+        '204':
+          description: The replacement lot is now the effective reservation
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates:
+    get:
+      tags: [Inventory]
+      operationId: listPickReplacementCandidates
+      summary: Eligible replacement lots for one FEFO-suggested pick
+      description: >
+        Returns only in-date GOOD lots of the same SKU and source location with enough currently
+        unreserved stock for the whole pick line, excluding its original lot. The OverridePick
+        command locks and revalidates the selected lot because availability may change after this
+        read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+      x-permission: whs.pick
+      parameters:
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Currently eligible replacement lots in FEFO order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PickReplacementCandidateResponse' }
   /v1/inventory/opening-balances:
     post:
       tags: [Inventory]
@@ -181,6 +242,47 @@ paths:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/bulk:
+    post:
+      tags: [Inventory]
+      operationId: bulkImportOpeningStock
+      summary: Import opening stock in bulk from a sheet or rows
+      description: >
+        Parses opening stock data and registers it as an opening balance in status DRAFT,
+        awaiting signatures before becoming active. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding,
+        m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required,
+        m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+      x-permission: inv.opening.prepare
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkImportStockRequest' }
+      responses:
+        '201':
+          description: Opening stock imported and converted into opening balance awaiting signatures
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkStockReport' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/template:
+    get:
+      tags: [Inventory]
+      operationId: downloadOpeningStockTemplate
+      summary: Download official opening stock Excel spreadsheet template
+      x-permission: inv.stock.view
+      responses:
+        '200':
+          description: Excel spreadsheet template (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /v1/inventory/opening-balances/{openingBalanceId}:
     get:
       tags: [Inventory]
@@ -245,6 +347,33 @@ paths:
       responses:
         '200':
           description: Posted, with the OPB document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/{openingBalanceId}/reject:
+    post:
+      tags: [Inventory]
+      operationId: rejectOpeningBalance
+      summary: A higher officer rejects a draft or signed opening balance with a documented reason
+      description: >
+        Rejects an opening balance in DRAFT or SIGNED_ENTITY status, recording the officer and
+        reason, freeing the location for re-preparation.
+      x-permission: inv.opening.sign
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: openingBalanceId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectOpeningBalanceRequest' }
+      responses:
+        '200':
+          description: Rejected, in status REJECTED
           content:
             application/json:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
@@ -409,6 +538,233 @@ paths:
               schema: { $ref: '#/components/schemas/TransferResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  # ---- stock repricing & valuation adjustments (PGL-M2-03) ------------------
+  /v1/inventory/lots/{stockLotId}/reprice:
+    post:
+      tags: [Inventory]
+      operationId: repriceStockLot
+      summary: Reprice a stock lot or part of it with new unit cost and optional condition change
+      description: >
+        Conserves physical inventory quantity and revalues entity weighted average cost under IAS 2.
+        Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope,
+        m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded,
+        m5.reprice.invalid_cost, m5.reprice.reason_required.
+      x-permission: inv.stock.reprice
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: stockLotId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RepriceStockLotRequest' }
+      responses:
+        '200':
+          description: Stock lot repriced
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockRepricingResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/repricings:
+    get:
+      tags: [Inventory]
+      operationId: listRepricings
+      summary: List stock repricing history for a location and optionally an SKU
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Repricing history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockRepricingResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  # ---- reorder controls & low-stock evaluation (PGL-M2-01) ----------------------------------
+  /v1/inventory/reorder-controls:
+    get:
+      tags: [ReorderControls]
+      operationId: listReorderControls
+      summary: List reorder controls for a location
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Reorder control settings for the location
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReorderControlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+    put:
+      tags: [ReorderControls]
+      operationId: configureReorderControl
+      summary: Set or update reorder level, reorder quantity and max quantity for an SKU at a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfigureReorderControlRequest' }
+      responses:
+        '200':
+          description: Reorder control configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderControlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+    delete:
+      tags: [ReorderControls]
+      operationId: deleteReorderControl
+      summary: Delete reorder control for an SKU at a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Reorder control deleted
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/inventory/reorder-controls/evaluate:
+    post:
+      tags: [ReorderControls]
+      operationId: evaluateLowStock
+      summary: Trigger low stock evaluation for a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Number of low stock items detected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvaluateLowStockResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/inventory/locations/{locationId}/expiry-feed:
+    get:
+      tags: [ExpiryAlerts]
+      operationId: getExpiryAlertFeed
+      summary: Near-expiry stock alert feed for a location with remaining quantities and urgency tiers
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: windowDays
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 365 }
+        - in: query
+          name: tier
+          required: false
+          schema: { type: string, enum: [ALL, CRITICAL, WARNING, APPROACHING, EXPIRED] }
+      responses:
+        '200':
+          description: List of near-expiry stock lots with urgency tiers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExpiryAlertItemResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/inventory/locations/{locationId}/slow-moving:
+    get:
+      tags: [ExpiryAlerts]
+      operationId: getSlowMovingStock
+      summary: Slow-moving and stagnant stock items at a location
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: evaluationDays
+          required: false
+          schema: { type: integer, minimum: 7, maximum: 365 }
+        - in: query
+          name: thresholdDaysOfSupply
+          required: false
+          schema: { type: integer, minimum: 14, maximum: 730 }
+      responses:
+        '200':
+          description: List of slow-moving stock items with velocity metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SlowMovingStockResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/inventory/locations/{locationId}/expiry-alerts/scan:
+    post:
+      tags: [ExpiryAlerts]
+      operationId: scanExpiryAlerts
+      summary: Trigger evaluation and publishing of near-expiry and slow-moving alerts for a location
+      x-permission: inv.expiry.scan
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Alert scan evaluation summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpiryAlertScanResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
   # ---- stock control (M5-11, M5-13, repack): counts, write-offs, recipes, repacks ----------
   /v1/inventory/counts:
     get:
@@ -1069,14 +1425,109 @@ components:
           items: { $ref: '#/components/schemas/PickResponse' }
     PickResponse:
       type: object
-      required: [deliveryLineId, skuId, qty]
+      required: [pickLineId, deliveryLineId, skuId, qty]
       properties:
+        pickLineId: { type: string, format: uuid }
         deliveryLineId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         locationId: { type: string, format: uuid, description: 'absent on the short part of a line' }
         stockLotId: { type: string, format: uuid }
         batchId: { type: string, format: uuid }
         qty: { type: number }
+    OverridePickRequest:
+      type: object
+      required: [replacementStockLotId, reason]
+      properties:
+        replacementStockLotId: { type: string, format: uuid }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PickReplacementCandidateResponse:
+      type: object
+      required: [stockLotId, batchId, availableQty]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        availableQty: { type: number }
+    BulkImportStockRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+          default: COMMIT
+        sheet: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowRequest' }
+    StockRowRequest:
+      type: object
+      properties:
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string, maxLength: 40 }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        qty: { type: number, exclusiveMinimum: 0 }
+        unitCost: { type: number, minimum: 0 }
+        uom: { type: string }
+    BulkStockReport:
+      type: object
+      required: [status, totalRows, importedLines]
+      properties:
+        importId: { type: string, format: uuid }
+        openingBalanceId: { type: string, format: uuid }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY, VALID] }
+        totalRows: { type: integer }
+        importedLines: { type: integer }
+        validRows: { type: integer }
+        errorRows: { type: integer }
+        totalValuation: { type: number }
+        problems:
+          type: array
+          items: { $ref: '#/components/schemas/StockProblem' }
+        previewRows:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowPreview' }
+    StockProblem:
+      type: object
+      required: [line, message]
+      properties:
+        line: { type: integer }
+        sku: { type: string }
+        field: { type: string }
+        message: { type: string }
+    StockRowPreview:
+      type: object
+      required: [lineNo, status]
+      properties:
+        lineNo: { type: integer }
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        itemName: { type: string }
+        baseUom: { type: string }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qty: { type: number }
+        unitCost: { type: number }
+        extendedCost: { type: number }
+        batchTracked: { type: boolean }
+        expiryTracked: { type: boolean }
+        hasPrintedMrp: { type: boolean }
+        status: { type: string, enum: [VALID, ERROR] }
+        error: { type: string }
+    RejectOpeningBalanceRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 500 }
     PrepareOpeningBalanceRequest:
       type: object
       required: [locationId, lines]
@@ -1109,10 +1560,13 @@ components:
       properties:
         openingBalanceId: { type: string, format: uuid }
         locationId: { type: string, format: uuid }
-        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED] }
+        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED, REJECTED] }
         preparedBy: { type: string, format: uuid }
         signedEntityBy: { type: string, format: uuid }
         countersignedBy: { type: string, format: uuid }
+        rejectedBy: { type: string, format: uuid }
+        rejectedAt: { type: string, format: date-time }
+        rejectionReason: { type: string }
         documentId: { type: string, format: uuid }
         lines:
           type: array
@@ -1268,7 +1722,7 @@ components:
         category:
           type: string
           enum: [DAMAGED_IN_TRANSIT, DAMAGED_IN_STORE, EXPIRED, THEFT, SHRINKAGE_UNEXPLAINED, STAFF_CONSUMPTION,
-                 SAMPLES, DONATION, OTHER]
+                 SAMPLES, DONATION, OTHER, WASTE, SPOILAGE]
         note: { type: string, maxLength: 500 }
         lines:
           type: array
@@ -1399,3 +1853,97 @@ components:
         executedAt: { type: string, format: date-time }
         reversalReason: { type: string }
         reversedAt: { type: string, format: date-time }
+    ConfigureReorderControlRequest:
+      type: object
+      required: [locationId, skuId, reorderLevel, reorderQty]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        reorderLevel: { type: number, minimum: 0 }
+        reorderQty: { type: number, exclusiveMinimum: 0 }
+        maxQty: { type: number, minimum: 0 }
+    ReorderControlResponse:
+      type: object
+      required: [reorderControlId, ownerEntityId, locationId, skuId, reorderLevel, reorderQty, alertTriggered]
+      properties:
+        reorderControlId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        reorderLevel: { type: number }
+        reorderQty: { type: number }
+        maxQty: { type: number }
+        alertTriggered: { type: boolean }
+        lastAlertedAt: { type: string, format: date-time }
+        lastAlertQty: { type: number }
+        currentOnHandQty: { type: number }
+        currentAvailableQty: { type: number }
+    EvaluateLowStockResponse:
+      type: object
+      required: [evaluatedCount, alertsTriggeredCount]
+      properties:
+        evaluatedCount: { type: integer }
+        alertsTriggeredCount: { type: integer }
+    RepriceStockLotRequest:
+      type: object
+      required: [qty, newUnitCost, reason]
+      properties:
+        qty: { type: number, exclusiveMinimum: 0, description: 'Quantity to reprice' }
+        newUnitCost: { type: number, minimum: 0, description: 'New unit cost (>= 0)' }
+        targetCondition: { type: string, enum: [GOOD, DAMAGED], description: 'Target condition if condition is changed' }
+        reason: { type: string, minLength: 1, maxLength: 500, description: 'Reason for repricing' }
+    StockRepricingResponse:
+      type: object
+      required: [repricingId, stockLotId, skuId, batchId, condition, qtyAffected, previousUnitCost, newUnitCost, targetCondition, valueAdjustment, reason, repricedBy, repricedAt]
+      properties:
+        repricingId: { type: string, format: uuid }
+        stockLotId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qtyAffected: { type: number }
+        previousUnitCost: { type: number }
+        newUnitCost: { type: number }
+        targetCondition: { type: string, enum: [GOOD, DAMAGED] }
+        targetLotId: { type: string, format: uuid }
+        valueAdjustment: { type: number }
+        reason: { type: string }
+        repricedBy: { type: string, format: uuid }
+        repricedAt: { type: string, format: date-time }
+    ExpiryAlertItemResponse:
+      type: object
+      required: [stockLotId, locationId, skuId, batchId, batchNo, expiryDate, daysToExpiry, qtyOnHand, unitCost, urgencyTier, alertActive]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        daysToExpiry: { type: integer }
+        qtyOnHand: { type: number }
+        unitCost: { type: number }
+        urgencyTier: { type: string, enum: [CRITICAL, WARNING, APPROACHING, EXPIRED, HEALTHY] }
+        alertActive: { type: boolean }
+    SlowMovingStockResponse:
+      type: object
+      required: [locationId, skuId, qtyOnHand, unitCost, daysWithoutSale, salesInWindow, averageDailySales, daysOfSupply, classification, alertActive]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        qtyOnHand: { type: number }
+        unitCost: { type: number }
+        daysWithoutSale: { type: integer }
+        lastSaleDate: { type: string, format: date, nullable: true }
+        salesInWindow: { type: number }
+        averageDailySales: { type: number }
+        daysOfSupply: { type: number }
+        classification: { type: string, enum: [STAGNANT, SLOW_VELOCITY] }
+        alertActive: { type: boolean }
+    ExpiryAlertScanResponse:
+      type: object
+      required: [nearExpiryAlertsEmitted, slowMovingAlertsEmitted, totalEvaluated]
+      properties:
+        nearExpiryAlertsEmitted: { type: integer }
+        slowMovingAlertsEmitted: { type: integer }
+        totalEvaluated: { type: integer }

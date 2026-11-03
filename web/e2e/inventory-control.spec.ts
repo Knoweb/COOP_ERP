@@ -103,6 +103,8 @@ test("a warehouse user opens a real pick list with physical batch details", asyn
   const batch = table.locator("tbody td").nth(1);
   await expect(batch).not.toHaveText(textOf(stores, "inventory.loading"));
   await expect(batch).not.toHaveText(/[0-9a-f]{8}-[0-9a-f-]{27}/i);
+  // Demo trading history is already dispatched: immutable history must never offer a late override.
+  await expect(page.getByRole("button", { name: textOf(stores, "inventory.pick.override.open") })).toHaveCount(0);
 });
 
 test("expiry, loss and policy screens expose honest supported views", async ({ page }) => {

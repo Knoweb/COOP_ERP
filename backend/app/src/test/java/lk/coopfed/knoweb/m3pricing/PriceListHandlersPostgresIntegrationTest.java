@@ -29,13 +29,16 @@ import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.PriceListDrafted;
 import lk.coopfed.knoweb.m3pricing.api.PriceListLinesSet;
 import lk.coopfed.knoweb.m3pricing.api.PriceListPublished;
+import lk.coopfed.knoweb.m3pricing.api.PriceListWithdrawn;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
 import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
+import lk.coopfed.knoweb.m3pricing.api.WithdrawDraft;
 import lk.coopfed.knoweb.m3pricing.internal.list.CreatePriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
+import lk.coopfed.knoweb.m3pricing.internal.list.WithdrawDraftHandler;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
@@ -78,6 +81,9 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     PublishPriceListHandler publish;
+
+    @Autowired
+    WithdrawDraftHandler withdrawDraft;
 
     @Autowired
     PricingQueries queries;
@@ -214,10 +220,224 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(price(rice, "1", today)).isEqualByComparingTo("100");
         assertThat(price(rice, "1", today.plusDays(9))).isEqualByComparingTo("100");
         assertThat(price(rice, "1", today.plusDays(10))).isEqualByComparingTo("110");
+        assertThat(queries.lines(v1, own(FEDERATION)))
+                .allSatisfy(line -> assertThat(line.effectiveTo()).isEqualTo(today.plusDays(9)));
+        assertThat(queries.lines(v2, own(FEDERATION)))
+                .allSatisfy(line -> assertThat(line.effectiveFrom()).isEqualTo(today.plusDays(10)));
+
+        // The old version's price cannot be edited after closure.
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update("update pricing.price_list_line set price = 1" + " where price_list_id = ?", v1))
+                .hasMessageContaining("is not a draft");
         // The buyer reads both published versions of the bound list, never another list.
         assertThat(queries.listPriceLists(null, null, own(DISTRIBUTOR)))
                 .extracting(v -> v.priceListId())
                 .containsExactlyInAnyOrder(v1, v2);
+    }
+
+    @Test
+    void withdrawingDraftRecordsAuditAndEventAndAllowsAnotherVersion() {
+        UUID published = published(List.of(line(rice, "0", "100")), today);
+        UUID draft = draftNewVersion.handle(new DraftNewVersion(published), own(FEDERATION));
+        kernel.reset();
+
+        UUID withdrawn = withdrawDraft.handle(new WithdrawDraft(draft, "  Pricing revised  "), own(FEDERATION));
+
+        assertThat(withdrawn).isEqualTo(draft);
+        assertThat(queries.getPriceList(draft, own(FEDERATION))).get().satisfies(view -> assertThat(view.status())
+                .isEqualTo("WITHDRAWN"));
+        assertThat(queries.lines(draft, own(FEDERATION))).hasSize(1);
+
+        assertThat(audit("PRICELIST_WITHDRAWN")).singleElement().satisfies(record -> {
+            assertThat(record.subject().id()).isEqualTo(draft);
+            assertThat(((Map<?, ?>) record.after()).get("reason")).isEqualTo("Pricing revised");
+        });
+
+        assertThat(events(PriceListWithdrawn.class))
+                .containsExactly(new PriceListWithdrawn(draft, published, FEDERATION, "TRADE", 2));
+
+        refused(
+                () -> withdrawDraft.handle(new WithdrawDraft(draft, "Again"), own(FEDERATION)),
+                "m3.price_list.not_draft");
+
+        assertThat(audit("PRICELIST_WITHDRAWN")).hasSize(1);
+        assertThat(events(PriceListWithdrawn.class)).hasSize(1);
+
+        UUID replacement = draftNewVersion.handle(new DraftNewVersion(published), own(FEDERATION));
+
+        assertThat(queries.getPriceList(replacement, own(FEDERATION))).get().satisfies(view -> {
+            assertThat(view.status()).isEqualTo("DRAFT");
+            assertThat(view.version()).isEqualTo(3);
+            assertThat(view.rootPriceListId()).isEqualTo(published);
+        });
+    }
+
+    @Test
+    void withdrawalRefusesMissingReasonOtherOwnerAndPublishedVersion() {
+        UUID draft = create.handle(new CreatePriceList("TRADE", "Temporary"), own(FEDERATION));
+        UUID published = published(List.of(line(rice, "0", "100")), today);
+        kernel.reset();
+
+        refused(() -> withdrawDraft.handle(new WithdrawDraft(draft, " "), own(FEDERATION)), "request.field.required");
+        refused(() -> withdrawDraft.handle(new WithdrawDraft(draft, null), own(FEDERATION)), "request.field.required");
+        refused(
+                () -> withdrawDraft.handle(new WithdrawDraft(draft, "Other owner"), own(DISTRIBUTOR)),
+                "m3.price_list.not_found");
+        refused(() -> withdrawDraft.handle(new WithdrawDraft(draft, "At shop"), atShop(FEDERATION)), "scope.invalid");
+        refused(
+                () -> withdrawDraft.handle(new WithdrawDraft(published, "Cannot withdraw"), own(FEDERATION)),
+                "m3.price_list.not_draft");
+
+        assertThat(queries.getPriceList(draft, own(FEDERATION))).get().satisfies(view -> assertThat(view.status())
+                .isEqualTo("DRAFT"));
+        assertThat(audit("PRICELIST_WITHDRAWN")).isEmpty();
+        assertThat(events(PriceListWithdrawn.class)).isEmpty();
+    }
+
+    @Test
+    void draftingFromSupersededVersionRecordsWarningAndCopiesSelectedSource() {
+        UUID v1 = published(List.of(line(rice, "0", "100")), today);
+        UUID v2 = draftNewVersion.handle(new DraftNewVersion(v1), own(FEDERATION));
+
+        setLines.handle(new SetLines(v2, List.of(line(rice, "0", "120"))), own(FEDERATION));
+        publish.handle(new PublishPriceList(v2, today.plusDays(1)), own(FEDERATION));
+        kernel.reset();
+
+        // The caller deliberately chooses v1, not the newer v2.
+        UUID v3 = draftNewVersion.handle(new DraftNewVersion(v1), own(FEDERATION));
+
+        assertThat(queries.getPriceList(v3, own(FEDERATION))).get().satisfies(view -> {
+            assertThat(view.status()).isEqualTo("DRAFT");
+            assertThat(view.sourceVersionId()).isEqualTo(v1);
+            assertThat(view.version()).isEqualTo(3);
+        });
+
+        assertThat(queries.lines(v3, own(FEDERATION))).singleElement().satisfies(line -> assertThat(line.price())
+                .isEqualByComparingTo("100"));
+
+        assertThat(audit("PRICELIST_DRAFTED")).singleElement().satisfies(record -> assertThat(
+                        ((Map<?, ?>) record.after()).get("sourceSuperseded"))
+                .isEqualTo(true));
+    }
+
+    @Test
+    void tradePriceListAcceptsConvertedCasePricesAndResolvesCaseTiers() {
+        JdbcTemplate admin = superuserJdbc();
+        admin.update("insert into catalogue.uom (uom_code, name_en, is_weight)"
+                + " values ('CASE', 'Case', false) on conflict do nothing");
+        admin.update(
+                "insert into catalogue.sku_uom_conversion "
+                        + "(sku_id, uom_code, factor_to_base, effective_from,"
+                        + " effective_to, owner_entity_id)"
+                        + " values (?, 'CASE', 24, ?, null, ?)",
+                rice,
+                today.minusDays(1),
+                FEDERATION);
+        admin.update(
+                "insert into catalogue.batch "
+                        + "(batch_id, sku_id, batch_no, printed_mrp, owner_entity_id)"
+                        + " values (?, ?, 'PRC11-CASE', 120.00, ?)",
+                Ids.next(),
+                rice,
+                FEDERATION);
+
+        UUID list = create.handle(new CreatePriceList("TRADE", "Case prices"), own(FEDERATION));
+
+        SetLinesResult result = setLines.handle(
+                new SetLines(
+                        list,
+                        List.of(
+                                line(rice, "0", "100"),
+                                new SetLines.Line(rice, "CASE", BigDecimal.ZERO, new BigDecimal("2500")),
+                                new SetLines.Line(rice, "CASE", new BigDecimal("10"), new BigDecimal("2400")))),
+                own(FEDERATION));
+
+        assertThat(result.saved()).isTrue();
+        assertThat(result.outcomes()).allSatisfy(outcome -> {
+            assertThat(outcome.ok()).isTrue();
+            assertThat(outcome.review()).isNull();
+        });
+
+        publish.handle(new PublishPriceList(list, today), own(FEDERATION));
+        bind(list);
+
+        assertThat(queries.resolveTradePrice(RELATIONSHIP, rice, "CASE", new BigDecimal("9"), today, own(DISTRIBUTOR)))
+                .get()
+                .satisfies(price -> {
+                    assertThat(price.unitPrice()).isEqualByComparingTo("2500");
+                    assertThat(price.uomCode()).isEqualTo("CASE");
+                    assertThat(price.tierFromQty()).isEqualByComparingTo("0");
+                });
+
+        assertThat(queries.resolveTradePrice(RELATIONSHIP, rice, "CASE", new BigDecimal("12"), today, own(DISTRIBUTOR)))
+                .get()
+                .satisfies(price -> {
+                    assertThat(price.unitPrice()).isEqualByComparingTo("2400");
+                    assertThat(price.tierFromQty()).isEqualByComparingTo("10");
+                });
+
+        assertThat(queries.resolveTradePrice(RELATIONSHIP, rice, "EA", BigDecimal.ONE, today, own(DISTRIBUTOR)))
+                .get()
+                .satisfies(price -> assertThat(price.unitPrice()).isEqualByComparingTo("100"));
+    }
+
+    @Test
+    void tradeConversionMustBeInForceOnPublicationDate() {
+        JdbcTemplate admin = superuserJdbc();
+        admin.update("insert into catalogue.uom (uom_code, name_en, is_weight)"
+                + " values ('CASE', 'Case', false) on conflict do nothing");
+
+        UUID list = create.handle(new CreatePriceList("TRADE", "Dated conversion"), own(FEDERATION));
+
+        SetLines.Line caseLine = new SetLines.Line(rice, "CASE", BigDecimal.ZERO, new BigDecimal("2500"));
+
+        SetLinesResult noConversion = setLines.handle(new SetLines(list, List.of(caseLine)), own(FEDERATION));
+
+        assertThat(noConversion.saved()).isFalse();
+        assertThat(noConversion.outcomes()).singleElement().satisfies(outcome -> assertThat(outcome.reason())
+                .isEqualTo("m3.price_list.line.uom_invalid"));
+
+        admin.update(
+                "insert into catalogue.sku_uom_conversion "
+                        + "(sku_id, uom_code, factor_to_base, effective_from,"
+                        + " effective_to, owner_entity_id)"
+                        + " values (?, 'CASE', 24, ?, ?, ?)",
+                rice,
+                today.minusDays(7),
+                today,
+                FEDERATION);
+
+        SetLinesResult saved = setLines.handle(new SetLines(list, List.of(caseLine)), own(FEDERATION));
+        assertThat(saved.saved()).isTrue();
+
+        refused(
+                () -> publish.handle(new PublishPriceList(list, today.plusDays(1)), own(FEDERATION)),
+                "m3.price_list.lines_invalid");
+
+        assertThat(queries.getPriceList(list, own(FEDERATION))).get().satisfies(view -> assertThat(view.status())
+                .isEqualTo("DRAFT"));
+    }
+
+    @Test
+    void aSuccessorCannotBeginOnOrBeforeThePreviousVersion() {
+        UUID v1 = published(List.of(line(rice, "0", "100")), today);
+        UUID v2 = draftNewVersion.handle(new DraftNewVersion(v1), own(FEDERATION));
+        kernel.reset();
+
+        refused(
+                () -> publish.handle(new PublishPriceList(v2, today), own(FEDERATION)),
+                "m3.price_list.apply_from_not_after_previous");
+
+        assertThat(queries.getPriceList(v1, own(FEDERATION))).get().satisfies(view -> assertThat(view.status())
+                .isEqualTo("PUBLISHED"));
+
+        assertThat(queries.getPriceList(v2, own(FEDERATION))).get().satisfies(view -> assertThat(view.status())
+                .isEqualTo("DRAFT"));
+
+        assertThat(queries.lines(v1, own(FEDERATION)))
+                .allSatisfy(line -> assertThat(line.effectiveTo()).isNull());
+
+        assertThat(audit("PRICELIST_PUBLISHED")).isEmpty();
     }
 
     // ---- guards -----------------------------------------------------------------------------------

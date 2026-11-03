@@ -177,14 +177,13 @@ export function RepacksPage() {
 
   return (
     <main className="shell-page">
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <PageHeader
         icon="stock"
         title={t("inventory.title").text}
-        actions={
-          <Link className="action-link" to="/inventory">
-            <span>{t("inventory.back").text}</span>
-          </Link>
-        }
       />
 
       <div className="inventory-control-links">
@@ -206,47 +205,47 @@ export function RepacksPage() {
         <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
           <h2>{t("inventory.repack.recipes").text}</h2>
         </div>
-      {recipes.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.recipe.none").text}</p>}
-      {recipes.data && recipes.data.length > 0 && (
-        <div className="modern-table-scroll">
-          <table className="modern-table stock-table">
-          <thead>
-            <tr>
-              <th>{t("inventory.repack.recipe.name").text}</th>
-              <th>{t("inventory.repack.recipe.input").text}</th>
-              <th>{t("inventory.repack.recipe.output").text}</th>
-              <th>{t("inventory.repack.recipe.loss").text}</th>
-              <th>{t("inventory.repack.column.status").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {recipes.data.map((r) => (
-              <tr key={r.recipeId}>
-                <td>{r.name}</td>
-                <td>
-                  {`${r.inputQty} × `}
-                  <SkuLabel skuId={r.inputSkuId} />
-                </td>
-                <td>
-                  {`${r.outputQty} × `}
-                  <SkuLabel skuId={r.outputSkuId} />
-                </td>
-                <td className="numeric-cell">{r.expectedLossPct}</td>
-                <td>{t(`inventory.repack.recipe.status.${r.status}`).text}</td>
-                <td>
-                  {r.status === "ACTIVE" && canManage && (
-                    <button type="button" disabled={retire.isPending} onClick={() => retire.mutate(r.recipeId)}>
-                      {t("inventory.repack.recipe.retire").text}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      )}
+        {recipes.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.recipe.none").text}</p>}
+        {recipes.data && recipes.data.length > 0 && (
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
+              <thead>
+                <tr>
+                  <th>{t("inventory.repack.recipe.name").text}</th>
+                  <th>{t("inventory.repack.recipe.input").text}</th>
+                  <th>{t("inventory.repack.recipe.output").text}</th>
+                  <th>{t("inventory.repack.recipe.loss").text}</th>
+                  <th>{t("inventory.repack.column.status").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {recipes.data.map((r) => (
+                  <tr key={r.recipeId}>
+                    <td>{r.name}</td>
+                    <td>
+                      {`${r.inputQty} × `}
+                      <SkuLabel skuId={r.inputSkuId} />
+                    </td>
+                    <td>
+                      {`${r.outputQty} × `}
+                      <SkuLabel skuId={r.outputSkuId} />
+                    </td>
+                    <td className="numeric-cell">{r.expectedLossPct}</td>
+                    <td>{t(`inventory.repack.recipe.status.${r.status}`).text}</td>
+                    <td>
+                      {r.status === "ACTIVE" && canManage && (
+                        <button type="button" disabled={retire.isPending} onClick={() => retire.mutate(r.recipeId)}>
+                          {t("inventory.repack.recipe.retire").text}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {canManage && (
@@ -353,61 +352,61 @@ export function RepacksPage() {
       )}
 
       <section className="modern-table-card" style={{ marginTop: 'var(--space-4)' }}>
-      {locationId !== "" && (
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.repack.list").text}</h2>
-        </div>
-      )}
-      {repacks.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.none").text}</p>}
-      {repacks.data && repacks.data.length > 0 && (
-        <div className="modern-table-scroll">
-          <table className="modern-table stock-table">
-          <thead>
-            <tr>
-              <th>{t("inventory.card.column.when").text}</th>
-              <th>{t("inventory.repack.recipe.input").text}</th>
-              <th>{t("inventory.repack.recipe.output").text}</th>
-              <th>{t("inventory.repack.column.output_batch").text}</th>
-              <th>{t("inventory.repack.column.variance").text}</th>
-              <th>{t("inventory.repack.column.unit_cost").text}</th>
-              <th>{t("inventory.repack.column.status").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {repacks.data.map((r) => (
-              <tr key={r.repackId}>
-                <td>{r.executedAt ? formatInstant(r.executedAt) : ""}</td>
-                <td>
-                  {`${r.inputQty} × `}
-                  <SkuLabel skuId={r.inputSkuId} />
-                </td>
-                <td>
-                  {`${r.actualOutputQty} × `}
-                  <SkuLabel skuId={r.outputSkuId} />
-                </td>
-                <td>{isSyntheticBatchNo(r.outputBatchNo) ? t("inventory.field.batch_not_tracked").text : (r.outputBatchNo ?? "")}</td>
-                <td className="numeric-cell">{r.varianceQty}</td>
-                <td className="numeric-cell">{r.outputUnitCost == null ? "" : <MoneyDisplay amount={r.outputUnitCost} />}</td>
-                <td>
-                  <StateChip
-                    state={r.status === "REVERSED" ? "void" : "issued"}
-                    label={t(`inventory.repack.status.${r.status}`).text}
-                  />
-                </td>
-                <td>
-                  {r.status === "EXECUTED" && canReverse && (
-                    <button type="button" onClick={() => setReversing(r.repackId)}>
-                      {t("inventory.repack.reverse").text}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      )}
+        {locationId !== "" && (
+          <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+            <h2>{t("inventory.repack.list").text}</h2>
+          </div>
+        )}
+        {repacks.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.none").text}</p>}
+        {repacks.data && repacks.data.length > 0 && (
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
+              <thead>
+                <tr>
+                  <th>{t("inventory.card.column.when").text}</th>
+                  <th>{t("inventory.repack.recipe.input").text}</th>
+                  <th>{t("inventory.repack.recipe.output").text}</th>
+                  <th>{t("inventory.repack.column.output_batch").text}</th>
+                  <th>{t("inventory.repack.column.variance").text}</th>
+                  <th>{t("inventory.repack.column.unit_cost").text}</th>
+                  <th>{t("inventory.repack.column.status").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {repacks.data.map((r) => (
+                  <tr key={r.repackId}>
+                    <td>{r.executedAt ? formatInstant(r.executedAt) : ""}</td>
+                    <td>
+                      {`${r.inputQty} × `}
+                      <SkuLabel skuId={r.inputSkuId} />
+                    </td>
+                    <td>
+                      {`${r.actualOutputQty} × `}
+                      <SkuLabel skuId={r.outputSkuId} />
+                    </td>
+                    <td>{isSyntheticBatchNo(r.outputBatchNo) ? t("inventory.field.batch_not_tracked").text : (r.outputBatchNo ?? "")}</td>
+                    <td className="numeric-cell">{r.varianceQty}</td>
+                    <td className="numeric-cell">{r.outputUnitCost == null ? "" : <MoneyDisplay amount={r.outputUnitCost} />}</td>
+                    <td>
+                      <StateChip
+                        state={r.status === "REVERSED" ? "void" : "issued"}
+                        label={t(`inventory.repack.status.${r.status}`).text}
+                      />
+                    </td>
+                    <td>
+                      {r.status === "EXECUTED" && canReverse && (
+                        <button type="button" onClick={() => setReversing(r.repackId)}>
+                          {t("inventory.repack.reverse").text}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       {reversing && (
         <ReasonCapture

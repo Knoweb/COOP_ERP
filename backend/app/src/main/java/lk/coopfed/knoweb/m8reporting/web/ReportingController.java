@@ -1,54 +1,110 @@
 package lk.coopfed.knoweb.m8reporting.web;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import lk.coopfed.knoweb.kernel.api.PermissionResolver;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m8reporting.api.CreateProfitCenter;
 import lk.coopfed.knoweb.m8reporting.api.CreateShopTarget;
 import lk.coopfed.knoweb.m8reporting.api.ExportReportCsv;
+import lk.coopfed.knoweb.m8reporting.api.RegisterAsset;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.api.UpdateShopTarget;
+import lk.coopfed.knoweb.m8reporting.query.AssetFilter;
+import lk.coopfed.knoweb.m8reporting.query.AssetView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherLineView;
+import lk.coopfed.knoweb.m8reporting.query.CreditVoucherView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.CreditorsReport;
 import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
+import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
+import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsExpenses;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsReport;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
+import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyProfitCenterPnlReport;
 import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalanceItemView;
+import lk.coopfed.knoweb.m8reporting.query.OpeningBalancesReport;
+import lk.coopfed.knoweb.m8reporting.query.ProfitCenterView;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimatePlan;
+import lk.coopfed.knoweb.m8reporting.query.RevenueEstimateResult;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
+import lk.coopfed.knoweb.m8reporting.web.generated.AssetListResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.AssetResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreateProfitCenterRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateShopTargetRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditVoucherLineResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditVoucherPrintResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditVoucherResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditorSummaryItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.CreditorsReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardTile;
+import lk.coopfed.knoweb.m8reporting.web.generated.DebtorSummaryItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.DebtorsReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ExceptionItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.ExpenseCategoryResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.FinalAccountPayrollItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.FinalAccountsExpensesResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.FinalAccountsReportResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.GoodsSuppliedLineItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.GoodsSuppliedReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyDailyTrendItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyProfitCenterPnlResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportSummary;
+import lk.coopfed.knoweb.m8reporting.web.generated.OpeningBalanceItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.OpeningBalancesReportResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterListResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterPnlSummary;
+import lk.coopfed.knoweb.m8reporting.web.generated.ProfitCenterResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.RegisterAssetRequest;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportColumn;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDataResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDefinitionResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportRunResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportingApi;
 import lk.coopfed.knoweb.m8reporting.web.generated.RequestReportRunRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateAssumptions;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.RevenueEstimateResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetPerformanceItem;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetPerformanceResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ShopTargetResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.TrendPoint;
 import lk.coopfed.knoweb.m8reporting.web.generated.UpdateShopTargetRequest;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -72,8 +128,13 @@ class ReportingController implements ReportingApi {
     private final Handles<ExportReportCsv, ReportTable> exportCsv;
     private final Handles<CreateShopTarget, UUID> createTarget;
     private final Handles<UpdateShopTarget, Void> updateTarget;
+    private final Handles<CreateProfitCenter, UUID> createProfitCenterHandler;
+    private final Handles<RegisterAsset, UUID> registerAssetHandler;
     private final Messages messages;
     private final ObjectProvider<A4Renderer> renderer;
+    private final Clock clock;
+    private final PermissionResolver permissionResolver;
+    private final boolean enforcePermissions;
 
     ReportingController(
             ReportingQueries queries,
@@ -82,16 +143,26 @@ class ReportingController implements ReportingApi {
             Handles<ExportReportCsv, ReportTable> exportCsv,
             Handles<CreateShopTarget, UUID> createTarget,
             Handles<UpdateShopTarget, Void> updateTarget,
+            Handles<CreateProfitCenter, UUID> createProfitCenterHandler,
+            Handles<RegisterAsset, UUID> registerAssetHandler,
             Messages messages,
-            ObjectProvider<A4Renderer> renderer) {
+            ObjectProvider<A4Renderer> renderer,
+            Clock clock,
+            PermissionResolver permissionResolver,
+            @Value("${coop-erp.security.enforce-permissions:true}") boolean enforcePermissions) {
         this.queries = queries;
         this.currentScope = currentScope;
         this.requestRun = requestRun;
         this.exportCsv = exportCsv;
         this.createTarget = createTarget;
         this.updateTarget = updateTarget;
+        this.createProfitCenterHandler = createProfitCenterHandler;
+        this.registerAssetHandler = registerAssetHandler;
         this.messages = messages;
         this.renderer = renderer;
+        this.clock = clock;
+        this.permissionResolver = permissionResolver;
+        this.enforcePermissions = enforcePermissions;
     }
 
     @Override
@@ -487,5 +558,638 @@ class ReportingController implements ReportingApi {
                 .toList();
 
         return new MonthlyShopReportResponse(summaryDto, trendDto, shopsDto);
+    }
+
+    @Override
+    public ResponseEntity<ProfitCenterResponse> createProfitCenter(
+            String idempotencyKey, CreateProfitCenterRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID id = createProfitCenterHandler.handle(
+                new CreateProfitCenter(
+                        request.getCode(),
+                        request.getName(),
+                        request.getCategory() != null ? request.getCategory().getValue() : null,
+                        request.getLocationId()),
+                scope);
+
+        ProfitCenterView pc = queries.listProfitCenters(scope).stream()
+                .filter(c -> c.profitCenterId().equals(id))
+                .findFirst()
+                .orElseGet(() -> new ProfitCenterView(
+                        id,
+                        scope.entityId(),
+                        request.getCode(),
+                        request.getName(),
+                        request.getCategory() != null ? request.getCategory().getValue() : "GENERAL",
+                        request.getLocationId(),
+                        null,
+                        "ACTIVE",
+                        clock.instant()));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(toProfitCenterResponse(pc));
+    }
+
+    @Override
+    public ResponseEntity<ProfitCenterListResponse> listProfitCenters() {
+        List<ProfitCenterView> list = queries.listProfitCenters(currentScope.get());
+        List<ProfitCenterResponse> items =
+                list.stream().map(ReportingController::toProfitCenterResponse).toList();
+        return ResponseEntity.ok(new ProfitCenterListResponse(items));
+    }
+
+    @Override
+    public ResponseEntity<MonthlyProfitCenterPnlResponse> getMonthlyProfitCenterPnl(String month, UUID profitCenterId) {
+        MonthlyProfitCenterPnlReport report = queries.monthlyProfitCenterPnl(month, profitCenterId, currentScope.get());
+        return ResponseEntity.ok(toMonthlyProfitCenterPnlResponse(report));
+    }
+
+    private static ProfitCenterResponse toProfitCenterResponse(ProfitCenterView view) {
+        ProfitCenterResponse response = new ProfitCenterResponse(
+                view.profitCenterId(),
+                view.ownerEntityId(),
+                view.code(),
+                view.name(),
+                view.category(),
+                view.status(),
+                view.createdAt());
+        response.setLocationId(view.locationId());
+        response.setLocationName(view.locationName());
+        return response;
+    }
+
+    private static MonthlyProfitCenterPnlResponse toMonthlyProfitCenterPnlResponse(
+            MonthlyProfitCenterPnlReport report) {
+        ProfitCenterPnlSummary summaryDto = new ProfitCenterPnlSummary(
+                report.summary().totalRevenue().toPlainString(),
+                report.summary().costPending());
+        if (report.summary().totalCost() != null) {
+            summaryDto.setTotalCost(report.summary().totalCost().toPlainString());
+        }
+        if (report.summary().grossProfit() != null) {
+            summaryDto.setGrossProfit(report.summary().grossProfit().toPlainString());
+        }
+        if (report.summary().marginPercent() != null) {
+            summaryDto.setMarginPercent(report.summary().marginPercent().toPlainString());
+        }
+
+        List<ProfitCenterPnlItem> itemsDto =
+                report.items().stream().map(ReportingController::toPnlItemDto).toList();
+
+        MonthlyProfitCenterPnlResponse response =
+                new MonthlyProfitCenterPnlResponse(report.month(), report.currency(), summaryDto, itemsDto);
+
+        if (report.unallocated() != null) {
+            response.setUnallocated(toPnlItemDto(report.unallocated()));
+        }
+        return response;
+    }
+
+    private static ProfitCenterPnlItem toPnlItemDto(lk.coopfed.knoweb.m8reporting.query.ProfitCenterPnlItem item) {
+        ProfitCenterPnlItem dto = new ProfitCenterPnlItem(
+                item.code(),
+                item.name(),
+                item.category(),
+                item.revenue().toPlainString(),
+                item.costPending(),
+                item.txnCount());
+        dto.setProfitCenterId(item.profitCenterId());
+        dto.setLocationId(item.locationId());
+        dto.setLocationName(item.locationName());
+        if (item.cost() != null) {
+            dto.setCost(item.cost().toPlainString());
+        }
+        if (item.grossProfit() != null) {
+            dto.setGrossProfit(item.grossProfit().toPlainString());
+        }
+        if (item.marginPercent() != null) {
+            dto.setMarginPercent(item.marginPercent().toPlainString());
+        }
+        return dto;
+    }
+
+    @Override
+    public ResponseEntity<AssetResponse> registerAsset(String idempotencyKey, RegisterAssetRequest request) {
+        ScopeContext scope = currentScope.get();
+        final BigDecimal acquisitionCost = (request.getAcquisitionCost() != null
+                        && !request.getAcquisitionCost().isBlank())
+                ? new BigDecimal(request.getAcquisitionCost())
+                : null;
+        RegisterAsset command = new RegisterAsset(
+                request.getAssetCode(),
+                request.getName(),
+                request.getDescription(),
+                request.getAssetType() != null ? request.getAssetType().getValue() : null,
+                request.getLocationId(),
+                request.getAcquisitionDate(),
+                acquisitionCost);
+
+        UUID assetId = registerAssetHandler.handle(command, scope);
+
+        AssetView view = queries.getAsset(assetId, scope)
+                .orElseGet(() -> new AssetView(
+                        assetId,
+                        scope.entityId(),
+                        request.getAssetCode(),
+                        request.getName(),
+                        request.getDescription(),
+                        request.getAssetType() != null ? request.getAssetType().getValue() : "OTHER",
+                        request.getLocationId(),
+                        null,
+                        request.getAcquisitionDate(),
+                        acquisitionCost,
+                        "ACTIVE",
+                        clock.instant()));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(toAssetResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<AssetListResponse> listAssets(
+            @Nullable UUID locationId, @Nullable String assetType, @Nullable String status) {
+        ScopeContext scope = currentScope.get();
+        if (scope.locationId() != null
+                && locationId != null
+                && !scope.locationId().equals(locationId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : locationId;
+        AssetFilter filter = new AssetFilter(effectiveLocationId, assetType, status);
+        List<AssetView> assets = queries.listAssets(filter, scope);
+        List<AssetResponse> items =
+                assets.stream().map(ReportingController::toAssetResponse).toList();
+        return ResponseEntity.ok(new AssetListResponse(items));
+    }
+
+    @Override
+    public ResponseEntity<AssetResponse> getAsset(UUID assetId) {
+        ScopeContext scope = currentScope.get();
+        Optional<AssetView> asset = queries.getAsset(assetId, scope);
+        return asset.map(view -> ResponseEntity.ok(toAssetResponse(view)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private static AssetResponse toAssetResponse(AssetView view) {
+        AssetResponse response = new AssetResponse(
+                view.assetId(),
+                view.ownerEntityId(),
+                view.assetCode(),
+                view.name(),
+                view.assetType(),
+                view.status(),
+                view.createdAt());
+        response.setDescription(view.description());
+        response.setLocationId(view.locationId());
+        response.setLocationName(view.locationName());
+        response.setAcquisitionDate(view.acquisitionDate());
+        if (view.acquisitionCost() != null) {
+            response.setAcquisitionCost(view.acquisitionCost().toPlainString());
+        }
+        return response;
+    }
+
+    @Override
+    public ResponseEntity<RevenueEstimateResponse> estimateRevenue(
+            String idempotencyKey, RevenueEstimateRequest request) {
+        ScopeContext scope = currentScope.get();
+        if (scope.policyClass() != PolicyClass.OWN || scope.userId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        if (enforcePermissions && !permissionResolver.allows(scope, "rpt.target.view")) {
+            throw new ProblemException("permission.denied", Map.of("permission", "rpt.target.view"));
+        }
+        if (request == null) {
+            throw new ProblemException("m8.estimator.mix_empty");
+        }
+        if (scope.locationId() != null
+                && request.getLocationId() != null
+                && !scope.locationId().equals(request.getLocationId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : request.getLocationId();
+
+        BigDecimal targetRevenue;
+        try {
+            targetRevenue = request.getTargetRevenue() != null ? new BigDecimal(request.getTargetRevenue()) : null;
+        } catch (NumberFormatException e) {
+            throw new ProblemException("m8.estimator.target_revenue_invalid");
+        }
+
+        List<RevenueEstimatePlan.MixItem> items = request.getItems() == null
+                ? List.of()
+                : request.getItems().stream()
+                        .map(i -> {
+                            BigDecimal mix;
+                            try {
+                                mix = i.getMixPercent() != null ? new BigDecimal(i.getMixPercent()) : null;
+                            } catch (NumberFormatException e) {
+                                throw new ProblemException("m8.estimator.mix_must_equal_100");
+                            }
+                            return new RevenueEstimatePlan.MixItem(i.getSkuId(), mix);
+                        })
+                        .toList();
+
+        RevenueEstimatePlan plan = new RevenueEstimatePlan(
+                targetRevenue,
+                effectiveLocationId,
+                request.getPriceType() != null ? request.getPriceType().toString() : "RETAIL",
+                request.getBusinessDate(),
+                items);
+
+        RevenueEstimateResult result = queries.estimateRevenue(plan, scope);
+        return ResponseEntity.ok(toResponse(result));
+    }
+
+    private static RevenueEstimateResponse toResponse(RevenueEstimateResult result) {
+        RevenueEstimateResponse response = new RevenueEstimateResponse();
+        response.setTargetRevenue(result.targetRevenue().toPlainString());
+        response.setTotalEstimatedRevenue(result.totalEstimatedRevenue().toPlainString());
+        response.setTargetVariance(result.targetVariance().toPlainString());
+        response.setTotalMixPercent(result.totalMixPercent().toPlainString());
+        response.setCurrency(result.currency());
+        response.setLocationId(result.locationId());
+        response.setPriceType(result.priceType());
+        response.setBusinessDate(result.businessDate());
+
+        List<RevenueEstimateItemResponse> itemDtos = result.items().stream()
+                .map(item -> {
+                    RevenueEstimateItemResponse dto = new RevenueEstimateItemResponse();
+                    dto.setSkuId(item.skuId());
+                    dto.setSkuCode(item.skuCode());
+                    dto.setSkuName(item.skuName());
+                    dto.setUomCode(item.uomCode());
+                    dto.setUnitPrice(item.unitPrice().toPlainString());
+                    dto.setPriceSource(item.priceSource());
+                    dto.setMixPercent(item.mixPercent().toPlainString());
+                    dto.setTargetShare(item.targetShare().toPlainString());
+                    dto.setRawQuantity(item.rawQuantity().toPlainString());
+                    dto.setRoundedQuantity(item.roundedQuantity().toPlainString());
+                    dto.setEstimatedRevenue(item.estimatedRevenue().toPlainString());
+                    dto.setRoundingVariance(item.roundingVariance().toPlainString());
+                    return dto;
+                })
+                .toList();
+        response.setItems(itemDtos);
+
+        RevenueEstimateAssumptions assumptionsDto = new RevenueEstimateAssumptions();
+        assumptionsDto.setTargetRevenue(result.assumptions().targetRevenue());
+        assumptionsDto.setLocationId(result.assumptions().locationId());
+        assumptionsDto.setPriceType(result.assumptions().priceType());
+        assumptionsDto.setBusinessDate(result.businessDate());
+        assumptionsDto.setRoundingMethod(result.assumptions().roundingMethod());
+        assumptionsDto.setPriceResolutionPolicy(result.assumptions().priceResolutionPolicy());
+        response.setAssumptions(assumptionsDto);
+
+        return response;
+    }
+
+    @Override
+    public ResponseEntity<DebtorsReportResponse> listDebtorsReport(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        DebtorsReport report = queries.debtorsReport(asOf, scope);
+        DebtorsReportResponse response = new DebtorsReportResponse(
+                report.asOf(),
+                report.items().stream()
+                        .map(ReportingController::toDebtorItemResponse)
+                        .toList(),
+                report.totalOpenInvoices().toPlainString(),
+                report.totalUnappliedReceipts().toPlainString(),
+                report.totalUnappliedCredits().toPlainString(),
+                report.totalNetExposure().toPlainString());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportDebtorsReportCsv(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        DebtorsReport report = queries.debtorsReport(asOf, scope);
+        String name = "debtors_" + (asOf != null ? asOf : report.asOf()) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeDebtors(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<CreditorsReportResponse> listCreditorsReport(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        CreditorsReport report = queries.creditorsReport(asOf, scope);
+        CreditorsReportResponse response = new CreditorsReportResponse(
+                report.asOf(),
+                report.items().stream()
+                        .map(ReportingController::toCreditorItemResponse)
+                        .toList(),
+                report.totalOpenInvoices().toPlainString(),
+                report.totalUnappliedPayments().toPlainString(),
+                report.totalUnappliedCredits().toPlainString(),
+                report.totalNetLiability().toPlainString());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportCreditorsReportCsv(LocalDate asOf) {
+        ScopeContext scope = currentScope.get();
+        CreditorsReport report = queries.creditorsReport(asOf, scope);
+        String name = "creditors_" + (asOf != null ? asOf : report.asOf()) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeCreditors(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<OpeningBalancesReportResponse> listOpeningBalancesReport(UUID counterpartyId) {
+        ScopeContext scope = currentScope.get();
+        OpeningBalancesReport report = queries.openingBalancesReport(counterpartyId, scope);
+        OpeningBalancesReportResponse response = new OpeningBalancesReportResponse(
+                report.items().stream()
+                        .map(ReportingController::toOpeningBalanceItemResponse)
+                        .toList(),
+                report.totalAmount().toPlainString());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportOpeningBalancesReportCsv(UUID counterpartyId) {
+        ScopeContext scope = currentScope.get();
+        OpeningBalancesReport report = queries.openingBalancesReport(counterpartyId, scope);
+        String name = "opening_balances" + (counterpartyId != null ? "_" + counterpartyId : "") + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeOpeningBalances(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<GoodsSuppliedReportResponse> getGoodsSuppliedReport(
+            LocalDate from, LocalDate to, UUID societyId, UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        GoodsSuppliedReport report = queries.goodsSuppliedReport(from, to, societyId, locationId, scope);
+        GoodsSuppliedReportResponse response = new GoodsSuppliedReportResponse(
+                report.lines().stream()
+                        .map(ReportingController::toGoodsSuppliedLineResponse)
+                        .toList(),
+                report.totalQuantity().toPlainString(),
+                report.totalNetAmount().toPlainString(),
+                report.totalTaxAmount().toPlainString(),
+                report.totalGrossAmount().toPlainString(),
+                report.lineCount());
+        response.setFrom(report.from());
+        response.setTo(report.to());
+        response.setSocietyId(report.societyId());
+        response.setLocationId(report.locationId());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<String> exportGoodsSuppliedReportCsv(
+            LocalDate from, LocalDate to, UUID societyId, UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        GoodsSuppliedReport report = queries.goodsSuppliedReport(from, to, societyId, locationId, scope);
+        String name = "goods_supplied" + (from != null ? "_" + from + "_" + to : "") + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(name).build().toString())
+                .body(ReportCsv.writeGoodsSupplied(report, messages, scope.locale()));
+    }
+
+    @Override
+    public ResponseEntity<CreditVoucherResponse> getCreditVoucher(UUID invoiceId) {
+        ScopeContext scope = currentScope.get();
+        CreditVoucherView voucher = queries.getCreditVoucher(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m8.finance.invoice_not_found"));
+        CreditVoucherResponse response = new CreditVoucherResponse(
+                voucher.voucherNumber(),
+                voucher.invoiceId(),
+                voucher.invoiceDocNumber(),
+                voucher.date(),
+                voucher.buyerEntityId(),
+                voucher.buyerName(),
+                voucher.sellerEntityId(),
+                voucher.sellerName(),
+                voucher.sourceTransactionReference(),
+                voucher.netAmount().toPlainString(),
+                voucher.taxAmount().toPlainString(),
+                voucher.grossAmount().toPlainString(),
+                voucher.lines().stream()
+                        .map(ReportingController::toCreditVoucherLineResponse)
+                        .toList());
+        response.setBuyerCode(voucher.buyerCode());
+        response.setSellerCode(voucher.sellerCode());
+        response.setSellerVatNo(voucher.sellerVatNo());
+        response.setBuyerVatNo(voucher.buyerVatNo());
+        response.setStatus(voucher.status());
+        response.setNotes(voucher.notes());
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<CreditVoucherPrintResponse> printCreditVoucher(UUID invoiceId) {
+        ScopeContext scope = currentScope.get();
+        CreditVoucherView voucher = queries.getCreditVoucher(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m8.finance.invoice_not_found"));
+        URI url = queries.renderCreditVoucher(invoiceId, scope);
+        CreditVoucherPrintResponse response = new CreditVoucherPrintResponse(invoiceId, voucher.voucherNumber(), url);
+        return ResponseEntity.ok(response);
+    }
+
+    private static DebtorSummaryItem toDebtorItemResponse(DebtorSummaryItemView item) {
+        DebtorSummaryItem dto = new DebtorSummaryItem(
+                item.counterpartyId(),
+                item.counterpartyCode(),
+                item.counterpartyName(),
+                item.openInvoices().toPlainString(),
+                item.acceptedNotInvoiced().toPlainString(),
+                item.unappliedReceipts().toPlainString(),
+                item.unappliedCredits().toPlainString(),
+                item.netExposure().toPlainString());
+        if (item.creditLimit() != null) {
+            dto.setCreditLimit(item.creditLimit().toPlainString());
+        }
+        dto.setWarnThresholdPercent(item.warnThresholdPercent());
+        return dto;
+    }
+
+    private static CreditorSummaryItem toCreditorItemResponse(CreditorSummaryItemView item) {
+        return new CreditorSummaryItem(
+                item.counterpartyId(),
+                item.counterpartyCode(),
+                item.counterpartyName(),
+                item.openInvoices().toPlainString(),
+                item.acceptedNotInvoiced().toPlainString(),
+                item.unappliedPayments().toPlainString(),
+                item.unappliedCredits().toPlainString(),
+                item.netLiability().toPlainString());
+    }
+
+    private static OpeningBalanceItem toOpeningBalanceItemResponse(OpeningBalanceItemView item) {
+        OpeningBalanceItem dto = new OpeningBalanceItem(
+                item.openingReceivableId(),
+                item.docNumberDisplay(),
+                item.counterpartyId(),
+                item.counterpartyCode(),
+                item.counterpartyName(),
+                item.role(),
+                item.amount().toPlainString(),
+                item.createdAt());
+        dto.setReferenceNo(item.referenceNo());
+        dto.setNotes(item.notes());
+        dto.setSignedAt(item.signedAt());
+        return dto;
+    }
+
+    private static GoodsSuppliedLineItem toGoodsSuppliedLineResponse(GoodsSuppliedLineItemView line) {
+        return new GoodsSuppliedLineItem(
+                line.invoiceId(),
+                line.invoiceDocNumber(),
+                line.invoiceDate(),
+                line.societyEntityId(),
+                line.societyName(),
+                line.skuId(),
+                line.skuCode(),
+                line.skuName(),
+                line.uomCode(),
+                line.quantity().toPlainString(),
+                line.unitPrice().toPlainString(),
+                line.taxRatePercent().toPlainString(),
+                line.taxAmount().toPlainString(),
+                line.lineTotal().toPlainString());
+    }
+
+    private static CreditVoucherLineResponse toCreditVoucherLineResponse(CreditVoucherLineView line) {
+        return new CreditVoucherLineResponse(
+                line.lineNo(),
+                line.skuId(),
+                line.skuCode(),
+                line.skuName(),
+                line.uomCode(),
+                line.quantity().toPlainString(),
+                line.unitPrice().toPlainString(),
+                line.taxRatePercent().toPlainString(),
+                line.taxAmount().toPlainString(),
+                line.lineTotal().toPlainString());
+    }
+
+    @Override
+    public ResponseEntity<FinalAccountsReportResponse> getFinalAccounts(String period) {
+        ScopeContext scope = currentScope.get();
+        FinalAccountsReport report = queries.finalAccounts(period, scope);
+        return ResponseEntity.ok(toFinalAccountsReportResponse(report));
+    }
+
+    @Override
+    public ResponseEntity<FinalAccountsExpensesResponse> getFinalAccountsExpenses(String period) {
+        ScopeContext scope = currentScope.get();
+        FinalAccountsExpenses expenses = queries.finalAccountsExpenses(period, scope);
+        return ResponseEntity.ok(toFinalAccountsExpensesResponse(expenses));
+    }
+
+    @Override
+    public ResponseEntity<String> exportFinalAccountsCsv(String period) {
+        ScopeContext scope = currentScope.get();
+        FinalAccountsReport report = queries.finalAccounts(period, scope);
+        Locale locale = scope != null && scope.lang() != null ? Locale.forLanguageTag(scope.lang()) : Locale.ENGLISH;
+        String csv = ReportCsv.writeFinalAccounts(report, messages, locale);
+        String filename = "final_accounts_" + report.period() + ".csv";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv);
+    }
+
+    private static FinalAccountsReportResponse toFinalAccountsReportResponse(FinalAccountsReport report) {
+        List<ExpenseCategoryResponse> catDtos = report.expenseCategories().stream()
+                .map(ReportingController::toExpenseCategoryResponse)
+                .toList();
+        List<FinalAccountPayrollItemResponse> payrollDtos = report.payrollContributions().stream()
+                .map(ReportingController::toFinalAccountPayrollItemResponse)
+                .toList();
+
+        FinalAccountsReportResponse.StatusEnum statusEnum =
+                FinalAccountsReportResponse.StatusEnum.fromValue(report.status());
+
+        FinalAccountsReportResponse res = new FinalAccountsReportResponse(
+                report.period(),
+                report.currency(),
+                statusEnum,
+                report.revenue().toPlainString(),
+                report.costPending(),
+                report.payrollExpenses().toPlainString(),
+                report.otherExpensesPending(),
+                catDtos,
+                payrollDtos);
+
+        res.setStatusReason(report.statusReason());
+        if (report.cogs() != null) {
+            res.setCogs(report.cogs().toPlainString());
+        }
+        if (report.grossProfit() != null) {
+            res.setGrossProfit(report.grossProfit().toPlainString());
+        }
+        if (report.grossProfitMarginPercent() != null) {
+            res.setGrossProfitMarginPercent(report.grossProfitMarginPercent().toPlainString());
+        }
+        if (report.otherExpenses() != null) {
+            res.setOtherExpenses(report.otherExpenses().toPlainString());
+        }
+        if (report.totalExpenses() != null) {
+            res.setTotalExpenses(report.totalExpenses().toPlainString());
+        }
+        if (report.operatingProfit() != null) {
+            res.setOperatingProfit(report.operatingProfit().toPlainString());
+        }
+        if (report.operatingProfitMarginPercent() != null) {
+            res.setOperatingProfitMarginPercent(
+                    report.operatingProfitMarginPercent().toPlainString());
+        }
+        return res;
+    }
+
+    private static ExpenseCategoryResponse toExpenseCategoryResponse(FinalAccountsReport.ExpenseCategoryItem item) {
+        ExpenseCategoryResponse res = new ExpenseCategoryResponse(item.category(), item.categoryName(), item.status());
+        if (item.amount() != null) {
+            res.setAmount(item.amount().toPlainString());
+        }
+        res.setNotes(item.notes());
+        return res;
+    }
+
+    private static FinalAccountPayrollItemResponse toFinalAccountPayrollItemResponse(
+            FinalAccountsReport.PayrollContributionLineItem item) {
+        FinalAccountPayrollItemResponse res = new FinalAccountPayrollItemResponse(
+                item.contributionId(),
+                item.employeeId(),
+                item.employeeNo(),
+                item.employeeName(),
+                item.contributionType(),
+                item.approvedAmount().toPlainString(),
+                item.approvedOtMinutes(),
+                item.status());
+        res.setApprovedAt(item.approvedAt());
+        return res;
+    }
+
+    private static FinalAccountsExpensesResponse toFinalAccountsExpensesResponse(FinalAccountsExpenses expenses) {
+        List<ExpenseCategoryResponse> catDtos = expenses.categories().stream()
+                .map(ReportingController::toExpenseCategoryResponse)
+                .toList();
+        List<FinalAccountPayrollItemResponse> payrollDtos = expenses.contributions().stream()
+                .map(ReportingController::toFinalAccountPayrollItemResponse)
+                .toList();
+
+        return new FinalAccountsExpensesResponse(
+                expenses.period(),
+                expenses.currency(),
+                expenses.totalPayrollExpenses().toPlainString(),
+                expenses.contributionCount(),
+                catDtos,
+                payrollDtos);
     }
 }

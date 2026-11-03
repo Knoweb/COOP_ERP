@@ -1,11 +1,11 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { usePricingApi } from "./pricingApi";
 import type { MrpPolicy, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
@@ -31,7 +31,7 @@ export function MrpPolicyPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("pricing.policy.title").text}</h1>
+      <PageHeader icon="mrp-policy" title={t("pricing.policy.title").text} />
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.policy.intro").text}</p>
 
@@ -56,7 +56,7 @@ export function MrpPolicyPage() {
                 <tbody>
                   {policies.data.map((policy) => (
                     <tr key={`${policy.skuId}/${policy.source}`}>
-                      <td>
+                      <td className="pricing-cell-item">
                         <SkuName skuId={policy.skuId} />
                       </td>
                       <td>{t(`pricing.policy.${policy.policy.toLowerCase()}`).text}</td>
@@ -88,6 +88,38 @@ function SetPolicyForm({ onSet }: { onSet: () => void }) {
   const [policy, setPolicy] = useState<PolicyKind>("AUTO_LOWEST");
   const [gapAmount, setGapAmount] = useState("");
   const [gapPercent, setGapPercent] = useState("");
+
+  const policyOptions: Array<{ value: PolicyKind; label: string; icon: ReactNode }> = [
+    {
+      value: "AUTO_LOWEST",
+      label: t("pricing.policy.auto_lowest").text,
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M19 12l-7 7-7-7" />
+        </svg>
+      )
+    },
+    {
+      value: "BARCODE_RESOLVED",
+      label: t("pricing.policy.barcode_resolved").text,
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14" />
+        </svg>
+      )
+    },
+    {
+      value: "PICKER",
+      label: t("pricing.policy.picker").text,
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M19 8v6M22 11h-6" />
+        </svg>
+      )
+    }
+  ];
 
   const set = useMutation({
     mutationFn: () =>
@@ -131,14 +163,39 @@ function SetPolicyForm({ onSet }: { onSet: () => void }) {
         <SkuPicker onPick={setSku} />
       )}
       <form onSubmit={submit} className="pricing-form-grid">
-        <label className="pricing-form-field">
-          {t("pricing.column.policy").text}
-          <select value={policy} onChange={(event) => setPolicy(event.target.value as PolicyKind)}>
+        <div className="pricing-form-field">
+          <label htmlFor="pricing-policy-select" className="pricing-field-label">
+            {t("pricing.column.policy").text}
+          </label>
+          <div className="pricing-policy-options" role="radiogroup" aria-label={t("pricing.column.policy").text}>
+            {policyOptions.map((opt) => {
+              const isSelected = policy === opt.value;
+              return (
+                <button
+                  type="button"
+                  key={opt.value}
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={`pricing-policy-option${isSelected ? " pricing-policy-option--selected" : ""}`}
+                  onClick={() => setPolicy(opt.value)}
+                >
+                  <span className="pricing-policy-option__icon">{opt.icon}</span>
+                  <span className="pricing-policy-option__label">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <select
+            id="pricing-policy-select"
+            className="pricing-select pricing-policy-native-select"
+            value={policy}
+            onChange={(event) => setPolicy(event.target.value as PolicyKind)}
+          >
             <option value="AUTO_LOWEST">{t("pricing.policy.auto_lowest").text}</option>
             <option value="BARCODE_RESOLVED">{t("pricing.policy.barcode_resolved").text}</option>
             <option value="PICKER">{t("pricing.policy.picker").text}</option>
           </select>
-        </label>
+        </div>
         {policy === "PICKER" && (
           <>
             <label className="pricing-form-field">

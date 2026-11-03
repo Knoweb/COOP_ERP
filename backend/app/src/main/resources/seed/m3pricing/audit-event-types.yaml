@@ -19,6 +19,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Price list published
 
+  - code: PRICELIST_WITHDRAWN
+    severity: INFO
+    offline_capturable: false
+    description_en: Draft price list withdrawn
+
   # M3-05, discount rules (23A section 7). RULE_AUTHORED covers AuthorRule (AmendDraftRule and
   # AdoptAdvisoryRule are deferred for the demo).
   - code: RULE_AUTHORED

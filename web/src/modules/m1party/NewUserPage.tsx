@@ -11,6 +11,7 @@ import { useScope } from "../../shell/scope/useScope";
 import { useAdminApi } from "./adminApi";
 import type { CreateUserRequest, UserKind } from "./adminApi";
 import { refusalOf } from "./adminView";
+import { CustomSelect } from "./CustomSelect";
 
 const LANGUAGES: CreateUserRequest["language"][] = ["en", "si", "ta"];
 // EXTERNAL is the Federation's alone and set up with a grant (M1-09); it is not offered here.
@@ -57,52 +58,100 @@ export function NewUserPage() {
   };
 
   return (
-    <main className="shell-page">
-      <p>
+    <main className="shell-page new-user-page">
+      <p className="new-user-back-wrap">
         <Link className="back-link" to="/party/users">
-          {t("party.users.back").text}
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M19 12H5" />
+            <path d="m12 19-7-7 7-7" />
+          </svg>
+          <span>{t("party.users.back").text}</span>
         </Link>
       </p>
       <PageHeader icon="society" title={t("party.users.new.title").text} />
-      <p>{t("party.users.new.hint").text}</p>
+      <p className="new-user-hint">{t("party.users.new.hint").text}</p>
 
-      <form onSubmit={submit} className="party-form-row">
-        <p>
+      <form onSubmit={submit} className="party-form-row new-user-form">
+        <p className="new-user-entity-info">
           {t("party.users.new.entity").text} <strong>{scope.entityName ?? scope.entityShortId ?? ""}</strong>
         </p>
-        <label className="party-form-field">
-          {t("party.user.username").text}
-          <input value={form.username} onChange={(event) => set("username", event.target.value)} required maxLength={64} autoComplete="off" />
+        <label className="party-form-field new-user-field">
+          <span className="new-user-field__label">{t("party.user.username").text}</span>
+          <input
+            className="new-user-input"
+            value={form.username}
+            onChange={(event) => set("username", event.target.value)}
+            required
+            maxLength={64}
+            autoComplete="off"
+          />
           {fieldErrors.username && <span className="party-alert-text">{fieldErrors.username}</span>}
         </label>
-        <label className="party-form-field">
-          {t("party.user.display_name").text}
-          <input value={form.displayName} onChange={(event) => set("displayName", event.target.value)} required maxLength={120} />
+        <label className="party-form-field new-user-field">
+          <span className="new-user-field__label">{t("party.user.display_name").text}</span>
+          <input
+            className="new-user-input"
+            value={form.displayName}
+            onChange={(event) => set("displayName", event.target.value)}
+            required
+            maxLength={120}
+          />
           {fieldErrors.displayName && <span className="party-alert-text">{fieldErrors.displayName}</span>}
         </label>
-        <label className="party-form-field">
-          {t("party.field.language").text}
-          <select value={form.language} onChange={(event) => set("language", event.target.value as CreateUserRequest["language"])}>
-            {LANGUAGES.map((language) => (
-              <option key={language} value={language}>
-                {t(`party.language.${language}`).text}
-              </option>
-            ))}
-          </select>
+        <label className="party-form-field new-user-field">
+          <span className="new-user-field__label">{t("party.field.language").text}</span>
+          <CustomSelect
+            value={form.language}
+            onChange={(language) => set("language", language)}
+            ariaLabel={t("party.field.language").text}
+            options={LANGUAGES.map((language) => ({
+              value: language,
+              label: t(`party.language.${language}`).text
+            }))}
+          />
         </label>
-        <label className="party-form-field">
-          {t("party.user.kind").text}
-          <select value={form.userKind} onChange={(event) => set("userKind", event.target.value as UserKind)}>
-            {KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {t(`party.user.kind.${kind}`).text}
-              </option>
-            ))}
-          </select>
+        <label className="party-form-field new-user-field">
+          <span className="new-user-field__label">{t("party.user.kind").text}</span>
+          <CustomSelect
+            value={form.userKind}
+            onChange={(userKind) => set("userKind", userKind)}
+            ariaLabel={t("party.user.kind").text}
+            options={KINDS.map((kind) => ({
+              value: kind,
+              label: t(`party.user.kind.${kind}`).text
+            }))}
+          />
         </label>
 
-        <button type="submit" className="modern-btn" disabled={create.isPending || !form.username.trim() || !form.displayName.trim()}>
-          {create.isPending ? t("party.users.new.submitting").text : t("party.users.new.submit").text}
+        <button
+          type="submit"
+          className="modern-btn new-user-submit-btn"
+          disabled={create.isPending || !form.username.trim() || !form.displayName.trim()}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>{create.isPending ? t("party.users.new.submitting").text : t("party.users.new.submit").text}</span>
         </button>
         {create.isError && <p role="alert">{refusalOf(create.error, t("party.error.generic").text).text}</p>}
       </form>

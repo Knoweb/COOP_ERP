@@ -42,11 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
  * delegation). Mutation: the lines are dated apply_from, the draft becomes PUBLISHED and the
  * previous published version SUPERSEDED. Event: price_list.published.v1.
  *
- * <p>Deferred for the demo (M3-04): closing the previous version's lines at apply_from - 1. The
- * trade price lookup and the retail price resolution read the newest version in force on
- * the date (PriceListStore.versionInForce), so the previous version stops answering at the new
- * one's apply_from without its lines being closed. The previous version is marked SUPERSEDED at
- * publication rather than at apply_from; it still answers for dates before apply_from.
+ * <p>Publication also closes the previous version's line dates at apply_from minus one
+ * day, preserving historical pricing. A successor must start strictly after its predecessor.
+ * The previous version remains available for historical queries.
  */
 @Service
 @CommandHandler(permission = "prc.pricelist.publish", requiresMfa = true)
@@ -118,6 +116,9 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
                 : List.of();
 
         Optional<PriceListView> previous = store.published(list.rootPriceListId());
+        if (previous.isPresent() && !command.applyFrom().isAfter(previous.get().applyFrom())) {
+            throw new ProblemException("m3.price_list.apply_from_not_after_previous");
+        }
         jdbc.update(
                 "update pricing.price_list_line set effective_from = ? where price_list_id = ?",
                 Date.valueOf(command.applyFrom()),
@@ -131,6 +132,14 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
                 scope.userId(),
                 Timestamp.from(clock.instant()),
                 list.priceListId());
+
+        // The successor is now PUBLISHED and its predecessor SUPERSEDED.
+        // V0011 permits only this effective_to change on old lines.
+        previous.ifPresent(old -> jdbc.update(
+                "update pricing.price_list_line set effective_to = ?"
+                        + " where price_list_id = ? and effective_to is null",
+                Date.valueOf(command.applyFrom().minusDays(1)),
+                old.priceListId()));
 
         List<UUID> skuIds =
                 lines.stream().map(PriceListLineView::skuId).distinct().toList();

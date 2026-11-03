@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.m3pricing.api.RescindControlPrice;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
 import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
 import lk.coopfed.knoweb.m3pricing.api.SetMrpPolicy;
+import lk.coopfed.knoweb.m3pricing.api.WithdrawDraft;
 import lk.coopfed.knoweb.m3pricing.api.WithdrawRule;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.EnterControlPriceHandler;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.RescindControlPriceHandler;
@@ -32,6 +33,7 @@ import lk.coopfed.knoweb.m3pricing.internal.list.CreatePriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
+import lk.coopfed.knoweb.m3pricing.internal.list.WithdrawDraftHandler;
 import lk.coopfed.knoweb.m3pricing.internal.policy.SetMrpPolicyHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
@@ -72,6 +74,7 @@ import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetMrpPolicyRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.TradePriceResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.WithdrawDraftRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.WithdrawRuleRequest;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -90,6 +93,7 @@ class PricingController implements PricingApi {
     private final DraftNewVersionHandler draftNewVersion;
     private final SetLinesHandler setLines;
     private final PublishPriceListHandler publish;
+    private final WithdrawDraftHandler withdrawDraft;
     private final AuthorRuleHandler authorRule;
     private final ActivateRuleHandler activateRule;
     private final WithdrawRuleHandler withdrawRule;
@@ -107,6 +111,7 @@ class PricingController implements PricingApi {
             DraftNewVersionHandler draftNewVersion,
             SetLinesHandler setLines,
             PublishPriceListHandler publish,
+            WithdrawDraftHandler withdrawDraft,
             AuthorRuleHandler authorRule,
             ActivateRuleHandler activateRule,
             WithdrawRuleHandler withdrawRule,
@@ -125,6 +130,7 @@ class PricingController implements PricingApi {
         this.draftNewVersion = draftNewVersion;
         this.setLines = setLines;
         this.publish = publish;
+        this.withdrawDraft = withdrawDraft;
         this.authorRule = authorRule;
         this.activateRule = activateRule;
         this.withdrawRule = withdrawRule;
@@ -476,6 +482,14 @@ class PricingController implements PricingApi {
             String idempotencyKey, UUID listId, PublishPriceListRequest request) {
         ScopeContext scope = currentScope.get();
         UUID id = publish.handle(new PublishPriceList(listId, request.getApplyFrom()), scope);
+        return ResponseEntity.ok(toResponse(queries.getPriceList(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<PriceListResponse> withdrawDraft(
+            String idempotencyKey, UUID listId, WithdrawDraftRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID id = withdrawDraft.handle(new WithdrawDraft(listId, request.getReason()), scope);
         return ResponseEntity.ok(toResponse(queries.getPriceList(id, scope).orElseThrow()));
     }
 

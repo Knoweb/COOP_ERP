@@ -22,7 +22,11 @@ export function LossShrinkagePage() {
 
   return (
     <main className="shell-page">
-      <PageHeader icon="stock" title={t("inventory.loss.title").text} actions={<Link className="action-link" to="/inventory">{t("inventory.back").text}</Link>} />
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
+      <PageHeader icon="stock" title={t("inventory.loss.title").text} />
       <p className="modern-intro-text">{t("inventory.loss.intro").text}</p>
       <section className="modern-filter-panel modern-filter-panel--stock"><LocationPicker value={locationId} onChange={setLocationId} /></section>
       {(writeOffs.isLoading || negatives.isLoading) && <p>{t("inventory.loading").text}</p>}

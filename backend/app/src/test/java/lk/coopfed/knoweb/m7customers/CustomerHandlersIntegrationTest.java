@@ -22,14 +22,19 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.m7customers.api.AccountCharged;
 import lk.coopfed.knoweb.m7customers.api.AccountOpened;
 import lk.coopfed.knoweb.m7customers.api.AmendCustomer;
+import lk.coopfed.knoweb.m7customers.api.BulkImportMembers;
+import lk.coopfed.knoweb.m7customers.api.BulkMemberReport;
 import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.ConsentRecorded;
 import lk.coopfed.knoweb.m7customers.api.CustomerDeactivated;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentRecorded;
+import lk.coopfed.knoweb.m7customers.api.CustomerReactivated;
 import lk.coopfed.knoweb.m7customers.api.CustomerRegistered;
 import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
+import lk.coopfed.knoweb.m7customers.api.MembersBulkImported;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
+import lk.coopfed.knoweb.m7customers.api.ReactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
 import lk.coopfed.knoweb.m7customers.query.AccountQueries;
@@ -55,6 +60,9 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
     Handles<RegisterCustomer, UUID> register;
 
     @Autowired
+    Handles<BulkImportMembers, BulkMemberReport> bulkImport;
+
+    @Autowired
     Handles<AmendCustomer, UUID> amend;
 
     @Autowired
@@ -62,6 +70,9 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Handles<DeactivateCustomer, UUID> deactivate;
+
+    @Autowired
+    Handles<ReactivateCustomer, UUID> reactivate;
 
     @Autowired
     Handles<OpenAccount, UUID> open;
@@ -143,6 +154,79 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
         CustomerCard card = customers.card(first, office()).orElseThrow();
         assertThat(card.phone()).isEqualTo("+94700000103");
         assertThat(card.phones()).hasSize(2);
+    }
+
+    @Test
+    void aMemberSheetRegistersCustomersWithTheReusePromptHonoured() {
+        // 1. Arrange an existing customer who held and gave up a phone within the reuse window
+        UUID previousHolder = registerMember("K. Dissanayake", "0700000201", false);
+        changePhone.handle(new ChangePhone(previousHolder, "0700000202", "Replaced SIM", false), office());
+        kernel.reset();
+
+        String sheet =
+                """
+                name,sinhala_name,lang,mobile,nic,limit,tags
+                Anoma Herath,අනෝමා හේරත්,si,0700000201,199012345678,5000.00,member
+                Sunil Shantha,,en,0700000203,,0.00,regular
+                """;
+
+        // 2. Unconfirmed: reuse prompt (m7.customer.phone_reuse_confirm) is raised
+        assertThatThrownBy(() -> bulkImport.handle(BulkImportMembers.ofSheet(sheet, false), office()))
+                .isInstanceOfSatisfying(ProblemException.class, p -> {
+                    assertThat(p.getMessage()).contains("m7.customer.phone_reuse_confirm");
+                });
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        // 3. With reuse confirmed: the reuse prompt is honoured and customers are registered
+        BulkMemberReport report = bulkImport.handle(BulkImportMembers.ofSheet(sheet, true), office());
+        assertThat(report.status()).isEqualTo(BulkMemberReport.IMPORTED);
+        assertThat(report.totalRows()).isEqualTo(2);
+        assertThat(report.registeredCount()).isEqualTo(2);
+        assertThat(report.updatedCount()).isEqualTo(0);
+        assertThat(report.failedCount()).isEqualTo(0);
+
+        // Verify the customer who reused the released phone
+        CustomerCard card1 = customers.search("Anoma Herath", null, 10, office()).stream()
+                .findFirst()
+                .flatMap(s -> customers.card(s.customerId(), office()))
+                .orElseThrow();
+        assertThat(card1.phone()).isEqualTo("+94700000201");
+        assertThat(card1.status()).isEqualTo("ACTIVE");
+        assertThat(card1.tags()).contains("member");
+        assertThat(card1.account()).isNotNull();
+        assertThat(card1.account().creditLimit()).isEqualByComparingTo("5000.00");
+
+        // Verify previous holder is audited under CUSTOMER_REGISTERED
+        AuditRecord regAudit = kernel.committedAudit().stream()
+                .filter(a -> a.eventType().equals("CUSTOMER_REGISTERED")
+                        && a.subject().id().equals(card1.customerId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(String.valueOf(regAudit.after())).contains(previousHolder.toString());
+
+        // Verify batch audit and domain events
+        AuditRecord batchAudit = single("MEMBERS_BULK_IMPORTED");
+        assertThat(((Map<?, ?>) batchAudit.after()).get("registered")).isEqualTo(2);
+        assertThat(kernel.committedEvents())
+                .anyMatch(e ->
+                        e instanceof MembersBulkImported mbi && mbi.registeredCount() == 2 && mbi.totalRows() == 2);
+
+        // 4. Existing member: re-importing with updated details honours existing customer rather than blindly failing
+        kernel.reset();
+        String updateSheet =
+                """
+                name,sinhala_name,lang,mobile,nic,limit,tags
+                Anoma Herath Updated,අනෝමා හේරත්,si,0700000201,199012345678,5000.00,vip
+                """;
+        BulkMemberReport updateReport = bulkImport.handle(BulkImportMembers.ofSheet(updateSheet, true), office());
+        assertThat(updateReport.status()).isEqualTo(BulkMemberReport.IMPORTED);
+        assertThat(updateReport.registeredCount()).isEqualTo(0);
+        assertThat(updateReport.updatedCount()).isEqualTo(1);
+
+        CustomerCard updatedCard = customers.card(card1.customerId(), office()).orElseThrow();
+        assertThat(updatedCard.displayName()).isEqualTo("Anoma Herath Updated");
+        assertThat(updatedCard.tags()).contains("vip");
     }
 
     @Test
@@ -246,6 +330,40 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
         assertThat(customers.card(id, office()).orElseThrow().status()).isEqualTo("INACTIVE");
         single("CUSTOMER_DEACTIVATED");
         assertThat(kernel.committedEvents()).containsExactly(new CustomerDeactivated(id, SOCIETY));
+    }
+
+    @Test
+    void reactivatingRestoresCreditPurchaseEligibilityAndRefusesAlreadyActive() {
+        UUID id = registerMember("Kamala Dissanayake", "0700000109", false);
+        UUID accountId = open.handle(new OpenAccount(id, new BigDecimal("5000"), null, null, "190000000002"), office());
+
+        // While ACTIVE, reactivating is refused as already active
+        assertThatThrownBy(() -> reactivate.handle(new ReactivateCustomer(id, "Return"), office()))
+                .hasMessageContaining("m7.customer.already_active");
+
+        deactivate.handle(new DeactivateCustomer(id, "Moved away"), office());
+        assertThat(customers.card(id, office()).orElseThrow().status()).isEqualTo("INACTIVE");
+
+        // While INACTIVE, a till charge is flagged ACCOUNT_CHARGED_CUSTOMER_INACTIVE
+        kernel.reset();
+        charge(accountId, "500.00", LocalDate.of(2026, 9, 1));
+        assertThat(kernel.committedAudit())
+                .extracting(AuditRecord::eventType)
+                .contains("ACCOUNT_CHARGED", "ACCOUNT_CHARGED_CUSTOMER_INACTIVE");
+
+        // Reactivate customer
+        kernel.reset();
+        reactivate.handle(new ReactivateCustomer(id, "Returned to village"), office());
+        assertThat(customers.card(id, office()).orElseThrow().status()).isEqualTo("ACTIVE");
+
+        AuditRecord reactivatedAudit = single("CUSTOMER_REACTIVATED");
+        assertThat(reactivatedAudit.reason()).isEqualTo("Returned to village");
+        assertThat(kernel.committedEvents()).containsExactly(new CustomerReactivated(id, SOCIETY));
+
+        // After reactivation, a till charge succeeds normally WITHOUT the customer inactive flag
+        kernel.reset();
+        charge(accountId, "300.00", LocalDate.of(2026, 9, 2));
+        assertThat(kernel.committedAudit()).extracting(AuditRecord::eventType).containsExactly("ACCOUNT_CHARGED");
     }
 
     // ---- the till's account tenders (27A 6.2) ------------------------------------------------------

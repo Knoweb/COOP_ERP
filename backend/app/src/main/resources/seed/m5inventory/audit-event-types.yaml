@@ -28,6 +28,11 @@ audit_event_types:
     offline_capturable: false
     description_en: An issued delivery note reserved the seller's lots on a pick list
 
+  - code: PICK_OVERRIDDEN
+    severity: INFO
+    offline_capturable: false
+    description_en: A warehouse user replaced a FEFO-suggested lot on an open pick list
+
   - code: PICK_LIST_DISPATCHED
     severity: INFO
     offline_capturable: false
@@ -38,10 +43,20 @@ audit_event_types:
     offline_capturable: false
     description_en: An opening stock balance was prepared
 
+  - code: STOCK_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Opening stock was imported in bulk for a location
+
   - code: OPB_SIGNED_ENTITY
     severity: INFO
     offline_capturable: false
     description_en: An opening stock balance was signed for the entity
+
+  - code: OPB_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: An opening stock balance was rejected by a higher officer
 
   - code: OPB_POSTED
     severity: INFO
@@ -247,3 +262,36 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A dispatched inventory transfer remained unreceived past its configured threshold
+
+  # Polgolla M2-01: reorder controls and low-stock event
+  - code: REORDER_CONTROL_CONFIGURED
+    severity: INFO
+    offline_capturable: false
+    description_en: Reorder level and quantities configured for an SKU at a location
+
+  - code: REORDER_CONTROL_DELETED
+    severity: INFO
+    offline_capturable: false
+    description_en: Reorder control removed for an SKU at a location
+
+  - code: LOW_STOCK_DETECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock fell to or below its configured reorder level at a location
+
+  # Polgolla M2-03: stock repricing and waste/spoilage adjustments
+  - code: STOCK_REPRICED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock lot unit cost repriced and entity valuation adjusted
+
+  # Polgolla M2-07: expiry alerts and slow-moving detection
+  - code: NEAR_EXPIRY_ALERT_TRIGGERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Near-expiry stock alert emitted for an expiring batch at a location
+
+  - code: SLOW_MOVING_ALERT_TRIGGERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Slow-moving stock alert emitted for a stagnant or low-velocity SKU at a location
