@@ -116,19 +116,20 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
           {title}
         </h2>
 
-        <div className="reason-capture__field reason-capture__field--select" ref={containerRef}>
-          <label htmlFor="reason-capture-code-btn" className="reason-capture__label">
+        <div className="reason-capture__field reason-capture__field--select">
+          <label htmlFor="reason-capture-code" className="reason-capture__label">
             {t("shell.reason.code").text}
           </label>
-          <div className="reason-capture__control-wrap">
+          <div className="reason-capture__control-wrap" ref={containerRef}>
             <select
               id="reason-capture-code"
               className="visually-hidden"
               value={code}
-              onChange={(event) => setCode(event.target.value)}
+              onChange={(event) => {
+                setCode(event.target.value);
+                setHoveredCode(event.target.value);
+              }}
               required
-              tabIndex={-1}
-              aria-hidden="true"
             >
               <option value="">{t("shell.reason.choose").text}</option>
               {codes.map((option) => (
@@ -140,11 +141,12 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
 
             <button
               type="button"
-              id="reason-capture-code-btn"
               className="register-dropdown-trigger custom-status-dropdown__trigger reason-dropdown-trigger"
               aria-haspopup="listbox"
               aria-expanded={dropdownOpen}
               onClick={toggleDropdown}
+              tabIndex={-1}
+              aria-hidden="true"
             >
               <span className="custom-status-dropdown__label">
                 {selectedOption ? selectedOption.label : t("shell.reason.choose").text}
@@ -170,6 +172,7 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
                 ref={menuRef}
                 className="register-dropdown-menu custom-status-dropdown__menu reason-dropdown-menu"
                 role="listbox"
+                aria-hidden="true"
               >
                 {codes.map((option) => {
                   const isSelected = code === option.code;
@@ -180,6 +183,7 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
                         type="button"
                         role="option"
                         aria-selected={isSelected}
+                        tabIndex={-1}
                         className={
                           isSelected
                             ? "custom-status-dropdown__option custom-status-dropdown__option--selected register-dropdown-option register-dropdown-option--selected"
