@@ -298,6 +298,7 @@ test-scaffold:
 	fi
 	node tools/scaffold-proof-prepare.mjs
 	node tools/new-module.mjs --name m9integration --schema integration --entity webhook
+	node tools/scaffold-proof-prepare.mjs --restore
 	sh tools/gen-clients.sh
 	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
 	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \

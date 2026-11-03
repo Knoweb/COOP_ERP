@@ -165,5 +165,6 @@
   "m8.finance.voucher.tax": "VAT Amount",
   "m8.finance.voucher.gross": "Total Amount",
   "m8.finance.invoice_not_found": "Tax invoice not found in caller’s permitted scope",
-  "m8.finance.print_not_ready": "Printable voucher document is not ready yet"
+  "m8.finance.print_not_ready": "Printable voucher document is not ready yet",
+  "m8.final_accounts.month_invalid": "Month must be in YYYY-MM format"
 }

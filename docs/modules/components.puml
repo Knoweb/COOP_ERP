@@ -57,6 +57,7 @@ Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplicatio
 Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.M3PricingRules, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.M4TradingDocuments, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.M9Integration, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M9Integration, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.PlatformKernel, CoopErpApplication.CoopErpApplication.Engine, "depends on", $techn="", $tags="", $link="")

@@ -13,6 +13,10 @@ export type LotBalance = components["schemas"]["LotBalanceResponse"];
 export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
+export type BulkStockReport = components["schemas"]["BulkStockReport"];
+export type StockProblem = components["schemas"]["StockProblem"];
+export type StockRowPreview = components["schemas"]["StockRowPreview"];
+export type StockRowRequest = components["schemas"]["StockRowRequest"];
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type PickList = components["schemas"]["PickListResponse"];
 export type PickReplacementCandidate = components["schemas"]["PickReplacementCandidateResponse"];
@@ -41,6 +45,9 @@ export type ConfigureReorderControlRequest = components["schemas"]["ConfigureReo
 export type RepriceStockLotRequest = components["schemas"]["RepriceStockLotRequest"];
 export type StockRepricingResponse = components["schemas"]["StockRepricingResponse"];
 export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockResponse"];
+export type ExpiryAlertItem = components["schemas"]["ExpiryAlertItemResponse"];
+export type SlowMovingStock = components["schemas"]["SlowMovingStockResponse"];
+export type ExpiryAlertScan = components["schemas"]["ExpiryAlertScanResponse"];
 
 export function useInventoryApi() {
   const api = useApiClient<paths>();
@@ -108,6 +115,39 @@ export function useInventoryApi() {
       async sign(id: string, idempotencyKey: string): Promise<OpeningBalance> {
         const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/sign", {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async downloadOpeningStockTemplate(): Promise<Blob> {
+        const { response } = await api.GET("/v1/inventory/opening-balances/template", {
+          parseAs: "blob"
+        });
+        return await response.blob();
+      },
+
+      async bulkImportOpeningStock(
+        locationId: string,
+        mode: "VALIDATE" | "COMMIT",
+        sheet: string | undefined,
+        lines: StockRowRequest[] | undefined,
+        idempotencyKey: string
+      ): Promise<BulkStockReport> {
+        const { data } = await api.POST("/v1/inventory/opening-balances/bulk", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId, mode, sheet, lines }
+        });
+        return data!;
+      },
+
+      async rejectOpeningBalance(
+        openingBalanceId: string,
+        reason: string,
+        idempotencyKey: string
+      ): Promise<OpeningBalance> {
+        const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/reject", {
+          params: { path: { openingBalanceId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
         });
         return data!;
       },
@@ -458,6 +498,53 @@ export function useInventoryApi() {
           throw error;
         }
         return data ?? [];
+      },
+
+      async expiryFeed(
+        locationId: string,
+        windowDays?: number,
+        tier?: "ALL" | "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED"
+      ): Promise<ExpiryAlertItem[]> {
+        const { data, error } = await api.GET("/v1/inventory/locations/{locationId}/expiry-feed", {
+          params: {
+            path: { locationId },
+            query: { windowDays, tier }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async slowMovingStock(
+        locationId: string,
+        evaluationDays?: number,
+        thresholdDaysOfSupply?: number
+      ): Promise<SlowMovingStock[]> {
+        const { data, error } = await api.GET("/v1/inventory/locations/{locationId}/slow-moving", {
+          params: {
+            path: { locationId },
+            query: { evaluationDays, thresholdDaysOfSupply }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async scanExpiryAlerts(locationId: string, idempotencyKey: string): Promise<ExpiryAlertScan> {
+        const { data, error } = await api.POST("/v1/inventory/locations/{locationId}/expiry-alerts/scan", {
+          params: {
+            path: { locationId },
+            header: { "Idempotency-Key": idempotencyKey }
+          }
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
       }
     }),
     [api, party, catalogue, trading]

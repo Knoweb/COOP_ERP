@@ -15,3 +15,53 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A notification rule was activated or retired
+
+  - code: EMPLOYEE_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: An employee profile was registered or updated for attendance and payroll
+
+  - code: ATTENDANCE_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Biometric attendance punch records were imported and validated
+
+  - code: OVERTIME_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: Overtime calculation was approved for payroll contribution
+
+  - code: NOTIFICATION_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification request was queued through the centralized notification gateway
+
+  - code: NOTIFICATION_SENT
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification was successfully dispatched to the provider through the centralized notification gateway
+
+  - code: VEHICLE_LOCATION_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Real-time GPS location update was captured for a delivery vehicle
+
+  - code: DELIVERY_TRIP_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery trip was planned and created for a vehicle
+
+  - code: DELIVERY_TRIP_COMPLETED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery trip was completed with final odometer and distance
+
+  - code: DELIVERY_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery drop was scheduled on a delivery trip
+
+  - code: DELIVERY_STATUS_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: The status of a delivery drop was updated

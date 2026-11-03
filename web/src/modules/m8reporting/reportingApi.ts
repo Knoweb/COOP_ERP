@@ -50,6 +50,10 @@ export type GoodsSuppliedLineItem = components["schemas"]["GoodsSuppliedLineItem
 export type CreditVoucher = components["schemas"]["CreditVoucherResponse"];
 export type CreditVoucherLine = components["schemas"]["CreditVoucherLineResponse"];
 export type CreditVoucherPrint = components["schemas"]["CreditVoucherPrintResponse"];
+export type FinalAccountsReport = components["schemas"]["FinalAccountsReportResponse"];
+export type ExpenseCategory = components["schemas"]["ExpenseCategoryResponse"];
+export type FinalAccountPayrollItem = components["schemas"]["FinalAccountPayrollItemResponse"];
+export type FinalAccountsExpenses = components["schemas"]["FinalAccountsExpensesResponse"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
 export type ReportQuery = { from?: string; to?: string; locationId?: string };
@@ -339,6 +343,28 @@ export function useReportingApi() {
           params: { path: { invoiceId } }
         });
         return data!;
+      },
+
+      async getFinalAccounts(period?: string): Promise<FinalAccountsReport> {
+        const { data } = await api.GET("/v1/reporting/final-accounts", {
+          params: { query: { period } }
+        });
+        return data!;
+      },
+
+      async getFinalAccountsExpenses(period?: string): Promise<FinalAccountsExpenses> {
+        const { data } = await api.GET("/v1/reporting/final-accounts/expenses", {
+          params: { query: { period } }
+        });
+        return data!;
+      },
+
+      async exportFinalAccountsCsv(period?: string): Promise<string> {
+        const { data } = await api.GET("/v1/reporting/final-accounts/csv", {
+          params: { query: { period } },
+          parseAs: "text"
+        });
+        return data as string;
       }
     }),
     [api, party, catalogue]

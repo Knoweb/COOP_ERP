@@ -47,6 +47,9 @@ public class ControlPolicy {
     static final String DISPATCH_MIN_SHELF_LIFE_DAYS = "inventory.dispatch_min_shelf_life_days";
     static final String REPACK_YIELD_TOLERANCE_PCT = "inventory.repack_yield_tolerance_pct";
     static final String EXPIRY_WARNING_DAYS = "inventory.expiry_warning_days";
+    static final String NEAR_EXPIRY_CRITICAL_DAYS = "inventory.near_expiry_critical_days";
+    static final String SLOW_MOVING_DAYS = "inventory.slow_moving_days";
+    static final String SLOW_MOVING_THRESHOLD_DOS = "inventory.slow_moving_threshold_dos";
     static final String NEGATIVE_LOT_ESCALATION_DAYS = "inventory.negative_lot_escalation_days";
     static final String TRANSFER_RECEIPT_DAYS = "inventory.transfer_receipt_days";
 
@@ -189,6 +192,18 @@ public class ControlPolicy {
      */
     public int expiryWarningDays(ScopeContext scope) {
         return config.getInt(EXPIRY_WARNING_DAYS, scope, 30);
+    }
+
+    public int nearExpiryCriticalDays(ScopeContext scope) {
+        return config.getInt(NEAR_EXPIRY_CRITICAL_DAYS, scope, 7);
+    }
+
+    public int slowMovingDays(ScopeContext scope) {
+        return config.getInt(SLOW_MOVING_DAYS, scope, 30);
+    }
+
+    public int slowMovingThresholdDos(ScopeContext scope) {
+        return config.getInt(SLOW_MOVING_THRESHOLD_DOS, scope, 90);
     }
 
     /**

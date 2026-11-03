@@ -2,7 +2,6 @@ package lk.coopfed.knoweb.m5inventory.internal.opening;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +12,7 @@ import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningStockRow;
 
 /**
- * Parses spreadsheet (CSV/TSV) opening stock files into {@link OpeningStockRow} instances (CAT-11).
+ * Parses spreadsheet (CSV/TSV) opening stock files into {@link OpeningStockRow} instances (CAT-11, PGL-M2-06).
  */
 public final class BulkOpeningStockCsvParser {
 
@@ -45,15 +44,26 @@ public final class BulkOpeningStockCsvParser {
                 continue;
             }
 
-            String skuStr = get(record, colIndex, "sku", "sku_code", "item", "item_code", "code", "barcode");
+            String skuStr = get(
+                    record,
+                    colIndex,
+                    "sku",
+                    "sku_code",
+                    "item",
+                    "item_code",
+                    "code",
+                    "barcode",
+                    "gtin",
+                    "sku_code_or_barcode");
             String skuIdStr = get(record, colIndex, "sku_id", "skuid");
             String batchIdStr = get(record, colIndex, "batch_id", "batchid");
             String batchNo = get(record, colIndex, "batch_no", "batch", "lot", "lot_no", "batch_number");
             String expiryStr = get(record, colIndex, "expiry_date", "expiry", "exp_date", "expiration_date");
             String mrpStr = get(record, colIndex, "printed_mrp", "mrp", "retail_price");
             String qtyStr = get(record, colIndex, "qty", "quantity", "counted_qty", "count");
-            String costStr = get(record, colIndex, "unit_cost", "cost", "unit_price", "price");
-            String conditionStr = get(record, colIndex, "condition", "status", "state");
+            String costStr = get(record, colIndex, "unit_cost", "cost", "unit_price", "price", "landed_cost");
+            String conditionStr = get(record, colIndex, "condition", "status", "state", "quality");
+            String uomStr = get(record, colIndex, "uom", "unit", "base_uom");
 
             if (skuStr.isEmpty() && skuIdStr.isEmpty() && batchIdStr.isEmpty() && qtyStr.isEmpty()) {
                 continue;
@@ -64,7 +74,7 @@ public final class BulkOpeningStockCsvParser {
             BigDecimal qty = parseBigDecimal(qtyStr);
             BigDecimal unitCost = parseBigDecimal(costStr);
             BigDecimal printedMrp = parseBigDecimal(mrpStr);
-            LocalDate expiryDate = parseLocalDate(expiryStr);
+            LocalDate expiryDate = BulkOpeningStockExcelParser.parseDateOrSerial(expiryStr);
             LotCondition condition = parseCondition(conditionStr);
 
             rows.add(new OpeningStockRow(
@@ -76,7 +86,8 @@ public final class BulkOpeningStockCsvParser {
                     printedMrp,
                     condition,
                     qty,
-                    unitCost));
+                    unitCost,
+                    uomStr.isEmpty() ? null : uomStr));
         }
 
         return List.copyOf(rows);
@@ -130,18 +141,6 @@ public final class BulkOpeningStockCsvParser {
         try {
             return new BigDecimal(text.trim());
         } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private static LocalDate parseLocalDate(String text) {
-        if (text == null || text.isBlank()) {
-            return null;
-        }
-        String clean = text.trim().replace('/', '-');
-        try {
-            return LocalDate.parse(clean);
-        } catch (DateTimeParseException e) {
             return null;
         }
     }

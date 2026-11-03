@@ -23,6 +23,41 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+const isRestore = process.argv.includes("--restore");
+const backupDir = path.join(root, "backend/app/build/tmp_proof_backup");
+const queryBackup = path.join(backupDir, "query");
+const queryTarget = path.join(root, "backend/app/src/main/java/lk/coopfed/knoweb/m9integration/query");
+const implBackup = path.join(backupDir, "ApprovedPayrollContributionQueriesImpl.java");
+const implTarget = path.join(root, "backend/app/src/main/java/lk/coopfed/knoweb/m9integration/internal/queries/ApprovedPayrollContributionQueriesImpl.java");
+
+if (isRestore) {
+  if (fs.existsSync(queryBackup)) {
+    fs.cpSync(queryBackup, queryTarget, { recursive: true });
+  }
+  if (fs.existsSync(implBackup)) {
+    fs.mkdirSync(path.dirname(implTarget), { recursive: true });
+    fs.copyFileSync(implBackup, implTarget);
+  }
+  if (fs.existsSync(backupDir)) {
+    fs.rmSync(backupDir, { recursive: true, force: true });
+    console.log("scaffolder proof: preserved query contracts and wiring stubs restored for downstream consumers");
+  }
+  process.exit(0);
+}
+
+// Preserve published query contracts (e.g. ApprovedPayrollContributionQueries) and their wiring
+// implementation so that downstream consumer modules (m8reporting) can compile and wire while the copy is in place.
+const queryDir = path.join(root, "backend/app/src/main/java/lk/coopfed/knoweb/m9integration/query");
+if (fs.existsSync(queryDir)) {
+  fs.mkdirSync(path.dirname(queryBackup), { recursive: true });
+  fs.cpSync(queryDir, queryBackup, { recursive: true });
+}
+const implFile = path.join(root, "backend/app/src/main/java/lk/coopfed/knoweb/m9integration/internal/queries/ApprovedPayrollContributionQueriesImpl.java");
+if (fs.existsSync(implFile)) {
+  fs.mkdirSync(path.dirname(implBackup), { recursive: true });
+  fs.copyFileSync(implFile, implBackup);
+}
+
 const removed = [
   "backend/app/src/main/java/lk/coopfed/knoweb/m9integration",
   "backend/app/src/test/java/lk/coopfed/knoweb/m9integration",

@@ -50,7 +50,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
         streams.put("m1security", "20");
         // CAT-06: m2catalogue V0011 (location_assortment) from V0010.
-        streams.put("m2catalogue", "10");
+        streams.put("m2catalogue", "11");
         // PRC-11: m3pricing V0011 (superseded line closure) from V0010.
         streams.put("m3pricing", "10");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
@@ -198,12 +198,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
-                .containsEntry("m2catalogue", 11)
+                .containsEntry("m2catalogue", 13)
                 .containsEntry("m3pricing", 11)
-                .containsEntry("m5inventory", 18)
+                .containsEntry("m5inventory", 20)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 // PGL-M3-01: m7customers V0006 adds regional registration & centralized loyalty.
-                .containsEntry("m7customers", 6)
+                // PGL-M3-03: m7customers V0007 adds loyalty rewards & insurance.
+                .containsEntry("m7customers", 7)
                 .containsEntry("m8reporting", 10);
 
         // What the new numbers leave in place, read from the catalogue.
@@ -286,6 +287,44 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .isTrue();
         assertThat(admin.queryForObject(
                         "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'customers.loyalty_permitted_location'::regclass",
+                        Boolean.class))
+                .isTrue();
+
+        // PGL-M2-08: Department category migration and RLS.
+        assertThat(admin.queryForObject("select to_regclass('catalogue.department_category')::text", String.class))
+                .isEqualTo("catalogue.department_category");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity"
+                                + " from pg_class where oid = 'catalogue.department_category'::regclass",
+                        Boolean.class))
+                .isTrue();
+
+        // PGL-M3-03: Loyalty rewards and insurance.
+        assertThat(admin.queryForObject("select to_regclass('customers.loyalty_reward_policy')::text", String.class))
+                .isEqualTo("customers.loyalty_reward_policy");
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity"
+                                + " from pg_class where oid = 'customers.loyalty_reward_policy'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity"
+                                + " from pg_class where oid = 'customers.loyalty_spend'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity"
+                                + " from pg_class where oid = 'customers.loyalty_monthly_reward'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity"
+                                + " from pg_class where oid = 'customers.loyalty_points_ledger'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity"
+                                + " from pg_class where oid = 'customers.loyalty_insurance_claim'::regclass",
                         Boolean.class))
                 .isTrue();
 
@@ -431,7 +470,35 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
     /** M9's V0006 over the demo server's rows: the new posting key, the closed door, the definer function. */
     private static void assertWhatM9sV0006LeavesInPlace(JdbcTemplate admin, Map<String, Integer> after) {
-        assertThat(after).containsEntry("m9integration", 6);
+        assertThat(after).containsEntry("m9integration", 9);
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.hr_employee'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.attendance_record'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.payroll_contribution'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.notification_request'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.delivery_trip'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.delivery_record'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'integration.vehicle_location_update'::regclass",
+                        Boolean.class))
+                .isTrue();
         assertThat(admin.queryForList(
                         "select conname from pg_constraint where conrelid = 'integration.journal_posting'::regclass"
                                 + " and contype = 'u'",

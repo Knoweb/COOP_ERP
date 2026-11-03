@@ -8,6 +8,7 @@ import lk.coopfed.knoweb.m8reporting.query.CreditorSummaryItemView;
 import lk.coopfed.knoweb.m8reporting.query.CreditorsReport;
 import lk.coopfed.knoweb.m8reporting.query.DebtorSummaryItemView;
 import lk.coopfed.knoweb.m8reporting.query.DebtorsReport;
+import lk.coopfed.knoweb.m8reporting.query.FinalAccountsReport;
 import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedLineItemView;
 import lk.coopfed.knoweb.m8reporting.query.GoodsSuppliedReport;
 import lk.coopfed.knoweb.m8reporting.query.OpeningBalanceItemView;
@@ -224,6 +225,130 @@ final class ReportCsv {
                     .append(quote(line.lineTotal().toPlainString()))
                     .append("\r\n");
         }
+        return csv.toString();
+    }
+
+    static String writeFinalAccounts(FinalAccountsReport report, Messages messages, Locale locale) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(quote("FINAL ACCOUNTS STATEMENT")).append("\r\n");
+        csv.append(quote("Period")).append(',').append(quote(report.period())).append("\r\n");
+        csv.append(quote("Currency"))
+                .append(',')
+                .append(quote(report.currency()))
+                .append("\r\n");
+        csv.append(quote("Status")).append(',').append(quote(report.status())).append("\r\n");
+        if (report.statusReason() != null) {
+            csv.append(quote("Status Reason"))
+                    .append(',')
+                    .append(quote(report.statusReason()))
+                    .append("\r\n");
+        }
+        csv.append(quote("Revenue"))
+                .append(',')
+                .append(report.revenue().toPlainString())
+                .append("\r\n");
+        csv.append(quote("Cost of Goods Sold"))
+                .append(',')
+                .append(report.cogs() != null ? report.cogs().toPlainString() : "PENDING")
+                .append("\r\n");
+        csv.append(quote("Gross Profit"))
+                .append(',')
+                .append(report.grossProfit() != null ? report.grossProfit().toPlainString() : "PENDING")
+                .append("\r\n");
+        csv.append(quote("Gross Profit Margin %"))
+                .append(',')
+                .append(
+                        report.grossProfitMarginPercent() != null
+                                ? report.grossProfitMarginPercent().toPlainString()
+                                : "PENDING")
+                .append("\r\n");
+        csv.append(quote("Approved Payroll Expenses"))
+                .append(',')
+                .append(report.payrollExpenses().toPlainString())
+                .append("\r\n");
+        csv.append(quote("Other Operating Expenses"))
+                .append(',')
+                .append("UNAVAILABLE")
+                .append("\r\n");
+        csv.append(quote("Total Operating Expenses"))
+                .append(',')
+                .append(report.totalExpenses() != null ? report.totalExpenses().toPlainString() : "UNAVAILABLE")
+                .append("\r\n");
+        csv.append(quote("Operating Profit"))
+                .append(',')
+                .append(
+                        report.operatingProfit() != null
+                                ? report.operatingProfit().toPlainString()
+                                : "UNAVAILABLE")
+                .append("\r\n");
+        csv.append(quote("Operating Profit Margin %"))
+                .append(',')
+                .append(
+                        report.operatingProfitMarginPercent() != null
+                                ? report.operatingProfitMarginPercent().toPlainString()
+                                : "UNAVAILABLE")
+                .append("\r\n");
+        csv.append("\r\n");
+
+        csv.append(quote("EXPENSE CATEGORIES")).append("\r\n");
+        csv.append(quote("Category"))
+                .append(',')
+                .append(quote("Category Name"))
+                .append(',')
+                .append(quote("Amount"))
+                .append(',')
+                .append(quote("Status"))
+                .append(',')
+                .append(quote("Notes"))
+                .append("\r\n");
+
+        for (FinalAccountsReport.ExpenseCategoryItem cat : report.expenseCategories()) {
+            csv.append(quote(cat.category()))
+                    .append(',')
+                    .append(quote(cat.categoryName()))
+                    .append(',')
+                    .append(cat.amount() != null ? cat.amount().toPlainString() : "UNAVAILABLE")
+                    .append(',')
+                    .append(quote(cat.status()))
+                    .append(',')
+                    .append(quote(cat.notes() != null ? cat.notes() : ""))
+                    .append("\r\n");
+        }
+        csv.append("\r\n");
+
+        csv.append(quote("APPROVED PAYROLL CONTRIBUTIONS")).append("\r\n");
+        csv.append(quote("Contribution ID"))
+                .append(',')
+                .append(quote("Employee No"))
+                .append(',')
+                .append(quote("Employee Name"))
+                .append(',')
+                .append(quote("Type"))
+                .append(',')
+                .append(quote("OT Minutes"))
+                .append(',')
+                .append(quote("Approved Amount"))
+                .append(',')
+                .append(quote("Status"))
+                .append("\r\n");
+
+        for (FinalAccountsReport.PayrollContributionLineItem item : report.payrollContributions()) {
+            csv.append(quote(item.contributionId().toString()))
+                    .append(',')
+                    .append(quote(item.employeeNo() != null ? item.employeeNo() : ""))
+                    .append(',')
+                    .append(quote(item.employeeName() != null ? item.employeeName() : ""))
+                    .append(',')
+                    .append(quote(item.contributionType()))
+                    .append(',')
+                    .append(item.approvedOtMinutes())
+                    .append(',')
+                    .append(item.approvedAmount().toPlainString())
+                    .append(',')
+                    .append(quote(item.status()))
+                    .append("\r\n");
+        }
+
         return csv.toString();
     }
 

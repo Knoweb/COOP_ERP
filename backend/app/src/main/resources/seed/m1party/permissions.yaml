@@ -229,6 +229,10 @@ permissions:
     module: "m2catalogue"
     description_en: "Import item sheets"
     scope: "ENTITY"
+  - code: "cat.department.manage"
+    module: "m2catalogue"
+    description_en: "Define and manage merchandise department categories"
+    scope: "FEDERATION"
   # M4 Trading Documents (24A section 3.1: "seed/m4/permissions.yaml (appended)"). M4 has no
   # permission file of its own for the same reason as M2: security.permission is M1's table and
   # M1SeedLoader reads this one file. "F" in the guide is scope FEDERATION, "mfa" requires_mfa,
@@ -456,6 +460,11 @@ permissions:
     module: "m5inventory"
     description_en: "Reprice stock lot unit cost and adjust valuation"
     scope: "ENTITY"
+  # Polgolla M2-07: expiry alerts and slow-moving detection
+  - code: "inv.expiry.scan"
+    module: "m5inventory"
+    description_en: "Trigger evaluation and scan of near-expiry and slow-moving stock alerts"
+    scope: "ENTITY"
   # M8 Reporting (28A section 3.1, "seed/m8/permissions.yaml (appended)"): the two codes the
   # demo's reports need. rpt.report.run reads a report and the dashboard (28A also checks the
   # audience per definition: deferred with the definitions as data); rpt.export.run takes a
@@ -582,6 +591,35 @@ permissions:
     module: "m9integration"
     description_en: "Activate and retire the federation's notification rules"
     scope: "FEDERATION"
+  - code: "int.employee.manage"
+    module: "m9integration"
+    description_en: "Register and maintain employee profiles for attendance and payroll"
+    scope: "ENTITY"
+  - code: "int.attendance.import"
+    module: "m9integration"
+    description_en: "Import biometric attendance records from fingerprint machines"
+    scope: "ENTITY"
+  - code: "int.overtime.approve"
+    module: "m9integration"
+    description_en: "Approve calculated overtime for payroll contribution"
+    scope: "ENTITY"
+  - code: "int.payroll.view"
+    module: "m9integration"
+    description_en: "View employee profiles, attendance records, overtime calculations and payroll contributions"
+    scope: "ENTITY"
+  # M3-06 (Wave 6): Delivery vehicle tracking, route history, and delivery reports
+  - code: "int.delivery.track"
+    module: "m9integration"
+    description_en: "Record delivery vehicle and mobile device GPS location updates"
+    scope: "ENTITY"
+  - code: "int.delivery.manage"
+    module: "m9integration"
+    description_en: "Plan delivery trips, record drops, and update delivery status"
+    scope: "ENTITY"
+  - code: "int.delivery.view"
+    module: "m9integration"
+    description_en: "View live vehicle locations, route history, and delivery reports"
+    scope: "ENTITY"
   # wave 2, PR 03 (CR-32-1 item 2, decided 6 October 2026): an administrator of the society
   # resolves a quarantined till event (REPAIRED or DISCARDED, with a reason, once). The kernel's
   # operation (openapi/sync.yaml, resolveQuarantine); listed here because M1SeedLoader reads this

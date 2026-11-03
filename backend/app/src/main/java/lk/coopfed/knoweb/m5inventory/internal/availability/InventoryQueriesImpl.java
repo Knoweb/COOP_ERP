@@ -21,6 +21,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
+import lk.coopfed.knoweb.m5inventory.internal.expiry.ExpiryAlertStore;
 import lk.coopfed.knoweb.m5inventory.internal.reorder.ReorderStore;
 import lk.coopfed.knoweb.m5inventory.internal.reprice.RepriceStore;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
@@ -29,10 +30,12 @@ import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LocationSalesCost;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
+import lk.coopfed.knoweb.m5inventory.query.NearExpiryLotView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
 import lk.coopfed.knoweb.m5inventory.query.ReorderControlView;
+import lk.coopfed.knoweb.m5inventory.query.SlowMovingStockView;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
 import lk.coopfed.knoweb.m5inventory.query.StockRepricingView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
@@ -92,6 +95,7 @@ class InventoryQueriesImpl implements InventoryQueries {
     private final ZoneId zone;
     private final ReorderStore reorderStore;
     private final RepriceStore repriceStore;
+    private final ExpiryAlertStore expiryAlertStore;
 
     InventoryQueriesImpl(
             JdbcTemplate jdbc,
@@ -99,6 +103,7 @@ class InventoryQueriesImpl implements InventoryQueries {
             ControlPolicy policy,
             ReorderStore reorderStore,
             RepriceStore repriceStore,
+            ExpiryAlertStore expiryAlertStore,
             @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
@@ -106,6 +111,7 @@ class InventoryQueriesImpl implements InventoryQueries {
         this.zone = ZoneId.of(zone);
         this.reorderStore = reorderStore;
         this.repriceStore = repriceStore;
+        this.expiryAlertStore = expiryAlertStore;
     }
 
     @Override
@@ -450,7 +456,7 @@ class InventoryQueriesImpl implements InventoryQueries {
                 .query(
                         """
                         select opening_balance_id, location_id, status, prepared_by, signed_entity_by,
-                               countersigned_by, document_id
+                               countersigned_by, document_id, rejected_by, rejected_at, rejection_reason
                           from inventory.opening_balance
                          where opening_balance_id = ?
                         """,
@@ -462,6 +468,11 @@ class InventoryQueriesImpl implements InventoryQueries {
                                 rs.getObject("signed_entity_by", UUID.class),
                                 rs.getObject("countersigned_by", UUID.class),
                                 rs.getObject("document_id", UUID.class),
+                                rs.getObject("rejected_by", UUID.class),
+                                rs.getTimestamp("rejected_at") == null
+                                        ? null
+                                        : rs.getTimestamp("rejected_at").toInstant(),
+                                rs.getString("rejection_reason"),
                                 lines),
                         openingBalanceId)
                 .stream()
@@ -660,5 +671,24 @@ class InventoryQueriesImpl implements InventoryQueries {
     @Override
     public List<StockRepricingView> repricings(UUID locationId, UUID skuId, ScopeContext scope) {
         return repriceStore.findRepricings(locationId, skuId, scope);
+    }
+
+    @Override
+    public List<NearExpiryLotView> nearExpiryLots(
+            UUID locationId, Integer windowDays, String tier, ScopeContext scope) {
+        LocalDate today = businessDay.today();
+        int criticalDays = policy.nearExpiryCriticalDays(scope);
+        int warningDays = policy.expiryWarningDays(scope);
+        return expiryAlertStore.findNearExpiryLots(
+                locationId, windowDays, tier, today, criticalDays, warningDays, scope);
+    }
+
+    @Override
+    public List<SlowMovingStockView> slowMovingStock(
+            UUID locationId, Integer evaluationDays, Integer thresholdDaysOfSupply, ScopeContext scope) {
+        LocalDate today = businessDay.today();
+        int evalDays = evaluationDays != null ? evaluationDays : policy.slowMovingDays(scope);
+        int threshDos = thresholdDaysOfSupply != null ? thresholdDaysOfSupply : policy.slowMovingThresholdDos(scope);
+        return expiryAlertStore.findSlowMovingStock(locationId, evalDays, threshDos, today, zone, scope);
     }
 }

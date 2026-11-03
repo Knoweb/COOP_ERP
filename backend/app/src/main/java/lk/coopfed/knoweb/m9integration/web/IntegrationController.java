@@ -2,28 +2,73 @@ package lk.coopfed.knoweb.m9integration.web;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m9integration.api.ApproveOvertime;
+import lk.coopfed.knoweb.m9integration.api.AttendanceImportResult;
+import lk.coopfed.knoweb.m9integration.api.CompleteDeliveryTrip;
+import lk.coopfed.knoweb.m9integration.api.CreateDeliveryTrip;
+import lk.coopfed.knoweb.m9integration.api.ImportAttendanceRecords;
+import lk.coopfed.knoweb.m9integration.api.RecordDeliveryDrop;
+import lk.coopfed.knoweb.m9integration.api.RecordVehicleLocation;
+import lk.coopfed.knoweb.m9integration.api.RegisterEmployee;
 import lk.coopfed.knoweb.m9integration.api.RequestJournalExport;
 import lk.coopfed.knoweb.m9integration.api.SetNotificationRuleStatus;
+import lk.coopfed.knoweb.m9integration.api.UpdateDeliveryStatus;
+import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries;
+import lk.coopfed.knoweb.m9integration.query.AttendanceQueries;
+import lk.coopfed.knoweb.m9integration.query.DailyDeliverySummaryView;
+import lk.coopfed.knoweb.m9integration.query.DeliveryDropView;
+import lk.coopfed.knoweb.m9integration.query.DeliveryTrackingQueries;
+import lk.coopfed.knoweb.m9integration.query.DeliveryTripSummaryView;
+import lk.coopfed.knoweb.m9integration.query.EmployeeQueries;
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries;
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.JournalExportView;
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.RuleView;
+import lk.coopfed.knoweb.m9integration.query.LiveVehicleLocationView;
+import lk.coopfed.knoweb.m9integration.query.MonthlyDeliveryReportView;
+import lk.coopfed.knoweb.m9integration.query.VehicleRoutePointView;
 import lk.coopfed.knoweb.m9integration.web.generated.AccountTotalResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.ApproveOvertimeRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.AttendanceImportResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.AttendanceRecordResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.AttendanceRejection;
+import lk.coopfed.knoweb.m9integration.web.generated.CompleteDeliveryTripRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.CreateDeliveryTripRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.DailyDeliveryBreakdownItem;
+import lk.coopfed.knoweb.m9integration.web.generated.DailyDeliverySummaryResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.DeliveryDropResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.DeliveryTripResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.EmployeeResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.ImportAttendanceRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.IntegrationApi;
 import lk.coopfed.knoweb.m9integration.web.generated.JournalExportResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.JournalLineResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.LiveVehicleLocationResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.MonthlyDeliveryReportResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationLogResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationRuleResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationTemplateResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.OvertimeCalculationResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.PayrollContributionResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.PayrollContributionSummaryResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.PendingPostingsResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.ReconciliationResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.RecordDeliveryDropRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.RecordVehicleLocationRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.RegisterEmployeeRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.RequestJournalExportRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.SupplementDueResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.UpdateDeliveryStatusRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.VehicleDeliveryBreakdownItem;
+import lk.coopfed.knoweb.m9integration.web.generated.VehicleLocationResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.VehicleRouteHistoryResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.VehicleRoutePointResponse;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,10 +76,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The HTTP surface of M9 for the demo (29A section 5): the journal exports and the notification
- * screens. It translates only: request to command, view to response. The kernel checks each
- * operation's x-permission and idempotency key; row-level security decides which rows the caller
- * sees, and an export the caller may not see is a 404, like one that does not exist.
+ * The HTTP surface of M9: the journal exports, notification screens, biometric attendance and
+ * overtime integration with payroll.
  */
 @RestController
 class IntegrationController implements IntegrationApi {
@@ -43,19 +86,58 @@ class IntegrationController implements IntegrationApi {
     private static final int LOG_ROWS = 100;
 
     private final IntegrationQueries queries;
+    private final EmployeeQueries employeeQueries;
+    private final AttendanceQueries attendanceQueries;
+    private final ApprovedPayrollContributionQueries payrollQueries;
+    private final DeliveryTrackingQueries deliveryQueries;
+    private final Clock clock;
     private final CurrentScope currentScope;
     private final Handles<RequestJournalExport, UUID> requestExport;
     private final Handles<SetNotificationRuleStatus, UUID> setRuleStatus;
+    private final Handles<RegisterEmployee, UUID> registerEmployee;
+    private final Handles<ImportAttendanceRecords, AttendanceImportResult> importAttendance;
+    private final Handles<ApproveOvertime, UUID> approveOvertime;
+    private final Handles<RecordVehicleLocation, UUID> recordVehicleLocation;
+    private final Handles<CreateDeliveryTrip, UUID> createDeliveryTrip;
+    private final Handles<CompleteDeliveryTrip, Void> completeDeliveryTrip;
+    private final Handles<RecordDeliveryDrop, UUID> recordDeliveryDrop;
+    private final Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus;
 
     IntegrationController(
             IntegrationQueries queries,
+            EmployeeQueries employeeQueries,
+            AttendanceQueries attendanceQueries,
+            ApprovedPayrollContributionQueries payrollQueries,
+            DeliveryTrackingQueries deliveryQueries,
+            Clock clock,
             CurrentScope currentScope,
             Handles<RequestJournalExport, UUID> requestExport,
-            Handles<SetNotificationRuleStatus, UUID> setRuleStatus) {
+            Handles<SetNotificationRuleStatus, UUID> setRuleStatus,
+            Handles<RegisterEmployee, UUID> registerEmployee,
+            Handles<ImportAttendanceRecords, AttendanceImportResult> importAttendance,
+            Handles<ApproveOvertime, UUID> approveOvertime,
+            Handles<RecordVehicleLocation, UUID> recordVehicleLocation,
+            Handles<CreateDeliveryTrip, UUID> createDeliveryTrip,
+            Handles<CompleteDeliveryTrip, Void> completeDeliveryTrip,
+            Handles<RecordDeliveryDrop, UUID> recordDeliveryDrop,
+            Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus) {
         this.queries = queries;
+        this.employeeQueries = employeeQueries;
+        this.attendanceQueries = attendanceQueries;
+        this.payrollQueries = payrollQueries;
+        this.deliveryQueries = deliveryQueries;
+        this.clock = clock;
         this.currentScope = currentScope;
         this.requestExport = requestExport;
         this.setRuleStatus = setRuleStatus;
+        this.registerEmployee = registerEmployee;
+        this.importAttendance = importAttendance;
+        this.approveOvertime = approveOvertime;
+        this.recordVehicleLocation = recordVehicleLocation;
+        this.createDeliveryTrip = createDeliveryTrip;
+        this.completeDeliveryTrip = completeDeliveryTrip;
+        this.recordDeliveryDrop = recordDeliveryDrop;
+        this.updateDeliveryStatus = updateDeliveryStatus;
     }
 
     @Override
@@ -215,6 +297,269 @@ class IntegrationController implements IntegrationApi {
                 .toList());
     }
 
+    // --- Employee Endpoints ---
+
+    @Override
+    public ResponseEntity<List<EmployeeResponse>> listEmployees() {
+        return ResponseEntity.ok(employeeQueries.listEmployees(currentScope.get()).stream()
+                .map(IntegrationController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<EmployeeResponse> registerEmployee(String idempotencyKey, RegisterEmployeeRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID employeeId = registerEmployee.handle(
+                new RegisterEmployee(
+                        request.getEmployeeNo(),
+                        request.getFullName(),
+                        request.getNic(),
+                        request.getEpfNo(),
+                        request.getHourlyRate(),
+                        request.getLocationId()),
+                scope);
+        EmployeeQueries.EmployeeView employee =
+                employeeQueries.getEmployee(employeeId, scope).orElseThrow();
+        return ResponseEntity.created(URI.create(IntegrationApi.PATH_LIST_EMPLOYEES + "/" + employeeId))
+                .body(toResponse(employee));
+    }
+
+    @Override
+    public ResponseEntity<EmployeeResponse> getEmployee(UUID employeeId) {
+        return employeeQueries
+                .getEmployee(employeeId, currentScope.get())
+                .map(IntegrationController::toResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // --- Attendance Endpoints ---
+
+    @Override
+    public ResponseEntity<AttendanceImportResponse> importAttendance(
+            String idempotencyKey, ImportAttendanceRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<ImportAttendanceRecords.AttendanceImportItem> items = request.getItems() == null
+                ? List.of()
+                : request.getItems().stream()
+                        .map(i -> new ImportAttendanceRecords.AttendanceImportItem(
+                                i.getExternalRecordId(),
+                                i.getEmployeeNo(),
+                                i.getDeviceIdentifier(),
+                                i.getSourceProvider(),
+                                i.getBusinessDate(),
+                                i.getClockIn(),
+                                i.getClockOut(),
+                                i.getRawPayload()))
+                        .toList();
+        AttendanceImportResult result = importAttendance.handle(new ImportAttendanceRecords(items), scope);
+        return ResponseEntity.ok(new AttendanceImportResponse(
+                result.imported(),
+                result.duplicate(),
+                result.rejected(),
+                result.recordIds(),
+                result.rejections().stream()
+                        .map(r -> new AttendanceRejection(r.externalRecordId(), r.reason()))
+                        .toList()));
+    }
+
+    @Override
+    public ResponseEntity<List<AttendanceRecordResponse>> listAttendance(LocalDate businessDate, UUID employeeId) {
+        return ResponseEntity.ok(attendanceQueries.listAttendance(businessDate, employeeId, currentScope.get()).stream()
+                .map(IntegrationController::toResponse)
+                .toList());
+    }
+
+    // --- Overtime Endpoints ---
+
+    @Override
+    public ResponseEntity<List<OvertimeCalculationResponse>> listOvertimeCalculations(
+            String status, LocalDate businessDate) {
+        return ResponseEntity.ok(attendanceQueries.listOvertime(status, businessDate, currentScope.get()).stream()
+                .map(IntegrationController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<PayrollContributionResponse> approveOvertime(
+            UUID calculationId, String idempotencyKey, ApproveOvertimeRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID contributionId = approveOvertime.handle(
+                new ApproveOvertime(calculationId, request.getPayrollPeriod(), request.getNotes()), scope);
+        ApprovedPayrollContributionQueries.ApprovedPayrollContributionView view =
+                payrollQueries.getContribution(contributionId, scope).orElseThrow();
+        return ResponseEntity.ok(toResponse(view));
+    }
+
+    // --- Payroll Contribution Endpoints ---
+
+    @Override
+    public ResponseEntity<List<PayrollContributionResponse>> listPayrollContributions(String payrollPeriod) {
+        return ResponseEntity.ok(payrollQueries.listApprovedContributions(payrollPeriod, currentScope.get()).stream()
+                .map(IntegrationController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<PayrollContributionSummaryResponse> getPayrollContributionSummary(String payrollPeriod) {
+        ApprovedPayrollContributionQueries.PayrollContributionSummary summary =
+                payrollQueries.getPeriodSummary(payrollPeriod, currentScope.get());
+        return ResponseEntity.ok(new PayrollContributionSummaryResponse(
+                summary.payrollPeriod(),
+                summary.totalEmployees(),
+                summary.totalOtMinutes(),
+                summary.totalApprovedAmount(),
+                summary.contributionCount()));
+    }
+
+    // --- Delivery Tracking Endpoints ---
+
+    @Override
+    public ResponseEntity<VehicleLocationResponse> recordVehicleLocation(
+            String idempotencyKey, RecordVehicleLocationRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID updateId = recordVehicleLocation.handle(
+                new RecordVehicleLocation(
+                        request.getVehicleId(),
+                        request.getDeviceId(),
+                        request.getTripId(),
+                        request.getLatitude(),
+                        request.getLongitude(),
+                        request.getSpeedKmh(),
+                        request.getHeadingDegrees(),
+                        request.getBatteryPercentage(),
+                        request.getRecordedAt()),
+                scope);
+        VehicleLocationResponse response = new VehicleLocationResponse(
+                        updateId,
+                        request.getVehicleId(),
+                        request.getDeviceId(),
+                        request.getLatitude(),
+                        request.getLongitude(),
+                        request.getSpeedKmh(),
+                        request.getRecordedAt(),
+                        clock.instant())
+                .headingDegrees(request.getHeadingDegrees())
+                .batteryPercentage(request.getBatteryPercentage());
+        return ResponseEntity.created(URI.create(IntegrationApi.PATH_RECORD_VEHICLE_LOCATION + "/" + updateId))
+                .body(response);
+    }
+
+    @Override
+    public ResponseEntity<List<LiveVehicleLocationResponse>> listLiveVehicleLocations() {
+        return ResponseEntity.ok(deliveryQueries.listLiveVehicleLocations(currentScope.get()).stream()
+                .map(IntegrationController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<LiveVehicleLocationResponse> getLiveVehicleLocation(String vehicleId) {
+        return deliveryQueries
+                .getLatestVehicleLocation(vehicleId, currentScope.get())
+                .map(IntegrationController::toResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<VehicleRouteHistoryResponse> getVehicleRouteHistory(String vehicleId, LocalDate date) {
+        List<VehicleRoutePointView> points =
+                deliveryQueries.getVehicleRouteHistory(vehicleId, date, currentScope.get());
+        List<VehicleRoutePointResponse> pointResponses = points.stream()
+                .map(p -> new VehicleRoutePointResponse(p.recordedAt(), p.latitude(), p.longitude(), p.speedKmh())
+                        .headingDegrees(p.headingDegrees()))
+                .toList();
+        return ResponseEntity.ok(
+                new VehicleRouteHistoryResponse(vehicleId, date, pointResponses.size(), pointResponses));
+    }
+
+    @Override
+    public ResponseEntity<DeliveryTripResponse> createDeliveryTrip(
+            String idempotencyKey, CreateDeliveryTripRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID tripId = createDeliveryTrip.handle(
+                new CreateDeliveryTrip(
+                        request.getTripReference(),
+                        request.getVehicleId(),
+                        request.getDriverUserId(),
+                        request.getDriverCode(),
+                        request.getOriginLocationId(),
+                        request.getDestinationLocationId(),
+                        request.getTripDate(),
+                        request.getStartOdometerKm()),
+                scope);
+        DeliveryTripSummaryView trip =
+                deliveryQueries.getDeliveryTrip(tripId, scope).orElseThrow();
+        return ResponseEntity.created(URI.create(IntegrationApi.PATH_CREATE_DELIVERY_TRIP + "/" + tripId))
+                .body(toResponse(trip));
+    }
+
+    @Override
+    public ResponseEntity<DeliveryTripResponse> completeDeliveryTrip(
+            UUID tripId, String idempotencyKey, CompleteDeliveryTripRequest request) {
+        ScopeContext scope = currentScope.get();
+        completeDeliveryTrip.handle(
+                new CompleteDeliveryTrip(
+                        tripId,
+                        request != null ? request.getEndOdometerKm() : null,
+                        request != null ? request.getTotalDistanceKm() : null),
+                scope);
+        DeliveryTripSummaryView trip =
+                deliveryQueries.getDeliveryTrip(tripId, scope).orElseThrow();
+        return ResponseEntity.ok(toResponse(trip));
+    }
+
+    @Override
+    public ResponseEntity<DeliveryDropResponse> recordDeliveryDrop(
+            UUID tripId, String idempotencyKey, RecordDeliveryDropRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID deliveryId = recordDeliveryDrop.handle(
+                new RecordDeliveryDrop(
+                        tripId,
+                        request.getDeliveryReference(),
+                        request.getDestinationLocationId(),
+                        request.getRecipientRef(),
+                        request.getPackagesCount(),
+                        request.getWeightKg(),
+                        request.getScheduledAt(),
+                        request.getNotes()),
+                scope);
+        DeliveryDropView drop =
+                deliveryQueries.getDeliveryDrop(deliveryId, scope).orElseThrow();
+        return ResponseEntity.created(
+                        URI.create(IntegrationApi.PATH_CREATE_DELIVERY_TRIP + "/" + tripId + "/drops/" + deliveryId))
+                .body(toResponse(drop));
+    }
+
+    @Override
+    public ResponseEntity<DeliveryDropResponse> updateDeliveryStatus(
+            UUID deliveryId, String idempotencyKey, UpdateDeliveryStatusRequest request) {
+        ScopeContext scope = currentScope.get();
+        updateDeliveryStatus.handle(
+                new UpdateDeliveryStatus(
+                        deliveryId, request.getStatus().getValue(), request.getFailureReason(), request.getNotes()),
+                scope);
+        DeliveryDropView drop =
+                deliveryQueries.getDeliveryDrop(deliveryId, scope).orElseThrow();
+        return ResponseEntity.ok(toResponse(drop));
+    }
+
+    @Override
+    public ResponseEntity<DailyDeliverySummaryResponse> getDailyDeliverySummary(LocalDate date, UUID locationId) {
+        DailyDeliverySummaryView summary =
+                deliveryQueries.getDailyDeliverySummary(date, locationId, currentScope.get());
+        return ResponseEntity.ok(toResponse(summary));
+    }
+
+    @Override
+    public ResponseEntity<MonthlyDeliveryReportResponse> getMonthlyDeliveryReport(String period, UUID locationId) {
+        MonthlyDeliveryReportView report =
+                deliveryQueries.getMonthlyDeliveryReport(period, locationId, currentScope.get());
+        return ResponseEntity.ok(toResponse(report));
+    }
+
+    // --- Helpers ---
+
     private ResponseEntity<NotificationRuleResponse> setStatus(UUID ruleId, String status) {
         ScopeContext scope = currentScope.get();
         setRuleStatus.handle(new SetNotificationRuleStatus(ruleId, status), scope);
@@ -254,11 +599,171 @@ class IntegrationController implements IntegrationApi {
                 export.generatedAt());
     }
 
-    /**
-     * journal_2026-09-01_2026-09-30_8000000000a1.csv: the period and the end of the export id (its
-     * random part); journal_2026-09-01_2026-09-30_PROVISIONAL_8000000000a1.csv for a provisional
-     * export (wave 2, CR-29-1 item 1), so the accountant sees the mark in the folder too.
-     */
+    private static EmployeeResponse toResponse(EmployeeQueries.EmployeeView e) {
+        return new EmployeeResponse(
+                        e.employeeId(),
+                        e.ownerEntityId(),
+                        e.employeeNo(),
+                        e.fullName(),
+                        e.hourlyRate(),
+                        EmployeeResponse.StatusEnum.fromValue(e.status()),
+                        e.createdAt(),
+                        e.updatedAt())
+                .nic(e.nic())
+                .epfNo(e.epfNo())
+                .locationId(e.locationId());
+    }
+
+    private static AttendanceRecordResponse toResponse(AttendanceQueries.AttendanceRecordView a) {
+        return new AttendanceRecordResponse(
+                        a.attendanceId(),
+                        a.ownerEntityId(),
+                        a.externalRecordId(),
+                        a.employeeId(),
+                        a.employeeNo(),
+                        a.employeeName(),
+                        a.deviceIdentifier(),
+                        a.sourceProvider(),
+                        a.businessDate(),
+                        a.clockIn(),
+                        a.clockOut(),
+                        a.workedMinutes(),
+                        AttendanceRecordResponse.StatusEnum.fromValue(a.status()),
+                        a.createdAt())
+                .rejectionReason(a.rejectionReason());
+    }
+
+    private static OvertimeCalculationResponse toResponse(AttendanceQueries.OvertimeCalculationView o) {
+        return new OvertimeCalculationResponse(
+                o.calculationId(),
+                o.attendanceId(),
+                o.ownerEntityId(),
+                o.employeeId(),
+                o.employeeNo(),
+                o.employeeName(),
+                o.businessDate(),
+                o.workedMinutes(),
+                o.standardMinutes(),
+                o.qualifyingOtMinutes(),
+                o.calculatedOtMinutes(),
+                o.otMultiplier(),
+                o.calculatedAmount(),
+                OvertimeCalculationResponse.StatusEnum.fromValue(o.status()),
+                o.createdAt());
+    }
+
+    private static PayrollContributionResponse toResponse(
+            ApprovedPayrollContributionQueries.ApprovedPayrollContributionView p) {
+        return new PayrollContributionResponse(
+                        p.contributionId(),
+                        p.ownerEntityId(),
+                        p.employeeId(),
+                        p.employeeNo(),
+                        p.employeeName(),
+                        p.calculationId(),
+                        p.payrollPeriod(),
+                        PayrollContributionResponse.ContributionTypeEnum.fromValue(p.contributionType()),
+                        p.approvedOtMinutes(),
+                        p.approvedAmount(),
+                        p.approvedBy(),
+                        p.approvedAt(),
+                        PayrollContributionResponse.StatusEnum.fromValue(p.status()),
+                        p.createdAt())
+                .approvalNotes(p.approvalNotes());
+    }
+
+    private static LiveVehicleLocationResponse toResponse(LiveVehicleLocationView v) {
+        return new LiveVehicleLocationResponse(
+                        v.vehicleId(), v.deviceId(), v.latitude(), v.longitude(), v.speedKmh(), v.recordedAt())
+                .tripId(v.tripId())
+                .headingDegrees(v.headingDegrees())
+                .batteryPercentage(v.batteryPercentage());
+    }
+
+    private static DeliveryTripResponse toResponse(DeliveryTripSummaryView t) {
+        return new DeliveryTripResponse(
+                        t.tripId(),
+                        t.ownerEntityId(),
+                        t.tripReference(),
+                        t.vehicleId(),
+                        t.originLocationId(),
+                        t.tripDate(),
+                        DeliveryTripResponse.TripStatusEnum.fromValue(t.tripStatus()),
+                        t.totalDistanceKm(),
+                        t.totalDrops(),
+                        t.deliveredDrops(),
+                        t.failedDrops())
+                .driverCode(t.driverCode())
+                .destinationLocationId(t.destinationLocationId())
+                .startedAt(t.startedAt())
+                .completedAt(t.completedAt());
+    }
+
+    private static DeliveryDropResponse toResponse(DeliveryDropView d) {
+        return new DeliveryDropResponse(
+                        d.deliveryId(),
+                        d.tripId(),
+                        d.deliveryReference(),
+                        d.destinationLocationId(),
+                        d.packagesCount(),
+                        d.weightKg(),
+                        DeliveryDropResponse.StatusEnum.fromValue(d.status()))
+                .recipientRef(d.recipientRef())
+                .scheduledAt(d.scheduledAt())
+                .deliveredAt(d.deliveredAt())
+                .failureReason(d.failureReason())
+                .notes(d.notes());
+    }
+
+    private static DailyDeliverySummaryResponse toResponse(DailyDeliverySummaryView s) {
+        List<DeliveryTripResponse> tripResponses =
+                s.trips().stream().map(IntegrationController::toResponse).toList();
+        return new DailyDeliverySummaryResponse(
+                s.date(),
+                s.totalTrips(),
+                s.completedTrips(),
+                s.totalDeliveries(),
+                s.deliveredCount(),
+                s.failedCount(),
+                s.pendingCount(),
+                s.completionRatePercent(),
+                s.totalDistanceKm(),
+                s.activeVehiclesCount(),
+                tripResponses);
+    }
+
+    private static MonthlyDeliveryReportResponse toResponse(MonthlyDeliveryReportView m) {
+        List<DailyDeliveryBreakdownItem> dailyItems = m.dailyBreakdown().stream()
+                .map(d -> new DailyDeliveryBreakdownItem(
+                        d.date(),
+                        d.totalTrips(),
+                        d.totalDeliveries(),
+                        d.deliveredCount(),
+                        d.failedCount(),
+                        d.totalDistanceKm()))
+                .toList();
+        List<VehicleDeliveryBreakdownItem> vehicleItems = m.vehicleBreakdown().stream()
+                .map(v -> new VehicleDeliveryBreakdownItem(
+                        v.vehicleId(),
+                        v.totalTrips(),
+                        v.totalDeliveries(),
+                        v.deliveredCount(),
+                        v.failedCount(),
+                        v.totalDistanceKm()))
+                .toList();
+        return new MonthlyDeliveryReportResponse(
+                m.periodMonth(),
+                m.totalTrips(),
+                m.completedTrips(),
+                m.totalDeliveries(),
+                m.deliveredCount(),
+                m.failedCount(),
+                m.deliverySuccessRate(),
+                m.totalDistanceKm(),
+                dailyItems,
+                vehicleItems);
+    }
+
     static String fileName(JournalExportView export) {
         return "journal_" + export.periodFrom() + "_" + export.periodTo() + (export.provisional() ? "_PROVISIONAL" : "")
                 + "_" + export.exportId().toString().substring(24) + ".csv";

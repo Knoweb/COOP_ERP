@@ -30,6 +30,12 @@ export type CorrectBatchRequest = components["schemas"]["CorrectBatchRequest"];
 export type LinkBarcodeToBatchRequest = components["schemas"]["LinkBarcodeToBatchRequest"];
 export type SupplierResponse = components["schemas"]["SupplierResponse"];
 export type RegisterSupplierRequest = components["schemas"]["RegisterSupplierRequest"];
+export type BulkImportSuppliersRequest = components["schemas"]["BulkImportSuppliersRequest"];
+export type SupplierImportReportResponse = components["schemas"]["SupplierImportReportResponse"];
+export type SupplierValidationError = components["schemas"]["SupplierValidationError"];
+export type DepartmentCategory = components["schemas"]["DepartmentCategoryResponse"];
+export type DefineDepartmentCategoryRequest = components["schemas"]["DefineDepartmentCategoryRequest"];
+export type UpdateDepartmentCategoryRequest = components["schemas"]["UpdateDepartmentCategoryRequest"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -237,6 +243,17 @@ export function useCatalogueApi() {
         return data!;
       },
 
+      async importSuppliers(
+        body: BulkImportSuppliersRequest,
+        idempotencyKey: string
+      ): Promise<SupplierImportReportResponse> {
+        const { data } = await api.POST("/v1/catalogue/suppliers/import", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
       async listTaxCategories(): Promise<TaxCategory[]> {
         const { data } = await api.GET("/v1/catalogue/tax/categories");
         return data ?? [];
@@ -258,6 +275,41 @@ export function useCatalogueApi() {
           params: { query: { categoryId, date } }
         });
         return data ?? [];
+      },
+
+      async listDepartmentCategories(): Promise<DepartmentCategory[]> {
+        const { data } = await api.GET("/v1/catalogue/departments");
+        return data ?? [];
+      },
+
+      async getDepartmentCategory(departmentId: string): Promise<DepartmentCategory> {
+        const { data } = await api.GET("/v1/catalogue/departments/{departmentId}", {
+          params: { path: { departmentId } }
+        });
+        return data!;
+      },
+
+      async defineDepartmentCategory(
+        body: DefineDepartmentCategoryRequest,
+        idempotencyKey: string
+      ): Promise<DepartmentCategory> {
+        const { data } = await api.POST("/v1/catalogue/departments", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async updateDepartmentCategory(
+        departmentId: string,
+        body: UpdateDepartmentCategoryRequest,
+        idempotencyKey: string
+      ): Promise<DepartmentCategory> {
+        const { data } = await api.PUT("/v1/catalogue/departments/{departmentId}", {
+          params: { path: { departmentId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
       },
 
       async publishTaxRate(

@@ -53,6 +53,11 @@ audit_event_types:
     offline_capturable: false
     description_en: An opening stock balance was signed for the entity
 
+  - code: OPB_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: An opening stock balance was rejected by a higher officer
+
   - code: OPB_POSTED
     severity: INFO
     offline_capturable: false
@@ -279,3 +284,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Stock lot unit cost repriced and entity valuation adjusted
+
+  # Polgolla M2-07: expiry alerts and slow-moving detection
+  - code: NEAR_EXPIRY_ALERT_TRIGGERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Near-expiry stock alert emitted for an expiring batch at a location
+
+  - code: SLOW_MOVING_ALERT_TRIGGERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Slow-moving stock alert emitted for a stagnant or low-velocity SKU at a location

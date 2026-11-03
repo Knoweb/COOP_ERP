@@ -126,5 +126,15 @@
   "m5.reprice.invalid_qty": "Reprice quantity must be greater than zero with at most 3 decimal places",
   "m5.reprice.qty_exceeded": "Reprice quantity exceeds the quantity available on this lot",
   "m5.reprice.invalid_cost": "Unit cost must be zero or greater with at most 4 decimal places",
-  "m5.reprice.reason_required": "A reason is required for repricing"
+  "m5.reprice.reason_required": "A reason is required for repricing",
+  "m5.expiry.location_required": "A location is required",
+  "m5.opening.batch_required": "A batch number is required for this item",
+  "m5.opening.batch_no_too_long": "Batch number cannot exceed 40 characters",
+  "m5.opening.expiry_required": "An expiry date is required for this item",
+  "m5.opening.mrp_required": "A printed MRP is required for this item",
+  "m5.opening.uom_mismatch": "Unit of measure does not match the item base UOM",
+  "m5.opening.rejection_reason_required": "A reason of at least 5 characters is required to reject an opening balance",
+  "m5.opening.cannot_reject_posted": "An opening balance that has already been posted cannot be rejected",
+  "m5.opening.already_rejected": "This opening balance has already been rejected",
+  "m5.opening.excel_parse_error": "The opening stock spreadsheet could not be read or is invalid"
 }

@@ -106,7 +106,13 @@ export function NewDeliveryNotePage() {
 
   return (
     <main className="shell-page">
-      <Link to={`/trading/orders/${o.orderId}`}>{t("trading.back_to_order").text}</Link>
+      <Link className="back-link" to={`/trading/orders/${o.orderId}`}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        {t("trading.back_to_order").text}
+      </Link>
       <h1>{t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}</h1>
       <dl>
         <dt>{t("trading.column.buyer").text}</dt>

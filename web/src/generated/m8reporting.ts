@@ -551,6 +551,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/final-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly final accounts statement combining revenue, COGS and approved expenses
+         * @description Produces month-end final accounts statement reconciling retail sales revenue, cost of goods sold, gross profit, and approved payroll/operating expenses. Surfaces partial or pending data explicitly without fabricating zero figures.
+         */
+        get: operations["getFinalAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/final-accounts/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly operating expense breakdown including approved payroll contributions
+         * @description Produces detailed monthly operating expense breakdown, classifying approved staff/payroll contributions from M9 and documenting non-payroll expense status.
+         */
+        get: operations["getFinalAccountsExpenses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/final-accounts/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export monthly final accounts statement and expense breakdown as CSV
+         * @description Exports monthly final accounts statement and expense breakdown as CSV.
+         */
+        get: operations["exportFinalAccountsCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1130,6 +1190,55 @@ export interface components {
             voucherNumber: string;
             /** Format: uri */
             downloadUrl: string;
+        };
+        FinalAccountsReportResponse: {
+            period: string;
+            currency: string;
+            /** @enum {string} */
+            status: "COMPLETE" | "PARTIAL" | "UNAVAILABLE";
+            statusReason?: string | null;
+            revenue: string;
+            cogs?: string | null;
+            costPending: boolean;
+            grossProfit?: string | null;
+            grossProfitMarginPercent?: string | null;
+            payrollExpenses: string;
+            otherExpenses?: string | null;
+            otherExpensesPending: boolean;
+            totalExpenses?: string | null;
+            operatingProfit?: string | null;
+            operatingProfitMarginPercent?: string | null;
+            expenseCategories: components["schemas"]["ExpenseCategoryResponse"][];
+            payrollContributions: components["schemas"]["FinalAccountPayrollItemResponse"][];
+        };
+        ExpenseCategoryResponse: {
+            category: string;
+            categoryName: string;
+            amount?: string | null;
+            status: string;
+            notes?: string | null;
+        };
+        FinalAccountPayrollItemResponse: {
+            /** Format: uuid */
+            contributionId: string;
+            /** Format: uuid */
+            employeeId: string;
+            employeeNo: string;
+            employeeName: string;
+            contributionType: string;
+            approvedAmount: string;
+            approvedOtMinutes: number;
+            /** Format: date-time */
+            approvedAt?: string | null;
+            status: string;
+        };
+        FinalAccountsExpensesResponse: {
+            period: string;
+            currency: string;
+            totalPayrollExpenses: string;
+            contributionCount: number;
+            categories: components["schemas"]["ExpenseCategoryResponse"][];
+            contributions: components["schemas"]["FinalAccountPayrollItemResponse"][];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -2182,6 +2291,101 @@ export interface operations {
             };
             /** @description Invoice not found in caller's permitted scope */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getFinalAccounts: {
+        parameters: {
+            query?: {
+                /** @description Year and month (YYYY-MM), defaults to current business month */
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly final accounts statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalAccountsReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getFinalAccountsExpenses: {
+        parameters: {
+            query?: {
+                /** @description Year and month (YYYY-MM), defaults to current business month */
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operating expense details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalAccountsExpensesResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    exportFinalAccountsCsv: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Scope forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

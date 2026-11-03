@@ -348,6 +348,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/suppliers/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk import suppliers from CSV or structured rows
+         * @description Validates (dry-run) or commits a bulk batch of suppliers for the caller's entity. Idempotently skips identical existing suppliers and rejects conflicting records.
+         */
+        post: operations["importSuppliers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/import": {
         parameters: {
             query?: never;
@@ -399,6 +419,44 @@ export interface paths {
         put?: never;
         /** Resolve a duplicate suspect pair as MERGED or DISMISSED */
         post: operations["resolveDuplicateSuspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all merchandise department categories */
+        get: operations["listDepartmentCategories"];
+        put?: never;
+        /** Define a new merchandise department category */
+        post: operations["defineDepartmentCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/departments/{departmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                departmentId: string;
+            };
+            cookie?: never;
+        };
+        /** Get a department category by id */
+        get: operations["getDepartmentCategory"];
+        /** Update an existing merchandise department category */
+        put: operations["updateDepartmentCategory"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -460,6 +518,8 @@ export interface components {
             expiryWarningDays?: number;
             /** Format: uuid */
             taxCategoryId: string;
+            /** Format: uuid */
+            departmentId?: string;
             /** @enum {string} */
             multiMrpPolicy: "AUTO_LOWEST" | "BARCODE_RESOLVED" | "PICKER";
             /** @enum {string} */
@@ -504,6 +564,8 @@ export interface components {
             expiryWarningDays?: number;
             /** Format: uuid */
             taxCategoryId: string;
+            /** Format: uuid */
+            departmentId?: string;
             multiMrpPolicy: string;
             originKind: string;
             attributes?: {
@@ -563,6 +625,36 @@ export interface components {
         CatalogueReferenceResponse: {
             units: components["schemas"]["UomResponse"][];
             taxCategories: components["schemas"]["TaxCategoryResponse"][];
+            departments: components["schemas"]["DepartmentCategoryResponse"][];
+        };
+        DepartmentCategoryResponse: {
+            /** Format: uuid */
+            departmentId: string;
+            code: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            description?: string;
+            displayOrder: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+        };
+        DefineDepartmentCategoryRequest: {
+            code: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            description?: string;
+            displayOrder?: number;
+        };
+        UpdateDepartmentCategoryRequest: {
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            description?: string;
+            displayOrder?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
         };
         RegisterBarcodeRequest: {
             barcode: string;
@@ -689,6 +781,34 @@ export interface components {
             name: string;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            supplierCode?: string;
+        };
+        BulkImportSuppliersRequest: {
+            /** @enum {string} */
+            mode: "VALIDATE" | "COMMIT";
+            csvContent?: string;
+            rows?: components["schemas"]["SupplierImportRowItem"][];
+        };
+        SupplierImportRowItem: {
+            rowNumber: number;
+            name: string;
+            supplierCode?: string;
+        };
+        SupplierImportReportResponse: {
+            /** @enum {string} */
+            status: "VALIDATED" | "ACCEPTED" | "REJECTED";
+            rows: number;
+            created: number;
+            skipped: number;
+            rejected: number;
+            errors: components["schemas"]["SupplierValidationError"][];
+        };
+        SupplierValidationError: {
+            rowNumber: number;
+            field: string;
+            code: string;
+            message: string;
+            rejectedValue?: string;
         };
         BulkImportSkusRequest: {
             /** @enum {string} */
@@ -1591,6 +1711,35 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    importSuppliers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportSuppliersRequest"];
+            };
+        };
+        responses: {
+            /** @description Import report with validation errors and created/skipped counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierImportReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
     importSkus: {
         parameters: {
             query?: never;
@@ -1670,6 +1819,128 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDepartmentCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of department categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentCategoryResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    defineDepartmentCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineDepartmentCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Department category defined */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentCategoryResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDepartmentCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                departmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Department category details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentCategoryResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.department.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateDepartmentCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                departmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDepartmentCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Department category updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentCategoryResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.department.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             422: components["responses"]["RuleBroken"];
         };
     };

@@ -1067,6 +1067,43 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/suppliers/import:
+
+    post:
+      tags: [Supplier]
+      operationId: importSuppliers
+      summary: Bulk import suppliers from CSV or structured rows
+      description: >
+        Validates (dry-run) or commits a bulk batch of suppliers for the caller's entity.
+        Idempotently skips identical existing suppliers and rejects conflicting records.
+      x-permission: cat.supplier.manage
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportSuppliersRequest'
+
+      responses:
+        '200':
+          description: Import report with validation errors and created/skipped counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierImportReportResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
   /v1/catalogue/import:
 
     post:
@@ -1178,6 +1215,132 @@ paths:
 
         '400':
           $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/departments:
+
+    get:
+      tags: [Department]
+      operationId: listDepartmentCategories
+      summary: List all merchandise department categories
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: List of department categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Department]
+      operationId: defineDepartmentCategory
+      summary: Define a new merchandise department category
+      x-permission: cat.department.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineDepartmentCategoryRequest'
+
+      responses:
+        '201':
+          description: Department category defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/departments/{departmentId}:
+
+    parameters:
+      - in: path
+        name: departmentId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Department]
+      operationId: getDepartmentCategory
+      summary: Get a department category by id
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: Department category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.department.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+    put:
+      tags: [Department]
+      operationId: updateDepartmentCategory
+      summary: Update an existing merchandise department category
+      x-permission: cat.department.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentCategoryRequest'
+
+      responses:
+        '200':
+          description: Department category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.department.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
 
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
@@ -1371,6 +1534,10 @@ components:
           type: string
           format: uuid
 
+        departmentId:
+          type: string
+          format: uuid
+
         multiMrpPolicy:
           type: string
           enum:
@@ -1502,6 +1669,10 @@ components:
           type: integer
 
         taxCategoryId:
+          type: string
+          format: uuid
+
+        departmentId:
           type: string
           format: uuid
 
@@ -1643,7 +1814,7 @@ components:
 
     CatalogueReferenceResponse:
       type: object
-      required: [units, taxCategories]
+      required: [units, taxCategories, departments]
       properties:
         units:
           type: array
@@ -1653,6 +1824,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TaxCategoryResponse'
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+
+    DepartmentCategoryResponse:
+      type: object
+      required:
+        - departmentId
+        - code
+        - nameEn
+        - displayOrder
+        - status
+      properties:
+        departmentId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+
+
+    DefineDepartmentCategoryRequest:
+      type: object
+      required:
+        - code
+        - nameEn
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+
+
+    UpdateDepartmentCategoryRequest:
+      type: object
+      required:
+        - nameEn
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
 
 
     RegisterBarcodeRequest:
@@ -1991,6 +2239,83 @@ components:
           enum:
             - ACTIVE
             - INACTIVE
+
+        supplierCode:
+          type: string
+
+
+    BulkImportSuppliersRequest:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+        csvContent:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierImportRowItem'
+
+    SupplierImportRowItem:
+      type: object
+      required:
+        - rowNumber
+        - name
+      properties:
+        rowNumber:
+          type: integer
+        name:
+          type: string
+        supplierCode:
+          type: string
+
+    SupplierImportReportResponse:
+      type: object
+      required:
+        - status
+        - rows
+        - created
+        - skipped
+        - rejected
+        - errors
+      properties:
+        status:
+          type: string
+          enum: [VALIDATED, ACCEPTED, REJECTED]
+        rows:
+          type: integer
+        created:
+          type: integer
+        skipped:
+          type: integer
+        rejected:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierValidationError'
+
+    SupplierValidationError:
+      type: object
+      required:
+        - rowNumber
+        - field
+        - code
+        - message
+      properties:
+        rowNumber:
+          type: integer
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        rejectedValue:
+          type: string
 
 
     BulkImportSkusRequest:

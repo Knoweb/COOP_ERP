@@ -58,4 +58,10 @@ public interface CatalogueQueries {
      * (max depth 3, 22A section 7; doc 22 section 6.3). Returns the SKU itself if not aliased.
      */
     UUID resolveAlias(UUID skuId, ScopeContext scope);
+
+    /** The merchandise department categories visible in the scope (PGL-M2-08). */
+    List<DepartmentCategoryView> departmentCategories(ScopeContext scope);
+
+    /** Resolves a department category by its identifier if visible in the scope (PGL-M2-08). */
+    Optional<DepartmentCategoryView> getDepartmentCategory(UUID departmentId, ScopeContext scope);
 }

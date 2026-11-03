@@ -38,7 +38,8 @@ const SKU: Sku = {
   taxCategoryId: "0190e620-0000-7000-8000-000000000100",
   multiMrpPolicy: "PICKER",
   originKind: "REPACK_OUTPUT",
-  expiryWarningDays: 7
+  expiryWarningDays: 7,
+  departmentId: "0190e620-0000-7000-8000-000000000050"
 };
 
 describe("the SKU view", () => {
@@ -55,6 +56,17 @@ describe("the SKU view", () => {
     expect(nameIn(SKU, "en")).toBe("Rice");
     expect(languageOf("ta")).toBe("ta");
     expect(languageOf("fr")).toBe("en");
+  });
+
+  it("maps departmentId in formOf and requestOf", () => {
+    const form = formOf(SKU);
+    expect(form.departmentId).toBe("0190e620-0000-7000-8000-000000000050");
+
+    const req = requestOf(form);
+    expect(req.departmentId).toBe("0190e620-0000-7000-8000-000000000050");
+
+    const clearedReq = requestOf({ ...form, departmentId: "" });
+    expect(clearedReq.departmentId).toBeUndefined();
   });
 
   it("keeps the fields the editor does not show on an update and uses the defaults on a create", () => {

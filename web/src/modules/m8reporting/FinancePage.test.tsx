@@ -8,6 +8,7 @@ import type {
   CreditVoucher,
   CreditorsReport,
   DebtorsReport,
+  FinalAccountsReport,
   GoodsSuppliedReport,
   OpeningBalancesReport
 } from "./reportingApi";
@@ -136,6 +137,54 @@ const mockCreditVoucher: CreditVoucher = {
   ]
 };
 
+const mockFinalAccounts: FinalAccountsReport = {
+  period: "2026-11",
+  currency: "LKR",
+  status: "PARTIAL",
+  statusReason:
+    "Non-payroll operating expenses (rent, utilities) pending Phase 3 general ledger integration; total operating expenses and operating profit are unavailable",
+  revenue: "150000.00",
+  cogs: "100000.00",
+  costPending: false,
+  grossProfit: "50000.00",
+  grossProfitMarginPercent: "33.33",
+  payrollExpenses: "12500.00",
+  otherExpenses: null,
+  otherExpensesPending: true,
+  totalExpenses: null,
+  operatingProfit: null,
+  operatingProfitMarginPercent: null,
+  expenseCategories: [
+    {
+      category: "STAFF_PAYROLL",
+      categoryName: "Staff & Payroll Costs",
+      amount: "12500.00",
+      status: "APPROVED",
+      notes: "Approved biometric attendance and overtime contributions from M9 (1 contribution(s), 120 approved OT minutes)"
+    },
+    {
+      category: "OTHER_OPERATING",
+      categoryName: "Other Operating Expenses",
+      amount: null,
+      status: "UNAVAILABLE",
+      notes: "Non-payroll operating expenses (rent, utilities, transport, maintenance) require general ledger / cashbook journal integration, which arrives in Phase 3"
+    }
+  ],
+  payrollContributions: [
+    {
+      contributionId: "0190f8aa-1111-7000-8000-000000000001",
+      employeeId: "0190f8bb-2222-7000-8000-000000000002",
+      employeeNo: "EMP-001",
+      employeeName: "Kamal Perera",
+      contributionType: "OVERTIME",
+      approvedAmount: "12500.00",
+      approvedOtMinutes: 120,
+      approvedAt: "2026-11-01T10:00:00Z",
+      status: "APPROVED"
+    }
+  ]
+};
+
 const api = {
   listDebtorsReport: vi.fn(async () => mockDebtors),
   exportDebtorsCsv: vi.fn(async () => "Code,Debtor Name,Credit Limit\nSOC-01,Polgolla MPCS,200000.00\n"),
@@ -150,7 +199,17 @@ const api = {
     invoiceId: "0190f8aa-0000-7000-8000-000000000001",
     voucherNumber: "CPV-INV-2026-00042",
     downloadUrl: "http://localhost:9000/reports/test/voucher.pdf"
-  }))
+  })),
+  getFinalAccounts: vi.fn(async () => mockFinalAccounts),
+  getFinalAccountsExpenses: vi.fn(async () => ({
+    period: "2026-11",
+    currency: "LKR",
+    totalPayrollExpenses: "12500.00",
+    contributionCount: 1,
+    categories: mockFinalAccounts.expenseCategories,
+    contributions: mockFinalAccounts.payrollContributions
+  })),
+  exportFinalAccountsCsv: vi.fn(async () => "FINAL ACCOUNTS STATEMENT\nPeriod,2026-11\nRevenue,150000.00\n")
 };
 
 vi.mock("./reportingApi", async () => {
@@ -257,6 +316,54 @@ describe("FinancePage", () => {
 
     await waitFor(() => {
       expect(api.printCreditVoucher).toHaveBeenCalledWith("0190f8aa-0000-7000-8000-000000000001");
+    });
+  });
+
+  it("switches to Final Accounts & Expenses tab and displays revenue, cogs, gross profit, approved payroll expenses, and drilldown", async () => {
+    renderPage();
+
+    const finalAccountsTab = screen.getByRole("tab", { name: "Final Accounts & Expenses" });
+    fireEvent.click(finalAccountsTab);
+
+    await waitFor(() => {
+      expect(api.getFinalAccounts).toHaveBeenCalled();
+      expect(screen.getByText(/Monthly Final Accounts Statement/)).toBeDefined();
+      expect(screen.getByText("Sales Revenue")).toBeDefined();
+      expect(screen.getByText("Cost of Goods Sold (COGS)")).toBeDefined();
+      expect(screen.getByText("Gross Profit")).toBeDefined();
+      expect(screen.getByText("Approved Payroll / Staff Costs")).toBeDefined();
+      expect(screen.getByText("Operating Profit / Net Result")).toBeDefined();
+      expect(screen.getByText("Staff & Payroll Costs")).toBeDefined();
+      expect(screen.getByText("Other Operating Expenses")).toBeDefined();
+      expect(screen.getByText("EMP-001")).toBeDefined();
+      expect(screen.getByText("Kamal Perera")).toBeDefined();
+      expect(screen.getByText("OVERTIME")).toBeDefined();
+      expect(screen.getByText("120")).toBeDefined();
+    });
+  });
+
+  it("handles period change and triggers CSV download for Final Accounts", async () => {
+    renderPage();
+
+    const finalAccountsTab = screen.getByRole("tab", { name: "Final Accounts & Expenses" });
+    fireEvent.click(finalAccountsTab);
+
+    await waitFor(() => {
+      expect(api.getFinalAccounts).toHaveBeenCalled();
+    });
+
+    const monthInput = screen.getByLabelText(/Period/);
+    fireEvent.change(monthInput, { target: { value: "2026-10" } });
+
+    await waitFor(() => {
+      expect(api.getFinalAccounts).toHaveBeenCalledWith("2026-10");
+    });
+
+    const downloadBtn = screen.getByRole("button", { name: "Download CSV" });
+    fireEvent.click(downloadBtn);
+
+    await waitFor(() => {
+      expect(api.exportFinalAccountsCsv).toHaveBeenCalledWith("2026-10");
     });
   });
 });

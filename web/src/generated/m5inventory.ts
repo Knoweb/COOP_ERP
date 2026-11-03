@@ -181,6 +181,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/opening-balances/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download official opening stock Excel spreadsheet template */
+        get: operations["downloadOpeningStockTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/opening-balances/{openingBalanceId}": {
         parameters: {
             query?: never;
@@ -232,6 +249,26 @@ export interface paths {
          * @description Codes this operation can answer with 422: m5.scope.own_required, m5.opening.user_required, m5.opening.federation_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown, m2.sku.not_found, m2.batch.sku_not_active, m2.batch.batch_no_too_long, m2.batch.mrp_required, m2.batch.mrp_invalid, m2.batch.expiry_required, m2.batch.dates_invalid; mfa.required when the second factor is not fresh.
          */
         post: operations["countersignOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/{openingBalanceId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A higher officer rejects a draft or signed opening balance with a documented reason
+         * @description Rejects an opening balance in DRAFT or SIGNED_ENTITY status, recording the officer and reason, freeing the location for re-preparation.
+         */
+        post: operations["rejectOpeningBalance"];
         delete?: never;
         options?: never;
         head?: never;
@@ -406,6 +443,57 @@ export interface paths {
         put?: never;
         /** Trigger low stock evaluation for a location */
         post: operations["evaluateLowStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/expiry-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Near-expiry stock alert feed for a location with remaining quantities and urgency tiers */
+        get: operations["getExpiryAlertFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/slow-moving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Slow-moving and stagnant stock items at a location */
+        get: operations["getSlowMovingStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/expiry-alerts/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger evaluation and publishing of near-expiry and slow-moving alerts for a location */
+        post: operations["scanExpiryAlerts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -952,6 +1040,11 @@ export interface components {
         BulkImportStockRequest: {
             /** Format: uuid */
             locationId: string;
+            /**
+             * @default COMMIT
+             * @enum {string}
+             */
+            mode: "VALIDATE" | "COMMIT";
             sheet?: string;
             lines?: components["schemas"]["StockRowRequest"][];
         };
@@ -972,22 +1065,55 @@ export interface components {
             condition: "GOOD" | "DAMAGED";
             qty?: number;
             unitCost?: number;
+            uom?: string;
         };
         BulkStockReport: {
             /** Format: uuid */
-            importId: string;
+            importId?: string;
             /** Format: uuid */
-            openingBalanceId: string;
+            openingBalanceId?: string;
             /** @enum {string} */
-            status: "IMPORTED" | "REJECTED" | "EMPTY";
+            status: "IMPORTED" | "REJECTED" | "EMPTY" | "VALID";
             totalRows: number;
             importedLines: number;
+            validRows?: number;
+            errorRows?: number;
+            totalValuation?: number;
             problems?: components["schemas"]["StockProblem"][];
+            previewRows?: components["schemas"]["StockRowPreview"][];
         };
         StockProblem: {
             line: number;
             sku?: string;
+            field?: string;
             message: string;
+        };
+        StockRowPreview: {
+            lineNo: number;
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            skuCode?: string;
+            itemName?: string;
+            baseUom?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /** @enum {string} */
+            condition?: "GOOD" | "DAMAGED";
+            qty?: number;
+            unitCost?: number;
+            extendedCost?: number;
+            batchTracked?: boolean;
+            expiryTracked?: boolean;
+            hasPrintedMrp?: boolean;
+            /** @enum {string} */
+            status: "VALID" | "ERROR";
+            error?: string;
+        };
+        RejectOpeningBalanceRequest: {
+            reason: string;
         };
         PrepareOpeningBalanceRequest: {
             /** Format: uuid */
@@ -1018,13 +1144,18 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             /** @enum {string} */
-            status: "DRAFT" | "SIGNED_ENTITY" | "POSTED";
+            status: "DRAFT" | "SIGNED_ENTITY" | "POSTED" | "REJECTED";
             /** Format: uuid */
             preparedBy?: string;
             /** Format: uuid */
             signedEntityBy?: string;
             /** Format: uuid */
             countersignedBy?: string;
+            /** Format: uuid */
+            rejectedBy?: string;
+            /** Format: date-time */
+            rejectedAt?: string;
+            rejectionReason?: string;
             /** Format: uuid */
             documentId?: string;
             lines: components["schemas"]["OpeningBalanceLineResponse"][];
@@ -1404,6 +1535,47 @@ export interface components {
             /** Format: date-time */
             repricedAt: string;
         };
+        ExpiryAlertItemResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo: string;
+            /** Format: date */
+            expiryDate: string;
+            daysToExpiry: number;
+            qtyOnHand: number;
+            unitCost: number;
+            /** @enum {string} */
+            urgencyTier: "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED" | "HEALTHY";
+            alertActive: boolean;
+        };
+        SlowMovingStockResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            qtyOnHand: number;
+            unitCost: number;
+            daysWithoutSale: number;
+            /** Format: date */
+            lastSaleDate?: string | null;
+            salesInWindow: number;
+            averageDailySales: number;
+            daysOfSupply: number;
+            /** @enum {string} */
+            classification: "STAGNANT" | "SLOW_VELOCITY";
+            alertActive: boolean;
+        };
+        ExpiryAlertScanResponse: {
+            nearExpiryAlertsEmitted: number;
+            slowMovingAlertsEmitted: number;
+            totalEvaluated: number;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1699,6 +1871,26 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    downloadOpeningStockTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Excel spreadsheet template (.xlsx) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
     getOpeningBalance: {
         parameters: {
             query?: never;
@@ -1769,6 +1961,36 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Posted, with the OPB document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectOpeningBalance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                openingBalanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectOpeningBalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Rejected, in status REJECTED */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2105,6 +2327,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvaluateLowStockResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getExpiryAlertFeed: {
+        parameters: {
+            query?: {
+                windowDays?: number;
+                tier?: "ALL" | "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED";
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of near-expiry stock lots with urgency tiers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryAlertItemResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getSlowMovingStock: {
+        parameters: {
+            query?: {
+                evaluationDays?: number;
+                thresholdDaysOfSupply?: number;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of slow-moving stock items with velocity metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlowMovingStockResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    scanExpiryAlerts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alert scan evaluation summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryAlertScanResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
