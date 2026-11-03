@@ -94,7 +94,7 @@ export function CatalogueDropdown<T extends string = string>({
       <select
         id={selectId}
         aria-label={label ? undefined : placeholder}
-        className="visually-hidden"
+        className="catalogue-dropdown-native"
         value={value}
         disabled={disabled}
         required={required}
