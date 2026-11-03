@@ -3361,22 +3361,65 @@ textarea {
 .users-table-card {
   border-radius: 16px;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .users-table-scroll {
-  width: 100%;
-  overflow-x: auto;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
 .users-table {
-  width: 100%;
-  min-width: 620px;
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+  border-collapse: collapse;
 }
 
 .users-table th,
 .users-table td {
-  padding: 12px 16px;
+  padding: 12px 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+  box-sizing: border-box;
+}
+
+.users-table th:nth-child(1),
+.users-table td:nth-child(1) {
+  width: 20%;
+}
+
+.users-table th:nth-child(2),
+.users-table td:nth-child(2) {
+  width: 25%;
+}
+
+.users-table th:nth-child(3),
+.users-table td:nth-child(3) {
+  width: 18%;
+}
+
+.users-table th:nth-child(4),
+.users-table td:nth-child(4) {
+  width: 17%;
+}
+
+.users-table th:nth-child(5),
+.users-table td:nth-child(5) {
+  width: 20%;
+}
+
+.users-table td a {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .users-table tbody tr {
@@ -3385,6 +3428,23 @@ textarea {
 
 .users-table tbody tr:hover {
   background: var(--color-polish-14);
+}
+
+@media (max-width: 640px) {
+  .users-table-scroll {
+    overflow-x: auto !important;
+  }
+
+  .users-table {
+    table-layout: auto !important;
+    min-width: 520px !important;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 10px 10px;
+    font-size: 13px;
+  }
 }
 
 .new-user-back-wrap {
