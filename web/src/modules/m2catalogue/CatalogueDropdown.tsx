@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 export type DropdownOption<T extends string = string> = {
   value: T;
@@ -17,11 +17,12 @@ type CatalogueDropdownProps<T extends string = string> = {
 };
 
 /**
- * Reusable custom dropdown with accessible listbox, arrow icon, checkmark on selected option,
- * vertical indicator bar on selected option, and keyboard/click-outside dismissal.
+ * Reusable custom dropdown with accessible native select (for Playwright E2E and forms),
+ * combined with custom styled listbox trigger, arrow icon, left wine accent indicator bar,
+ * soft pink hover background, checkmark, and keyboard/click-outside dismissal.
  */
 export function CatalogueDropdown<T extends string = string>({
-  id,
+  id: explicitId,
   label,
   value,
   onChange,
@@ -30,6 +31,8 @@ export function CatalogueDropdown<T extends string = string>({
   disabled,
   required
 }: CatalogueDropdownProps<T>) {
+  const generatedId = useId();
+  const selectId = explicitId || generatedId;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
@@ -78,7 +81,7 @@ export function CatalogueDropdown<T extends string = string>({
     >
       {label && (
         <label
-          htmlFor={id}
+          htmlFor={selectId}
           className="catalogue-filter-label"
           style={{ display: "flex", gap: "var(--space-half)" }}
         >
@@ -87,15 +90,33 @@ export function CatalogueDropdown<T extends string = string>({
         </label>
       )}
 
+      {/* Accessible native select for Playwright E2E and forms */}
+      <select
+        id={selectId}
+        aria-label={label ? undefined : placeholder}
+        className="visually-hidden"
+        value={value}
+        disabled={disabled}
+        required={required}
+        onChange={(e) => onChange(e.target.value as T)}
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+        {options.map((opt) => (
+          <option key={String(opt.value)} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+
+      {/* Custom visual trigger button */}
       <button
-        id={id}
         type="button"
-        role="combobox"
+        className="register-dropdown-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
         disabled={disabled}
-        className="register-dropdown-trigger"
+        tabIndex={-1}
+        aria-hidden="true"
         onClick={() => setOpen(!open)}
       >
         <span className="custom-status-dropdown__label">{currentLabel}</span>
@@ -116,13 +137,14 @@ export function CatalogueDropdown<T extends string = string>({
       </button>
 
       {open && (
-        <ul ref={menuRef} className="register-dropdown-menu" role="listbox">
+        <ul ref={menuRef} className="register-dropdown-menu" role="listbox" aria-hidden="true">
           {placeholder && (
             <li role="presentation">
               <button
                 type="button"
                 role="option"
                 aria-selected={value === ""}
+                tabIndex={-1}
                 className={
                   value === ""
                     ? "register-dropdown-option register-dropdown-option--selected"
@@ -161,6 +183,7 @@ export function CatalogueDropdown<T extends string = string>({
                   type="button"
                   role="option"
                   aria-selected={isSelected}
+                  tabIndex={-1}
                   className={
                     isSelected
                       ? "register-dropdown-option register-dropdown-option--selected"
