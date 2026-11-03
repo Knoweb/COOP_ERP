@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
@@ -12,12 +13,16 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m9integration.api.ApproveOvertime;
 import lk.coopfed.knoweb.m9integration.api.AttendanceImportResult;
 import lk.coopfed.knoweb.m9integration.api.CompleteDeliveryTrip;
+import lk.coopfed.knoweb.m9integration.api.ConfirmCodSettlement;
+import lk.coopfed.knoweb.m9integration.api.ConfirmPayment;
 import lk.coopfed.knoweb.m9integration.api.CreateDeliveryTrip;
 import lk.coopfed.knoweb.m9integration.api.ImportAttendanceRecords;
+import lk.coopfed.knoweb.m9integration.api.InitiatePayment;
 import lk.coopfed.knoweb.m9integration.api.RecordDeliveryDrop;
 import lk.coopfed.knoweb.m9integration.api.RecordVehicleLocation;
 import lk.coopfed.knoweb.m9integration.api.RegisterEmployee;
 import lk.coopfed.knoweb.m9integration.api.RequestJournalExport;
+import lk.coopfed.knoweb.m9integration.api.RetryPayment;
 import lk.coopfed.knoweb.m9integration.api.SetNotificationRuleStatus;
 import lk.coopfed.knoweb.m9integration.api.UpdateDeliveryStatus;
 import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries;
@@ -32,6 +37,8 @@ import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.JournalExportVie
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.RuleView;
 import lk.coopfed.knoweb.m9integration.query.LiveVehicleLocationView;
 import lk.coopfed.knoweb.m9integration.query.MonthlyDeliveryReportView;
+import lk.coopfed.knoweb.m9integration.query.PaymentIntentView;
+import lk.coopfed.knoweb.m9integration.query.PaymentQueries;
 import lk.coopfed.knoweb.m9integration.query.VehicleRoutePointView;
 import lk.coopfed.knoweb.m9integration.web.generated.AccountTotalResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.ApproveOvertimeRequest;
@@ -39,6 +46,8 @@ import lk.coopfed.knoweb.m9integration.web.generated.AttendanceImportResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.AttendanceRecordResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.AttendanceRejection;
 import lk.coopfed.knoweb.m9integration.web.generated.CompleteDeliveryTripRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.ConfirmCodPaymentRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.ConfirmPaymentRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.CreateDeliveryTripRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.DailyDeliveryBreakdownItem;
 import lk.coopfed.knoweb.m9integration.web.generated.DailyDeliverySummaryResponse;
@@ -46,6 +55,7 @@ import lk.coopfed.knoweb.m9integration.web.generated.DeliveryDropResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.DeliveryTripResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.EmployeeResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.ImportAttendanceRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.InitiatePaymentRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.IntegrationApi;
 import lk.coopfed.knoweb.m9integration.web.generated.JournalExportResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.JournalLineResponse;
@@ -55,6 +65,7 @@ import lk.coopfed.knoweb.m9integration.web.generated.NotificationLogResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationRuleResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationTemplateResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.OvertimeCalculationResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.PaymentIntentResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.PayrollContributionResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.PayrollContributionSummaryResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.PendingPostingsResponse;
@@ -63,6 +74,7 @@ import lk.coopfed.knoweb.m9integration.web.generated.RecordDeliveryDropRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.RecordVehicleLocationRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.RegisterEmployeeRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.RequestJournalExportRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.RetryPaymentRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.SupplementDueResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.UpdateDeliveryStatusRequest;
 import lk.coopfed.knoweb.m9integration.web.generated.VehicleDeliveryBreakdownItem;
@@ -102,6 +114,11 @@ class IntegrationController implements IntegrationApi {
     private final Handles<CompleteDeliveryTrip, Void> completeDeliveryTrip;
     private final Handles<RecordDeliveryDrop, UUID> recordDeliveryDrop;
     private final Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus;
+    private final PaymentQueries paymentQueries;
+    private final Handles<InitiatePayment, PaymentIntentView> initiatePayment;
+    private final Handles<ConfirmPayment, PaymentIntentView> confirmPayment;
+    private final Handles<ConfirmCodSettlement, PaymentIntentView> confirmCodPayment;
+    private final Handles<RetryPayment, PaymentIntentView> retryPayment;
 
     IntegrationController(
             IntegrationQueries queries,
@@ -120,7 +137,12 @@ class IntegrationController implements IntegrationApi {
             Handles<CreateDeliveryTrip, UUID> createDeliveryTrip,
             Handles<CompleteDeliveryTrip, Void> completeDeliveryTrip,
             Handles<RecordDeliveryDrop, UUID> recordDeliveryDrop,
-            Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus) {
+            Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus,
+            PaymentQueries paymentQueries,
+            Handles<InitiatePayment, PaymentIntentView> initiatePayment,
+            Handles<ConfirmPayment, PaymentIntentView> confirmPayment,
+            Handles<ConfirmCodSettlement, PaymentIntentView> confirmCodPayment,
+            Handles<RetryPayment, PaymentIntentView> retryPayment) {
         this.queries = queries;
         this.employeeQueries = employeeQueries;
         this.attendanceQueries = attendanceQueries;
@@ -138,6 +160,11 @@ class IntegrationController implements IntegrationApi {
         this.completeDeliveryTrip = completeDeliveryTrip;
         this.recordDeliveryDrop = recordDeliveryDrop;
         this.updateDeliveryStatus = updateDeliveryStatus;
+        this.paymentQueries = paymentQueries;
+        this.initiatePayment = initiatePayment;
+        this.confirmPayment = confirmPayment;
+        this.confirmCodPayment = confirmCodPayment;
+        this.retryPayment = retryPayment;
     }
 
     @Override
@@ -762,6 +789,103 @@ class IntegrationController implements IntegrationApi {
                 m.totalDistanceKm(),
                 dailyItems,
                 vehicleItems);
+    }
+
+    @Override
+    public ResponseEntity<PaymentIntentResponse> initiatePayment(String idempotencyKey, InitiatePaymentRequest req) {
+        ScopeContext scope = currentScope.get();
+        InitiatePayment cmd = new InitiatePayment(
+                req.getPaymentId(),
+                req.getOrderReference(),
+                req.getCustomerRef(),
+                req.getAmount(),
+                req.getPaymentMethod() != null ? req.getPaymentMethod().getValue() : null,
+                req.getProvider(),
+                req.getDescription(),
+                req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank()
+                        ? req.getIdempotencyKey()
+                        : idempotencyKey,
+                req.getMetadata());
+        PaymentIntentView view = initiatePayment.handle(cmd, scope);
+        return ResponseEntity.created(URI.create("/v1/integration/payments/" + view.paymentId()))
+                .body(toPaymentResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<PaymentIntentResponse> confirmPayment(
+            UUID paymentId, String idempotencyKey, ConfirmPaymentRequest req) {
+        ScopeContext scope = currentScope.get();
+        ConfirmPayment cmd = new ConfirmPayment(
+                paymentId,
+                req != null ? req.getProviderRef() : null,
+                req != null && req.getStatus() != null ? req.getStatus().getValue() : null,
+                req != null ? req.getFailureReason() : null,
+                req != null ? req.getMetadata() : Map.of());
+        PaymentIntentView view = confirmPayment.handle(cmd, scope);
+        return ResponseEntity.ok(toPaymentResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<PaymentIntentResponse> confirmCodPayment(
+            UUID paymentId, String idempotencyKey, ConfirmCodPaymentRequest req) {
+        ScopeContext scope = currentScope.get();
+        ConfirmCodSettlement cmd = new ConfirmCodSettlement(
+                paymentId, req != null ? req.getReceiptReference() : null, req != null ? req.getMetadata() : Map.of());
+        PaymentIntentView view = confirmCodPayment.handle(cmd, scope);
+        return ResponseEntity.ok(toPaymentResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<PaymentIntentResponse> retryPayment(
+            UUID paymentId, String idempotencyKey, RetryPaymentRequest req) {
+        ScopeContext scope = currentScope.get();
+        String provider = req != null ? req.getProvider() : null;
+        RetryPayment cmd = new RetryPayment(paymentId, provider);
+        PaymentIntentView view = retryPayment.handle(cmd, scope);
+        return ResponseEntity.ok(toPaymentResponse(view));
+    }
+
+    @Override
+    public ResponseEntity<PaymentIntentResponse> getPayment(UUID paymentId) {
+        ScopeContext scope = currentScope.get();
+        return paymentQueries
+                .findById(paymentId, scope)
+                .map(this::toPaymentResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<List<PaymentIntentResponse>> listPaymentsByOrder(String orderReference) {
+        ScopeContext scope = currentScope.get();
+        List<PaymentIntentResponse> list = paymentQueries.findByOrderReference(orderReference, scope).stream()
+                .map(this::toPaymentResponse)
+                .toList();
+        return ResponseEntity.ok(list);
+    }
+
+    private PaymentIntentResponse toPaymentResponse(PaymentIntentView v) {
+        PaymentIntentResponse resp = new PaymentIntentResponse();
+        resp.setPaymentId(v.paymentId());
+        resp.setOwnerEntityId(v.ownerEntityId());
+        resp.setOrderReference(v.orderReference());
+        resp.setCustomerRef(v.customerRef());
+        resp.setAmount(v.amount());
+        resp.setCurrency(v.currency());
+        resp.setPaymentMethod(v.paymentMethod());
+        resp.setStatus(v.status());
+        resp.setProvider(v.provider());
+        resp.setProviderRef(v.providerRef());
+        resp.setQrPayload(v.qrPayload());
+        resp.setDescription(v.description());
+        resp.setFailureReason(v.failureReason());
+        resp.setIdempotencyKey(v.idempotencyKey());
+        resp.setMetadata(v.metadata() != null ? v.metadata() : Map.of());
+        resp.setInitiatedAt(v.initiatedAt());
+        resp.setSettledAt(v.settledAt());
+        resp.setCreatedAt(v.createdAt());
+        resp.setUpdatedAt(v.updatedAt());
+        return resp;
     }
 
     static String fileName(JournalExportView export) {
