@@ -59,12 +59,12 @@ export function NewUserPage() {
 
   return (
     <main className="shell-page new-user-page">
-      <p className="new-user-back-wrap">
-        <Link className="back-link" to="/party/users">
+      <div className="new-user-back-wrap">
+        <Link className="back-pill-btn" to="/party/users">
           <svg
             viewBox="0 0 24 24"
-            width="18"
-            height="18"
+            width="16"
+            height="16"
             stroke="currentColor"
             strokeWidth="2"
             fill="none"
@@ -72,12 +72,12 @@ export function NewUserPage() {
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <path d="M19 12H5" />
             <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
           </svg>
-          <span>{t("party.users.back").text}</span>
+          {t("party.users.back").text}
         </Link>
-      </p>
+      </div>
       <PageHeader icon="society" title={t("party.users.new.title").text} />
       <p className="new-user-hint">{t("party.users.new.hint").text}</p>
 

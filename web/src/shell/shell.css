@@ -9065,7 +9065,8 @@ textarea {
 /* ====
    Back Button (Modern Brand Pill) across Catalogue Subpages
    ==== */
-.back-pill-btn {
+.back-pill-btn,
+.back-link {
   display: inline-flex !important;
   align-items: center !important;
   gap: 8px !important;
@@ -9088,13 +9089,19 @@ textarea {
   margin-bottom: var(--space-2) !important;
 }
 
-.back-pill-btn svg {
+.back-pill-btn svg,
+.back-link svg {
   stroke: var(--color-accent) !important;
+  width: 16px !important;
+  height: 16px !important;
+  fill: none !important;
+  stroke-width: 2 !important;
   flex-shrink: 0 !important;
   transition: transform 0.2s ease !important;
 }
 
-.back-pill-btn:hover {
+.back-pill-btn:hover,
+.back-link:hover {
   background: var(--color-surface-subtle) !important;
   color: var(--color-accent) !important;
   border-color: var(--color-accent) !important;
@@ -9102,11 +9109,13 @@ textarea {
   box-shadow: 0 4px 12px var(--color-polish-13) !important;
 }
 
-.back-pill-btn:hover svg {
+.back-pill-btn:hover svg,
+.back-link:hover svg {
   transform: translateX(-3px) !important;
 }
 
-.back-pill-btn:active {
+.back-pill-btn:active,
+.back-link:active {
   transform: translateY(0) !important;
 }
 
