@@ -74,12 +74,25 @@ export function BulkNetworkRegisterPage() {
 
   return (
     <main className="shell-page">
-      <p>
-        <Link className="back-link" to="/party/societies">
-          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+      <div>
+        <Link className="back-pill-btn" to="/party/societies">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
           {t("party.back_to_register").text}
         </Link>
-      </p>
+      </div>
       <h1>{t("party.bulk_network.title").text}</h1>
       <p>{t("party.bulk_network.intro").text}</p>
 
