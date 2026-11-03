@@ -114,8 +114,10 @@ export function MarkdownQueuePage() {
 
       <section className="pricing-section">
         <div className="pricing-filter-bar">
-          <label className="pricing-form-field">
-            <span>{t("pricing.markdown.select_location").text}</span>
+          <label className="pricing-form-field pricing-location-filter-field">
+            <span className="pricing-filter-label">
+              {t("pricing.markdown.select_location").text}
+            </span>
             <PricingSelect
               aria-label={t("pricing.markdown.select_location").text}
               value={locationId}
@@ -131,7 +133,7 @@ export function MarkdownQueuePage() {
           </label>
 
           <label className="pricing-form-field pricing-markdown-search-field">
-            <span style={{ color: "var(--color-brand-dark)", fontWeight: "var(--font-weight-strong)" }}>
+            <span className="pricing-filter-label">
               {t("pricing.markdown.search_label").text}
             </span>
             <div className="pricing-markdown-search-wrapper">
