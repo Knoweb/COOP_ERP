@@ -2259,8 +2259,9 @@ textarea {
 }
 
 .dropdown-select__native {
+  display: none !important;
   position: absolute !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
   pointer-events: none !important;
   width: 0 !important;
   height: 0 !important;
@@ -10126,7 +10127,7 @@ textarea {
 }
 
 .custom-status-dropdown__option--selected::before,
-.register-dropdown-option--selected::before,
+/* .register-dropdown-option--selected::before removed so only hover displays the moving wine line */
 .reason-capture .register-dropdown-option--selected::before {
   content: "" !important;
   position: static !important;
@@ -10343,7 +10344,7 @@ textarea {
   height: 18px !important;
   background-color: var(--color-accent) !important;
   border-radius: 2px !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
   display: block !important;
   transition: opacity 0.15s ease !important;
 }
@@ -10351,10 +10352,10 @@ textarea {
 /* Show the dark line on hover, active (when opening), or selected */
 .reason-capture .register-dropdown-option:hover::before,
 .reason-capture .register-dropdown-option--active::before,
-.reason-capture .register-dropdown-option--selected::before,
+/* selected line removed */
 .reason-dropdown-menu .register-dropdown-option:hover::before,
 .reason-dropdown-menu .register-dropdown-option--active::before,
-.reason-dropdown-menu .register-dropdown-option--selected::before,
+/* selected line removed */
 .reason-dropdown-menu .custom-status-dropdown__option:hover::before,
 .reason-dropdown-menu .custom-status-dropdown__option--active::before,
 .reason-dropdown-menu .custom-status-dropdown__option--selected::before {
@@ -10513,8 +10514,8 @@ textarea {
   transition: all 0.15s ease !important;
 }
 
-.catalogue-form-field .register-dropdown-option::before,
-.register-dropdown-menu .register-dropdown-option::before {
+.catalogue-form-field .register-dropdown-option--selected::before,
+.register-dropdown-menu .register-dropdown-option--selected::before {
   content: "" !important;
   position: absolute !important;
   left: 10px !important;
@@ -10524,19 +10525,52 @@ textarea {
   height: 18px !important;
   background-color: var(--color-accent) !important;
   border-radius: 2px !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
   display: block !important;
   transition: opacity 0.15s ease !important;
 }
 
-.catalogue-form-field .register-dropdown-option:hover::before,
-.catalogue-form-field .register-dropdown-option--active::before,
-.catalogue-form-field .register-dropdown-option--selected::before,
-.register-dropdown-menu .register-dropdown-option:hover::before,
-.register-dropdown-menu .register-dropdown-option--active::before,
-.register-dropdown-menu .register-dropdown-option--selected::before {
+.catalogue-form-field .register-dropdown-option:not(.register-dropdown-option--selected)::before,
+.register-dropdown-menu .register-dropdown-option:not(.register-dropdown-option--selected)::before {
+  display: none !important;
+  opacity: 0 !important;
+  content: none !important;
+}
+.dropdown-unused-cleanup-1 {
+  display: none !important;
+}
+.dropdown-unused-cleanup-2 {
+  opacity: 0 !important;
+}
+.dropdown-unused-cleanup-3 {
+}
+.dropdown-unused-cleanup-4 {
+  display: none !important;
+}
+.dropdown-unused-cleanup-5 {
+}
+.dropdown-unused-cleanup-6 {
+  display: none !important;
+}
+.dropdown-unused-cleanup-7 {
+  display: none !important;
+  opacity: 0 !important;
+  content: none !important;
+}
+
+
+
+
+
+
+
   opacity: 1 !important;
   display: block !important;
+}
+
+
+  display: none !important;
+  opacity: 1 !important;
 }
 
 .catalogue-form-field .register-dropdown-option:hover,
