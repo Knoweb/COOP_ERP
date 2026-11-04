@@ -28,8 +28,9 @@ import lk.coopfed.knoweb.m9integration.internal.payment.ConfirmCodSettlementHand
 import lk.coopfed.knoweb.m9integration.internal.payment.ConfirmPaymentHandler;
 import lk.coopfed.knoweb.m9integration.internal.payment.InitiatePaymentHandler;
 import lk.coopfed.knoweb.m9integration.internal.payment.RetryPaymentHandler;
+import lk.coopfed.knoweb.m9integration.query.PaymentIntentQueries;
 import lk.coopfed.knoweb.m9integration.query.PaymentIntentView;
-import lk.coopfed.knoweb.m9integration.query.PaymentQueries;
+import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -59,7 +60,7 @@ class PaymentOrchestrationPostgresIntegrationTest extends PostgresIntegrationTes
     Handles<RetryPayment, PaymentIntentView> retryPayment;
 
     @Autowired
-    PaymentQueries paymentQueries;
+    PaymentIntentQueries paymentQueries;
 
     @Autowired
     PaymentOrchestrator paymentOrchestrator;
@@ -79,7 +80,6 @@ class PaymentOrchestrationPostgresIntegrationTest extends PostgresIntegrationTes
 
         superuserJdbc().update("DELETE FROM integration.payment_event_log");
         superuserJdbc().update("DELETE FROM integration.payment_intent");
-        kernel.reset();
     }
 
     @Test
@@ -103,9 +103,9 @@ class PaymentOrchestrationPostgresIntegrationTest extends PostgresIntegrationTes
 
         // Verify audit & event for initiation
         assertThat(kernel.committedAudit())
-                .extracting(a -> a.eventType())
+                .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains(InitiatePaymentHandler.AUDIT_PAYMENT_INITIATED);
-        assertThat(kernel.committedEvents()).hasAtLeastOneElementOfType(PaymentInitiated.class);
+        assertThat(kernel.committedEvents()).anyMatch(e -> e instanceof PaymentInitiated);
 
         // Confirm settlement from provider callback
         ConfirmPayment confirmCmd =
@@ -193,7 +193,7 @@ class PaymentOrchestrationPostgresIntegrationTest extends PostgresIntegrationTes
         assertThat(initiated.status()).isEqualTo("COD_PENDING");
         assertThat(initiated.paymentMethod()).isEqualTo("COD");
 
-        assertThat(kernel.committedEvents()).hasAtLeastOneElementOfType(PaymentCodPending.class);
+        assertThat(kernel.committedEvents()).anyMatch(e -> e instanceof PaymentCodPending);
 
         // Delivery agent collects cash and confirms settlement
         ConfirmCodSettlement codCmd =
@@ -205,7 +205,7 @@ class PaymentOrchestrationPostgresIntegrationTest extends PostgresIntegrationTes
         assertThat(settled.settledAt()).isNotNull();
 
         assertThat(kernel.committedAudit())
-                .extracting(a -> a.eventType())
+                .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains(ConfirmCodSettlementHandler.AUDIT_COD_COLLECTED);
 
         // Idempotent second COD confirmation
@@ -242,7 +242,7 @@ class PaymentOrchestrationPostgresIntegrationTest extends PostgresIntegrationTes
         assertThat(retried.metadata()).containsEntry("retryCount", 1);
 
         assertThat(kernel.committedAudit())
-                .extracting(a -> a.eventType())
+                .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains(RetryPaymentHandler.AUDIT_PAYMENT_RETRIED);
     }
 

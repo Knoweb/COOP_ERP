@@ -12,7 +12,7 @@
 * `l.c.k.m.query.DeliveryTrackingQueries` (via `l.c.k.m.internal.queries.DeliveryTrackingQueriesImpl`)
 * `l.c.k.m.query.EmployeeQueries` (via `l.c.k.m.internal.queries.EmployeeQueriesImpl`)
 * `l.c.k.m.query.IntegrationQueries` (via `l.c.k.m.internal.queries.IntegrationQueriesImpl`)
-* `l.c.k.m.query.PaymentQueries` (via `l.c.k.m.internal.queries.PaymentQueriesImpl`)
+* `l.c.k.m.query.PaymentIntentQueries` (via `l.c.k.m.internal.queries.PaymentIntentQueriesImpl`)
 |Bean references
 |* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)

@@ -37,8 +37,8 @@ import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.JournalExportVie
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.RuleView;
 import lk.coopfed.knoweb.m9integration.query.LiveVehicleLocationView;
 import lk.coopfed.knoweb.m9integration.query.MonthlyDeliveryReportView;
+import lk.coopfed.knoweb.m9integration.query.PaymentIntentQueries;
 import lk.coopfed.knoweb.m9integration.query.PaymentIntentView;
-import lk.coopfed.knoweb.m9integration.query.PaymentQueries;
 import lk.coopfed.knoweb.m9integration.query.VehicleRoutePointView;
 import lk.coopfed.knoweb.m9integration.web.generated.AccountTotalResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.ApproveOvertimeRequest;
@@ -88,7 +88,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The HTTP surface of M9: the journal exports, notification screens, biometric attendance and
+ * The HTTP surface of M9: the journal exports, notification screens, biometric
+ * attendance and
  * overtime integration with payroll.
  */
 @RestController
@@ -114,7 +115,7 @@ class IntegrationController implements IntegrationApi {
     private final Handles<CompleteDeliveryTrip, Void> completeDeliveryTrip;
     private final Handles<RecordDeliveryDrop, UUID> recordDeliveryDrop;
     private final Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus;
-    private final PaymentQueries paymentQueries;
+    private final PaymentIntentQueries paymentQueries;
     private final Handles<InitiatePayment, PaymentIntentView> initiatePayment;
     private final Handles<ConfirmPayment, PaymentIntentView> confirmPayment;
     private final Handles<ConfirmCodSettlement, PaymentIntentView> confirmCodPayment;
@@ -138,7 +139,7 @@ class IntegrationController implements IntegrationApi {
             Handles<CompleteDeliveryTrip, Void> completeDeliveryTrip,
             Handles<RecordDeliveryDrop, UUID> recordDeliveryDrop,
             Handles<UpdateDeliveryStatus, Void> updateDeliveryStatus,
-            PaymentQueries paymentQueries,
+            PaymentIntentQueries paymentQueries,
             Handles<InitiatePayment, PaymentIntentView> initiatePayment,
             Handles<ConfirmPayment, PaymentIntentView> confirmPayment,
             Handles<ConfirmCodSettlement, PaymentIntentView> confirmCodPayment,
@@ -802,9 +803,7 @@ class IntegrationController implements IntegrationApi {
                 req.getPaymentMethod() != null ? req.getPaymentMethod().getValue() : null,
                 req.getProvider(),
                 req.getDescription(),
-                req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank()
-                        ? req.getIdempotencyKey()
-                        : idempotencyKey,
+                req.getIdempotencyKey() != null ? req.getIdempotencyKey() : idempotencyKey,
                 req.getMetadata());
         PaymentIntentView view = initiatePayment.handle(cmd, scope);
         return ResponseEntity.created(URI.create("/v1/integration/payments/" + view.paymentId()))
@@ -812,8 +811,7 @@ class IntegrationController implements IntegrationApi {
     }
 
     @Override
-    public ResponseEntity<PaymentIntentResponse> confirmPayment(
-            UUID paymentId, String idempotencyKey, ConfirmPaymentRequest req) {
+    public ResponseEntity<PaymentIntentResponse> confirmPayment(UUID paymentId, String idempotencyKey, ConfirmPaymentRequest req) {
         ScopeContext scope = currentScope.get();
         ConfirmPayment cmd = new ConfirmPayment(
                 paymentId,
@@ -826,8 +824,7 @@ class IntegrationController implements IntegrationApi {
     }
 
     @Override
-    public ResponseEntity<PaymentIntentResponse> confirmCodPayment(
-            UUID paymentId, String idempotencyKey, ConfirmCodPaymentRequest req) {
+    public ResponseEntity<PaymentIntentResponse> confirmCodPayment(UUID paymentId, String idempotencyKey, ConfirmCodPaymentRequest req) {
         ScopeContext scope = currentScope.get();
         ConfirmCodSettlement cmd = new ConfirmCodSettlement(
                 paymentId, req != null ? req.getReceiptReference() : null, req != null ? req.getMetadata() : Map.of());
@@ -836,8 +833,7 @@ class IntegrationController implements IntegrationApi {
     }
 
     @Override
-    public ResponseEntity<PaymentIntentResponse> retryPayment(
-            UUID paymentId, String idempotencyKey, RetryPaymentRequest req) {
+    public ResponseEntity<PaymentIntentResponse> retryPayment(UUID paymentId, String idempotencyKey, RetryPaymentRequest req) {
         ScopeContext scope = currentScope.get();
         String provider = req != null ? req.getProvider() : null;
         RetryPayment cmd = new RetryPayment(paymentId, provider);
@@ -889,7 +885,8 @@ class IntegrationController implements IntegrationApi {
     }
 
     static String fileName(JournalExportView export) {
-        return "journal_" + export.periodFrom() + "_" + export.periodTo() + (export.provisional() ? "_PROVISIONAL" : "")
+        return "journal_" + export.periodFrom() + "_" + export.periodTo()
+                + (export.provisional() ? "_PROVISIONAL" : "")
                 + "_" + export.exportId().toString().substring(24) + ".csv";
     }
 }
