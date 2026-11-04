@@ -537,6 +537,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/integration/payments/initiate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Initiate an online payment, generate a dynamic LankaQR code, or record COD intent */
+        post: operations["initiatePayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payments/{paymentId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm payment settlement or capture failure from provider */
+        post: operations["confirmPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payments/{paymentId}/confirm-cod": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm cash collection and settlement for a COD payment */
+        post: operations["confirmCodPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payments/{paymentId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a pending or failed payment with a provider */
+        post: operations["retryPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payments/{paymentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get details and status of a payment intent */
+        get: operations["getPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/payments/by-order/{orderReference}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all payment intents associated with an order reference */
+        get: operations["listPaymentsByOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1016,6 +1118,68 @@ export interface components {
             totalDistanceKm: number;
             dailyBreakdown: components["schemas"]["DailyDeliveryBreakdownItem"][];
             vehicleBreakdown: components["schemas"]["VehicleDeliveryBreakdownItem"][];
+        };
+        InitiatePaymentRequest: {
+            /** Format: uuid */
+            paymentId?: string;
+            orderReference: string;
+            customerRef: string;
+            amount: number;
+            /** @enum {string} */
+            paymentMethod: "ONLINE" | "LANKA_QR" | "COD";
+            provider?: string;
+            description?: string;
+            idempotencyKey?: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        ConfirmPaymentRequest: {
+            providerRef?: string;
+            /** @enum {string} */
+            status?: "PAID" | "FAILED";
+            failureReason?: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        ConfirmCodPaymentRequest: {
+            receiptReference?: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        RetryPaymentRequest: {
+            provider?: string;
+        };
+        PaymentIntentResponse: {
+            /** Format: uuid */
+            paymentId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            orderReference: string;
+            customerRef: string;
+            amount: number;
+            currency: string;
+            paymentMethod: string;
+            status: string;
+            provider: string;
+            providerRef?: string | null;
+            qrPayload?: string | null;
+            description?: string | null;
+            failureReason?: string | null;
+            idempotencyKey: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            initiatedAt: string;
+            /** Format: date-time */
+            settledAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1900,6 +2064,200 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonthlyDeliveryReportResponse"];
+                };
+            };
+        };
+    };
+    initiatePayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InitiatePaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Payment initiated */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    confirmPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Payment confirmed and settled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    confirmCodPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmCodPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description COD payment settled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retryPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RetryPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Payment retried */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payment details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentResponse"];
+                };
+            };
+            /** @description Payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPaymentsByOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderReference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payment intents for the order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentResponse"][];
                 };
             };
         };

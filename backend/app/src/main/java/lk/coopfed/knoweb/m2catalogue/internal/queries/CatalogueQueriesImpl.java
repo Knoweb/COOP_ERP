@@ -79,14 +79,48 @@ class CatalogueQueriesImpl implements CatalogueQueries {
 
     @Override
     public List<UomView> units(ScopeContext scope) {
+        return listUoms(false, scope);
+    }
+
+    @Override
+    public List<UomView> listUoms(boolean includeInactive, ScopeContext scope) {
+        String sql = includeInactive
+                ? "select uom_code, name_en, name_si, name_ta, is_weight, description, status, created_at from catalogue.uom order by uom_code"
+                : "select uom_code, name_en, name_si, name_ta, is_weight, description, status, created_at from catalogue.uom where status = 'ACTIVE' order by uom_code";
         return jdbc.query(
-                "select uom_code, name_en, name_si, name_ta, is_weight from catalogue.uom order by uom_code",
+                sql,
                 (rs, row) -> new UomView(
                         rs.getString("uom_code"),
                         rs.getString("name_en"),
                         rs.getString("name_si"),
                         rs.getString("name_ta"),
-                        rs.getBoolean("is_weight")));
+                        rs.getBoolean("is_weight"),
+                        rs.getString("description"),
+                        rs.getString("status"),
+                        rs.getTimestamp("created_at") != null
+                                ? rs.getTimestamp("created_at").toInstant()
+                                : null));
+    }
+
+    @Override
+    public Optional<UomView> getUom(String uomCode, ScopeContext scope) {
+        return jdbc
+                .query(
+                        "select uom_code, name_en, name_si, name_ta, is_weight, description, status, created_at from catalogue.uom where uom_code = ?",
+                        (rs, row) -> new UomView(
+                                rs.getString("uom_code"),
+                                rs.getString("name_en"),
+                                rs.getString("name_si"),
+                                rs.getString("name_ta"),
+                                rs.getBoolean("is_weight"),
+                                rs.getString("description"),
+                                rs.getString("status"),
+                                rs.getTimestamp("created_at") != null
+                                        ? rs.getTimestamp("created_at").toInstant()
+                                        : null),
+                        uomCode)
+                .stream()
+                .findFirst();
     }
 
     @Override

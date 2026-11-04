@@ -150,3 +150,13 @@ audit_event_types:
     offline_capturable: false
     description_en: Merchandise department category updated
 
+  - code: UOM_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Unit of measure defined
+
+  - code: UOM_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Unit of measure updated
+

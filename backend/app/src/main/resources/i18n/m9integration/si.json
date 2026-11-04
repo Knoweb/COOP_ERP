@@ -37,5 +37,18 @@
   "m9.delivery.destination_location_required": "ගමනාන්ත ස්ථානය අවශ්‍යයි",
   "m9.delivery.status_invalid": "බෙදාහැරීමේ තත්ත්වය වලංගු නොවේ",
   "m9.delivery.failure_reason_required": "බෙදාහැරීම අසාර්ථක වූ විට අසාර්ථක වීමට හේතුව අවශ්‍යයි",
-  "m9.delivery.period_invalid": "මාසාන්ත කාලසීමාව YYYY-MM ආකෘතියෙන් තිබිය යුතුය"
+  "m9.delivery.period_invalid": "මාසාන්ත කාලසීමාව YYYY-MM ආකෘතියෙන් තිබිය යුතුය",
+  "m9.payment.not_found": "ගෙවීම් අභිප්‍රාය සොයාගත නොහැක",
+  "m9.payment.order_reference_required": "ගෙවීම් ආරම්භය සඳහා ඇණවුම් යොමු අංකය අවශ්‍යයි",
+  "m9.payment.customer_ref_required": "ගෙවීම් ආරම්භය සඳහා පාරිභෝගික යොමු අංකය අවශ්‍යයි",
+  "m9.payment.amount_positive": "ගෙවීම් මුදල බිංදුවට වඩා වැඩි විය යුතුය",
+  "m9.payment.payment_method_required": "ගෙවීම් ක්‍රමය අවශ්‍යයි",
+  "m9.payment.payment_method_invalid": "ගෙවීම් ක්‍රමය ONLINE, LANKA_QR, හෝ COD විය යුතුය",
+  "m9.payment.provider_not_found": "ගෙවීම් සැපයුම්කරු සොයාගත නොහැක හෝ සහාය නොදක්වයි",
+  "m9.payment.already_paid": "ගෙවීම දැනටමත් ගෙවා පියවා ඇත",
+  "m9.payment.already_settled": "ගෙවීම දැනටමත් පියවා ඇත",
+  "m9.payment.already_cancelled": "ගෙවීම අවලංගු කර ඇති අතර පියවිය නොහැක",
+  "m9.payment.not_cod": "මෙය භාණ්ඩ ලැබුණු පසු මුදල් ගෙවීමේ (COD) ක්‍රමයක් නොවේ",
+  "m9.payment.invalid_state_transition": "ගෙවීම් තත්ත්වය {0} සිට {1} දක්වා මාරු කළ නොහැක",
+  "m9.payment.webhook_signature_invalid": "ගෙවීම් webhook අත්සන සත්‍යාපනය අසාර්ථක විය"
 }

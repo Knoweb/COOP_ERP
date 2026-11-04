@@ -123,4 +123,36 @@ public interface PricingQueries {
 
     /** ListAdjustmentTypes: all registered adjustment types. */
     List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope);
+
+    // ---- PGL-M1-07: Expiry / Slow-Moving Discounts -------------------------------------------
+
+    /**
+     * List active expiry and slow-moving discount markdowns for a location (PGL-M1-07).
+     * Filters by reason (NEAR_EXPIRY, SLOW_MOVING) and status (ACTIVE) when provided.
+     */
+    List<ExpirySlowMovingDiscountView> listExpirySlowMovingDiscounts(
+            UUID locationId, String reason, String status, ScopeContext scope);
+
+    // ---- M3-08: Customer Price Lookup Web Portal ---------------------------------------------
+
+    /**
+     * Customer price lookup for an item at a shop location (M3-08): resolves the permitted public
+     * retail price using the core engine effective price resolver. Strictly excludes internal cost,
+     * margins, batch references, and restricted owner data.
+     */
+    Optional<CustomerPriceLookupView> lookupCustomerPrice(
+            UUID locationId,
+            UUID skuId,
+            String barcode,
+            String skuCode,
+            String query,
+            String uom,
+            LocalDate date,
+            ScopeContext scope);
+
+    /**
+     * Customer price search for items at a shop location (M3-08).
+     */
+    List<CustomerPriceLookupView> searchCustomerPrices(
+            UUID locationId, String query, LocalDate date, int limit, ScopeContext scope);
 }

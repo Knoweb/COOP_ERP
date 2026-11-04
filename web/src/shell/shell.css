@@ -9114,9 +9114,19 @@ textarea {
   transform: translateX(-3px) !important;
 }
 
+.back-pill-btn:focus,
+.back-pill-btn:focus-visible,
+.back-link:focus,
+.back-link:focus-visible {
+  outline: none !important;
+  box-shadow: 0 1px 4px var(--color-polish-23) !important;
+}
+
 .back-pill-btn:active,
 .back-link:active {
   transform: translateY(0) !important;
+  outline: none !important;
+  box-shadow: 0 1px 4px var(--color-polish-23) !important;
 }
 
 /* ====

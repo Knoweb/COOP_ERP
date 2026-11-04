@@ -33,7 +33,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
 
     /** The policies of every table M2-01 creates (V0001), and batch_key of the review (V0003). */
     private static final Map<String, Set<String>> POLICIES = Map.ofEntries(
-            Map.entry("uom", Set.of("authenticated_read", "seed_reference")),
+            Map.entry("uom", Set.of("authenticated_read", "seed_reference", "governed_write", "governed_update")),
             Map.entry("tax_category", with("own_update", "authenticated_read", "seed_reference")),
             Map.entry("tax_rate", with("own_update", "authenticated_read", "seed_reference")),
             Map.entry("sku", with("own_update", "shared_read", "fed_promote")),
@@ -152,9 +152,17 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             assertThat(may(db, table, "TRUNCATE")).as(table + " TRUNCATE").isFalse();
             assertThat(may(db, table, "SELECT")).as(table + " SELECT").isTrue();
         }
-        // Units are reference data: read only.
-        assertThat(may(db, "uom", "INSERT")).isFalse();
-        assertThat(may(db, "uom", "UPDATE")).isFalse();
+        // PGL-M2-04: Units can be managed by app_rw, but uom_code is immutable.
+        assertThat(may(db, "uom", "INSERT")).isTrue();
+        assertThat(may(db, "uom", "UPDATE")).as("UPDATE on the whole row").isFalse();
+        assertThat(mayUpdateColumn(db, "uom", "name_en")).isTrue();
+        assertThat(mayUpdateColumn(db, "uom", "status")).isTrue();
+        assertThat(mayUpdateColumn(db, "uom", "uom_code"))
+                .as("uom_code is immutable")
+                .isFalse();
+        assertThat(mayUpdateColumn(db, "uom", "created_at"))
+                .as("created_at is immutable")
+                .isFalse();
         // A tag assignment is never changed.
         assertThat(may(db, "sku_tag", "UPDATE")).isFalse();
         // 22A section 3: "batch: INSERT + UPDATE(status) only".

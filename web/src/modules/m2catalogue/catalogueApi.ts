@@ -36,6 +36,9 @@ export type SupplierValidationError = components["schemas"]["SupplierValidationE
 export type DepartmentCategory = components["schemas"]["DepartmentCategoryResponse"];
 export type DefineDepartmentCategoryRequest = components["schemas"]["DefineDepartmentCategoryRequest"];
 export type UpdateDepartmentCategoryRequest = components["schemas"]["UpdateDepartmentCategoryRequest"];
+export type UomDetail = components["schemas"]["UomDetailResponse"];
+export type DefineUomRequest = components["schemas"]["DefineUomRequest"];
+export type UpdateUomRequest = components["schemas"]["UpdateUomRequest"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -318,6 +321,43 @@ export function useCatalogueApi() {
       ): Promise<TaxRate> {
         const { data } = await api.POST("/v1/catalogue/tax/rates", {
           params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async listUoms(includeInactive?: boolean): Promise<UomDetail[]> {
+        const { data } = await api.GET("/v1/catalogue/uoms", {
+          params: { query: { includeInactive: includeInactive ?? false } }
+        });
+        return data ?? [];
+      },
+
+      async getUom(uomCode: string): Promise<UomDetail> {
+        const { data } = await api.GET("/v1/catalogue/uoms/{uomCode}", {
+          params: { path: { uomCode } }
+        });
+        return data!;
+      },
+
+      async defineUom(
+        body: DefineUomRequest,
+        idempotencyKey: string
+      ): Promise<UomDetail> {
+        const { data } = await api.POST("/v1/catalogue/uoms", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async updateUom(
+        uomCode: string,
+        body: UpdateUomRequest,
+        idempotencyKey: string
+      ): Promise<UomDetail> {
+        const { data } = await api.PUT("/v1/catalogue/uoms/{uomCode}", {
+          params: { path: { uomCode }, header: { "Idempotency-Key": idempotencyKey } },
           body
         });
         return data!;
