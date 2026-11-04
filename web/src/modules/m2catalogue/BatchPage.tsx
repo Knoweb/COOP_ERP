@@ -13,6 +13,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useCatalogueApi, type Batch } from "./catalogueApi";
 import { errorText } from "./skuView";
 import { CatalogueDropdown } from "./CatalogueDropdown";
+import { CatalogueDatePicker } from "./CatalogueDatePicker";
 
 /**
  * Batch card with correction functionality (22A section 8, "Batch card").
@@ -221,14 +222,12 @@ export function BatchPage() {
                 />
               </label>
 
-              <label className="catalogue-form-field">
-                <span>{t("catalogue.batch.field.expiry").text}</span>
-                <input
-                  type="date"
-                  value={newExpiry}
-                  onChange={(e) => setNewExpiry(e.target.value)}
-                />
-              </label>
+              <CatalogueDatePicker
+                label={t("catalogue.batch.field.expiry").text}
+                value={newExpiry}
+                placeholder={t("catalogue.field.choose").text}
+                onChange={(val) => setNewExpiry(val)}
+              />
 
               <CatalogueDropdown
                 label={t("shell.reason.code").text}

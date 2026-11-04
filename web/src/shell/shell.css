@@ -8050,6 +8050,8 @@ textarea {
 }
 
 .catalogue-form-field .register-dropdown-trigger {
+  position: relative !important;
+  z-index: 1 !important;
   width: 100% !important;
 }
 
@@ -10467,7 +10469,7 @@ textarea {
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  opacity: 0.0001 !important;
+  opacity: 0 !important;
   pointer-events: none !important;
   border: none !important;
   margin: 0 !important;
@@ -10477,6 +10479,8 @@ textarea {
   -webkit-appearance: none !important;
 }
 .catalogue-form-field .register-dropdown-trigger {
+  position: relative !important;
+  z-index: 1 !important;
   width: 100% !important;
   height: 46px !important;
   min-height: 46px !important;
