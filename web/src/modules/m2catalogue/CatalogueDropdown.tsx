@@ -31,8 +31,8 @@ export function CatalogueDropdown<T extends string = string>({
   disabled,
   required
 }: CatalogueDropdownProps<T>) {
-  const generatedId = useId();
-  const selectId = explicitId || generatedId;
+  const rawId = useId();
+  const selectId = explicitId || `select-${rawId.replace(/:/g, "")}`;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
@@ -93,7 +93,7 @@ export function CatalogueDropdown<T extends string = string>({
       {/* Accessible native select for Playwright E2E and forms */}
       <select
         id={selectId}
-        aria-label={label ? undefined : placeholder}
+        aria-label={label || placeholder}
         className="catalogue-dropdown-native"
         value={value}
         disabled={disabled}
