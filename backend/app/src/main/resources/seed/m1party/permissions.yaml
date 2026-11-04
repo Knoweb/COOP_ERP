@@ -233,6 +233,10 @@ permissions:
     module: "m2catalogue"
     description_en: "Define and manage merchandise department categories"
     scope: "FEDERATION"
+  - code: "cat.uom.manage"
+    module: "m2catalogue"
+    description_en: "Define and manage units of measure"
+    scope: "FEDERATION"
   # M4 Trading Documents (24A section 3.1: "seed/m4/permissions.yaml (appended)"). M4 has no
   # permission file of its own for the same reason as M2: security.permission is M1's table and
   # M1SeedLoader reads this one file. "F" in the guide is scope FEDERATION, "mfa" requires_mfa,

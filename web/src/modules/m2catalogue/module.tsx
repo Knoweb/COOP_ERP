@@ -16,6 +16,7 @@ import { BatchPage } from "./BatchPage";
 import { SuppliersPage } from "./SuppliersPage";
 import { DuplicateSuspectsPage } from "./DuplicateSuspectsPage";
 import { DepartmentCategoriesPage } from "./DepartmentCategoriesPage";
+import { UnitsOfMeasurePage } from "./UnitsOfMeasurePage";
 
 export const catalogueModule: ModuleDefinition = {
   id: "catalogue",
@@ -27,6 +28,22 @@ export const catalogueModule: ModuleDefinition = {
       element: (
         <RequirePermission anyOf={["cat.department.manage", "cat.sku.view"]}>
           <DepartmentCategoriesPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "catalogue/uom",
+      element: (
+        <RequirePermission anyOf={["cat.uom.manage", "cat.sku.view"]}>
+          <UnitsOfMeasurePage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "catalogue/uoms",
+      element: (
+        <RequirePermission anyOf={["cat.uom.manage", "cat.sku.view"]}>
+          <UnitsOfMeasurePage />
         </RequirePermission>
       )
     },
@@ -78,6 +95,7 @@ export const catalogueModule: ModuleDefinition = {
   navItems: [
     { labelId: "catalogue.nav", to: "/catalogue" },
     { labelId: "catalogue.departments.nav", to: "/catalogue/departments" },
+    { labelId: "catalogue.uom.nav", to: "/catalogue/uom" },
     { labelId: "catalogue.tax.nav", to: "/catalogue/tax-rates" },
     { labelId: "catalogue.suppliers.nav", to: "/catalogue/suppliers" },
     { labelId: "catalogue.suspects.nav", to: "/catalogue/suspects" }
@@ -95,6 +113,7 @@ export const catalogueModule: ModuleDefinition = {
     "cat.image.manage",
     "cat.import.run",
     "cat.tax.publish",
-    "cat.department.manage"
+    "cat.department.manage",
+    "cat.uom.manage"
   ]
 };
