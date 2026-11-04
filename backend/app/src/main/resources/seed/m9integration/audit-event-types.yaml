@@ -65,3 +65,33 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The status of a delivery drop was updated
+
+  - code: PAYMENT_INITIATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction was initiated via online gateway, LankaQR, or COD
+
+  - code: PAYMENT_SETTLED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction was confirmed and settled
+
+  - code: PAYMENT_FAILED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction failed or was rejected by provider
+
+  - code: COD_PAYMENT_COLLECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Cash on delivery payment was collected and marked settled
+
+  - code: PAYMENT_RETRIED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction was retried with payment provider
+
+  - code: PAYMENT_WEBHOOK_PROCESSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A provider webhook callback was received and processed idempotently

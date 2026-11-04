@@ -37,5 +37,18 @@
   "m9.delivery.destination_location_required": "சேருமிடம் தேவை",
   "m9.delivery.status_invalid": "விநியோக நிலை தவறானது",
   "m9.delivery.failure_reason_required": "விநியோகம் தோல்வியடையும் போது தோல்விக்கான காரணம் தேவை",
-  "m9.delivery.period_invalid": "மாத இறுதி காலம் YYYY-MM வடிவத்தில் இருக்க வேண்டும்"
+  "m9.delivery.period_invalid": "மாத இறுதி காலம் YYYY-MM வடிவத்தில் இருக்க வேண்டும்",
+  "m9.payment.not_found": "கொடுப்பனவு நோக்கம் காணப்படவில்லை",
+  "m9.payment.order_reference_required": "கொடுப்பனவைத் தொடங்குவதற்கு கட்டளைக் குறிப்பு தேவை",
+  "m9.payment.customer_ref_required": "கொடுப்பனவைத் தொடங்குவதற்கு வாடிக்கையாளர் குறிப்பு தேவை",
+  "m9.payment.amount_positive": "கொடுப்பனவுத் தொகை பூஜ்ஜியத்தை விட அதிகமாக இருக்க வேண்டும்",
+  "m9.payment.payment_method_required": "கொடுப்பனவு முறை தேவை",
+  "m9.payment.payment_method_invalid": "கொடுப்பனவு முறை ONLINE, LANKA_QR, அல்லது COD ஆக இருக்க வேண்டும்",
+  "m9.payment.provider_not_found": "கொடுப்பனவு வழங்குநர் அடாப்டர் காணப்படவில்லை அல்லது ஆதரிக்கப்படவில்லை",
+  "m9.payment.already_paid": "கொடுப்பனவு ஏற்கனவே செலுத்தப்பட்டு தீர்க்கப்பட்டது",
+  "m9.payment.already_settled": "கொடுப்பனவு ஏற்கனவே தீர்க்கப்பட்டது",
+  "m9.payment.already_cancelled": "கொடுப்பனவு ரத்து செய்யப்பட்டுள்ளது, தீர்க்க முடியாது",
+  "m9.payment.not_cod": "கொடுப்பனவு ஒரு விநியோகத்தில் பணம் செலுத்தும் (COD) முறை அல்ல",
+  "m9.payment.invalid_state_transition": "கொடுப்பனவு நிலையை {0} இலிருந்து {1} ஆக மாற்ற முடியாது",
+  "m9.payment.webhook_signature_invalid": "கொடுப்பனவு webhook கையொப்ப சரிபார்ப்பு தோல்வியடைந்தது"
 }

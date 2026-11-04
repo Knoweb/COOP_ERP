@@ -37,5 +37,18 @@
   "m9.delivery.destination_location_required": "Destination location is required",
   "m9.delivery.status_invalid": "Delivery status is invalid",
   "m9.delivery.failure_reason_required": "Failure reason is required when delivery fails",
-  "m9.delivery.period_invalid": "Month-end period must be in YYYY-MM format"
+  "m9.delivery.period_invalid": "Month-end period must be in YYYY-MM format",
+  "m9.payment.not_found": "Payment intent not found",
+  "m9.payment.order_reference_required": "Order reference is required for payment initiation",
+  "m9.payment.customer_ref_required": "Customer reference is required for payment initiation",
+  "m9.payment.amount_positive": "Payment amount must be greater than zero",
+  "m9.payment.payment_method_required": "Payment method is required",
+  "m9.payment.payment_method_invalid": "Payment method must be ONLINE, LANKA_QR, or COD",
+  "m9.payment.provider_not_found": "Payment provider adapter not found or unsupported",
+  "m9.payment.already_paid": "Payment has already been paid and settled",
+  "m9.payment.already_settled": "Payment has already been settled",
+  "m9.payment.already_cancelled": "Payment has been cancelled and cannot be settled",
+  "m9.payment.not_cod": "Payment is not a Cash on Delivery (COD) payment",
+  "m9.payment.invalid_state_transition": "Payment status cannot transition from {0} to {1}",
+  "m9.payment.webhook_signature_invalid": "Payment webhook signature verification failed"
 }

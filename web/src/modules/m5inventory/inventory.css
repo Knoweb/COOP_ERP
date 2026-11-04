@@ -76,6 +76,10 @@
   box-shadow: none;
 }
 
+/* ---------- Stock Navigation & Filter Controls ----------------------------- */
+
+/* Back links unified into web/src/shell/shell.css (.back-pill-btn, .back-link) */
+
 /* ---------- Stock Controls & Search Toolbar -------------------------------- */
 
 .stock-controls-toolbar {

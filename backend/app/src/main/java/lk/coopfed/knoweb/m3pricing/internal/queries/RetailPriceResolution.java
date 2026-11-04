@@ -35,12 +35,15 @@ import lk.coopfed.knoweb.m2catalogue.query.TaxRateView;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ShelfBatches;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
+import lk.coopfed.knoweb.m3pricing.internal.markdown.ExpirySlowMovingDiscountCalculator;
 import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
 import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
@@ -51,7 +54,7 @@ import org.springframework.stereotype.Component;
  * The engine then takes the lowest of list, batch term and control term (doc 23 section 3.5).
  */
 @Component
-class RetailPriceResolution {
+public class RetailPriceResolution {
 
     private final PartyQueries party;
     private final CatalogueQueries catalogue;
@@ -59,17 +62,18 @@ class RetailPriceResolution {
     private final ControlPriceStore controlPrices;
     private final ShelfBatches shelf;
     private final EffectivePolicy policies;
-
     private final RuleStore rules;
+    private final ObjectProvider<ExpirySlowMovingDiscountCalculator> discountCalculatorProvider;
 
-    RetailPriceResolution(
+    public RetailPriceResolution(
             PartyQueries party,
             CatalogueQueries catalogue,
             PriceListStore lists,
             ControlPriceStore controlPrices,
             ShelfBatches shelf,
             EffectivePolicy policies,
-            RuleStore rules) {
+            RuleStore rules,
+            ObjectProvider<ExpirySlowMovingDiscountCalculator> discountCalculatorProvider) {
         this.party = party;
         this.catalogue = catalogue;
         this.lists = lists;
@@ -77,9 +81,10 @@ class RetailPriceResolution {
         this.shelf = shelf;
         this.policies = policies;
         this.rules = rules;
+        this.discountCalculatorProvider = discountCalculatorProvider;
     }
 
-    Optional<RetailPrice> resolve(
+    public Optional<RetailPrice> resolveBase(
             UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
         Optional<LocationView> location = party.getLocation(locationId, scope);
         Optional<SkuView> sku = catalogue.getSku(skuId, scope);
@@ -171,6 +176,57 @@ class RetailPriceResolution {
                 EngineVersionKt.ENGINE_VERSION));
     }
 
+    public Optional<RetailPrice> resolve(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
+        Optional<RetailPrice> basePrice = resolveBase(locationId, skuId, uomCode, quantity, date, scope);
+        if (basePrice.isEmpty()
+                || !basePrice.get().sellable()
+                || basePrice.get().unitPrice() == null) {
+            return basePrice;
+        }
+
+        ExpirySlowMovingDiscountCalculator calculator =
+                discountCalculatorProvider != null ? discountCalculatorProvider.getIfAvailable() : null;
+        if (calculator == null) {
+            return basePrice;
+        }
+
+        List<ExpirySlowMovingDiscountView> activeMarkdowns = calculator.calculate(locationId, null, "ACTIVE", scope);
+
+        RetailPrice base = basePrice.get();
+        UUID effectiveBatchId = base.batchId();
+
+        Optional<ExpirySlowMovingDiscountView> matching = activeMarkdowns.stream()
+                .filter(m -> m.skuId().equals(skuId))
+                .filter(m -> m.batchId() == null
+                        || effectiveBatchId == null
+                        || m.batchId().equals(effectiveBatchId))
+                .findFirst();
+
+        if (matching.isPresent()) {
+            ExpirySlowMovingDiscountView markdown = matching.get();
+            if (markdown.discountedPrice().compareTo(base.unitPrice()) < 0) {
+                return Optional.of(new RetailPrice(
+                        base.locationId(),
+                        base.skuId(),
+                        base.uomCode(),
+                        base.sellable(),
+                        base.reason(),
+                        base.priceListId(),
+                        base.listPrice(),
+                        markdown.discountedPrice(),
+                        base.mrpApplied(),
+                        base.controlPrice(),
+                        base.capReason(),
+                        base.policy(),
+                        markdown.batchId() != null ? markdown.batchId() : base.batchId(),
+                        base.engineVersion()));
+            }
+        }
+
+        return basePrice;
+    }
+
     public Optional<BasketResult> resolveBasket(
             UUID locationId, LocalDate date, TenderKind tender, Basket basket, ScopeContext scope) {
 
@@ -242,7 +298,7 @@ class RetailPriceResolution {
             }
         }
 
-        List<Rule> engineRules = rules.activeOnOrAfter(date).stream()
+        List<Rule> engineRules = new ArrayList<>(rules.activeOnOrAfter(date).stream()
                 .filter(r -> r.ownerEntityId().equals(owner)
                         && !date.isBefore(r.validFrom())
                         && (r.validTo() == null || !date.isAfter(r.validTo())))
@@ -264,7 +320,7 @@ class RetailPriceResolution {
                                 : Money.rounded(r.predicate().billTotalFrom()),
                         lk.coopfed.knoweb.engine.BenefitKind.valueOf(r.benefit().kind()),
                         r.benefit().value()))
-                .toList();
+                .toList());
 
         PricingSnapshotIndex index = new PricingSnapshotIndex(
                 0L,

@@ -94,6 +94,7 @@ openApiSlices.forEach { slice ->
 }
 
 tasks.compileJava { dependsOn(generateOpenApi) }
+tasks.processResources { dependsOn(generateOpenApi) }
 
 // Security patches ahead of Spring Boot: the property names are Spring Boot's own
 // (spring-boot-dependencies), the versions and the reasons are in the catalogue.

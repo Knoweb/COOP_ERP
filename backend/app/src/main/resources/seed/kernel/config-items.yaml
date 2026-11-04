@@ -702,6 +702,66 @@ config_items:
     scope_kind: ENTITY
     change_permission: prc.label.print
     module: m3pricing
+  # PGL-M1-07: Expiry and slow-moving discount markdown rules
+  - key: pricing.expiry_discounts_enabled
+    value_type: BOOLEAN
+    description_en: Whether automated expiry and slow-moving discount markdowns are enabled
+    description_si: ස්වයංක්‍රීය කල් ඉකුත්වීමේ සහ මන්දගාමී තොග වට්ටම් සක්‍රීයද
+    description_ta: தானியங்கி காலாவதி மற்றும் மெதுவாக நகரும் இருப்பு தள்ளுபடிகள் இயக்கப்பட்டுள்ளதா
+    default: "true"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.near_expiry_discount_critical_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to critically near-expiry stock
+    description_si: ඉතා ආසන්නව කල් ඉකුත්වන තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: அவசரமாக காலாவதியாகும் இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "30.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.near_expiry_discount_warning_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to warning near-expiry stock
+    description_si: අවවාදාත්මක කල් ඉකුත්වීමේ තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: எச்சரிக்கை காலாவதி இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "15.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.slow_moving_discount_stagnant_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to stagnant stock with zero sales
+    description_si: ශුන්‍ය විකුණුම් සහිත අක්‍රිය තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: விற்பனையற்ற தேக்கமடைந்த இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "20.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.slow_moving_discount_slow_velocity_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to slow-velocity stock exceeding days of supply threshold
+    description_si: සැපයුම් දින සීමාව ඉක්මවන මන්දගාමී තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: விநியோக நாட்களை விட அதிகமான மெதுவான வேக இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "10.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.max_markdown_percent
+    value_type: DECIMAL
+    schema: { minimum: 1, maximum: 90 }
+    description_en: Maximum allowable discount percentage ceiling for expiry and slow-moving markdowns
+    description_si: කල් ඉකුත්වීමේ සහ මන්දගාමී තොග සඳහා උපරිම අවසර ලත් වට්ටම් ප්‍රතිශතය
+    description_ta: காலாவதி மற்றும் மெதுவாக நகரும் தள்ளுபடிகளுக்கான அதிகபட்ச அனுமதிக்கப்பட்ட தள்ளுபடி வரம்பு
+    default: "50.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
   # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
   # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
   - key: customers.phone_reuse_window_months
