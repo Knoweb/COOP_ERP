@@ -142,14 +142,14 @@ class OpenStockTakeSessionHandler implements Handles<OpenStockTakeSession, UUID>
         UUID taskId = Ids.next();
         LocalDate day = LocalDate.ofInstant(clock.instant(), zone);
         Instant now = clock.instant();
-        UUID[] skuArray = skus.isEmpty() ? null : skus.toArray(UUID[]::new);
+        UUID[] skuArray = full ? new UUID[0] : skus.toArray(new UUID[0]);
 
         jdbc.update(
                 """
                 insert into inventory.count_task
                     (task_id, owner_entity_id, location_id, scope_kind, scope_sku_ids, scheduled_for, scheduled_by,
-                     status, started_by, started_at, created_at)
-                values (?, ?, ?, ?, ?, ?, ?, 'COUNTING', ?, ?, ?)
+                     scheduled_at, status, started_by, started_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, 'COUNTING', ?, ?)
                 """,
                 taskId,
                 scope.entityId(),
@@ -158,8 +158,8 @@ class OpenStockTakeSessionHandler implements Handles<OpenStockTakeSession, UUID>
                 skuArray,
                 day,
                 scope.userId(),
-                scope.userId(),
                 Timestamp.from(now),
+                scope.userId(),
                 Timestamp.from(now));
 
         CountStore.Task newTask = new CountStore.Task(
