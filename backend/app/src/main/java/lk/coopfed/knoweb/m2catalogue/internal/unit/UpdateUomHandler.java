@@ -153,7 +153,7 @@ public class UpdateUomHandler implements Handles<UpdateUom, Void> {
         UUID uomId = UUID.nameUUIDFromBytes(code.getBytes(StandardCharsets.UTF_8));
         audit.record(AUDIT_UPDATED, Subject.of("uom", uomId), before, Collections.unmodifiableMap(after), scope);
 
-        events.publish(new UomUpdated(code, nameEn, nameSi, nameTa, newWeight, status));
+        events.publish(new UomUpdated(uomId, code, nameEn, nameSi, nameTa, newWeight, status));
 
         return null;
     }

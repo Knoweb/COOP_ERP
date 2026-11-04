@@ -94,6 +94,7 @@ class UomCataloguePostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(record.subject().id()).isEqualTo(expectedSubjectId);
         });
         assertThat(events(UomDefined.class)).singleElement().satisfies(event -> {
+            assertThat(event.uomId()).isEqualTo(expectedSubjectId);
             assertThat(event.uomCode()).isEqualTo(TEST_UOM_CODE);
             assertThat(event.nameEn()).isEqualTo("Test Box of 24");
             assertThat(event.weight()).isFalse();
@@ -134,6 +135,7 @@ class UomCataloguePostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(((Map<?, ?>) record.after()).get("status")).isEqualTo("INACTIVE");
         });
         assertThat(events(UomUpdated.class)).singleElement().satisfies(event -> {
+            assertThat(event.uomId()).isEqualTo(expectedSubjectId);
             assertThat(event.uomCode()).isEqualTo(TEST_UOM_CODE);
             assertThat(event.nameEn()).isEqualTo("Test Box of 24 (Updated)");
             assertThat(event.status()).isEqualTo("INACTIVE");

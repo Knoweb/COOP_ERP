@@ -180,6 +180,7 @@ class UpdateUomHandlerTest {
         verify(events).publish(eventCaptor.capture());
 
         UomUpdated event = eventCaptor.getValue();
+        assertThat(event.uomId()).isEqualTo(expectedSubjectId);
         assertThat(event.uomCode()).isEqualTo("BOX");
         assertThat(event.nameEn()).isEqualTo("Box (Master Carton)");
         assertThat(event.status()).isEqualTo("INACTIVE");

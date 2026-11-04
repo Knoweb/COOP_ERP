@@ -158,6 +158,7 @@ class DefineUomHandlerTest {
         verify(events).publish(eventCaptor.capture());
 
         UomDefined published = eventCaptor.getValue();
+        assertThat(published.uomId()).isEqualTo(expectedSubjectId);
         assertThat(published.uomCode()).isEqualTo("PACK");
         assertThat(published.nameEn()).isEqualTo("Packet 10s");
         assertThat(published.nameSi()).isEqualTo("පැකට්ටු");

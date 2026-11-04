@@ -112,7 +112,7 @@ public class DefineUomHandler implements Handles<DefineUom, String> {
         UUID uomId = UUID.nameUUIDFromBytes(code.getBytes(StandardCharsets.UTF_8));
         audit.record(AUDIT_DEFINED, Subject.of("uom", uomId), null, Collections.unmodifiableMap(after), scope);
 
-        events.publish(new UomDefined(code, nameEn, nameSi, nameTa, weight, "ACTIVE"));
+        events.publish(new UomDefined(uomId, code, nameEn, nameSi, nameTa, weight, "ACTIVE"));
 
         return code;
     }
