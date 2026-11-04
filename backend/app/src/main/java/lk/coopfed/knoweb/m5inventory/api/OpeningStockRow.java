@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * One row in a bulk opening stock import payload (CAT-11).
+ * One row in a bulk opening stock import payload (CAT-11, PGL-M2-06).
  *
  * <p>Either references an existing batch known to M2 ({@code batchId}), or carries the batch
  * attributes ({@code batchNo}, {@code expiryDate}, {@code printedMrp}) alongside the item
@@ -20,7 +20,21 @@ public record OpeningStockRow(
         BigDecimal printedMrp,
         LotCondition condition,
         BigDecimal qty,
-        BigDecimal unitCost) {
+        BigDecimal unitCost,
+        String uom) {
+
+    public OpeningStockRow(
+            String sku,
+            UUID skuId,
+            UUID batchId,
+            String batchNo,
+            LocalDate expiryDate,
+            BigDecimal printedMrp,
+            LotCondition condition,
+            BigDecimal qty,
+            BigDecimal unitCost) {
+        this(sku, skuId, batchId, batchNo, expiryDate, printedMrp, condition, qty, unitCost, null);
+    }
 
     public OpeningStockRow(
             String sku,
@@ -30,6 +44,6 @@ public record OpeningStockRow(
             LocalDate expiryDate,
             BigDecimal printedMrp,
             LotCondition condition) {
-        this(sku, null, null, batchNo, expiryDate, printedMrp, condition, qty, unitCost);
+        this(sku, null, null, batchNo, expiryDate, printedMrp, condition, qty, unitCost, null);
     }
 }

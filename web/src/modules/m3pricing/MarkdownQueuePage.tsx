@@ -63,7 +63,7 @@ export function MarkdownQueuePage() {
 
   const [locationId, setLocationId] = useState<string>("");
   const [reasonFilter, setReasonFilter] = useState<ReasonFilter>("ALL");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
@@ -258,8 +258,10 @@ export function MarkdownQueuePage() {
 
       <section className="pricing-section">
         <div className="pricing-filter-bar">
-          <label className="pricing-form-field">
-            <span>{t("pricing.markdown.select_location").text}</span>
+          <label className="pricing-form-field pricing-location-filter-field">
+            <span className="pricing-filter-label">
+              {t("pricing.markdown.select_location").text}
+            </span>
             <PricingSelect
               aria-label={t("pricing.markdown.select_location").text}
               value={locationId}
@@ -275,7 +277,7 @@ export function MarkdownQueuePage() {
           </label>
 
           <label className="pricing-form-field">
-            <span>{t("pricing.markdown.filter_reason").text}</span>
+            <span className="pricing-filter-label">{t("pricing.markdown.filter_reason").text}</span>
             <PricingSelect
               aria-label={t("pricing.markdown.filter_reason").text}
               value={reasonFilter}
@@ -289,7 +291,7 @@ export function MarkdownQueuePage() {
           </label>
 
           <label className="pricing-form-field">
-            <span>{t("pricing.markdown.filter_status").text}</span>
+            <span className="pricing-filter-label">{t("pricing.markdown.filter_status").text}</span>
             <PricingSelect
               aria-label={t("pricing.markdown.filter_status").text}
               value={statusFilter}
@@ -302,7 +304,9 @@ export function MarkdownQueuePage() {
           </label>
 
           <label className="pricing-form-field pricing-markdown-search-field">
-            <span>{t("pricing.markdown.search_label").text}</span>
+            <span className="pricing-filter-label">
+              {t("pricing.markdown.search_label").text}
+            </span>
             <div className="pricing-markdown-search-wrapper">
               <svg
                 className="pricing-markdown-search-icon"
@@ -493,10 +497,7 @@ export function MarkdownQueuePage() {
                               <MoneyDisplay amount={item.discountedPrice} />
                             </strong>
                             {item.basePrice != null && (
-                              <div
-                                className="pricing-muted"
-                                style={{ fontSize: "0.85em", textDecoration: "line-through" }}
-                              >
+                              <div className="pricing-markdown-original-price">
                                 <MoneyDisplay amount={item.basePrice} />
                               </div>
                             )}

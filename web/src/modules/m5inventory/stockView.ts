@@ -36,7 +36,13 @@ export function transferLinesOf(lots: LotBalance[], quantities: Record<string, s
 
 /** The look of an opening balance's state (doc 30 section 2.2): being prepared, signed once, posted. */
 export function chipOf(status: OpeningBalance["status"]): ChipState {
-  return status === "POSTED" ? "issued" : "draft";
+  if (status === "POSTED") {
+    return "issued";
+  }
+  if (status === "REJECTED") {
+    return "void";
+  }
+  return "draft";
 }
 
 /** The problem's title, which the server has already translated; the fallback otherwise. */

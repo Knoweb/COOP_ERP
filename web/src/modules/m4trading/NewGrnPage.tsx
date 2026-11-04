@@ -156,7 +156,13 @@ export function NewGrnPage() {
 
   return (
     <main className="shell-page">
-      <Link to={`/trading/delivery-notes/${deliveryNoteId}`}>{t("trading.back_to_note").text}</Link>
+      <Link className="back-link" to={`/trading/delivery-notes/${deliveryNoteId}`}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        {t("trading.back_to_note").text}
+      </Link>
       <h1>{t("trading.grn.new.title", undefined, { number: note.data?.docNumber ?? "" }).text}</h1>
       <p>
         {t("trading.field.receive_at").text}: <LocationName locationId={drop.shipToLocationId} />

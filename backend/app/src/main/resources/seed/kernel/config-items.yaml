@@ -1202,3 +1202,52 @@ config_items:
     sensitive: false
     till_visible: false
     module: m9integration
+  # M3-03: Loyalty Monthly Reward & Insurance Eligibility rules
+  - key: customers.loyalty.monthly_spend_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 1000000.0 }
+    description_en: Monthly qualifying spend threshold required for loyalty rewards and insurance eligibility
+    description_si: පක්ෂපාතිත්ව ප්‍රතිලාභ සහ රක්ෂණ සුදුසුකම් සඳහා අවශ්‍ය මාසික සුදුසුකම් ලබන වියදම් සීමාව
+    description_ta: விசுவாச வெகுமதிகள் மற்றும் காப்பீட்டுத் தகுதிக்குத் தேவையான மாதாந்த தகுதியான செலவு வரம்பு
+    default: 20000.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers
+  - key: customers.loyalty.min_membership_months
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 120 }
+    description_en: Minimum membership age in months required for loyalty reward points and insurance eligibility
+    description_si: පක්ෂපාතිත්ව ලකුණු සහ රක්ෂණ සුදුසුකම් සඳහා අවශ්‍ය අවම සාමාජිකත්ව කාලය (මාස වලින්)
+    description_ta: விசுவாச வெகுமதி புள்ளிகள் மற்றும் காப்பீட்டுத் தகுதிக்குத் தேவையான குறைந்தபட்ச உறுப்பினர் காலம் (மாதங்களில்)
+    default: 3
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers
+  - key: customers.loyalty.monthly_reward_points
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 100000 }
+    description_en: Monthly reward points awarded to eligible loyalty customers meeting spend threshold
+    description_si: වියදම් සීමාව සපුරාලන සුදුසුකම් ලත් පක්ෂපාතිත්ව පාරිභෝගිකයින්ට පිරිනමන මාසික ප්‍රතිලාභ ලකුණු
+    description_ta: செலவு வரம்பை பூர்த்தி செய்யும் தகுதியான விசுவாச வாடிக்கையாளர்களுக்கு வழங்கப்படும் மாதாந்த வெகுமதி புள்ளிகள்
+    default: 200
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers
+  - key: customers.loyalty.insurance_benefit_amount
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 10000000.0 }
+    description_en: Configured policy insurance cover amount for eligible loyalty members
+    description_si: සුදුසුකම් ලත් පක්ෂපාතිත්ව සාමාජිකයින් සඳහා ප්‍රතිපත්තිමය රක්ෂණ ආවරණ මුදල
+    description_ta: தகுதியான விசுவாச உறுப்பினர்களுக்கான கொள்கை காப்பீட்டுத் தொகை
+    default: 50000.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers

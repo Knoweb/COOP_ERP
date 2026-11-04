@@ -173,3 +173,29 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A customer's regional registration and loyalty branch access were updated
+
+  # Polgolla Program 2026 - Wave 4 (PGL-M3-03: Loyalty Monthly Reward & Insurance Eligibility).
+  - code: LOYALTY_POLICY_CONFIGURED
+    severity: INFO
+    offline_capturable: false
+    description_en: A loyalty reward and insurance policy was configured or updated
+
+  - code: LOYALTY_SPEND_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Qualifying spend was recorded for a loyalty customer
+
+  - code: LOYALTY_MONTHLY_REWARD_CALCULATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Monthly qualifying spend, rewards and insurance eligibility were evaluated for loyalty customers
+
+  - code: INSURANCE_CLAIM_SUBMITTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A loyalty insurance benefit claim was submitted with supporting document references
+
+  - code: INSURANCE_CLAIM_STATUS_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A loyalty insurance benefit claim status was updated

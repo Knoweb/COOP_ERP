@@ -456,7 +456,7 @@ class InventoryQueriesImpl implements InventoryQueries {
                 .query(
                         """
                         select opening_balance_id, location_id, status, prepared_by, signed_entity_by,
-                               countersigned_by, document_id
+                               countersigned_by, document_id, rejected_by, rejected_at, rejection_reason
                           from inventory.opening_balance
                          where opening_balance_id = ?
                         """,
@@ -468,6 +468,11 @@ class InventoryQueriesImpl implements InventoryQueries {
                                 rs.getObject("signed_entity_by", UUID.class),
                                 rs.getObject("countersigned_by", UUID.class),
                                 rs.getObject("document_id", UUID.class),
+                                rs.getObject("rejected_by", UUID.class),
+                                rs.getTimestamp("rejected_at") == null
+                                        ? null
+                                        : rs.getTimestamp("rejected_at").toInstant(),
+                                rs.getString("rejection_reason"),
                                 lines),
                         openingBalanceId)
                 .stream()

@@ -44,6 +44,7 @@ async function registerOnboardingWarehouse(page: Page, scopedRequest: Request, m
 
 async function addOpeningLine(page: Page, locationId: string, itemName: string): Promise<void> {
   await page.goto("/inventory/opening/new");
+  await page.getByRole("tab", { name: textOf(MPCS_ADMIN, "inventory.opening.tab.manual") }).click();
   await page.getByLabel(textOf(MPCS_ADMIN, "inventory.field.location")).selectOption(locationId);
   await page.getByLabel(textOf(MPCS_ADMIN, "inventory.field.find_item")).fill(itemName);
   await page.getByRole("button", { name: textOf(MPCS_ADMIN, "inventory.find"), exact: true }).click();

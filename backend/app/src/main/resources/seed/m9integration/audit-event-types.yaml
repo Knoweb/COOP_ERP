@@ -40,3 +40,28 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A notification was successfully dispatched to the provider through the centralized notification gateway
+
+  - code: VEHICLE_LOCATION_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Real-time GPS location update was captured for a delivery vehicle
+
+  - code: DELIVERY_TRIP_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery trip was planned and created for a vehicle
+
+  - code: DELIVERY_TRIP_COMPLETED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery trip was completed with final odometer and distance
+
+  - code: DELIVERY_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery drop was scheduled on a delivery trip
+
+  - code: DELIVERY_STATUS_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: The status of a delivery drop was updated

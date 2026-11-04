@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueApi;
 import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueReferenceResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ConversionResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.DefineConversionRequest;
+import lk.coopfed.knoweb.m2catalogue.web.generated.DepartmentCategoryResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.PromoteSkuRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
@@ -120,7 +121,11 @@ class CatalogueController implements CatalogueApi {
                 })
                 .toList();
 
-        return ResponseEntity.ok(new CatalogueReferenceResponse(units, taxCategories));
+        List<DepartmentCategoryResponse> departments = queries.departmentCategories(scope).stream()
+                .map(DepartmentController::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(new CatalogueReferenceResponse(units, taxCategories, departments));
     }
 
     @Override
@@ -223,7 +228,8 @@ class CatalogueController implements CatalogueApi {
                 request.getTaxCategoryId(),
                 request.getMultiMrpPolicy().getValue(),
                 request.getOriginKind().getValue(),
-                request.getAttributes());
+                request.getAttributes(),
+                request.getDepartmentId());
     }
 
     private static SkuResponse toResponse(SkuView view) {
@@ -253,6 +259,7 @@ class CatalogueController implements CatalogueApi {
         }
 
         response.setAttributes(view.attributes());
+        response.setDepartmentId(view.departmentId());
 
         return response;
     }

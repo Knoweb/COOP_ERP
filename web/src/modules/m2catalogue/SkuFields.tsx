@@ -90,7 +90,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         </select>
       </label>
 
-      {/* Row 3: Tax category | MRP resolution policy */}
+      {/* Row 3: Tax category | Department category */}
       <label className="catalogue-form-field">
         <span>
           {t("catalogue.field.tax_category").text}
@@ -112,6 +112,23 @@ export function SkuFields({ form, onChange, disabled }: Props) {
       </label>
 
       <label className="catalogue-form-field">
+        <span>{t("catalogue.field.department").text}</span>
+        <select
+          value={form.departmentId}
+          disabled={disabled}
+          onChange={(event) => onChange({ departmentId: event.target.value })}
+        >
+          <option value="">{t("catalogue.field.choose").text}</option>
+          {(reference.data?.departments ?? []).map((department) => (
+            <option key={department.departmentId} value={department.departmentId}>
+              {department.code} - {nameIn(department, language)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Row 4: MRP policy | Item origin */}
+      <label className="catalogue-form-field">
         <span>{t("catalogue.field.multi_mrp_policy").text}</span>
         <select
           value={form.multiMrpPolicy}
@@ -124,7 +141,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
         </select>
       </label>
 
-      {/* Row 4: Item origin | Expiry warning window (days) */}
+      {/* Row 5: Item origin | Expiry warning window (days) */}
       <label className="catalogue-form-field">
         <span>{t("catalogue.field.origin_kind").text}</span>
         <select

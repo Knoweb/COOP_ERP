@@ -96,6 +96,11 @@ public final class CustomersFixture {
     /** Everything the M7 tests and the demo leave behind in the customers schema, and the CPRs. */
     public static void cleanAllCustomers(JdbcTemplate admin) {
         for (String table : new String[] {
+            "loyalty_insurance_claim",
+            "loyalty_points_ledger",
+            "loyalty_monthly_reward",
+            "loyalty_spend",
+            "loyalty_reward_policy",
             "allocation_reversal",
             "account_history",
             "account_adjustment",

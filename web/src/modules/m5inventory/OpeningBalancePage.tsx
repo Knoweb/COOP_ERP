@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
@@ -12,11 +13,15 @@ import { chipOf, errorText } from "./stockView";
 import "./inventory.css";
 
 /**
- * One opening balance (doc 25 section 4.7, flow 6.9): its counted lines and state. A DRAFT is
+ * One opening balance (doc 25 section 4.7, flow 6.9, PGL-M2-06): its counted lines and state. A DRAFT is
  * signed by the entity's officer (`inv.opening.sign`); a signed one is countersigned by another
- * person (`inv.opening.countersign`), which issues the OPB document and posts the stock. Both ask
- * for a fresh second factor (the shell's step-up). The server refuses a countersignature by the
- * signer, in its own words.
+ * person (`inv.opening.countersign`), which issues the OPB document and posts the stock.
+ * Both ask for a fresh second factor (the shell's step-up). The server refuses a countersignature
+ * by the signer, in its own words.
+ *
+ * When discrepancies are discovered during pre-check, an authorized higher officer with `inv.opening.sign`
+ * can reject the draft or signed balance with a documented reason, leaving historical lines
+ * immutable and freeing the onboarding location for re-preparation.
  */
 export function OpeningBalancePage() {
   const { openingBalanceId = "" } = useParams();
@@ -25,8 +30,13 @@ export function OpeningBalancePage() {
   const queryClient = useQueryClient();
   const canSign = useHasPermission("inv.opening.sign");
   const canCountersign = useHasPermission("inv.opening.countersign");
+  const canReject = useHasPermission("inv.opening.sign");
   const signKey = useIdempotencyKey();
   const countersignKey = useIdempotencyKey();
+  const rejectKey = useIdempotencyKey();
+
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const balance = useQuery({
     queryKey: ["inventory", "opening", openingBalanceId],
@@ -51,6 +61,15 @@ export function OpeningBalancePage() {
     mutationFn: () => api.countersign(openingBalanceId, countersignKey.current()),
     onSuccess: done(countersignKey),
     onError: forget(countersignKey)
+  });
+  const reject = useMutation({
+    mutationFn: () => api.rejectOpeningBalance(openingBalanceId, rejectionReason.trim(), rejectKey.current()),
+    onSuccess: () => {
+      setRejecting(false);
+      setRejectionReason("");
+      done(rejectKey)();
+    },
+    onError: forget(rejectKey)
   });
 
   if (balance.isLoading) {
@@ -79,6 +98,12 @@ export function OpeningBalancePage() {
       <p>
         <StateChip state={chipOf(ob.status)} label={t(`inventory.opening.status.${ob.status}`).text} />
       </p>
+
+      {ob.status === "REJECTED" && (
+        <aside className="inventory-rejection-banner" role="alert">
+          {t("inventory.opening.rejection.banner", undefined, { reason: ob.rejectionReason ?? "" }).text}
+        </aside>
+      )}
 
       <section className="modern-table-card">
         <div className="modern-table-scroll">
@@ -118,17 +143,59 @@ export function OpeningBalancePage() {
       </section>
 
       <section className="inventory-action-bar">
-        {ob.status === "DRAFT" && canSign && (
+        {ob.status === "DRAFT" && canSign && !rejecting && (
           <button type="button" disabled={sign.isPending} onClick={() => sign.mutate()}>
             {t("inventory.opening.sign").text}
           </button>
         )}
-        {ob.status === "SIGNED_ENTITY" && canCountersign && (
+        {ob.status === "SIGNED_ENTITY" && canCountersign && !rejecting && (
           <button type="button" disabled={countersign.isPending} onClick={() => countersign.mutate()}>
             {t("inventory.opening.countersign").text}
           </button>
         )}
-        {ob.status === "SIGNED_ENTITY" && <p>{t("inventory.opening.countersign.other_person").text}</p>}
+        {(ob.status === "DRAFT" || ob.status === "SIGNED_ENTITY") && canReject && !rejecting && (
+          <button type="button" className="btn-secondary" onClick={() => setRejecting(true)}>
+            {t("inventory.opening.reject").text}
+          </button>
+        )}
+
+        {rejecting && (
+          <div className="inventory-reject-form">
+            <label className="inventory-form-field">
+              {t("inventory.opening.reject.reason").text}
+              <input
+                type="text"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder={t("inventory.opening.reject.placeholder").text}
+                aria-label={t("inventory.opening.reject.reason").text}
+              />
+            </label>
+            <div className="inventory-action-row">
+              <button
+                type="button"
+                className="btn-danger"
+                disabled={reject.isPending || rejectionReason.trim().length < 5}
+                onClick={() => reject.mutate()}
+              >
+                {t("inventory.opening.reject.confirm").text}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setRejecting(false);
+                  setRejectionReason("");
+                }}
+              >
+                {t("inventory.opening.reject.cancel").text}
+              </button>
+            </div>
+            {reject.isError && <p role="alert">{errorText(reject.error, t("inventory.error.generic").text)}</p>}
+          </div>
+        )}
+
+        {ob.status === "SIGNED_ENTITY" && !rejecting && <p>{t("inventory.opening.countersign.other_person").text}</p>}
       </section>
       {sign.isError && <p role="alert">{errorText(sign.error, t("inventory.error.generic").text)}</p>}
       {countersign.isError && <p role="alert">{errorText(countersign.error, t("inventory.error.generic").text)}</p>}
