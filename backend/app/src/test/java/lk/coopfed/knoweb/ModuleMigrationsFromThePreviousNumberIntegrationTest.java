@@ -205,7 +205,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 // PGL-M3-01: m7customers V0006 adds regional registration & centralized loyalty.
                 // PGL-M3-03: m7customers V0007 adds loyalty rewards & insurance.
                 .containsEntry("m7customers", 7)
-                .containsEntry("m8reporting", 10);
+                .containsEntry("m8reporting", 11);
 
         // What the new numbers leave in place, read from the catalogue.
         List<String> functions = admin.queryForList(
@@ -418,7 +418,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // POL-M1-01: m8reporting V0008 adds reporting.shop_target with 4-class RLS.
         // POL-M1-08: m8reporting V0009 adds reporting.profit_center with 4-class RLS.
         // PGL-M1-04: m8reporting V0010 adds reporting.asset with 4-class RLS.
-        assertThat(after).containsEntry("m8reporting", 10);
+        assertThat(after).containsEntry("m8reporting", 11);
         assertThat(admin.queryForObject("select to_regclass('reporting.shop_target')::text", String.class))
                 .isEqualTo("reporting.shop_target");
         assertThat(admin.queryForObject(

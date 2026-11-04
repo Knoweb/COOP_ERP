@@ -65,6 +65,7 @@ public class TradeProjection extends Projection {
             Map.entry("invoice.disputed.v1", new String[] {"INVOICE", "DISPUTED"}),
             Map.entry("invoice.dispute_resolved.v1", new String[] {"INVOICE", "DISPUTE_RESOLVED"}),
             Map.entry("credit_note.issued.v1", new String[] {"CREDIT_NOTE", "ISSUED"}),
+            Map.entry("debit_note.issued.v1", new String[] {"DEBIT_NOTE", "ISSUED"}),
             Map.entry("payment_receipt.recorded.v1", new String[] {"PAYMENT", "RECORDED"}),
             Map.entry("payment_receipt.reversed.v1", new String[] {"PAYMENT", "REVERSED"}),
             // Money on account applied later: a row of its own (the application's id), not the receipt's.
@@ -105,6 +106,7 @@ public class TradeProjection extends Projection {
             Map.entry("invoice.disputed.v1", "invoiceId"),
             Map.entry("invoice.dispute_resolved.v1", "invoiceId"),
             Map.entry("credit_note.issued.v1", "creditNoteId"),
+            Map.entry("debit_note.issued.v1", "debitNoteId"),
             Map.entry("payment_receipt.recorded.v1", "receiptId"),
             Map.entry("payment_receipt.reversed.v1", "reversalId"),
             Map.entry("payment_receipt.applied.v1", "applicationId"),
@@ -278,6 +280,27 @@ public class TradeProjection extends Projection {
                             row.documentId,
                             row.reference,
                             "CREDIT",
+                            owner,
+                            counterparty,
+                            seller,
+                            buyer,
+                            row.businessDate,
+                            row.gross,
+                            event,
+                            row.location);
+                }
+            }
+            case "debit_note.issued.v1" -> {
+                row.documentId = event.uuid("debitNoteId");
+                row.reference = event.uuid("invoiceId");
+                row.net = event.decimal("netAmount");
+                row.tax = event.decimal("taxAmount");
+                row.gross = event.decimal("grossAmount");
+                if (row.reference != null && row.gross != null) {
+                    insertSettlement(
+                            row.documentId,
+                            row.reference,
+                            "DEBIT",
                             owner,
                             counterparty,
                             seller,
