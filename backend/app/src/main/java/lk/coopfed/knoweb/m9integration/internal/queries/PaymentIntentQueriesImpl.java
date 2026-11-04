@@ -29,30 +29,14 @@ public class PaymentIntentQueriesImpl implements PaymentIntentQueries {
 
     @Override
     public Optional<PaymentIntentView> findById(UUID paymentId, ScopeContext scope) {
-        String sql =
-                """
-                SELECT payment_id, owner_entity_id, order_reference, customer_reference,
-                       amount, currency, payment_method, payment_status, provider_id,
-                       provider_reference, qr_payload, description, failure_reason,
-                       dedup_key, metadata, created_at, settled_at, updated_at, expires_at
-                FROM integration.payment_intent
-                WHERE payment_id = ?
-                """;
+        String sql = "SELECT * FROM integration.payment_intent WHERE payment_id = ?";
         List<PaymentIntentView> results = jdbc.query(sql, rowMapper, paymentId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.getFirst());
     }
 
     @Override
     public Optional<PaymentIntentView> findByDedupKey(String dedupKey, ScopeContext scope) {
-        String sql =
-                """
-                SELECT payment_id, owner_entity_id, order_reference, customer_reference,
-                       amount, currency, payment_method, payment_status, provider_id,
-                       provider_reference, qr_payload, description, failure_reason,
-                       dedup_key, metadata, created_at, settled_at, updated_at, expires_at
-                FROM integration.payment_intent
-                WHERE dedup_key = ?
-                """;
+        String sql = "SELECT * FROM integration.payment_intent WHERE idempotency_key = ?";
         List<PaymentIntentView> results = jdbc.query(sql, rowMapper, dedupKey);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.getFirst());
     }
@@ -61,11 +45,7 @@ public class PaymentIntentQueriesImpl implements PaymentIntentQueries {
     public Optional<PaymentIntentView> findByOrderReference(String orderReference, ScopeContext scope) {
         String sql =
                 """
-                SELECT payment_id, owner_entity_id, order_reference, customer_reference,
-                       amount, currency, payment_method, payment_status, provider_id,
-                       provider_reference, qr_payload, description, failure_reason,
-                       dedup_key, metadata, created_at, settled_at, updated_at, expires_at
-                FROM integration.payment_intent
+                SELECT * FROM integration.payment_intent
                 WHERE order_reference = ?
                 ORDER BY created_at DESC
                 LIMIT 1

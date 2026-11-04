@@ -811,7 +811,8 @@ class IntegrationController implements IntegrationApi {
     }
 
     @Override
-    public ResponseEntity<PaymentIntentResponse> confirmPayment(UUID paymentId, String idempotencyKey, ConfirmPaymentRequest req) {
+    public ResponseEntity<PaymentIntentResponse> confirmPayment(
+            UUID paymentId, String idempotencyKey, ConfirmPaymentRequest req) {
         ScopeContext scope = currentScope.get();
         ConfirmPayment cmd = new ConfirmPayment(
                 paymentId,
@@ -824,7 +825,8 @@ class IntegrationController implements IntegrationApi {
     }
 
     @Override
-    public ResponseEntity<PaymentIntentResponse> confirmCodPayment(UUID paymentId, String idempotencyKey, ConfirmCodPaymentRequest req) {
+    public ResponseEntity<PaymentIntentResponse> confirmCodPayment(
+            UUID paymentId, String idempotencyKey, ConfirmCodPaymentRequest req) {
         ScopeContext scope = currentScope.get();
         ConfirmCodSettlement cmd = new ConfirmCodSettlement(
                 paymentId, req != null ? req.getReceiptReference() : null, req != null ? req.getMetadata() : Map.of());
@@ -833,7 +835,8 @@ class IntegrationController implements IntegrationApi {
     }
 
     @Override
-    public ResponseEntity<PaymentIntentResponse> retryPayment(UUID paymentId, String idempotencyKey, RetryPaymentRequest req) {
+    public ResponseEntity<PaymentIntentResponse> retryPayment(
+            UUID paymentId, String idempotencyKey, RetryPaymentRequest req) {
         ScopeContext scope = currentScope.get();
         String provider = req != null ? req.getProvider() : null;
         RetryPayment cmd = new RetryPayment(paymentId, provider);
