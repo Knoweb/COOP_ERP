@@ -715,6 +715,62 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/ReviewItem' }
+  /v1/pricing/expiry-slow-moving-discounts:
+    get:
+      tags: [Pricing]
+      operationId: listExpirySlowMovingDiscounts
+      summary: Active expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+      description: >
+        Returns active markdown discounts calculated deterministically from authoritative
+        inventory near-expiry and slow-moving facts. Filterable by reason (NEAR_EXPIRY,
+        SLOW_MOVING) and status (ACTIVE).
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: reason
+          required: false
+          schema: { type: string, enum: [ALL, NEAR_EXPIRY, SLOW_MOVING] }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [ALL, ACTIVE] }
+      responses:
+        '200':
+          description: List of active expiry and slow-moving discount markdowns
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExpirySlowMovingDiscountResponse' }
+  /v1/pricing/expiry-slow-moving-discounts/evaluate:
+    post:
+      tags: [Pricing]
+      operationId: evaluateExpirySlowMovingDiscounts
+      summary: Evaluate near-expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+      description: >
+        Triggers evaluation of inventory near-expiry and slow-moving candidates against
+        configured markdown rules, records audit EXPIRY_SLOW_MOVING_DISCOUNTS_EVALUATED,
+        publishes pricing.expiry_slow_moving_discounts_evaluated.v1, and returns evaluation summary.
+      x-permission: prc.rule.activate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluateExpirySlowMovingDiscountsRequest' }
+      responses:
+        '200':
+          description: Evaluation result summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpirySlowMovingEvaluationResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
     RulePredicate:
@@ -1072,3 +1128,55 @@ components:
         skuName: { type: [string, 'null'] }
         skuCode: { type: [string, 'null'] }
         details: { type: object }
+    ExpirySlowMovingDiscountResponse:
+      type: object
+      required:
+        - skuId
+        - skuCode
+        - locationId
+        - reason
+        - tierOrClassification
+        - basePrice
+        - markdownPercent
+        - discountedPrice
+        - qtyOnHand
+        - status
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        stockLotId: { type: [string, 'null'], format: uuid }
+        batchId: { type: [string, 'null'], format: uuid }
+        batchNo: { type: [string, 'null'] }
+        locationId: { type: string, format: uuid }
+        reason: { type: string, enum: [NEAR_EXPIRY, SLOW_MOVING] }
+        tierOrClassification: { type: string }
+        basePrice: { type: number }
+        markdownPercent: { type: number }
+        discountedPrice: { type: number }
+        qtyOnHand: { type: number }
+        expiryDate: { type: [string, 'null'], format: date }
+        daysToExpiry: { type: [integer, 'null'] }
+        validFrom: { type: [string, 'null'], format: date }
+        validTo: { type: [string, 'null'], format: date }
+        status: { type: string, enum: [ACTIVE] }
+    EvaluateExpirySlowMovingDiscountsRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+    ExpirySlowMovingEvaluationResponse:
+      type: object
+      required:
+        - locationId
+        - totalEvaluated
+        - markdownsActive
+        - nearExpiryCount
+        - slowMovingCount
+        - evaluatedAt
+      properties:
+        locationId: { type: string, format: uuid }
+        totalEvaluated: { type: integer }
+        markdownsActive: { type: integer }
+        nearExpiryCount: { type: integer }
+        slowMovingCount: { type: integer }
+        evaluatedAt: { type: string, format: date-time }

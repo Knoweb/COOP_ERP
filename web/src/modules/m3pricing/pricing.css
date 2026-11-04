@@ -2457,6 +2457,31 @@ select.pricing-select option:focus {
   margin: 0 auto !important;
 }
 
+/* ---- Markdown Queue Enhancements (PGL-M1-07) -------------------------------- */
+.pricing-markdown-action-cell {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: var(--space-2);
+}
+
+.pricing-markdown-feedback {
+  margin: var(--space-4) 0;
+}
+
+.pricing-markdown-days-wrapper {
+  margin-top: var(--space-1);
+}
+
+.pricing-markdown-discounted-price {
+  color: var(--color-brand-success);
+}
+
+.pricing-markdown-original-price {
+  font-size: var(--font-size-xs);
+  text-decoration: line-through;
+  color: var(--color-ink-subtle);
+}
+
 
 
 

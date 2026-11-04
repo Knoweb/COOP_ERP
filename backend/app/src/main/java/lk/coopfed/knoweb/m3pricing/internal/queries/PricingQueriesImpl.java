@@ -29,11 +29,13 @@ import lk.coopfed.knoweb.m3pricing.internal.adjustment.AdjustmentTypeStore;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
 import lk.coopfed.knoweb.m3pricing.internal.label.LabelJobStore;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
+import lk.coopfed.knoweb.m3pricing.internal.markdown.ExpirySlowMovingDiscountCalculator;
 import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
 import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.AdjustmentTypeView;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
@@ -73,6 +75,7 @@ class PricingQueriesImpl implements PricingQueries {
     private final CatalogueQueries catalogue;
     private final AdjustmentTypeStore adjustmentTypes;
     private final LabelJobStore labelJobs;
+    private final ExpirySlowMovingDiscountCalculator expiryDiscountCalculator;
 
     @SuppressWarnings("java:S107") // the inputs of the central resolution; a query service only reads
     PricingQueriesImpl(
@@ -86,7 +89,8 @@ class PricingQueriesImpl implements PricingQueries {
             AuditReviewReader auditReviews,
             CatalogueQueries catalogue,
             AdjustmentTypeStore adjustmentTypes,
-            LabelJobStore labelJobs) {
+            LabelJobStore labelJobs,
+            ExpirySlowMovingDiscountCalculator expiryDiscountCalculator) {
         this.catalogue = catalogue;
         this.store = store;
         this.relationships = relationships;
@@ -98,6 +102,7 @@ class PricingQueriesImpl implements PricingQueries {
         this.auditReviews = auditReviews;
         this.adjustmentTypes = adjustmentTypes;
         this.labelJobs = labelJobs;
+        this.expiryDiscountCalculator = expiryDiscountCalculator;
     }
 
     @Override
@@ -304,5 +309,11 @@ class PricingQueriesImpl implements PricingQueries {
     @Override
     public List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope) {
         return adjustmentTypes.list();
+    }
+
+    @Override
+    public List<ExpirySlowMovingDiscountView> listExpirySlowMovingDiscounts(
+            UUID locationId, String reason, String status, ScopeContext scope) {
+        return expiryDiscountCalculator.calculate(locationId, reason, status, scope);
     }
 }

@@ -26,6 +26,9 @@ export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
 export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
 export type ReviewItem = components["schemas"]["ReviewItem"];
 export type LabelJob = components["schemas"]["LabelJobResponse"];
+export type ExpirySlowMovingDiscount = components["schemas"]["ExpirySlowMovingDiscountResponse"];
+export type ExpirySlowMovingEvaluation = components["schemas"]["ExpirySlowMovingEvaluationResponse"];
+export type EvaluateExpirySlowMovingDiscountsRequest = components["schemas"]["EvaluateExpirySlowMovingDiscountsRequest"];
 export type LotBalance = inventoryComponents["schemas"]["LotBalanceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type SkuConversion = catalogueComponents["schemas"]["ConversionResponse"];
@@ -237,6 +240,30 @@ export function usePricingApi() {
           params: { path: { locationId } }
         });
         return data ?? [];
+      },
+
+      /** Active expiry and slow-moving discount markdowns (PGL-M1-07). */
+      async listExpirySlowMovingDiscounts(
+        locationId: string,
+        reason?: "ALL" | "NEAR_EXPIRY" | "SLOW_MOVING",
+        status?: "ALL" | "ACTIVE"
+      ): Promise<ExpirySlowMovingDiscount[]> {
+        const { data } = await api.GET("/v1/pricing/expiry-slow-moving-discounts", {
+          params: { query: { locationId, reason, status } }
+        });
+        return data ?? [];
+      },
+
+      /** Trigger evaluation of near-expiry and slow-moving discount markdowns (PGL-M1-07). */
+      async evaluateExpirySlowMovingDiscounts(
+        locationId: string,
+        idempotencyKey: string
+      ): Promise<ExpirySlowMovingEvaluation> {
+        const { data } = await api.POST("/v1/pricing/expiry-slow-moving-discounts/evaluate", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId }
+        });
+        return data!;
       }
     }),
     [api, catalogue, party, inventory]
