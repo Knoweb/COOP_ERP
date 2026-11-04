@@ -7,6 +7,7 @@ import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { PriceList } from "./pricingApi";
@@ -73,7 +74,7 @@ export function ShelfPricesPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("pricing.shelf.title").text}</h1>
+      <PageHeader icon="shelf" title={t("pricing.shelf.title").text} />
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.shelf.intro").text}</p>
 

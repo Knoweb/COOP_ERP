@@ -76,66 +76,6 @@
   box-shadow: none;
 }
 
-/* ---------- Stock Navigation & Filter Controls ----------------------------- */
-
-.shell-page>.back-link,
-.shell-page .back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--space-half) + var(--space-half) / 2);
-  min-height: calc(var(--space-3) + var(--space-half));
-  padding: calc(var(--space-half) / 2) var(--space-1);
-  border-radius: var(--radius-pill);
-  background: var(--color-polish-31);
-  border: var(--border-width) solid var(--color-polish-6);
-  color: var(--color-accent);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-strong);
-  text-decoration: none;
-  margin-bottom: var(--space-2);
-  max-width: 100%;
-  box-sizing: border-box;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.shell-page>.back-link:hover,
-.shell-page .back-link:hover {
-  background: var(--color-polish-22);
-  border-color: var(--color-accent);
-  transform: translateX(calc(var(--space-half) * -1 / 2));
-}
-
-.shell-page>.back-link:focus,
-.shell-page>.back-link:focus-visible,
-.shell-page>.back-link:active,
-.shell-page .back-link:focus,
-.shell-page .back-link:focus-visible,
-.shell-page .back-link:active {
-  outline: none;
-  box-shadow: none;
-}
-
-.shell-page>.back-link:active,
-.shell-page .back-link:active {
-  transform: scale(0.98);
-}
-
-.shell-page>.back-link svg,
-.shell-page .back-link svg {
-  flex-shrink: 0;
-  width: calc(var(--space-2) - var(--space-half) / 2);
-  height: calc(var(--space-2) - var(--space-half) / 2);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--border-width-strong);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 /* ---------- Stock Controls & Search Toolbar -------------------------------- */
 
 .stock-controls-toolbar {

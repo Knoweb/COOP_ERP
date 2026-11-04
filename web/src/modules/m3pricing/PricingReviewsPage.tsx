@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { ReviewItem } from "./pricingApi";
@@ -35,7 +36,7 @@ export function PricingReviewsPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("pricing.reviews.title").text}</h1>
+      <PageHeader icon="reviews" title={t("pricing.reviews.title").text} />
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.reviews.intro").text}</p>
 
