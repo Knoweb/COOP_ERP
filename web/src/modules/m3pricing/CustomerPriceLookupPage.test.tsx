@@ -13,6 +13,7 @@ const SHOP_A: Location = {
   locationCode: "SHOP-COL-01",
   nameEn: "Colombo Central Cooperative Shop",
   locationType: "SHOP",
+  connectivitySpecMet: true,
   status: "ACTIVE"
 };
 
@@ -22,6 +23,7 @@ const SHOP_B: Location = {
   locationCode: "SHOP-KAN-02",
   nameEn: "Kandy Cooperative Shop",
   locationType: "SHOP",
+  connectivitySpecMet: true,
   status: "ACTIVE"
 };
 

@@ -93,10 +93,10 @@ class CustomerPriceLookupPostgresIntegrationTest extends PostgresIntegrationTest
 
         // Add a barcode row for rice
         admin.update(
-                "insert into catalogue.sku_barcode (barcode_id, sku_id, barcode, symbology, is_primary, status)"
-                        + " values (?, ?, '479000100010', 'EAN_13', true, 'ACTIVE')",
-                Ids.next(),
-                rice);
+                "insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id, status)"
+                        + " values ('479000100010', 'EAN13', ?, 'EA', ?, 'ACTIVE')",
+                rice,
+                FEDERATION);
 
         kernel.reset();
 
