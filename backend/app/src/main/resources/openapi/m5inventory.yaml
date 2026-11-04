@@ -1285,6 +1285,193 @@ paths:
               schema: { $ref: '#/components/schemas/RepackResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions:
+    post:
+      tags: [StockTake]
+      operationId: openStockTakeSession
+      summary: Open or resume an active mobile stock-taking session for a location
+      description: >
+        Opens or resumes a counting session for the specified location.
+        If a count task is in COUNTING status, returns it. If in SCHEDULED, transitions it to COUNTING.
+        If no count task is open, schedules and starts one.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpenStockTakeSessionRequest' }
+      responses:
+        '200':
+          description: Stock-taking session opened or resumed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeSessionResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions/active:
+    get:
+      tags: [StockTake]
+      operationId: getActiveStockTakeSession
+      summary: Get the currently active stock-taking session for a location
+      x-permission: shop.count.record
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Active session found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeSessionResponse' }
+        '404':
+          description: No active stock-taking session found for this location
+  /v1/inventory/stock-take/sessions/{sessionId}:
+    get:
+      tags: [StockTake]
+      operationId: getStockTakeSession
+      summary: Get stock-taking session details
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeSessionResponse' }
+        '404':
+          description: Session not found
+  /v1/inventory/stock-take/sessions/{sessionId}/scan:
+    post:
+      tags: [StockTake]
+      operationId: recordStockTakeScan
+      summary: Record an individual barcode or SKU scan in a session
+      description: >
+        Accepts a barcode or SKU scan, resolves the item and lot safely, and records the counted quantity.
+        Idempotent by scanId: repeated submissions with identical attributes return the existing scan result without double-counting.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockTakeScanRequest' }
+      responses:
+        '200':
+          description: Scan recorded or recognized as identical retry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeScanResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions/{sessionId}/scans:
+    get:
+      tags: [StockTake]
+      operationId: listStockTakeScans
+      summary: List all recorded scans for a stock-taking session
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of scans
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockTakeScanItemResponse' }
+        '404':
+          description: Session not found
+  /v1/inventory/stock-take/sessions/{sessionId}/scans/batch:
+    post:
+      tags: [StockTake]
+      operationId: batchStockTakeScan
+      summary: Ingest an offline batch of queued mobile scans
+      description: >
+        Processes multiple queued scans with row-level deduplication.
+        Already-recorded scans in the batch are safely skipped without double-counting.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockTakeBatchScanRequest' }
+      responses:
+        '200':
+          description: Batch processed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeBatchScanResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions/{sessionId}/review:
+    get:
+      tags: [StockTake]
+      operationId: reviewStockTakeSession
+      summary: Review expected vs counted variances for a stock-taking session
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Review report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeReviewResponse' }
+        '404':
+          description: Session not found
+  /v1/inventory/stock-take/sessions/{sessionId}/reconcile:
+    post:
+      tags: [StockTake]
+      operationId: reconcileStockTakeSession
+      summary: Reconcile and submit counted quantities into the inventory count workflow
+      description: >
+        Aggregates session scans, processes uncounted items (ZERO or SKIP), and submits into M5's
+        tolerance evaluation and approval workflow.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockTakeReconcileRequest' }
+      responses:
+        '200':
+          description: Session reconciled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeReconcileResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     TaskId:
@@ -1947,3 +2134,141 @@ components:
         nearExpiryAlertsEmitted: { type: integer }
         slowMovingAlertsEmitted: { type: integer }
         totalEvaluated: { type: integer }
+    OpenStockTakeSessionRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+        scopeKind: { type: string, enum: [FULL, SKUS], default: FULL }
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+    StockTakeSessionResponse:
+      type: object
+      required: [sessionId, ownerEntityId, locationId, scopeKind, skuIds, status, expectedLotsCount, totalScansCount, totalCountedUnits]
+      properties:
+        sessionId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        scopeKind: { type: string, enum: [FULL, SKUS] }
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+        status: { type: string, enum: [SCHEDULED, COUNTING, VARIANCE_REVIEW, CLOSED] }
+        startedAt: { type: string, format: date-time }
+        startedBy: { type: string, format: uuid }
+        expectedLotsCount: { type: integer }
+        totalScansCount: { type: integer }
+        totalCountedUnits: { type: number }
+    StockTakeScanRequest:
+      type: object
+      required: [quantity]
+      properties:
+        scanId: { type: string, format: uuid, description: Client-generated UUID for offline deduplication }
+        barcode: { type: string, maxLength: 100 }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string, maxLength: 50 }
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        quantity: { type: number, minimum: 0.001 }
+        scannedAt: { type: string, format: date-time }
+        deviceId: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 500 }
+    StockTakeScanResponse:
+      type: object
+      required: [scanId, skuId, skuCode, skuNameEn, batchId, condition, quantity, totalCountedForLot, wasDuplicate]
+      properties:
+        scanId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        quantity: { type: number }
+        totalCountedForLot: { type: number }
+        wasDuplicate: { type: boolean }
+    StockTakeScanItemResponse:
+      type: object
+      required: [scanId, sessionId, scannedCode, skuId, skuCode, skuNameEn, batchId, condition, countedQty, scannedAt]
+      properties:
+        scanId: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        scannedCode: { type: string }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        countedQty: { type: number }
+        scannedAt: { type: string, format: date-time }
+        scannedBy: { type: string, format: uuid }
+        deviceId: { type: string }
+        notes: { type: string }
+    StockTakeBatchScanRequest:
+      type: object
+      required: [scans]
+      properties:
+        scans:
+          type: array
+          items: { $ref: '#/components/schemas/StockTakeScanRequest' }
+    StockTakeBatchScanResponse:
+      type: object
+      required: [sessionId, processedCount, duplicateCount, totalScansCount]
+      properties:
+        sessionId: { type: string, format: uuid }
+        processedCount: { type: integer }
+        duplicateCount: { type: integer }
+        totalScansCount: { type: integer }
+    StockTakeReviewResponse:
+      type: object
+      required: [sessionId, locationId, status, totalExpectedLots, totalCountedLots, matchedLots, discrepantLots, uncountedLots, totalVarianceQty, totalVarianceValue, lines]
+      properties:
+        sessionId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        status: { type: string }
+        totalExpectedLots: { type: integer }
+        totalCountedLots: { type: integer }
+        matchedLots: { type: integer }
+        discrepantLots: { type: integer }
+        uncountedLots: { type: integer }
+        totalVarianceQty: { type: number }
+        totalVarianceValue: { type: number }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StockTakeReviewLine' }
+    StockTakeReviewLine:
+      type: object
+      required: [skuId, skuCode, skuNameEn, condition, expectedQty, countedQty, varianceQty, unitCost, varianceValue, status]
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        skuNameSi: { type: string }
+        skuNameTa: { type: string }
+        barcode: { type: string }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        expectedQty: { type: number }
+        countedQty: { type: number }
+        varianceQty: { type: number }
+        unitCost: { type: number }
+        varianceValue: { type: number }
+        status: { type: string, enum: [MATCHED, OVER, SHORT, UNCOUNTED, UNEXPECTED] }
+    StockTakeReconcileRequest:
+      type: object
+      properties:
+        uncountedHandling: { type: string, enum: [ZERO, SKIP], default: ZERO }
+        skipReason: { type: string, maxLength: 500 }
+    StockTakeReconcileResponse:
+      type: object
+      required: [sessionId, status]
+      properties:
+        sessionId: { type: string, format: uuid }
+        status: { type: string, enum: [SCHEDULED, COUNTING, VARIANCE_REVIEW, CLOSED] }
+        outcome: { type: string, enum: [POSTED, APPROVED, REJECTED] }
+        reviewValue: { type: number }
+        reviewBand: { type: integer }

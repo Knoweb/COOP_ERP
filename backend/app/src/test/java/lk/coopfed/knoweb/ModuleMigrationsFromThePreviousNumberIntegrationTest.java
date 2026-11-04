@@ -200,7 +200,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 13)
                 .containsEntry("m3pricing", 11)
-                .containsEntry("m5inventory", 20)
+                .containsEntry("m5inventory", 21)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 // PGL-M3-01: m7customers V0006 adds regional registration & centralized loyalty.
                 // PGL-M3-03: m7customers V0007 adds loyalty rewards & insurance.
@@ -367,6 +367,16 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("received_qty", new java.math.BigDecimal("7.000"));
         // PGL-M2-01: m5inventory V0017 (reorder controls)
         // PGL-M2-03: m5inventory V0018 (stock repricing and waste/spoilage write-offs)
+        // PGL-M2-09: m5inventory V0021 (mobile stock-taking scans)
+        assertThat(admin.queryForObject(
+                        "select count(*) from information_schema.tables where table_schema = 'inventory'"
+                                + " and table_name = 'stock_take_scan'",
+                        Integer.class))
+                .isEqualTo(1);
+        assertThat(admin.queryForObject(
+                        "select relrowsecurity and relforcerowsecurity from pg_class where oid = 'inventory.stock_take_scan'::regclass",
+                        Boolean.class))
+                .isTrue();
         assertThat(admin.queryForObject(
                         "select count(*) from information_schema.tables where table_schema = 'inventory'"
                                 + " and table_name = 'stock_repricing'",

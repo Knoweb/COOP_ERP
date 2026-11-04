@@ -136,5 +136,15 @@
   "m5.opening.rejection_reason_required": "A reason of at least 5 characters is required to reject an opening balance",
   "m5.opening.cannot_reject_posted": "An opening balance that has already been posted cannot be rejected",
   "m5.opening.already_rejected": "This opening balance has already been rejected",
-  "m5.opening.excel_parse_error": "The opening stock spreadsheet could not be read or is invalid"
+  "m5.opening.excel_parse_error": "The opening stock spreadsheet could not be read or is invalid",
+  "m5.location.required": "A location is required",
+  "m5.count.in_review": "A stock count at this location is currently awaiting variance review or approval",
+  "m5.scan.quantity_invalid": "Counted quantity must be greater than zero with at most 3 decimal places",
+  "m5.stock_take.scan_conflict": "A conflicting scan with the same identifier has already been recorded",
+  "m5.stock_take.sku_not_found": "The scanned barcode or SKU could not be identified",
+  "m5.stock_take.sku_required": "A barcode, SKU identifier, or SKU code is required",
+  "m5.stock_take.scans_empty": "The batch contains no scan entries",
+  "m5.stock_take.batch_too_large": "Batch exceeds the maximum allowed size of 1000 scans",
+  "m5.stock_take.uncounted_handling_invalid": "Uncounted handling must be either ZERO or SKIP",
+  "m5.stock_take.skip_reason_required": "A reason is required when skipping uncounted items"
 }
