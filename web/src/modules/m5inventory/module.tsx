@@ -22,6 +22,7 @@ import { ExpiryListPage } from "./ExpiryListPage";
 import { LossShrinkagePage } from "./LossShrinkagePage";
 import { InventoryPoliciesPage } from "./InventoryPoliciesPage";
 import { ReorderControlsPage } from "./ReorderControlsPage";
+import { MobileStockTakePage } from "./MobileStockTakePage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -47,6 +48,8 @@ export const inventoryModule: ModuleDefinition = {
     // the damage and expiry register, repacks.
     { path: "inventory/counts", element: <CountsPage /> },
     { path: "inventory/counts/:taskId", element: <CountPage /> },
+    { path: "inventory/stock-take", element: <MobileStockTakePage /> },
+    { path: "inventory/stock-take/:sessionId", element: <MobileStockTakePage /> },
     { path: "inventory/write-offs", element: <WriteOffsPage /> },
     { path: "inventory/write-offs/:writeOffId", element: <WriteOffPage /> },
     { path: "inventory/repacks", element: <RepacksPage /> },
@@ -93,6 +96,7 @@ export const inventoryModule: ModuleDefinition = {
     "shop.transfer.request",
     "mpcs.transfer.approve",
     "inv.count.schedule",
+    "shop.count.record",
     "inv.writeoff.request",
     "inv.writeoff.witness",
     "inv.writeoff.approve",
