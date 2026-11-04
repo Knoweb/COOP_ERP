@@ -158,13 +158,14 @@ class UomCataloguePostgresIntegrationTest extends PostgresIntegrationTest {
         // Define active unit
         defineHandler.handle(new DefineUom(TEST_UOM_CODE, "Test Unit", null, null, null, false), own(FEDERATION));
 
-        // Insert SKU using this UOM as base_uom_code
+        // Insert SKU using this UOM as base_uom_code with valid status 'LOCAL' (CHECK status IN ('DRAFT', 'LOCAL',
+        // 'SHARED', 'INACTIVE'))
         UUID skuId = UUID.fromString("0190e640-0000-7000-8000-000000000099");
         superuserJdbc()
                 .update(
                         """
                 insert into catalogue.sku (sku_id, sku_code, owner_entity_id, short_name_en, base_uom_code, tax_category_id, status)
-                values (?, 'T-SKU-UOM', ?, 'Test UOM SKU', ?, '00000000-0000-0000-0000-000000000100', 'ACTIVE')
+                values (?, 'T-SKU-UOM', ?, 'Test UOM SKU', ?, '00000000-0000-0000-0000-000000000100', 'LOCAL')
                 """,
                         skuId,
                         FEDERATION,
