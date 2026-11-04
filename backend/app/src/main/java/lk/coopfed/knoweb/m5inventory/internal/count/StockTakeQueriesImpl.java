@@ -25,8 +25,10 @@ import lk.coopfed.knoweb.m5inventory.query.StockTakeScanView;
 import lk.coopfed.knoweb.m5inventory.query.StockTakeSessionView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 class StockTakeQueriesImpl implements StockTakeQueries {
 
     private final CountStore countStore;
@@ -62,7 +64,7 @@ class StockTakeQueriesImpl implements StockTakeQueries {
     @Override
     public Optional<StockTakeSessionView> getSession(UUID sessionId, ScopeContext scope) {
         ControlPolicy.requireOwn(scope);
-        return countStore.lock(sessionId).map(this::toSessionView);
+        return stockTakeStore.findTask(sessionId).map(this::toSessionView);
     }
 
     private StockTakeSessionView toSessionView(CountStore.Task task) {
@@ -87,8 +89,8 @@ class StockTakeQueriesImpl implements StockTakeQueries {
     @Override
     public StockTakeReviewView getReview(UUID sessionId, ScopeContext scope) {
         ControlPolicy.requireOwn(scope);
-        CountStore.Task task = countStore
-                .lock(sessionId)
+        CountStore.Task task = stockTakeStore
+                .findTask(sessionId)
                 .orElseThrow(() -> new ProblemException("m5.count.not_found", Map.of("taskId", sessionId.toString())));
 
         List<CountStore.Lot> expectations = countStore.expectation(task.taskId());
@@ -224,8 +226,8 @@ class StockTakeQueriesImpl implements StockTakeQueries {
     @Override
     public List<StockTakeScanView> listScans(UUID sessionId, ScopeContext scope) {
         ControlPolicy.requireOwn(scope);
-        CountStore.Task task = countStore
-                .lock(sessionId)
+        CountStore.Task task = stockTakeStore
+                .findTask(sessionId)
                 .orElseThrow(() -> new ProblemException("m5.count.not_found", Map.of("taskId", sessionId.toString())));
 
         List<StockTakeStore.ScanRow> rows = stockTakeStore.scansForTask(task.taskId());

@@ -74,6 +74,35 @@ class StockTakeStore {
                 .findFirst();
     }
 
+    Optional<CountStore.Task> findTask(UUID taskId) {
+        return jdbc
+                .query(
+                        """
+                        select task_id, owner_entity_id, location_id, scope_kind, scope_sku_ids, status,
+                               submitted_by, review_value, review_band, started_at
+                          from inventory.count_task
+                         where task_id = ?
+                        """,
+                        (rs, n) -> {
+                            Array skus = rs.getArray("scope_sku_ids");
+                            OffsetDateTime startedAt = rs.getObject("started_at", OffsetDateTime.class);
+                            return new CountStore.Task(
+                                    rs.getObject("task_id", UUID.class),
+                                    rs.getObject("owner_entity_id", UUID.class),
+                                    rs.getObject("location_id", UUID.class),
+                                    rs.getString("scope_kind"),
+                                    skus == null ? List.of() : Arrays.asList((UUID[]) skus.getArray()),
+                                    rs.getString("status"),
+                                    rs.getObject("submitted_by", UUID.class),
+                                    rs.getBigDecimal("review_value"),
+                                    (Integer) rs.getObject("review_band"),
+                                    startedAt == null ? null : startedAt.toInstant());
+                        },
+                        taskId)
+                .stream()
+                .findFirst();
+    }
+
     Optional<ScanRow> findScan(UUID scanId) {
         return jdbc
                 .query(

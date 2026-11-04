@@ -128,6 +128,7 @@ class BatchStockTakeScanHandler implements Handles<BatchStockTakeScan, StockTake
 
                     if (sameTask && sameLocation && sameCondition && sameQty && sameSku && sameBatch && sameCode) {
                         duplicate++;
+                        processed++;
                         continue;
                     }
                     throw new ProblemException(

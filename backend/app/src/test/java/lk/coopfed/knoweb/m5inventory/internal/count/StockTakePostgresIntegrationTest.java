@@ -415,6 +415,7 @@ class StockTakePostgresIntegrationTest extends PostgresIntegrationTest {
     @DisplayName("Reconcile with variance beyond tolerance transitions session to VARIANCE_REVIEW for supervisor")
     void reconcileWithLargeVarianceTransitionsToVarianceReview() {
         ScopeContext scope = at(MPCS, stores);
+        post(MovementType.SALE, dhalBatch, "-9", null);
         UUID sessionId = openSession.handle(new OpenStockTakeSession(stores, "FULL", null), scope);
         linkBarcode("479000100001", rice, riceBatch);
 

@@ -643,7 +643,7 @@ class StockTakeHandlerTest {
             StockTakeBatchScanResult result =
                     batchHandler.handle(new BatchStockTakeScan(taskId, List.of(s1, s2)), OWN_SCOPE);
 
-            assertThat(result.processedCount()).isEqualTo(1);
+            assertThat(result.processedCount()).isEqualTo(2);
             assertThat(result.duplicateCount()).isEqualTo(1);
             verify(audit).record(eq("STOCK_TAKE_BATCH_SCANNED"), any(), any(), any(), eq(OWN_SCOPE));
         }
