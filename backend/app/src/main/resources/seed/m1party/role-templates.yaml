@@ -102,6 +102,7 @@ templates:
       - "cat.tag.manage"
       - "cat.tag.govern"
       - "cat.department.manage"
+      - "cat.uom.manage"
   # M4 Trading Documents (24A section 8): the two desks of the demo of 27 September 2026. A
   # buyer's stores role drafts and submits orders and confirms what arrives at its warehouse; a
   # seller's sales role accepts orders, issues and dispatches delivery notes and issues invoices.
