@@ -10463,7 +10463,8 @@ textarea {
 }
 
 /* 2. Unified Dropdowns in Catalogue & Form Fields (Wine accent line, pink hover, checkmark) */
-.catalogue-dropdown-native {
+.catalogue-dropdown-native,
+.dropdown-select__native {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
