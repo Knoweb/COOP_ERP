@@ -44,6 +44,7 @@ interface MarkdownQueueItem {
   discountedPrice?: number;
   matchedRule?: Rule;
   status: string;
+  isInventoryLot?: boolean;
 }
 
 
@@ -176,7 +177,8 @@ export function MarkdownQueuePage() {
               (matchedRule?.benefit.kind === "PERCENT_OFF" ? Number(matchedRule.benefit.value) : undefined),
             discountedPrice: matchedDiscount?.discountedPrice,
             matchedRule,
-            status: matchedDiscount?.status ?? (matchedRule ? "ACTIVE" : "PENDING")
+            status: matchedDiscount?.status ?? (matchedRule ? "ACTIVE" : "PENDING"),
+            isInventoryLot: true
           };
         });
 
@@ -202,6 +204,7 @@ export function MarkdownQueuePage() {
           status: d.status
         }));
 
+      lotItems.sort((a, b) => (a.daysRemaining ?? Infinity) - (b.daysRemaining ?? Infinity));
       return [...lotItems, ...slowMovingItems];
     }
 
@@ -233,7 +236,7 @@ export function MarkdownQueuePage() {
       items = items.filter((i) => i.reason === reasonFilter);
     }
     if (statusFilter !== "ALL") {
-      items = items.filter((i) => i.status === statusFilter);
+      items = items.filter((i) => i.isInventoryLot || i.status === statusFilter);
     }
 
     const q = searchQuery.trim().toLowerCase();
@@ -241,12 +244,27 @@ export function MarkdownQueuePage() {
 
     return items.filter((i) => {
       const matchSku = i.skuCode ? i.skuCode.toLowerCase().includes(q) : false;
+      const matchSkuId = i.skuId ? i.skuId.toLowerCase().includes(q) : false;
       const matchBatch = i.batchNo ? i.batchNo.toLowerCase().includes(q) : false;
       const matchCondition = i.condition ? i.condition.toLowerCase().includes(q) : false;
       const matchReason = i.reason ? i.reason.toLowerCase().includes(q) : false;
       const matchTier = i.tierOrClassification ? i.tierOrClassification.toLowerCase().includes(q) : false;
       const matchRule = i.matchedRule?.name ? i.matchedRule.name.toLowerCase().includes(q) : false;
-      return matchSku || matchBatch || matchCondition || matchReason || matchTier || matchRule;
+      const matchExpiry = i.expiryDate ? i.expiryDate.toLowerCase().includes(q) : false;
+      const matchDays = i.daysRemaining != null ? String(i.daysRemaining).includes(q) : false;
+      const matchQty = String(i.qtyOnHand).includes(q);
+      return (
+        matchSku ||
+        matchSkuId ||
+        matchBatch ||
+        matchCondition ||
+        matchReason ||
+        matchTier ||
+        matchRule ||
+        matchExpiry ||
+        matchDays ||
+        matchQty
+      );
     });
   }, [queueItems, reasonFilter, statusFilter, searchQuery]);
 
