@@ -16,6 +16,8 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.CreditNoteIssued;
+import lk.coopfed.knoweb.m4trading.api.DebitNoteIssued;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteDispatched;
 import lk.coopfed.knoweb.m4trading.api.GrnConfirmed;
 import lk.coopfed.knoweb.m4trading.api.GrnLineConfirmed;
@@ -27,6 +29,8 @@ import lk.coopfed.knoweb.m4trading.api.OrderCancelled;
 import lk.coopfed.knoweb.m4trading.api.OrderLineSummary;
 import lk.coopfed.knoweb.m4trading.api.OrderRejected;
 import lk.coopfed.knoweb.m4trading.api.OrderSubmitted;
+import lk.coopfed.knoweb.m4trading.api.PaymentReceiptRecorded;
+import lk.coopfed.knoweb.m4trading.api.RecordPaymentReceipt;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness.Delivery;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
@@ -222,6 +226,108 @@ class TradeProjectionPostgresIntegrationTest extends PostgresIntegrationTest {
      * Wave 2, M8-03: a second dispute after a resolution is a row of its own (the table is keyed
      * by the event), and the exception queue takes the latest: the invoice is disputed again.
      */
+    @Test
+    void aDebitNoteIncreasesOutstandingForBothParties() {
+        UUID seller = Ids.next();
+        UUID buyer = Ids.next();
+        UUID invoiceId = Ids.next();
+        UUID debitNoteId = Ids.next();
+        Instant time = Instant.parse("2026-10-15T03:00:00Z");
+
+        Delivery issued =
+                harness.event(InvoiceIssued.TYPE, seller, time, invoice(invoiceId, seller, buyer, null, "100.00"));
+
+        Delivery debit = harness.event(
+                DebitNoteIssued.TYPE,
+                seller,
+                time.plusSeconds(60),
+                new DebitNoteIssued(
+                        debitNoteId,
+                        "DN2-001",
+                        invoiceId,
+                        seller,
+                        buyer,
+                        new BigDecimal("20.00"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("20.00"),
+                        "hash"));
+
+        harness.deliver(issued, projection::on);
+        harness.deliver(debit, projection::on);
+        harness.deliver(debit, projection::on);
+
+        Integer debitFacts = admin.queryForObject(
+                """
+                select count(*)
+                  from reporting.trade_settlement_fact
+                 where invoice_id = ? and kind = 'DEBIT'
+                """,
+                Integer.class,
+                invoiceId);
+
+        assertThat(debitFacts).isEqualTo(1);
+
+        Dashboard sellerDashboard = queries.dashboard(ScopeContext.dev(Ids.next(), seller, null));
+        Dashboard buyerDashboard = queries.dashboard(ScopeContext.dev(Ids.next(), buyer, null));
+
+        assertThat(tile(sellerDashboard, "receivables")).isEqualByComparingTo("120.00");
+        assertThat(tile(buyerDashboard, "payables")).isEqualByComparingTo("120.00");
+        // A credit and a payment reduce the amount due, even after a debit.
+        Delivery credit = harness.event(
+                CreditNoteIssued.TYPE,
+                seller,
+                time.plusSeconds(120),
+                new CreditNoteIssued(
+                        Ids.next(),
+                        "CN-RPT-01",
+                        invoiceId,
+                        null,
+                        seller,
+                        buyer,
+                        new BigDecimal("15.00"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("15.00"),
+                        "hash"));
+
+        Delivery payment = harness.event(
+                PaymentReceiptRecorded.TYPE,
+                seller,
+                time.plusSeconds(180),
+                new PaymentReceiptRecorded(
+                        Ids.next(),
+                        "PAY-RPT-01",
+                        Ids.next(),
+                        seller,
+                        buyer,
+                        "TRANSFER",
+                        new BigDecimal("25.00"),
+                        LocalDate.of(2026, 10, 15),
+                        List.of(new RecordPaymentReceipt.Settlement(invoiceId, new BigDecimal("25.00"))),
+                        BigDecimal.ZERO));
+
+        harness.deliver(credit, projection::on);
+        harness.deliver(payment, projection::on);
+
+        // Retries must not count either settlement twice.
+        harness.deliver(credit, projection::on);
+        harness.deliver(payment, projection::on);
+
+        assertThat(admin.queryForList(
+                        """
+                        select kind from reporting.trade_settlement_fact
+                         where invoice_id = ?
+                         order by kind
+                        """,
+                        String.class,
+                        invoiceId))
+                .containsExactly("CREDIT", "DEBIT", "PAYMENT");
+
+        assertThat(tile(queries.dashboard(ScopeContext.dev(Ids.next(), seller, null)), "receivables"))
+                .isEqualByComparingTo("80.00");
+        assertThat(tile(queries.dashboard(ScopeContext.dev(Ids.next(), buyer, null)), "payables"))
+                .isEqualByComparingTo("80.00");
+    }
+
     @Test
     void aSecondDisputeAfterAResolutionIsKeptAndTheQueueShowsTheInvoiceDisputed() {
         UUID seller = Ids.next();

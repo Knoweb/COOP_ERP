@@ -29,22 +29,25 @@ final class TradeSql {
 
     /**
      * Every issued invoice the caller reads, once, with what was paid (receipts less the reversals
-     * of bounced cheques) and credited against it, and what is still due (never below zero):
+     * of bounced cheques), credits and debits, and what is still due (never below zero):
      * columns document_id, doc_number, business_date (the tax point), due_date, seller_entity_id,
-     * buyer_entity_id, gross, paid, credited, outstanding.
+     * buyer_entity_id, gross, paid, credited, debited, outstanding.
      */
     static final String INVOICES =
             """
             (select i.document_id, i.doc_number, i.business_date, i.due_date, i.seller_entity_id,
                     i.buyer_entity_id, i.gross,
                     coalesce(s.paid, 0) as paid, coalesce(s.credited, 0) as credited,
-                    greatest(coalesce(i.gross, 0) - coalesce(s.paid, 0) - coalesce(s.credited, 0), 0) as outstanding
+                    coalesce(s.debited, 0) as debited,
+                    greatest(coalesce(i.gross, 0) + coalesce(s.debited, 0)
+                              - coalesce(s.paid, 0) - coalesce(s.credited, 0), 0) as outstanding
                from (select distinct on (document_id) * from reporting.trade_document_event
                       where doc_type = 'INVOICE' and event_kind = 'ISSUED'
                       order by document_id, owner_entity_id, occurred_at desc, event_id desc) i
                left join (select invoice_id,
-                                 sum(case when kind = 'CREDIT' then 0 else amount end) as paid,
-                                 sum(case when kind = 'CREDIT' then amount else 0 end) as credited
+                                 sum(case when kind in ('PAYMENT', 'REVERSAL') then amount else 0 end) as paid,
+                                 sum(case when kind = 'CREDIT' then amount else 0 end) as credited,
+                                 sum(case when kind = 'DEBIT' then amount else 0 end) as debited
                             from reporting.trade_settlement_fact group by invoice_id) s
                       on s.invoice_id = i.document_id)
             """;
