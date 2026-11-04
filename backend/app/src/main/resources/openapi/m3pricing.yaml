@@ -351,6 +351,89 @@ paths:
               schema: { $ref: '#/components/schemas/RetailPriceResponse' }
         '404':
           description: The location or the SKU is not visible in the caller's scope
+  /v1/pricing/customer/lookup:
+    get:
+      tags: [Pricing]
+      operationId: lookupCustomerPrice
+      summary: Customer price lookup for an item at a shop location
+      description: >
+        Customer-facing price lookup that resolves the current permitted public retail price
+        for a product at a given shop using the effective retail price resolver. Internal cost,
+        margin, batch references, supplier identity, and restricted owner data are strictly excluded.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: barcode
+          required: false
+          schema: { type: string, maxLength: 64 }
+        - in: query
+          name: skuCode
+          required: false
+          schema: { type: string, maxLength: 60 }
+        - in: query
+          name: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: uom
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: date
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The customer-safe public price
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPriceLookupResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: Location or product not found
+  /v1/pricing/customer/search:
+    get:
+      tags: [Pricing]
+      operationId: searchCustomerPrices
+      summary: Search current permitted product prices at a shop location for customer portal
+      description: >
+        Customer-facing search across catalog items at a given shop location. Returns permitted
+        public retail prices with zero internal cost or margin data.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: date
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Matching product public prices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CustomerPriceLookupResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
   /v1/pricing/advisory-lines:
     get:
       tags: [Pricing]
@@ -901,6 +984,22 @@ components:
         policy: { type: string, enum: [AUTO_LOWEST, BARCODE_RESOLVED, PICKER] }
         batchId: { type: [string, 'null'], format: uuid }
         engineVersion: { type: string }
+    CustomerPriceLookupResponse:
+      type: object
+      required: [skuId, skuCode, productName, uom, publicPrice, currency, isAvailable, isPriceControlled, locationId]
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        productName: { type: string }
+        uom: { type: string }
+        publicPrice: { type: number, description: 'Current permitted retail price, tax-inclusive' }
+        currency: { type: string, default: 'LKR' }
+        isAvailable: { type: boolean }
+        controlPrice: { type: [number, 'null'], description: 'Gazetted maximum retail price ceiling if applicable' }
+        isPriceControlled: { type: boolean }
+        locationId: { type: string, format: uuid }
+        locationName: { type: [string, 'null'] }
+        effectiveDate: { type: [string, 'null'], format: date }
     EnterControlPriceRequest:
       type: object
       required: [skuId, ceilingPrice, ceilingUomCode, effectiveFrom, gazetteReference]
