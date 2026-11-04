@@ -11,6 +11,7 @@ import { PricingPage } from "./PricingPage";
 import { PricingReviewsPage } from "./PricingReviewsPage";
 import { RulesPage } from "./RulesPage";
 import { ShelfListPage } from "./ShelfListPage";
+import { CustomerPriceLookupPage } from "./CustomerPriceLookupPage";
 import { ShelfPricesPage } from "./ShelfPricesPage";
 import { TradePriceListPage } from "./TradePriceListPage";
 
@@ -24,6 +25,8 @@ export const pricingModule: ModuleDefinition = {
     { path: "pricing", element: <PricingPage /> },
     { path: "pricing/lists/:listId", element: <TradePriceListPage /> },
     { path: "pricing/shelf", element: <ShelfPricesPage /> },
+    { path: "pricing/customer-lookup", element: <CustomerPriceLookupPage /> },
+    { path: "pricing/portal", element: <CustomerPriceLookupPage /> },
     { path: "pricing/shelf/:listId", element: <ShelfListPage /> },
     { path: "pricing/gazette", element: <GazettePage /> },
     { path: "pricing/mrp-policy", element: <MrpPolicyPage /> },

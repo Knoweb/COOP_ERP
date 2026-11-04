@@ -132,4 +132,27 @@ public interface PricingQueries {
      */
     List<ExpirySlowMovingDiscountView> listExpirySlowMovingDiscounts(
             UUID locationId, String reason, String status, ScopeContext scope);
+
+    // ---- M3-08: Customer Price Lookup Web Portal ---------------------------------------------
+
+    /**
+     * Customer price lookup for an item at a shop location (M3-08): resolves the permitted public
+     * retail price using the core engine effective price resolver. Strictly excludes internal cost,
+     * margins, batch references, and restricted owner data.
+     */
+    Optional<CustomerPriceLookupView> lookupCustomerPrice(
+            UUID locationId,
+            UUID skuId,
+            String barcode,
+            String skuCode,
+            String query,
+            String uom,
+            LocalDate date,
+            ScopeContext scope);
+
+    /**
+     * Customer price search for items at a shop location (M3-08).
+     */
+    List<CustomerPriceLookupView> searchCustomerPrices(
+            UUID locationId, String query, LocalDate date, int limit, ScopeContext scope);
 }
