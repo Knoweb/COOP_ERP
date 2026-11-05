@@ -242,13 +242,25 @@ export function NewOpeningBalancePage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/inventory">
-        <svg viewBox="0 0 24 24">
-          <path d="M15 18l-6-6 6-6" />
-          <path d="M9 12h10" />
-        </svg>
-        {t("inventory.back").text}
-      </Link>
+      <div>
+        <Link className="back-pill-btn" to="/inventory">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("inventory.back").text}
+        </Link>
+      </div>
       <h1>{t("inventory.opening.new.title").text}</h1>
 
       <div className="opening-tabs" role="tablist">

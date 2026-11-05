@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,9 +22,14 @@ import lk.coopfed.knoweb.engine.TradePriceResolver;
 import lk.coopfed.knoweb.kernel.api.AuditReviewReader;
 import lk.coopfed.knoweb.kernel.api.AuditReviewRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.LocationView;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
+import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
+import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.internal.adjustment.AdjustmentTypeStore;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
@@ -35,6 +41,7 @@ import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.AdjustmentTypeView;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.CustomerPriceLookupView;
 import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
@@ -72,10 +79,12 @@ class PricingQueriesImpl implements PricingQueries {
     private static final int REVIEW_PAGE = 100;
 
     private final AuditReviewReader auditReviews;
+    private final PartyQueries party;
     private final CatalogueQueries catalogue;
     private final AdjustmentTypeStore adjustmentTypes;
     private final LabelJobStore labelJobs;
     private final ExpirySlowMovingDiscountCalculator expiryDiscountCalculator;
+    private final Clock clock;
 
     @SuppressWarnings("java:S107") // the inputs of the central resolution; a query service only reads
     PricingQueriesImpl(
@@ -87,10 +96,14 @@ class PricingQueriesImpl implements PricingQueries {
             RetailPriceResolution retail,
             ObjectMapper mapper,
             AuditReviewReader auditReviews,
+            PartyQueries party,
             CatalogueQueries catalogue,
             AdjustmentTypeStore adjustmentTypes,
             LabelJobStore labelJobs,
-            ExpirySlowMovingDiscountCalculator expiryDiscountCalculator) {
+            ExpirySlowMovingDiscountCalculator expiryDiscountCalculator,
+            Clock clock) {
+        this.clock = clock;
+        this.party = party;
         this.catalogue = catalogue;
         this.store = store;
         this.relationships = relationships;
@@ -315,5 +328,136 @@ class PricingQueriesImpl implements PricingQueries {
     public List<ExpirySlowMovingDiscountView> listExpirySlowMovingDiscounts(
             UUID locationId, String reason, String status, ScopeContext scope) {
         return expiryDiscountCalculator.calculate(locationId, reason, status, scope);
+    }
+
+    @Override
+    public Optional<CustomerPriceLookupView> lookupCustomerPrice(
+            UUID locationId,
+            UUID skuId,
+            String barcode,
+            String skuCode,
+            String query,
+            String uom,
+            LocalDate date,
+            ScopeContext scope) {
+        if (locationId == null) {
+            return Optional.empty();
+        }
+        Optional<LocationView> location = party.getLocation(locationId, scope);
+        if (location.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<SkuView> skuOpt = Optional.empty();
+        if (skuId != null) {
+            skuOpt = catalogue.getSku(skuId, scope);
+        } else if (barcode != null && !barcode.isBlank()) {
+            skuOpt = catalogue
+                    .lookupByBarcode(new BarcodeLookup(barcode, null, null, null, null, locationId), scope)
+                    .flatMap(res -> catalogue.getSku(res.skuId(), scope));
+        } else if (skuCode != null && !skuCode.isBlank()) {
+            SkuPage page = catalogue.listSkus(new SkuFilter(null, skuCode, "en", 0, 10), scope);
+            skuOpt = page.items().stream()
+                    .filter(s -> skuCode.equalsIgnoreCase(s.skuCode()))
+                    .findFirst()
+                    .or(() -> page.items().stream().findFirst());
+        } else if (query != null && !query.isBlank()) {
+            SkuPage page = catalogue.searchSku(new SkuFilter(null, query, "en", 0, 5), scope);
+            skuOpt = page.items().stream().findFirst();
+        }
+
+        if (skuOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        SkuView sku = skuOpt.get();
+        String uomCode = (uom != null && !uom.isBlank()) ? uom : sku.baseUomCode();
+        LocalDate targetDate = (date != null) ? date : LocalDate.now(clock);
+
+        Optional<RetailPrice> resolved =
+                retail.resolve(locationId, sku.skuId(), uomCode, BigDecimal.ONE, targetDate, scope);
+        if (resolved.isEmpty()) {
+            return Optional.empty();
+        }
+
+        RetailPrice price = resolved.get();
+        BigDecimal publicPrice = price.sellable() && price.unitPrice() != null
+                ? price.unitPrice()
+                : (price.listPrice() != null ? price.listPrice() : BigDecimal.ZERO);
+        boolean isAvailable = price.sellable() && price.unitPrice() != null;
+        boolean isPriceControlled = "CONTROL_PRICE".equals(price.capReason()) || price.controlPrice() != null;
+        String productName = (sku.nameEn() != null && !sku.nameEn().isBlank()) ? sku.nameEn() : sku.skuCode();
+
+        return Optional.of(new CustomerPriceLookupView(
+                sku.skuId(),
+                sku.skuCode(),
+                productName,
+                uomCode,
+                publicPrice,
+                "LKR",
+                isAvailable,
+                price.controlPrice(),
+                isPriceControlled,
+                locationId,
+                location.get().nameEn(),
+                targetDate));
+    }
+
+    @Override
+    public List<CustomerPriceLookupView> searchCustomerPrices(
+            UUID locationId, String query, LocalDate date, int limit, ScopeContext scope) {
+        if (locationId == null) {
+            return List.of();
+        }
+        Optional<LocationView> location = party.getLocation(locationId, scope);
+        if (location.isEmpty()) {
+            return List.of();
+        }
+
+        int max = limit > 0 ? Math.min(limit, 100) : 20;
+        List<SkuView> skus;
+        if (query != null && !query.isBlank()) {
+            SkuPage searchPage = catalogue.searchSku(new SkuFilter(null, query, "en", 0, max), scope);
+            skus = searchPage.items();
+            if (skus.isEmpty()) {
+                SkuPage listPage = catalogue.listSkus(new SkuFilter(null, query, "en", 0, max), scope);
+                skus = listPage.items();
+            }
+        } else {
+            SkuPage listPage = catalogue.listSkus(new SkuFilter(null, null, "en", 0, max), scope);
+            skus = listPage.items();
+        }
+
+        LocalDate targetDate = (date != null) ? date : LocalDate.now(clock);
+        List<CustomerPriceLookupView> results = new ArrayList<>();
+
+        for (SkuView sku : skus) {
+            Optional<RetailPrice> resolved =
+                    retail.resolve(locationId, sku.skuId(), sku.baseUomCode(), BigDecimal.ONE, targetDate, scope);
+            if (resolved.isPresent()) {
+                RetailPrice price = resolved.get();
+                BigDecimal publicPrice = price.sellable() && price.unitPrice() != null
+                        ? price.unitPrice()
+                        : (price.listPrice() != null ? price.listPrice() : BigDecimal.ZERO);
+                boolean isAvailable = price.sellable() && price.unitPrice() != null;
+                boolean isPriceControlled = "CONTROL_PRICE".equals(price.capReason()) || price.controlPrice() != null;
+                String productName = (sku.nameEn() != null && !sku.nameEn().isBlank()) ? sku.nameEn() : sku.skuCode();
+
+                results.add(new CustomerPriceLookupView(
+                        sku.skuId(),
+                        sku.skuCode(),
+                        productName,
+                        sku.baseUomCode(),
+                        publicPrice,
+                        "LKR",
+                        isAvailable,
+                        price.controlPrice(),
+                        isPriceControlled,
+                        locationId,
+                        location.get().nameEn(),
+                        targetDate));
+            }
+        }
+        return results;
     }
 }

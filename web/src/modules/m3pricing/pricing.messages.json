@@ -269,7 +269,21 @@
     "pricing.markdown.column.discount": "Markdown",
     "pricing.markdown.column.discounted_price": "Discounted price",
     "pricing.markdown.column.status": "Status",
-    "pricing.markdown.sku_level": "SKU Level"
+    "pricing.markdown.sku_level": "SKU Level",
+    "pricing.tab.customer_lookup": "Customer prices",
+    "pricing.customer.portal_title": "Customer Price Lookup",
+    "pricing.customer.portal_intro": "Official permitted retail prices for cooperative federation shops. Verified against gazetted maximum price ceilings.",
+    "pricing.customer.shop_label": "Select Shop Location",
+    "pricing.customer.search_placeholder": "Search by product name, SKU code, or scan barcode…",
+    "pricing.customer.search_button": "Search prices",
+    "pricing.customer.no_results": "No products found matching your search at this shop.",
+    "pricing.customer.verified_price": "Verified Retail Price",
+    "pricing.customer.control_price_notice": "Government Gazetted Maximum Price: {price}",
+    "pricing.customer.available": "Available",
+    "pricing.customer.unavailable": "Currently Unavailable",
+    "pricing.customer.privacy_banner": "Consumer Notice: Displayed prices are final and tax-inclusive. Internal wholesale margins and commercial costs are protected.",
+    "pricing.customer.choose_shop": "Choose a shop…",
+    "pricing.customer.per_unit": "per {unit}"
   },
   "si": {
     "pricing.labels.title": "රාක්ක ලේබල් මුද්‍රණය",
@@ -541,7 +555,21 @@
     "pricing.markdown.column.discount": "මිල අඩුකිරීම",
     "pricing.markdown.column.discounted_price": "වට්ටම් කළ මිල",
     "pricing.markdown.column.status": "තත්ත්වය",
-    "pricing.markdown.sku_level": "SKU මට්ටම"
+    "pricing.markdown.sku_level": "SKU මට්ටම",
+    "pricing.tab.customer_lookup": "පාරිභෝගික මිල",
+    "pricing.customer.portal_title": "පාරිභෝගික මිල පිරික්සුම",
+    "pricing.customer.portal_intro": "සමූපකාර සමිති වෙළඳසැල් සඳහා වන නිල අවසරලත් සිල්ලර මිල ගණන්. ගැසට් කරන ලද උපරිම මිල සීමාවන් සමඟ තහවුරු කර ඇත.",
+    "pricing.customer.shop_label": "වෙළඳසැල් ස්ථානය තෝරන්න",
+    "pricing.customer.search_placeholder": "භාණ්ඩයේ නම, කේතය හෝ තීරු කේතය (බාර්කෝඩ්) මඟින් සොයන්න…",
+    "pricing.customer.search_button": "මිල සොයන්න",
+    "pricing.customer.no_results": "මෙම වෙළඳසැලේ ඔබ සෙවූ භාණ්ඩ හමු නොවීය.",
+    "pricing.customer.verified_price": "තහවුරු කළ සිල්ලර මිල",
+    "pricing.customer.control_price_notice": "රජයේ ගැසට් කළ උපරිම සිල්ලර මිල: {price}",
+    "pricing.customer.available": "ලබාගත හැක",
+    "pricing.customer.unavailable": "දැනට නොමැත",
+    "pricing.customer.privacy_banner": "පාරිභෝගික දැනුම්දීම: ප්‍රදර්ශනය කර ඇති මිල ගණන් බදු ඇතුළත් අවසාන මිල වේ. අභ්‍යන්තර තොග සහ වාණිජ පිරිවැය ආරක්ෂා කර ඇත.",
+    "pricing.customer.choose_shop": "වෙළඳසැලක් තෝරන්න…",
+    "pricing.customer.per_unit": "{unit} සඳහා"
   },
   "ta": {
     "pricing.labels.title": "அலமாரி லேபிள் அச்சிடுதல்",
@@ -813,6 +841,20 @@
     "pricing.markdown.column.discount": "விலைக் குறைப்பு",
     "pricing.markdown.column.discounted_price": "தள்ளுபடி விலை",
     "pricing.markdown.column.status": "நிலை",
-    "pricing.markdown.sku_level": "SKU நிலை"
+    "pricing.markdown.sku_level": "SKU நிலை",
+    "pricing.tab.customer_lookup": "வாடிக்கையாளர் விலைகள்",
+    "pricing.customer.portal_title": "வாடிக்கையாளர் விலை தேடல்",
+    "pricing.customer.portal_intro": "கூட்டுறவு சம்மேளன கடைகளுக்கான உத்தியோகபூர்வ அனுமதிக்கப்பட்ட சில்லறை விலைகள். வர்த்தமானி அதிகபட்ச விலை வரம்புகளுக்கு எதிராக சரிபார்க்கப்பட்டது.",
+    "pricing.customer.shop_label": "கடை அமைவிடத்தைத் தேர்ந்தெடுக்கவும்",
+    "pricing.customer.search_placeholder": "பொருளின் பெயர், SKU குறியீடு அல்லது பார்கோடை ஸ்கேன் செய்து தேடுங்கள்…",
+    "pricing.customer.search_button": "விலைகளைத் தேடுங்கள்",
+    "pricing.customer.no_results": "இந்தக் கடையில் உங்கள் தேடலுக்குப் பொருந்தக்கூடிய தயாரிப்புகள் எதுவும் இல்லை.",
+    "pricing.customer.verified_price": "சரிபார்க்கப்பட்ட சில்லறை விலை",
+    "pricing.customer.control_price_notice": "அரசாங்க வர்த்தமானி அதிகபட்ச விலை: {price}",
+    "pricing.customer.available": "கிடைக்கக்கூடியது",
+    "pricing.customer.unavailable": "தற்போது கிடைக்கவில்லை",
+    "pricing.customer.privacy_banner": "நுகர்வோர் அறிவிப்பு: காட்டப்படும் விலைகள் இறுதியானது மற்றும் வரி உள்ளடக்கியது. உள் மொத்த விற்பனை வரம்புகள் மற்றும் வணிக செலவுகள் பாதுகாக்கப்படுகின்றன.",
+    "pricing.customer.choose_shop": "ஒரு கடையைத் தேர்ந்தெடுக்கவும்…",
+    "pricing.customer.per_unit": "ஒரு {unit} க்கு"
   }
 }

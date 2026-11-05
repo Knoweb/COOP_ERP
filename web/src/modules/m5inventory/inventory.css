@@ -1703,3 +1703,228 @@
   font-size: var(--font-size-xs);
   margin-bottom: var(--space-half);
 }
+
+/* ---- Mobile Stock-Taking (M3-09) ---------------------------------------- */
+
+.mobile-stock-take-page {
+  max-width: var(--page-max-width);
+}
+
+.mobile-stock-take-status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mobile-stock-take-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.mobile-stock-take-badge--online {
+  background-color: var(--color-issued-bg);
+  color: var(--color-issued-text);
+  border: var(--border-width) solid var(--color-issued-text);
+}
+
+.mobile-stock-take-badge--offline {
+  background-color: var(--color-disputed-bg);
+  color: var(--color-disputed-text);
+  border: var(--border-width) solid var(--color-disputed-text);
+}
+
+.mobile-stock-take-queue-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background-color: var(--color-disputed-bg);
+  border: var(--border-width) solid var(--color-disputed-text);
+  border-radius: var(--radius);
+  color: var(--color-disputed-text);
+  margin-bottom: var(--space-3);
+}
+
+.mobile-stock-take-queue-text {
+  font-size: var(--font-size-sm);
+}
+
+.mobile-stock-take-alert {
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-3);
+}
+
+.mobile-stock-take-alert--info {
+  background-color: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
+}
+
+.mobile-stock-take-alert--warning {
+  background-color: var(--color-disputed-bg);
+  border: var(--border-width) solid var(--color-disputed-text);
+  color: var(--color-disputed-text);
+}
+
+.mobile-stock-take-card {
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.mobile-stock-take-empty-notice {
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: var(--font-size-sm);
+}
+
+.mobile-stock-take-session-card {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.mobile-stock-take-session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.mobile-stock-take-session-id {
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.mobile-stock-take-chip {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.mobile-stock-take-chip--counting {
+  background-color: var(--color-draft-bg);
+  color: var(--color-draft-text);
+  border-color: var(--color-draft-text);
+}
+
+.mobile-stock-take-chip--good,
+.mobile-stock-take-chip--matched {
+  background-color: var(--color-issued-bg);
+  color: var(--color-issued-text);
+  border-color: var(--color-issued-text);
+}
+
+.mobile-stock-take-chip--damaged,
+.mobile-stock-take-chip--discrepant,
+.mobile-stock-take-chip--short,
+.mobile-stock-take-chip--unexpected {
+  background-color: var(--color-alert-bg);
+  color: var(--color-alert-text);
+  border-color: var(--color-alert-text);
+}
+
+.mobile-stock-take-chip--over,
+.mobile-stock-take-chip--uncounted {
+  background-color: var(--color-disputed-bg);
+  color: var(--color-disputed-text);
+  border-color: var(--color-disputed-text);
+}
+
+.mobile-stock-take-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2), 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.mobile-stock-take-kpi {
+  padding: var(--space-3);
+  background-color: var(--color-surface-subtle);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mobile-stock-take-kpi__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.mobile-stock-take-kpi__value {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.mobile-stock-take-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.mobile-stock-take-tab {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  background: none;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: var(--border-width-strong) solid transparent;
+}
+
+.mobile-stock-take-tab--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.mobile-stock-take-scan-form-card,
+.mobile-stock-take-scans-card,
+.mobile-stock-take-review-card,
+.mobile-stock-take-reconcile-card {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.mobile-stock-take-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.mobile-stock-take-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mobile-stock-take-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2), 1fr));
+  gap: var(--space-3);
+}
+
+.mobile-stock-take-submit-btn {
+  margin-top: var(--space-2);
+  align-self: flex-start;
+}

@@ -41,6 +41,20 @@ export function PricingTabs() {
       )
     },
     {
+      to: "/pricing/customer-lookup",
+      labelId: "pricing.tab.customer_lookup",
+      end: false,
+      show: true,
+      icon: (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          <line x1="11" y1="8" x2="11" y2="14" />
+          <line x1="8" y1="11" x2="14" y2="11" />
+        </svg>
+      )
+    },
+    {
       to: "/pricing/gazette",
       labelId: "pricing.tab.gazette",
       end: false,
