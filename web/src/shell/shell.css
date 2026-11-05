@@ -10416,3 +10416,45 @@ textarea {
   margin-left: 8px !important;
   flex-shrink: 0 !important;
 }
+
+
+/* ==========================================================================
+   Society Register Compact Dropdown & Seamless Floating Scrollbar
+   ========================================================================== */
+.register-dropdown-menu--compact,
+.register-field-group .register-dropdown-menu--compact {
+  max-height: 168px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 transparent !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar,
+.register-dropdown-menu--compact::-webkit-scrollbar {
+  width: 5px !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-track,
+.register-dropdown-menu--compact::-webkit-scrollbar-track {
+  background: transparent !important;
+  margin: 8px 0 !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-thumb,
+.register-dropdown-menu--compact::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 9999px !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-thumb:hover,
+.register-dropdown-menu--compact::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-button,
+.register-dropdown-menu--compact::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
