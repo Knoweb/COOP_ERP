@@ -23,6 +23,7 @@ export type SetMrpPolicyRequest = components["schemas"]["SetMrpPolicyRequest"];
 export type RetailPrice = components["schemas"]["RetailPriceResponse"];
 export type ResolveBasketRequest = components["schemas"]["ResolveBasketRequest"];
 export type BasketResult = components["schemas"]["BasketResult"];
+export type CustomerPriceLookup = components["schemas"]["CustomerPriceLookupResponse"];
 export type Rule = components["schemas"]["RuleResponse"];
 export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
 export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
@@ -185,6 +186,30 @@ export function usePricingApi() {
       },
 
       /** The shelf price of one unit of the item at the shop on the date; null when the shop is not visible. */
+      /** Customer price lookup for an item at a shop (M3-08). Strictly excludes internal costs/margins. */
+      async lookupCustomerPrice(
+        locationId: string,
+        params: { skuId?: string; barcode?: string; skuCode?: string; query?: string; uom?: string; date?: string }
+      ): Promise<CustomerPriceLookup | null> {
+        const { data } = await api.GET("/v1/pricing/customer/lookup", {
+          params: { query: { locationId, ...params } }
+        });
+        return data ?? null;
+      },
+
+      /** Customer price search for items at a shop (M3-08). */
+      async searchCustomerPrices(
+        locationId: string,
+        query?: string,
+        date?: string,
+        limit?: number
+      ): Promise<CustomerPriceLookup[]> {
+        const { data } = await api.GET("/v1/pricing/customer/search", {
+          params: { query: { locationId, query, date, limit } }
+        });
+        return data ?? [];
+      },
+
       async resolveRetailPrice(locationId: string, skuId: string, uom: string, date: string): Promise<RetailPrice | null> {
         const { data } = await api.GET("/v1/pricing/resolve/retail", {
           params: { query: { locationId, skuId, uom, qty: 1, date } }

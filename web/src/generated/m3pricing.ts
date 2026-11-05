@@ -199,6 +199,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/customer/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer price lookup for an item at a shop location
+         * @description Customer-facing price lookup that resolves the current permitted public retail price for a product at a given shop using the effective retail price resolver. Internal cost, margin, batch references, supplier identity, and restricted owner data are strictly excluded.
+         */
+        get: operations["lookupCustomerPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/customer/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search current permitted product prices at a shop location for customer portal
+         * @description Customer-facing search across catalog items at a given shop location. Returns permitted public retail prices with zero internal cost or margin data.
+         */
+        get: operations["searchCustomerPrices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/advisory-lines": {
         parameters: {
             query?: never;
@@ -622,6 +662,26 @@ export interface components {
             /** Format: uuid */
             batchId?: string | null;
             engineVersion: string;
+        };
+        CustomerPriceLookupResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            productName: string;
+            uom: string;
+            /** @description Current permitted retail price, tax-inclusive */
+            publicPrice: number;
+            /** @default LKR */
+            currency: string;
+            isAvailable: boolean;
+            /** @description Gazetted maximum retail price ceiling if applicable */
+            controlPrice?: number | null;
+            isPriceControlled: boolean;
+            /** Format: uuid */
+            locationId: string;
+            locationName?: string | null;
+            /** Format: date */
+            effectiveDate?: string | null;
         };
         EnterControlPriceRequest: {
             /** Format: uuid */
@@ -1311,6 +1371,68 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    lookupCustomerPrice: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+                barcode?: string;
+                skuCode?: string;
+                query?: string;
+                uom?: string;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The customer-safe public price */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPriceLookupResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Location or product not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    searchCustomerPrices: {
+        parameters: {
+            query: {
+                locationId: string;
+                query?: string;
+                date?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching product public prices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPriceLookupResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
     listAdvisoryLines: {

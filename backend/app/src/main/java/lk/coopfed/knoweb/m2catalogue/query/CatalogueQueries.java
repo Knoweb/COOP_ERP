@@ -24,6 +24,12 @@ public interface CatalogueQueries {
     /** The units every scope reads (22A section 3.1), for the SKU editor's pickers (M2-10). */
     List<UomView> units(ScopeContext scope);
 
+    /** Lists units of measure, optionally including inactive ones (PGL-M2-04). */
+    List<UomView> listUoms(boolean includeInactive, ScopeContext scope);
+
+    /** Resolves a unit of measure by its code if visible in the scope (PGL-M2-04). */
+    Optional<UomView> getUom(String uomCode, ScopeContext scope);
+
     /** The tax categories every scope reads (22A section 3.1), for the SKU editor's picker (M2-10). */
     List<TaxCategoryView> taxCategories(ScopeContext scope);
 

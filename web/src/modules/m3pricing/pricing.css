@@ -229,98 +229,6 @@
   visibility: visible !important;
 }
 
-/* ---- Navigation Links / Back to Price Lists Button --------------------- */
-
-.shell-page a.back-link,
-a.back-link,
-.back-link {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: var(--space-1) !important;
-  flex-shrink: 0 !important;
-  box-sizing: border-box !important;
-  width: fit-content !important;
-  min-height: calc(var(--space-4) + var(--space-1)) !important;
-  padding: var(--space-1) calc(var(--space-2) + var(--space-half)) !important;
-  border-radius: var(--radius-pill) !important;
-  background: var(--color-polish-29) !important;
-  background-color: var(--color-polish-29) !important;
-  color: var(--color-polish-25) !important;
-  border: var(--border-width-strong) solid var(--color-polish-18) !important;
-  font-size: var(--font-size-sm) !important;
-  font-weight: var(--font-weight-strong) !important;
-  text-decoration: none !important;
-  white-space: nowrap !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  cursor: pointer !important;
-  margin-bottom: var(--space-4) !important;
-}
-
-.shell-page a.back-link svg,
-a.back-link svg,
-.back-link svg {
-  width: var(--space-2) !important;
-  height: var(--space-2) !important;
-  min-width: var(--space-2) !important;
-  min-height: var(--space-2) !important;
-  display: block !important;
-  flex-shrink: 0 !important;
-  fill: none !important;
-  stroke: var(--color-polish-25) !important;
-  stroke-width: var(--border-width-strong) !important;
-  stroke-linecap: round !important;
-  stroke-linejoin: round !important;
-  transition: transform 0.2s ease, stroke 0.2s ease !important;
-}
-
-.shell-page a.back-link:hover,
-a.back-link:hover,
-.back-link:hover {
-  background: var(--color-polish-31) !important;
-  background-color: var(--color-polish-31) !important;
-  border-color: var(--color-polish-21) !important;
-  color: var(--color-polish-25) !important;
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13) !important;
-  transform: translateY(calc(var(--border-width) * -1)) !important;
-  text-decoration: none !important;
-}
-
-.shell-page a.back-link:hover svg,
-a.back-link:hover svg,
-.back-link:hover svg {
-  transform: translateX(calc(var(--border-width) * -2)) !important;
-  stroke: var(--color-polish-25) !important;
-}
-
-.shell-page a.back-link:focus,
-.shell-page a.back-link:focus-visible,
-a.back-link:focus,
-a.back-link:focus-visible,
-.back-link:focus,
-.back-link:focus-visible {
-  outline: var(--border-width-strong) solid var(--color-accent) !important;
-  outline-offset: var(--border-width-strong) !important;
-}
-
-.shell-page a.back-link:active,
-a.back-link:active,
-.back-link:active {
-  transform: translateY(0) scale(0.98) !important;
-  background: var(--color-polish-22) !important;
-  background-color: var(--color-polish-22) !important;
-  border-color: var(--color-polish-25) !important;
-  color: var(--color-polish-25) !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-13) !important;
-}
-
-.shell-page a.back-link:active svg,
-a.back-link:active svg,
-.back-link:active svg {
-  transform: translateX(calc(var(--border-width) * -1)) !important;
-}
-
 /* ---- Modern Buttons (matched to Users page "New User" button) ----------- */
 
 .modern-btn,
@@ -2482,6 +2390,154 @@ select.pricing-select option:focus {
   color: var(--color-ink-subtle);
 }
 
+/* ---- Customer Price Lookup Portal (M3-08) ----------------------------------- */
+.customer-price-portal {
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+}
 
+.customer-price-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+  background: var(--color-surface-subtle);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+  margin-bottom: var(--space-4);
+}
 
+.customer-shop-select {
+  flex: 1 1 calc(var(--space-8) * 3);
+}
 
+.customer-query-input {
+  flex: 2 1 calc(var(--space-8) * 4);
+}
+
+.customer-search-submit {
+  min-height: var(--target-min);
+  padding: 0 var(--space-4);
+}
+
+.customer-error-banner {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+}
+
+.customer-loading-indicator,
+.customer-empty-results {
+  text-align: center;
+  padding: var(--space-6) var(--space-3);
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-md);
+}
+
+.customer-price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-8) * 4), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.customer-price-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease;
+}
+
+.customer-price-card:hover {
+  transform: translateY(calc(var(--space-half) * -0.5));
+}
+
+.customer-price-card__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
+  margin: 0 0 var(--space-1) 0;
+  color: var(--color-text);
+}
+
+.customer-price-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.customer-price-chip {
+  font-size: var(--font-size-xs);
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-subtle);
+}
+
+.status-chip--available {
+  background: var(--color-brand-success-subtle);
+  color: var(--color-brand-success);
+  font-weight: var(--font-weight-strong);
+}
+
+.status-chip--unavailable {
+  background: var(--color-surface-subtle);
+  color: var(--color-ink-subtle);
+}
+
+.customer-price-card__amount-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-2);
+}
+
+.customer-price-card__price-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-subtle);
+  text-transform: uppercase;
+}
+
+.customer-price-card__price-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-primary);
+}
+
+.customer-price-card__control-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-surface-subtle);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-subtle);
+  border-left: var(--border-width-strong) solid var(--color-accent);
+}
+
+.customer-privacy-footer {
+  margin-top: var(--space-6);
+  padding: var(--space-3);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.customer-privacy-footer__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-sm);
+}
+
+.customer-privacy-footer__content p {
+  margin: 0;
+}

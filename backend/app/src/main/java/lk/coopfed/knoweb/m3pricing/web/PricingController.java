@@ -42,6 +42,7 @@ import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.CustomerPriceLookupView;
 import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
 import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
@@ -55,6 +56,7 @@ import lk.coopfed.knoweb.m3pricing.web.generated.BasketResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.BatchCandidate;
 import lk.coopfed.knoweb.m3pricing.web.generated.ControlPriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.CustomerPriceLookupResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.EvaluateExpirySlowMovingDiscountsRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingDiscountResponse;
@@ -340,6 +342,44 @@ class PricingController implements PricingApi {
                         .batchId(price.batchId()))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // ---- customer price lookup (M3-08) ---------------------------------------------------------
+
+    @Override
+    public ResponseEntity<CustomerPriceLookupResponse> lookupCustomerPrice(
+            UUID locationId, UUID skuId, String barcode, String skuCode, String query, String uom, LocalDate date) {
+        return queries.lookupCustomerPrice(locationId, skuId, barcode, skuCode, query, uom, date, currentScope.get())
+                .map(this::toCustomerResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<List<CustomerPriceLookupResponse>> searchCustomerPrices(
+            UUID locationId, String query, LocalDate date, Integer limit) {
+        int max = limit != null ? limit : 20;
+        List<CustomerPriceLookupResponse> list =
+                queries.searchCustomerPrices(locationId, query, date, max, currentScope.get()).stream()
+                        .map(this::toCustomerResponse)
+                        .toList();
+        return ResponseEntity.ok(list);
+    }
+
+    private CustomerPriceLookupResponse toCustomerResponse(CustomerPriceLookupView view) {
+        return new CustomerPriceLookupResponse(
+                        view.skuId(),
+                        view.skuCode(),
+                        view.productName(),
+                        view.uom(),
+                        view.publicPrice(),
+                        view.currency(),
+                        view.isAvailable(),
+                        view.isPriceControlled(),
+                        view.locationId())
+                .controlPrice(view.controlPrice())
+                .locationName(view.locationName())
+                .effectiveDate(view.effectiveDate());
     }
 
     @Override

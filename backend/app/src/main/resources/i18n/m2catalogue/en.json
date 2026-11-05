@@ -89,5 +89,8 @@
   "m2.sku.barcode_conflict": "Barcode is already registered to a different SKU",
   "m2.department.not_found": "The merchandise department category was not found",
   "m2.department.code_exists": "A department category with this code already exists",
-  "m2.sku.department_unknown": "The selected merchandise department category is not defined or inactive"
+  "m2.sku.department_unknown": "The selected merchandise department category is not defined or inactive",
+  "m2.uom.not_found": "The unit of measure was not found",
+  "m2.uom.code_exists": "A unit of measure with this code already exists",
+  "m2.uom.in_use_cannot_change_weight": "Cannot change the weight attribute of a unit of measure that is currently in use"
 }

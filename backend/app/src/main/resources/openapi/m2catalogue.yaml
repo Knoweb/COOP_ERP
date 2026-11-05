@@ -1467,6 +1467,142 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+
+  /v1/catalogue/uoms:
+
+    get:
+      tags: [Uom]
+      operationId: listUoms
+      summary: List units of measure
+      description: Returns units of measure, optionally including inactive ones. All authenticated scopes read.
+      x-permission: cat.sku.view
+      parameters:
+        - name: includeInactive
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+
+      responses:
+        '200':
+          description: List of units of measure
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Uom]
+      operationId: defineUom
+      summary: Define a new unit of measure
+      description: Federation Catalogue Steward only.
+      x-permission: cat.uom.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineUomRequest'
+
+      responses:
+        '201':
+          description: Unit of measure defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/uoms/{uomCode}:
+
+    parameters:
+      - in: path
+        name: uomCode
+        required: true
+        schema:
+          type: string
+
+    get:
+      tags: [Uom]
+      operationId: getUom
+      summary: Get unit of measure by code
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: Unit of measure details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.uom.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+    put:
+      tags: [Uom]
+      operationId: updateUom
+      summary: Update an existing unit of measure
+      description: Federation Catalogue Steward only.
+      x-permission: cat.uom.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUomRequest'
+
+      responses:
+        '200':
+          description: Unit of measure updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.uom.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -1777,6 +1913,81 @@ components:
         status:
           type: string
           enum: [ACTIVE, RETIRED]
+
+
+
+    UomDetailResponse:
+      type: object
+      required:
+        - uomCode
+        - nameEn
+        - weight
+        - status
+      properties:
+        uomCode:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        weight:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        createdAt:
+          type: string
+          format: date-time
+
+
+    DefineUomRequest:
+      type: object
+      required:
+        - uomCode
+        - nameEn
+        - weight
+      properties:
+        uomCode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        weight:
+          type: boolean
+
+
+    UpdateUomRequest:
+      type: object
+      required:
+        - nameEn
+        - weight
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        weight:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
 
 
     UomResponse:

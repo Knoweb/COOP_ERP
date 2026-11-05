@@ -11,7 +11,8 @@ export type PageIconName =
   | "mrp_policy"
   | "rules"
   | "markdown"
-  | "queue";
+  | "queue"
+  | "reviews";
 
 export function PageHeader({
   icon,
@@ -127,6 +128,16 @@ function PageIcon({ name }: { name: PageIconName }) {
         <path d="M4 6h1v4" />
         <path d="M4 10h2" />
         <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+      </svg>
+    );
+  }
+
+  if (name === "reviews") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        <path d="m9 11 2 2 4-4" />
       </svg>
     );
   }

@@ -88,5 +88,8 @@
   "m3.expiry_discount.evaluated": "Expiry and slow-moving discount evaluation completed",
   "m3.location.not_found": "The location could not be found",
   "m3.location.not_owned": "Choose a location that belongs to this entity",
-  "m3.rule.location_invalid": "The specified branch or shop location does not belong to your entity"
+  "m3.rule.location_invalid": "The specified branch or shop location does not belong to your entity",
+  "m3.customer.location_required": "A shop location is required to look up customer prices",
+  "m3.customer.item_not_found": "No price found for this product at the selected store",
+  "m3.customer.lookup_failed": "Price lookup could not be completed"
 }
