@@ -233,8 +233,8 @@ class ManualBranchOrderPostgresIntegrationTest extends PostgresIntegrationTest {
                         List.of(Map.of("skuId", RICE.toString(), "qty", 10))),
                 locationScopedHeaders);
 
-        assertThat(locationScopedCall.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(locationScopedCall.getBody().get("code").asText()).isEqualTo("kernel.scope.entity_required");
+        assertThat(locationScopedCall.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(locationScopedCall.getBody().get("code").asText()).isEqualTo("scope.invalid");
     }
 
     private ResponseEntity<JsonNode> post(String path, Object body, HttpHeaders headers) {
