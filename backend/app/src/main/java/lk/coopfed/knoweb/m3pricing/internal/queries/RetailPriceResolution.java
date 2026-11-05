@@ -349,7 +349,8 @@ public class RetailPriceResolution {
                 .filter(r -> r.ownerEntityId().equals(owner)
                         && !date.isBefore(r.validFrom())
                         && (r.validTo() == null || !date.isAfter(r.validTo()))
-                        && (r.predicate().locationId() == null || r.predicate().locationId().equals(locationId)))
+                        && (r.predicate().locationId() == null
+                                || r.predicate().locationId().equals(locationId)))
                 .map(r -> new Rule(
                         r.ruleId(),
                         lk.coopfed.knoweb.engine.RuleKind.valueOf(r.kind()),

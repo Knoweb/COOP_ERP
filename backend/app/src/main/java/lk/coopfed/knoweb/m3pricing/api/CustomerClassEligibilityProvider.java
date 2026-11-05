@@ -27,4 +27,3 @@ public interface CustomerClassEligibilityProvider {
      */
     boolean isEligible(String identifier, UUID locationId, ScopeContext scope);
 }
-

@@ -19,6 +19,8 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.SnapshotContributor;
+import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.m9integration.api.ApproveOvertime;
 import lk.coopfed.knoweb.m9integration.api.AttendanceImportResult;
 import lk.coopfed.knoweb.m9integration.api.AttendanceImported;
@@ -30,6 +32,7 @@ import lk.coopfed.knoweb.m9integration.api.RegisterEmployee;
 import lk.coopfed.knoweb.m9integration.internal.hr.ApproveOvertimeHandler;
 import lk.coopfed.knoweb.m9integration.internal.hr.ImportAttendanceRecordsHandler;
 import lk.coopfed.knoweb.m9integration.internal.hr.RegisterEmployeeHandler;
+import lk.coopfed.knoweb.m9integration.internal.snapshot.EmployeeSnapshotContributor;
 import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries;
 import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries.ApprovedPayrollContributionView;
 import lk.coopfed.knoweb.m9integration.query.ApprovedPayrollContributionQueries.PayrollContributionSummary;
@@ -37,9 +40,6 @@ import lk.coopfed.knoweb.m9integration.query.AttendanceQueries;
 import lk.coopfed.knoweb.m9integration.query.AttendanceQueries.OvertimeCalculationView;
 import lk.coopfed.knoweb.m9integration.query.EmployeeQueries;
 import lk.coopfed.knoweb.m9integration.query.EmployeeQueries.EmployeeView;
-import lk.coopfed.knoweb.kernel.api.SnapshotContributor;
-import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
-import lk.coopfed.knoweb.m9integration.internal.snapshot.EmployeeSnapshotContributor;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -412,19 +412,26 @@ class AttendanceOvertimePayrollPostgresIntegrationTest extends PostgresIntegrati
         assertThat(summary.getBody().path("totalEmployees").asInt()).isEqualTo(1);
         assertThat(summary.getBody().path("totalOtMinutes").asInt()).isEqualTo(90);
     }
+
     @Test
     void employeeSnapshotContributorPublishesSanitizedEligibilityOnly() {
         ScopeContext scope = ownerScope();
         UUID shopLoc = UUID.randomUUID();
         UUID empId = registerEmployee.handle(
                 new RegisterEmployee(
-                        "EMP-SNAP-01", "Sunil Jayawardena", "198512345678", "EPF123", new BigDecimal("400.00"), shopLoc),
+                        "EMP-SNAP-01",
+                        "Sunil Jayawardena",
+                        "198512345678",
+                        "EPF123",
+                        new BigDecimal("400.00"),
+                        shopLoc),
                 scope);
 
         var shop = new SnapshotContributor.Shop(OWNER_ENTITY, shopLoc);
         var rows = transactions.inScope(
                 SystemScope.own(OWNER_ENTITY, shopLoc),
-                () -> employeeSnapshotContributor.allRows(EmployeeSnapshotContributor.EMPLOYEE_DISCOUNT_ELIGIBILITY, shop));
+                () -> employeeSnapshotContributor.allRows(
+                        EmployeeSnapshotContributor.EMPLOYEE_DISCOUNT_ELIGIBILITY, shop));
 
         assertThat(rows).containsKey(empId);
         Map<String, Object> row = rows.get(empId);

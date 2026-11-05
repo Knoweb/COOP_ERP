@@ -46,7 +46,23 @@ class RuleVocabularyTest {
         when(catalogue.getSku(any(), any())).thenReturn(Optional.of(sku));
 
         LocationView loc = new LocationView(
-                shopId, entityId, "S01", "SHOP", "Main Shop", null, null, null, null, null, null, "en", List.of(), null, true, null, "ACTIVE");
+                shopId,
+                entityId,
+                "S01",
+                "SHOP",
+                "Main Shop",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "en",
+                List.of(),
+                null,
+                true,
+                null,
+                "ACTIVE");
         when(party.getLocation(eq(shopId), any())).thenReturn(Optional.of(loc));
     }
 
@@ -113,7 +129,23 @@ class RuleVocabularyTest {
         UUID otherEntity = UUID.randomUUID();
         UUID otherShop = UUID.randomUUID();
         LocationView otherLoc = new LocationView(
-                otherShop, otherEntity, "S02", "SHOP", "Other Shop", null, null, null, null, null, null, "en", List.of(), null, true, null, "ACTIVE");
+                otherShop,
+                otherEntity,
+                "S02",
+                "SHOP",
+                "Other Shop",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "en",
+                List.of(),
+                null,
+                true,
+                null,
+                "ACTIVE");
         when(party.getLocation(eq(otherShop), any())).thenReturn(Optional.of(otherLoc));
 
         RulePredicate foreignShopRule = new RulePredicate(skuId, null, null, null, null, null, otherShop);

@@ -77,4 +77,3 @@ public class EmployeeSnapshotContributor implements SnapshotContributor {
         return rows;
     }
 }
-

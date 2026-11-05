@@ -7,4 +7,3 @@ public enum BeneficiaryClass {
     MEMBER,
     EMPLOYEE
 }
-

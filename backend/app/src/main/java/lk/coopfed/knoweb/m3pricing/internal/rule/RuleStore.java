@@ -106,7 +106,10 @@ public class RuleStore {
         putIfPresent(map, "days_to_expiry", p.daysToExpiry());
         putIfPresent(map, "bill_total_from", plain(p.billTotalFrom()));
         putIfPresent(map, "customer_class", p.customerClass());
-        putIfPresent(map, "location_id", p.locationId() == null ? null : p.locationId().toString());
+        putIfPresent(
+                map,
+                "location_id",
+                p.locationId() == null ? null : p.locationId().toString());
         return write(map);
     }
 

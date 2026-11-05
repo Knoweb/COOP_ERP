@@ -13,7 +13,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lk.coopfed.knoweb.m7customers.api.RegisterLoyaltyCustomer;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.SnapshotContributor.Shop;
@@ -25,6 +24,7 @@ import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
+import lk.coopfed.knoweb.m7customers.api.RegisterLoyaltyCustomer;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -160,6 +160,7 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
                         false),
                 society.equals(SOCIETY) ? office() : other());
     }
+
     @Test
     void theTillGetsSanitizedMemberDiscountEligibilityFactsOnly() {
         RegisterLoyaltyCustomer cmd = new RegisterLoyaltyCustomer(
