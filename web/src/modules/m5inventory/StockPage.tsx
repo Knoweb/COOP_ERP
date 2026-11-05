@@ -90,7 +90,7 @@ export function StockPage() {
     return map;
   }, [balancesQuery.data]);
 
-  const summaries = summariesQuery.data ?? [];
+  const summaries = useMemo(() => summariesQuery.data ?? [], [summariesQuery.data]);
 
   const kpis = useMemo(() => {
     const totalItems = summaries.length;
