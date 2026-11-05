@@ -10427,7 +10427,7 @@ textarea {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   scrollbar-width: thin !important;
-  scrollbar-color: #cbd5e1 transparent !important;
+  scrollbar-color: var(--color-border-control) transparent !important;
 }
 
 .register-field-group .register-dropdown-menu::-webkit-scrollbar,
@@ -10443,13 +10443,13 @@ textarea {
 
 .register-field-group .register-dropdown-menu::-webkit-scrollbar-thumb,
 .register-dropdown-menu--compact::-webkit-scrollbar-thumb {
-  background: #cbd5e1 !important;
-  border-radius: 9999px !important;
+  background: var(--color-border-control) !important;
+  border-radius: var(--radius-pill) !important;
 }
 
 .register-field-group .register-dropdown-menu::-webkit-scrollbar-thumb:hover,
 .register-dropdown-menu--compact::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8 !important;
+  background: var(--color-text-muted) !important;
 }
 
 .register-field-group .register-dropdown-menu::-webkit-scrollbar-button,
