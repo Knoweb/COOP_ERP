@@ -269,7 +269,14 @@
     "pricing.markdown.column.discount": "Markdown",
     "pricing.markdown.column.discounted_price": "Discounted price",
     "pricing.markdown.column.status": "Status",
-    "pricing.markdown.sku_level": "SKU Level"
+    "pricing.markdown.sku_level": "SKU Level",
+    "pricing.rules.field.customer_class": "Customer class",
+    "pricing.rules.customer_class.GENERAL": "General",
+    "pricing.rules.customer_class.MEMBER": "Member",
+    "pricing.rules.customer_class.EMPLOYEE": "Employee",
+    "pricing.rules.field.location": "Branch scope",
+    "pricing.rules.location.all": "All Branches (Society-wide)",
+    "pricing.rules.target.location": "Branch: {branch}"
   },
   "si": {
     "pricing.labels.title": "රාක්ක ලේබල් මුද්‍රණය",
@@ -541,7 +548,14 @@
     "pricing.markdown.column.discount": "මිල අඩුකිරීම",
     "pricing.markdown.column.discounted_price": "වට්ටම් කළ මිල",
     "pricing.markdown.column.status": "තත්ත්වය",
-    "pricing.markdown.sku_level": "SKU මට්ටම"
+    "pricing.markdown.sku_level": "SKU මට්ටම",
+    "pricing.rules.field.customer_class": "පාරිභෝගික පන්තිය",
+    "pricing.rules.customer_class.GENERAL": "සාමාන්‍ය",
+    "pricing.rules.customer_class.MEMBER": "සාමාජික",
+    "pricing.rules.customer_class.EMPLOYEE": "සේවක",
+    "pricing.rules.field.location": "ශාඛා සීමාව",
+    "pricing.rules.location.all": "සියලුම ශාඛා (සමිතිය පුරා)",
+    "pricing.rules.target.location": "ශාඛාව: {branch}"
   },
   "ta": {
     "pricing.labels.title": "அலமாரி லேபிள் அச்சிடுதல்",
@@ -813,6 +827,13 @@
     "pricing.markdown.column.discount": "விலைக் குறைப்பு",
     "pricing.markdown.column.discounted_price": "தள்ளுபடி விலை",
     "pricing.markdown.column.status": "நிலை",
-    "pricing.markdown.sku_level": "SKU நிலை"
+    "pricing.markdown.sku_level": "SKU நிலை",
+    "pricing.rules.field.customer_class": "வாடிக்கையாளர் வகுப்பு",
+    "pricing.rules.customer_class.GENERAL": "பொதுவான",
+    "pricing.rules.customer_class.MEMBER": "உறுப்பினர்",
+    "pricing.rules.customer_class.EMPLOYEE": "ஊழியர்",
+    "pricing.rules.field.location": "கிளை வரம்பு",
+    "pricing.rules.location.all": "அனைத்து கிளைகளும் (சங்கம் முழுவதும்)",
+    "pricing.rules.target.location": "கிளை: {branch}"
   }
 }

@@ -105,6 +105,8 @@ public class RuleStore {
         putIfPresent(map, "min_qty", plain(p.minQty()));
         putIfPresent(map, "days_to_expiry", p.daysToExpiry());
         putIfPresent(map, "bill_total_from", plain(p.billTotalFrom()));
+        putIfPresent(map, "customer_class", p.customerClass());
+        putIfPresent(map, "location_id", p.locationId() == null ? null : p.locationId().toString());
         return write(map);
     }
 
@@ -119,6 +121,12 @@ public class RuleStore {
         Date validTo = rs.getDate("valid_to");
         JsonNode p = read(rs.getString("predicate"));
         JsonNode b = read(rs.getString("benefit"));
+        UUID locationId = null;
+        if (p.hasNonNull("location_id")) {
+            locationId = UUID.fromString(p.get("location_id").asText());
+        } else if (p.hasNonNull("locationId")) {
+            locationId = UUID.fromString(p.get("locationId").asText());
+        }
         return new RuleView(
                 rs.getObject("rule_id", UUID.class),
                 rs.getObject("owner_entity_id", UUID.class),
@@ -129,7 +137,9 @@ public class RuleStore {
                         p.hasNonNull("uom_code") ? p.get("uom_code").asText() : null,
                         decimal(p, "min_qty"),
                         p.hasNonNull("days_to_expiry") ? p.get("days_to_expiry").asInt() : null,
-                        decimal(p, "bill_total_from")),
+                        decimal(p, "bill_total_from"),
+                        p.hasNonNull("customer_class") ? p.get("customer_class").asText() : null,
+                        locationId),
                 new RuleBenefit(b.path("kind").asText(null), decimal(b, "value")),
                 rs.getInt("priority"),
                 rs.getDate("valid_from").toLocalDate(),

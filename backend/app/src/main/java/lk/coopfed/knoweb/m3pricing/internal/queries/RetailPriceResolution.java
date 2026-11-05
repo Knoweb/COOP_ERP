@@ -26,6 +26,7 @@ import lk.coopfed.knoweb.engine.Rule;
 import lk.coopfed.knoweb.engine.SkuFacts;
 import lk.coopfed.knoweb.engine.StackingPolicy;
 import lk.coopfed.knoweb.engine.TenderKind;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
@@ -64,6 +65,29 @@ public class RetailPriceResolution {
     private final EffectivePolicy policies;
     private final RuleStore rules;
     private final ObjectProvider<ExpirySlowMovingDiscountCalculator> discountCalculatorProvider;
+    private final List<lk.coopfed.knoweb.m3pricing.api.CustomerClassEligibilityProvider> eligibilityProviders;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RetailPriceResolution(
+            PartyQueries party,
+            CatalogueQueries catalogue,
+            PriceListStore lists,
+            ControlPriceStore controlPrices,
+            ShelfBatches shelf,
+            EffectivePolicy policies,
+            RuleStore rules,
+            ObjectProvider<ExpirySlowMovingDiscountCalculator> discountCalculatorProvider,
+            List<lk.coopfed.knoweb.m3pricing.api.CustomerClassEligibilityProvider> eligibilityProviders) {
+        this.party = party;
+        this.catalogue = catalogue;
+        this.lists = lists;
+        this.controlPrices = controlPrices;
+        this.shelf = shelf;
+        this.policies = policies;
+        this.rules = rules;
+        this.discountCalculatorProvider = discountCalculatorProvider;
+        this.eligibilityProviders = eligibilityProviders != null ? eligibilityProviders : List.of();
+    }
 
     public RetailPriceResolution(
             PartyQueries party,
@@ -74,14 +98,7 @@ public class RetailPriceResolution {
             EffectivePolicy policies,
             RuleStore rules,
             ObjectProvider<ExpirySlowMovingDiscountCalculator> discountCalculatorProvider) {
-        this.party = party;
-        this.catalogue = catalogue;
-        this.lists = lists;
-        this.controlPrices = controlPrices;
-        this.shelf = shelf;
-        this.policies = policies;
-        this.rules = rules;
-        this.discountCalculatorProvider = discountCalculatorProvider;
+        this(party, catalogue, lists, controlPrices, shelf, policies, rules, discountCalculatorProvider, List.of());
     }
 
     public Optional<RetailPrice> resolveBase(
@@ -229,12 +246,42 @@ public class RetailPriceResolution {
 
     public Optional<BasketResult> resolveBasket(
             UUID locationId, LocalDate date, TenderKind tender, Basket basket, ScopeContext scope) {
+        return resolveBasket(locationId, date, tender, basket, null, null, scope);
+    }
+
+    public Optional<BasketResult> resolveBasket(
+            UUID locationId,
+            LocalDate date,
+            TenderKind tender,
+            Basket basket,
+            lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass beneficiaryClass,
+            String beneficiaryIdentifier,
+            ScopeContext scope) {
+
+        if (beneficiaryClass != null && (beneficiaryIdentifier == null || beneficiaryIdentifier.isBlank())) {
+            throw new ProblemException("m3.basket.beneficiary_incomplete");
+        }
+        if (beneficiaryClass == null && beneficiaryIdentifier != null && !beneficiaryIdentifier.isBlank()) {
+            throw new ProblemException("m3.basket.beneficiary_incomplete");
+        }
 
         Optional<LocationView> location = party.getLocation(locationId, scope);
         if (location.isEmpty()) {
             return Optional.empty();
         }
         UUID owner = location.get().ownerEntityId();
+
+        String verifiedCustomerClass = null;
+        if (beneficiaryClass != null) {
+            boolean eligible = eligibilityProviders.stream()
+                    .filter(p -> p.supports(beneficiaryClass))
+                    .findFirst()
+                    .map(p -> p.isEligible(beneficiaryIdentifier, locationId, scope))
+                    .orElse(false);
+            if (eligible) {
+                verifiedCustomerClass = beneficiaryClass.name();
+            }
+        }
 
         Set<UUID> skus = basket.getLines().stream().map(l -> l.getSkuId()).collect(Collectors.toSet());
 
@@ -301,7 +348,8 @@ public class RetailPriceResolution {
         List<Rule> engineRules = new ArrayList<>(rules.activeOnOrAfter(date).stream()
                 .filter(r -> r.ownerEntityId().equals(owner)
                         && !date.isBefore(r.validFrom())
-                        && (r.validTo() == null || !date.isAfter(r.validTo())))
+                        && (r.validTo() == null || !date.isAfter(r.validTo()))
+                        && (r.predicate().locationId() == null || r.predicate().locationId().equals(locationId)))
                 .map(r -> new Rule(
                         r.ruleId(),
                         lk.coopfed.knoweb.engine.RuleKind.valueOf(r.kind()),
@@ -319,7 +367,9 @@ public class RetailPriceResolution {
                                 ? null
                                 : Money.rounded(r.predicate().billTotalFrom()),
                         lk.coopfed.knoweb.engine.BenefitKind.valueOf(r.benefit().kind()),
-                        r.benefit().value()))
+                        r.benefit().value(),
+                        r.predicate().customerClass(),
+                        r.predicate().locationId()))
                 .toList());
 
         PricingSnapshotIndex index = new PricingSnapshotIndex(
@@ -333,7 +383,8 @@ public class RetailPriceResolution {
                 Map.of(),
                 engineRules);
 
-        return Optional.of(BasketResolver.resolve(basket, index, date, tender));
+        Basket effectiveBasket = new Basket(basket.getLines(), verifiedCustomerClass);
+        return Optional.of(BasketResolver.resolve(effectiveBasket, index, date, tender));
     }
 
     Optional<RetailPrice> resolveCommercial(

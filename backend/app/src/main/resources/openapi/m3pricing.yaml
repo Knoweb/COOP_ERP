@@ -785,6 +785,14 @@ components:
         minQty: { type: [number, 'null'], exclusiveMinimum: 0 }
         daysToExpiry: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
         billTotalFrom: { type: [number, 'null'], exclusiveMinimum: 0 }
+        customerClass:
+          type: [string, 'null']
+          enum: [MEMBER, EMPLOYEE]
+          description: Optional customer-class targeting (PGL-M1-06); null applies to general public.
+        locationId:
+          type: [string, 'null']
+          format: uuid
+          description: Optional shop/branch location scope (PGL-M1-06); null applies society-wide to all branches.
     RuleBenefit:
       type: object
       required: [kind, value]
@@ -1045,6 +1053,13 @@ components:
             Doc 23 section 3.5: CASH rounds the total to the rupee; CARD, KHATA (the member's
             account) and CHEQUE are exact. VOUCHER is not priced by M3 (vouchers are a later
             phase) and is refused with 400 m3.basket.tender_not_priced.
+        beneficiaryClass:
+          type: [string, 'null']
+          enum: [MEMBER, EMPLOYEE]
+          description: Optional explicit beneficiary class (PGL-M1-06). Requires beneficiaryIdentifier when supplied.
+        beneficiaryIdentifier:
+          type: [string, 'null']
+          description: Optional explicit beneficiary credential (e.g. memberNo for MEMBER, employeeNo for EMPLOYEE).
         lines:
           type: array
           items: { $ref: '#/components/schemas/ResolveBasketLineRequest' }

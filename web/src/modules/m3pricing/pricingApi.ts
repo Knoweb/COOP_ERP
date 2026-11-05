@@ -21,6 +21,8 @@ export type RescindControlPriceRequest = components["schemas"]["RescindControlPr
 export type MrpPolicy = components["schemas"]["MrpPolicyResponse"];
 export type SetMrpPolicyRequest = components["schemas"]["SetMrpPolicyRequest"];
 export type RetailPrice = components["schemas"]["RetailPriceResponse"];
+export type ResolveBasketRequest = components["schemas"]["ResolveBasketRequest"];
+export type BasketResult = components["schemas"]["BasketResult"];
 export type Rule = components["schemas"]["RuleResponse"];
 export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
 export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
@@ -186,6 +188,15 @@ export function usePricingApi() {
       async resolveRetailPrice(locationId: string, skuId: string, uom: string, date: string): Promise<RetailPrice | null> {
         const { data } = await api.GET("/v1/pricing/resolve/retail", {
           params: { query: { locationId, skuId, uom, qty: 1, date } }
+        });
+        return data ?? null;
+      },
+
+      /** Resolve a basket at a shop centrally with rules, caps, and optional customer-class targeting (PGL-M1-06). */
+      async resolveBasket(body: ResolveBasketRequest, idempotencyKey: string): Promise<BasketResult | null> {
+        const { data } = await api.POST("/v1/pricing/resolve/retail", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
         });
         return data ?? null;
       },

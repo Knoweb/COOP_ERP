@@ -244,8 +244,14 @@ class PricingQueriesImpl implements PricingQueries {
 
     @Override
     public Optional<BasketResult> resolveBasket(
-            UUID locationId, LocalDate date, TenderKind tender, Basket basket, ScopeContext scope) {
-        return retail.resolveBasket(locationId, date, tender, basket, scope);
+            UUID locationId,
+            LocalDate date,
+            TenderKind tender,
+            Basket basket,
+            lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass beneficiaryClass,
+            String beneficiaryIdentifier,
+            ScopeContext scope) {
+        return retail.resolveBasket(locationId, date, tender, basket, beneficiaryClass, beneficiaryIdentifier, scope);
     }
 
     /**
