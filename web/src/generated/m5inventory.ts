@@ -24,6 +24,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/locations/{locationId}/stock-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock balance summaries for a location with explainable quantities
+         * @description Aggregated stock position summaries for a location with explainable on-hand, reserved, in-transit, and count variance quantities, optionally filtered by department, UOM, or discrepancy.
+         */
+        get: operations["getStockSummaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/skus/{skuId}/explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explainability drilldown for a SKU stock position at a location
+         * @description Surfaces the individual lots, active pick list reservations, in-transit transfers, and latest count session details explaining the stock quantities.
+         */
+        get: operations["getStockExplanation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/locations/{locationId}/movements": {
         parameters: {
             query?: never;
@@ -1882,6 +1922,101 @@ export interface components {
             reviewValue?: number;
             reviewBand?: number;
         };
+        StockSummaryResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            baseUomCode: string;
+            /** Format: uuid */
+            departmentId?: string;
+            departmentNameEn?: string;
+            departmentNameSi?: string;
+            departmentNameTa?: string;
+            qtyOnHand: number;
+            reservedQty: number;
+            availableQty: number;
+            inTransitIncomingQty: number;
+            inTransitOutgoingQty: number;
+            countedVarianceQty?: number;
+            countedVarianceValue?: number;
+            latestCountStatus?: string;
+            /** Format: date-time */
+            latestCountedAt?: string;
+            remainingStockQty: number;
+            lotCount: number;
+            lots?: components["schemas"]["LotBalanceResponse"][];
+        };
+        StockExplanationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            baseUomCode: string;
+            /** Format: uuid */
+            departmentId?: string;
+            departmentNameEn?: string;
+            departmentNameSi?: string;
+            departmentNameTa?: string;
+            qtyOnHand: number;
+            reservedQty: number;
+            availableQty: number;
+            inTransitIncomingQty: number;
+            inTransitOutgoingQty: number;
+            countedVarianceQty?: number;
+            remainingStockQty: number;
+            lots?: components["schemas"]["LotBalanceResponse"][];
+            reservations?: components["schemas"]["StockReservationDetail"][];
+            incomingTransfers?: components["schemas"]["StockInTransitDetail"][];
+            outgoingTransfers?: components["schemas"]["StockInTransitDetail"][];
+            latestCount?: components["schemas"]["StockCountDetail"];
+        };
+        StockReservationDetail: {
+            /** Format: uuid */
+            pickListId: string;
+            /** Format: uuid */
+            deliveryDocumentId?: string;
+            deliveryDocNumber?: string;
+            reservedQty: number;
+            pickStatus: string;
+            /** Format: date-time */
+            reservedAt?: string;
+        };
+        StockInTransitDetail: {
+            /** Format: uuid */
+            transferId: string;
+            documentNo?: string;
+            /** Format: uuid */
+            locationId?: string;
+            locationName?: string;
+            qty: number;
+            /** Format: date-time */
+            dispatchedAt?: string;
+            status: string;
+        };
+        StockCountDetail: {
+            /** Format: uuid */
+            taskId: string;
+            scopeKind?: string;
+            status: string;
+            outcome?: string;
+            expectedQty: number;
+            countedQty: number;
+            varianceQty: number;
+            varianceValue?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            submittedAt?: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1964,6 +2099,66 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    getStockSummaries: {
+        parameters: {
+            query?: {
+                departmentId?: string;
+                uomCode?: string;
+                skuId?: string;
+                includeZero?: boolean;
+                discrepancyOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSummaryResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getStockExplanation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock explanation details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockExplanationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Stock explanation not found, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listMovements: {
