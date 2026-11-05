@@ -6,10 +6,13 @@ import java.util.Optional;
 import java.util.Set;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.LocationView;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.api.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.api.RulePredicate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,9 +57,16 @@ class RuleVocabulary {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final CatalogueQueries catalogue;
+    private final PartyQueries party;
 
-    RuleVocabulary(CatalogueQueries catalogue) {
+    public RuleVocabulary(CatalogueQueries catalogue) {
+        this(catalogue, null);
+    }
+
+    @Autowired
+    public RuleVocabulary(CatalogueQueries catalogue, PartyQueries party) {
         this.catalogue = catalogue;
+        this.party = party;
     }
 
     /** Throws the first rule the predicate and benefit break, in the order of the table above. */
@@ -71,6 +81,21 @@ class RuleVocabulary {
             throw new ProblemException("m3.rule.kind_invalid", Map.of("kind", kind));
         }
         RulePredicate p = predicate == null ? new RulePredicate(null, null, null, null, null) : predicate;
+
+        if (p.customerClass() != null && !p.customerClass().isBlank()) {
+            String cc = p.customerClass().trim().toUpperCase(java.util.Locale.ROOT);
+            if (!"MEMBER".equals(cc) && !"EMPLOYEE".equals(cc)) {
+                throw new ProblemException(
+                        "m3.rule.customer_class_invalid", Map.of("customerClass", p.customerClass()));
+            }
+        }
+
+        if (p.locationId() != null && party != null && scope != null) {
+            Optional<LocationView> loc = party.getLocation(p.locationId(), scope);
+            if (loc.isEmpty() || !scope.entityId().equals(loc.get().ownerEntityId())) {
+                throw new ProblemException("m3.rule.location_invalid");
+            }
+        }
 
         if (BILL_THRESHOLD.equals(kind)) {
             forbid(p.skuId(), "skuId");

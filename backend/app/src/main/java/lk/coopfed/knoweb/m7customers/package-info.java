@@ -5,8 +5,9 @@
  *
  * <p>allowedDependencies: 27A section 4 names the kernel and M1's api and query; the list holds
  * what the code uses (the kernel's api and M1's query, for the entity code of the CPR series).
+ * Also includes m3pricing::api to answer MemberEligibilityForPricing (PGL-M1-06).
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M7 Customers & Payment Recording",
-        allowedDependencies = {"kernel", "kernel::api", "m1party::query"})
+        allowedDependencies = {"kernel", "kernel::api", "m1party::query", "m3pricing::api"})
 package lk.coopfed.knoweb.m7customers;

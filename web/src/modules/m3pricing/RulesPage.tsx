@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useIntl } from "react-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { businessToday, formatMoneyDigits, useFormatDate } from "../../shell/i18n/formats";
@@ -9,8 +10,9 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
+import { inLocale } from "../../shell/i18n/localName";
 import { usePricingApi } from "./pricingApi";
-import type { AuthorRuleRequest, Rule, Sku } from "./pricingApi";
+import type { AuthorRuleRequest, Location, Rule, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { errorText, ruleStatusChip } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
@@ -54,6 +56,11 @@ export function RulesPage() {
         status: statusFilter !== "ALL" ? (statusFilter as Rule["status"]) : undefined,
         kind: kindFilter !== "ALL" ? (kindFilter as Rule["kind"]) : undefined
       })
+  });
+
+  const locationsQuery = useQuery({
+    queryKey: ["pricing", "locations"],
+    queryFn: () => api.locations()
   });
 
   const activateMutation = useMutation({
@@ -108,6 +115,7 @@ export function RulesPage() {
 
       {canAuthor && (
         <AuthorRuleForm
+          locations={locationsQuery.data}
           onCreated={() => {
             void queryClient.invalidateQueries({ queryKey: ["pricing", "rules"] });
           }}
@@ -183,7 +191,7 @@ export function RulesPage() {
                       </td>
                       <td>{t(`pricing.rules.kind.${rule.kind}`).text}</td>
                       <td>
-                        <RuleTarget predicate={rule.predicate} kind={rule.kind as RuleKind} />
+                        <RuleTarget predicate={rule.predicate} kind={rule.kind as RuleKind} locations={locationsQuery.data} />
                       </td>
                       <td>
                         <RuleBenefitDisplay benefit={rule.benefit} />
@@ -272,17 +280,52 @@ export function RulesPage() {
   );
 }
 
-function RuleTarget({ predicate, kind }: { predicate: Rule["predicate"]; kind: RuleKind }) {
+function RuleTarget({
+  predicate,
+  kind,
+  locations
+}: {
+  predicate: Rule["predicate"];
+  kind: RuleKind;
+  locations?: Location[];
+}) {
   const t = useT();
+  const customerBadge = predicate.customerClass ? (
+    <div>
+      <StateChip
+        state="issued"
+        label={t(`pricing.rules.customer_class.${predicate.customerClass}`).text}
+      />
+    </div>
+  ) : null;
+
+  const branchBadge = predicate.locationId ? (
+    <div>
+      <span className="pricing-muted">
+        {t("pricing.rules.target.location", undefined, {
+          branch:
+            locations?.find((l) => l.locationId === predicate.locationId)?.locationCode ??
+            predicate.locationId.substring(0, 8)
+        }).text}
+      </span>
+    </div>
+  ) : null;
+
   if (kind === "BILL_THRESHOLD" && predicate.billTotalFrom != null) {
     return (
-      <span>
-        {t("pricing.rules.target.bill_from").text} <MoneyDisplay amount={predicate.billTotalFrom} />
-      </span>
+      <div>
+        {customerBadge}
+        {branchBadge}
+        <span>
+          {t("pricing.rules.target.bill_from").text} <MoneyDisplay amount={predicate.billTotalFrom} />
+        </span>
+      </div>
     );
   }
   return (
     <div>
+      {customerBadge}
+      {branchBadge}
       {predicate.skuId && <SkuName skuId={predicate.skuId} />}
       {kind === "QUANTITY_BREAK" && predicate.minQty != null && (
         <span className="pricing-muted">
@@ -322,14 +365,17 @@ function RuleBenefitDisplay({ benefit }: { benefit: Rule["benefit"] }) {
   }
 }
 
-function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
+function AuthorRuleForm({ onCreated, locations }: { onCreated: () => void; locations?: Location[] }) {
   const t = useT();
+  const { locale } = useIntl();
   const api = usePricingApi();
   const key = useIdempotencyKey();
   const today = businessToday();
 
   const [name, setName] = useState("");
   const [kind, setKind] = useState<RuleKind>("TIME_LIMITED_PRICE");
+  const [customerClass, setCustomerClass] = useState<string>("GENERAL");
+  const [locationId, setLocationId] = useState<string>("");
   const [sku, setSku] = useState<Sku | null>(null);
   const [uomCode, setUomCode] = useState("");
   const [minQty, setMinQty] = useState("");
@@ -356,6 +402,8 @@ function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
     onSuccess: () => {
       key.next();
       setName("");
+      setCustomerClass("GENERAL");
+      setLocationId("");
       setSku(null);
       setUomCode("");
       setMinQty("");
@@ -424,7 +472,9 @@ function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
         uomCode: kind === "TIME_LIMITED_PRICE" && uomCode.trim() ? uomCode.trim() : null,
         minQty: kind === "QUANTITY_BREAK" && minQty ? Number(minQty) : null,
         daysToExpiry: kind === "EXPIRY_MARKDOWN" && daysToExpiry !== "" ? Number(daysToExpiry) : null,
-        billTotalFrom: kind === "BILL_THRESHOLD" && billTotalFrom ? Number(billTotalFrom) : null
+        billTotalFrom: kind === "BILL_THRESHOLD" && billTotalFrom ? Number(billTotalFrom) : null,
+        customerClass: customerClass === "GENERAL" ? null : (customerClass as "MEMBER" | "EMPLOYEE"),
+        locationId: locationId.trim() ? locationId.trim() : null
       },
       benefit: {
         kind: benefitKind,
@@ -472,6 +522,38 @@ function AuthorRuleForm({ onCreated }: { onCreated: () => void }) {
               { value: "QUANTITY_BREAK", label: t("pricing.rules.kind.QUANTITY_BREAK").text },
               { value: "BILL_THRESHOLD", label: t("pricing.rules.kind.BILL_THRESHOLD").text },
               { value: "EXPIRY_MARKDOWN", label: t("pricing.rules.kind.EXPIRY_MARKDOWN").text }
+            ]}
+          />
+        </label>
+
+        <label className="pricing-form-field">
+          <span>{t("pricing.rules.field.customer_class").text}</span>
+          <PricingSelect
+            aria-label={t("pricing.rules.field.customer_class").text}
+            value={customerClass}
+            onChange={(next) => setCustomerClass(next)}
+            options={[
+              { value: "GENERAL", label: t("pricing.rules.customer_class.GENERAL").text },
+              { value: "MEMBER", label: t("pricing.rules.customer_class.MEMBER").text },
+              { value: "EMPLOYEE", label: t("pricing.rules.customer_class.EMPLOYEE").text }
+            ]}
+          />
+        </label>
+
+        <label className="pricing-form-field">
+          <span>{t("pricing.rules.field.location").text}</span>
+          <PricingSelect
+            aria-label={t("pricing.rules.field.location").text}
+            value={locationId}
+            onChange={(next) => setLocationId(next)}
+            options={[
+              { value: "", label: t("pricing.rules.location.all").text },
+              ...(locations ?? [])
+                .filter((l) => l.locationType === "SHOP")
+                .map((loc) => ({
+                  value: loc.locationId,
+                  label: `${loc.locationCode} — ${inLocale(locale, loc.nameEn, loc.nameSi, loc.nameTa)}`
+                }))
             ]}
           />
         </label>

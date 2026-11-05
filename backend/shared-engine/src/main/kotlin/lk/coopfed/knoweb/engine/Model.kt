@@ -81,7 +81,7 @@ enum class BenefitKind { FIXED_PRICE, PERCENT_OFF, AMOUNT_OFF, FREE_QTY }
  * A discount rule, its predicate and benefit already read from the JSON of doc 23 section 3.3
  * (the closed vocabulary: no expression language). Fields a kind does not use are null.
  */
-data class Rule(
+data class Rule @JvmOverloads constructor(
     val ruleId: UUID,
     val kind: RuleKind,
     val priority: Int,
@@ -94,7 +94,9 @@ data class Rule(
     val daysToExpiry: Int? = null,
     val billThreshold: Money? = null,
     val benefitKind: BenefitKind,
-    val benefitValue: BigDecimal
+    val benefitValue: BigDecimal,
+    val customerClass: String? = null,
+    val locationId: UUID? = null
 ) {
     fun validOn(date: LocalDate): Boolean =
         !date.isBefore(validFrom) && (validTo == null || !date.isAfter(validTo))
@@ -111,7 +113,10 @@ data class LineInput(
     val pickedBatchId: UUID? = null
 )
 
-data class Basket(val lines: List<LineInput>)
+data class Basket @JvmOverloads constructor(
+    val lines: List<LineInput>,
+    val customerClass: String? = null
+)
 
 /**
  * The engine's answer for one line (doc 23 section 3.5, Outputs). unitPrice is the price the

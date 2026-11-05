@@ -86,6 +86,9 @@
   "m3.expiry_discount.evaluated": "කල් ඉකුත්වීමේ සහ මන්දගාමී වට්ටම් ඇගයීම සම්පූර්ණ කරන ලදී",
   "m3.location.not_found": "ස්ථානය සොයාගත නොහැකි විය",
   "m3.location.not_owned": "මෙම ආයතනයට අයත් ස්ථානයක් තෝරන්න",
+  "m3.rule.customer_class_invalid": "පාරිභෝගික පන්තිය වලංගු නොවේ; සාමාජික (MEMBER) හෝ සේවක (EMPLOYEE) තෝරන්න",
+  "m3.basket.beneficiary_incomplete": "ප්‍රතිලාභී පන්තිය සහ හඳුනාගැනීමේ අංකය එකවර ලබා දිය යුතුය",
+  "m3.rule.location_invalid": "නියමිත ශාඛාව හෝ සාප්පු ස්ථානය ඔබගේ ආයතනයට අයත් නොවේ",
   "m3.customer.location_required": "පාරිභෝගික මිල පිරික්සීම සඳහා වෙළඳසැල් ස්ථානයක් අවශ්‍ය වේ",
   "m3.customer.item_not_found": "තෝරාගත් වෙළඳසැලේ මෙම භාණ්ඩය සඳහා මිලක් හමු නොවීය",
   "m3.customer.lookup_failed": "මිල පිරික්සුම සම්පූර්ණ කළ නොහැකි විය"

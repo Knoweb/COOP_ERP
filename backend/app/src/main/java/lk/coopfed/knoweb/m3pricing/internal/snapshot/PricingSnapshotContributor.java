@@ -149,6 +149,7 @@ public class PricingSnapshotContributor implements SnapshotContributor {
     private Map<UUID, Map<String, Object>> discountRules(Shop shop, Collection<UUID> ids, LocalDate today) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("ownerEntityId", shop.ownerEntityId());
+        params.addValue("shopLocationId", shop.locationId().toString());
         params.addValue("ids", ids);
         params.addValue("today", Date.valueOf(today));
         String onlyIds = ids == null ? "" : " and r.rule_id in (:ids)";
@@ -161,7 +162,12 @@ public class PricingSnapshotContributor implements SnapshotContributor {
                   from pricing.discount_rule r
                  where r.owner_entity_id = :ownerEntityId
                    and r.status = 'ACTIVE'
-                   and (r.valid_to is null or r.valid_to >= :today)"""
+                   and (r.valid_to is null or r.valid_to >= :today)
+                   and (
+                        (r.predicate->>'location_id' is null and r.predicate->>'locationId' is null)
+                        or r.predicate->>'location_id' = :shopLocationId
+                        or r.predicate->>'locationId' = :shopLocationId
+                   )"""
                         + onlyIds
                         + " order by r.rule_id",
                 params,

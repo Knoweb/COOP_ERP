@@ -96,14 +96,28 @@ public interface PricingQueries {
             UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
 
     /**
-     * ResolveBasket(location, date, tenderKind, lines) of doc 23 section 5.2.
+     * ResolveBasket(location, date, tenderKind, lines, beneficiaryClass, beneficiaryIdentifier) (PGL-M1-06).
      */
     Optional<lk.coopfed.knoweb.engine.BasketResult> resolveBasket(
             UUID locationId,
             LocalDate date,
             lk.coopfed.knoweb.engine.TenderKind tender,
             lk.coopfed.knoweb.engine.Basket basket,
+            lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass beneficiaryClass,
+            String beneficiaryIdentifier,
             ScopeContext scope);
+
+    /**
+     * ResolveBasket(location, date, tenderKind, lines) of doc 23 section 5.2.
+     */
+    default Optional<lk.coopfed.knoweb.engine.BasketResult> resolveBasket(
+            UUID locationId,
+            LocalDate date,
+            lk.coopfed.knoweb.engine.TenderKind tender,
+            lk.coopfed.knoweb.engine.Basket basket,
+            ScopeContext scope) {
+        return resolveBasket(locationId, date, tender, basket, null, null, scope);
+    }
 
     /** The published ADVISORY lines in force on the date, of every Federation list (the shelf list's advisory column). */
     List<PriceListLineView> advisoryLines(LocalDate date, ScopeContext scope);

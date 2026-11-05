@@ -533,6 +533,16 @@ export interface components {
             minQty?: number | null;
             daysToExpiry?: number | null;
             billTotalFrom?: number | null;
+            /**
+             * @description Optional customer-class targeting (PGL-M1-06); null applies to general public.
+             * @enum {string|null}
+             */
+            customerClass?: "MEMBER" | "EMPLOYEE" | null;
+            /**
+             * Format: uuid
+             * @description Optional shop/branch location scope (PGL-M1-06); null applies society-wide to all branches.
+             */
+            locationId?: string | null;
         };
         RuleBenefit: {
             /** @enum {string} */
@@ -843,6 +853,13 @@ export interface components {
              * @enum {string}
              */
             tenderKind: "CASH" | "CARD" | "KHATA" | "CHEQUE" | "VOUCHER";
+            /**
+             * @description Optional explicit beneficiary class (PGL-M1-06). Requires beneficiaryIdentifier when supplied.
+             * @enum {string|null}
+             */
+            beneficiaryClass?: "MEMBER" | "EMPLOYEE" | null;
+            /** @description Optional explicit beneficiary credential (e.g. memberNo for MEMBER, employeeNo for EMPLOYEE). */
+            beneficiaryIdentifier?: string | null;
             lines: components["schemas"]["ResolveBasketLineRequest"][];
         };
         ResolveBasketLineRequest: {

@@ -421,7 +421,11 @@ class PricingController implements PricingApi {
                                         p.getUomCode(),
                                         p.getMinQty(),
                                         p.getDaysToExpiry(),
-                                        p.getBillTotalFrom()),
+                                        p.getBillTotalFrom(),
+                                        p.getCustomerClass() == null
+                                                ? null
+                                                : p.getCustomerClass().getValue(),
+                                        p.getLocationId()),
                         new lk.coopfed.knoweb.m3pricing.api.RuleBenefit(
                                 request.getBenefit().getKind().getValue(),
                                 request.getBenefit().getValue()),
@@ -459,7 +463,12 @@ class PricingController implements PricingApi {
                                 .uomCode(p.uomCode())
                                 .minQty(p.minQty())
                                 .daysToExpiry(p.daysToExpiry())
-                                .billTotalFrom(p.billTotalFrom()),
+                                .billTotalFrom(p.billTotalFrom())
+                                .customerClass(
+                                        p.customerClass() == null
+                                                ? null
+                                                : RulePredicate.CustomerClassEnum.fromValue(p.customerClass()))
+                                .locationId(p.locationId()),
                         new RuleBenefit(
                                 RuleBenefit.KindEnum.fromValue(rule.benefit().kind()),
                                 rule.benefit().value()),
@@ -632,8 +641,20 @@ class PricingController implements PricingApi {
                     l.getSkuId(), l.getUom(), qty, l.getBatchId(), l.getPickedBatchId()));
         }
 
+        lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass beneficiaryClass = null;
+        if (request.getBeneficiaryClass() != null) {
+            beneficiaryClass = lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass.valueOf(
+                    request.getBeneficiaryClass().getValue());
+        }
+
         return queries.resolveBasket(
-                        request.getLocationId(), request.getBusinessDate(), tender, new Basket(engineLines), scope)
+                        request.getLocationId(),
+                        request.getBusinessDate(),
+                        tender,
+                        new Basket(engineLines),
+                        beneficiaryClass,
+                        request.getBeneficiaryIdentifier(),
+                        scope)
                 .map(result -> ResponseEntity.ok(toResponse(result)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
