@@ -127,4 +127,27 @@ public interface InventoryQueries {
     default List<StockRepricingView> repricings(UUID locationId, ScopeContext scope) {
         return repricings(locationId, null, scope);
     }
+
+    /**
+     * Aggregated stock position summaries for a location with explainable on-hand, reserved,
+     * in-transit, and count variance quantities, optionally filtered by department, UOM, or discrepancy (PGL-M2-10).
+     */
+    List<StockSummaryView> stockSummaries(
+            UUID locationId,
+            UUID departmentId,
+            String uomCode,
+            UUID skuId,
+            boolean includeZero,
+            boolean discrepancyOnly,
+            ScopeContext scope);
+
+    default List<StockSummaryView> stockSummaries(UUID locationId, ScopeContext scope) {
+        return stockSummaries(locationId, null, null, null, false, false, scope);
+    }
+
+    /**
+     * Explainability drilldown detailing the specific lots, pick-list reservations, in-transit transfers,
+     * and count sessions behind a SKU's stock position at a location (PGL-M2-10).
+     */
+    Optional<StockExplanationView> stockExplanation(UUID locationId, UUID skuId, ScopeContext scope);
 }
