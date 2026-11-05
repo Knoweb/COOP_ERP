@@ -159,7 +159,8 @@ class OrderQueriesImpl implements OrderQueries {
                 deliveryPoint(row),
                 ((Number) row.get("version")).intValue(),
                 (UUID) row.get("amends_order_id"),
-                (UUID) row.get("amended_by"));
+                (UUID) row.get("amended_by"),
+                header.operatorUserId());
     }
 
     /** The delivery point the order was drafted for (V0004); null for an order that names none. */

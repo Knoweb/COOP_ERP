@@ -213,6 +213,7 @@ class OrderController implements OrderApi {
         response.setNetAmount(order.netAmount());
         response.setNotes(order.notes());
         response.setDeliverToLocationId(order.deliverToLocationId());
+        response.setOperatorUserId(order.operatorUserId());
         response.setVersion(order.version());
         response.setAmendsOrderId(order.amendsOrderId());
         response.setAmendedByOrderId(order.amendedByOrderId());
