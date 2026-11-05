@@ -1435,26 +1435,111 @@ select.pricing-select option:focus {
   width: 100%;
 }
 
-/* ---- Markdown Queue Search Bar --------------------------------- */
+/* ---- Markdown Queue Filter Panel & Search (PGL-M1-07) ------------------ */
 
-.pricing-markdown-search-field {
-  flex: 0 1 calc(var(--space-8) * 3 + var(--space-6));
-  width: calc(var(--space-8) * 3 + var(--space-6));
-  min-width: 0;
-  max-width: 100%;
-  margin-left: auto;
+.pricing-markdown-filter-card {
+  background: var(--color-accent-light) !important;
+  border: var(--border-width) solid var(--color-border) !important;
+  border-radius: calc(var(--radius) * 4) !important;
+  padding: var(--space-3) var(--space-4) !important;
+  margin-bottom: var(--space-3) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-13) !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
 }
 
-.pricing-markdown-search-field > span {
-  color: var(--color-brand-dark) !important;
+.pricing-markdown-filter-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-3) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Row 1: Location (1.4fr), Reason (1fr), Status (1fr) */
+.pricing-markdown-row-top {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: var(--space-3) !important;
+  align-items: flex-end !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Row 2: Snug Search Box + Action Button */
+.pricing-markdown-row-bottom {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: var(--space-3) !important;
+  align-items: flex-end !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.pricing-markdown-cell--location,
+.pricing-markdown-cell--reason,
+.pricing-markdown-cell--status {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-half) !important;
+}
+
+/* Search Box: Snug width strictly for "Search Markdown Queue..." text (~240px) without excess empty space */
+.pricing-markdown-cell--search {
+  flex: 0 0 calc(var(--space-8) * 3.8) !important;
+  width: calc(var(--space-8) * 3.8) !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-half) !important;
+}
+
+.pricing-markdown-cell--action {
+  display: flex !important;
+  align-items: flex-end !important;
+  flex: 0 0 auto !important;
+}
+
+.pricing-markdown-filter-card .dropdown-select__trigger,
+.pricing-markdown-filter-card .pricing-markdown-search-input {
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.pricing-markdown-filter-card .dropdown-select__trigger:hover,
+.pricing-markdown-filter-card .pricing-markdown-search-input:hover {
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.pricing-markdown-filter-card .dropdown-select__trigger:focus,
+.pricing-markdown-filter-card .dropdown-select__trigger--active,
+.pricing-markdown-filter-card .pricing-markdown-search-input:focus {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.pricing-markdown-filter-card .pricing-filter-label {
+  display: block !important;
+  font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
+  color: var(--color-brand-dark) !important;
+  text-transform: uppercase !important;
+  letter-spacing: calc(var(--space-half) / 4) !important;
+  margin-bottom: var(--space-1) !important;
 }
 
 .pricing-markdown-search-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
 }
 
 .pricing-markdown-search-icon {
@@ -1464,10 +1549,17 @@ select.pricing-select option:focus {
   transform: translateY(-50%) !important;
   width: var(--space-2) !important;
   height: var(--space-2) !important;
-  stroke: var(--color-brand-dark) !important;
+  stroke: var(--color-accent) !important;
+  fill: none !important;
   pointer-events: none !important;
   flex-shrink: 0 !important;
   z-index: 2 !important;
+}
+
+.pricing-markdown-search-icon circle,
+.pricing-markdown-search-icon line {
+  fill: none !important;
+  stroke: var(--color-accent) !important;
 }
 
 .shell-page input.pricing-markdown-search-input,
@@ -1478,12 +1570,12 @@ select.pricing-select option:focus {
   max-width: 100% !important;
   min-height: calc(var(--space-4) + var(--space-1)) !important;
   padding-left: calc(var(--space-4) + var(--space-1)) !important;
-  padding-right: calc(var(--space-4) + var(--space-1)) !important;
+  padding-right: var(--space-3) !important;
   padding-top: var(--space-1) !important;
   padding-bottom: var(--space-1) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
   border: var(--border-width) solid var(--color-accent) !important;
-  background-color: var(--color-polish-24) !important;
+  background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
@@ -1569,6 +1661,62 @@ select.pricing-select option:focus {
   width: var(--space-2);
   height: var(--space-2);
   stroke: currentColor;
+}
+
+.pricing-markdown-btn-evaluate {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--space-1) !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding: 0 var(--space-3) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-surface) !important;
+  background: var(--color-accent) !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-13) !important;
+}
+
+.pricing-markdown-btn-evaluate:hover:not(:disabled) {
+  background: var(--color-brand-dark) !important;
+  transform: translateY(calc(var(--border-width) * -1)) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13) !important;
+}
+
+.pricing-markdown-btn-evaluate:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+.pricing-markdown-btn-evaluate:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.pricing-markdown-btn-icon {
+  width: var(--font-size-sm) !important;
+  height: var(--font-size-sm) !important;
+  stroke: currentColor !important;
+  stroke-width: var(--border-width-strong) !important;
+  fill: none !important;
+  flex-shrink: 0 !important;
+}
+
+@keyframes pricing-markdown-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pricing-markdown-spin {
+  animation: pricing-markdown-spin 1s linear infinite !important;
 }
 
 /* ---- Trade List Detail Search Bar -------------------------------- */
@@ -1857,6 +2005,10 @@ select.pricing-select option:focus {
   max-width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 3) !important;
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-13), 0 var(--space-half) var(--space-2) var(--color-polish-14) !important;
   overflow: hidden !important;
 }
 
@@ -1865,159 +2017,185 @@ select.pricing-select option:focus {
   max-width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
-  overflow: hidden !important;
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
   overflow-y: hidden !important;
-  touch-action: pan-y !important;
-  user-select: auto;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--color-polish-18) transparent !important;
 }
 
 .pricing-markdown-table {
-  table-layout: fixed !important;
   width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
+  min-width: calc(var(--space-8) * 23) !important;
   border-collapse: collapse !important;
   border-spacing: 0 !important;
   box-sizing: border-box !important;
+  margin: 0 !important;
 }
 
-/* Explicit percentage widths and alignments for the six Markdown Queue columns */
+/* Explicit widths and alignments for all 11 Markdown Queue columns */
 
 .shell-page .pricing-markdown-table th,
 .pricing-markdown-table th {
-  min-width: 0 !important;
-  white-space: normal !important;
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
-  line-height: var(--line-height) !important;
-  padding: var(--space-2) var(--space-1) !important;
-  box-sizing: border-box !important;
+  background: var(--color-accent-light) !important;
+  color: var(--color-brand-dark) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  letter-spacing: calc(var(--space-half) / 4) !important;
+  padding: var(--space-2) var(--space-2) !important;
+  white-space: nowrap !important;
+  border-bottom: var(--border-width) solid var(--color-border) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  vertical-align: middle !important;
   text-align: center !important;
+  box-sizing: border-box !important;
+}
+
+.shell-page .pricing-markdown-table th:last-child,
+.pricing-markdown-table th:last-child {
+  border-right: none !important;
 }
 
 .shell-page .pricing-markdown-table td,
 .pricing-markdown-table td {
-  min-width: 0 !important;
-  padding: var(--space-2) var(--space-1) !important;
+  padding: var(--space-2) var(--space-2) !important;
+  font-size: var(--font-size-sm) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-18) !important;
+  border-right: var(--border-width) solid var(--color-polish-18) !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  text-align: center !important;
   box-sizing: border-box !important;
 }
 
-/* 1. Item (First Column - 20%) */
+.shell-page .pricing-markdown-table td:last-child,
+.pricing-markdown-table td:last-child {
+  border-right: none !important;
+}
+
+/* 1. Item */
 .shell-page .pricing-markdown-table th:first-child,
 .shell-page .pricing-markdown-table th.pricing-th-item,
 .pricing-markdown-table th:first-child,
 .pricing-markdown-table th.pricing-th-item,
-.pricing-col-item {
-  width: 20% !important;
-  min-width: 0 !important;
-  max-width: 20% !important;
-  text-align: left !important;
-  vertical-align: middle !important;
-}
-
 .shell-page .pricing-markdown-table td:first-child,
 .shell-page .pricing-markdown-table td.pricing-cell-item,
 .pricing-markdown-table td:first-child,
-.pricing-markdown-table td.pricing-cell-item {
-  width: 20% !important;
-  min-width: 0 !important;
-  max-width: 20% !important;
+.pricing-markdown-table td.pricing-cell-item,
+.pricing-col-item {
+  min-width: calc(var(--space-8) * 3.5) !important;
   text-align: left !important;
-  vertical-align: middle !important;
+  white-space: normal !important;
 }
 
-/* 2. Batch (14%) */
+/* 2. Reason */
+.shell-page .pricing-markdown-table th.pricing-th-reason,
+.pricing-markdown-table th.pricing-th-reason,
+.shell-page .pricing-markdown-table td.pricing-cell-reason,
+.pricing-markdown-table td.pricing-cell-reason,
+.pricing-col-reason {
+  min-width: calc(var(--space-8) * 2.2) !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+/* 3. Classification / Tier */
+.shell-page .pricing-markdown-table th.pricing-th-classification,
+.pricing-markdown-table th.pricing-th-classification,
+.shell-page .pricing-markdown-table td.pricing-cell-classification,
+.pricing-markdown-table td.pricing-cell-classification,
+.pricing-col-classification {
+  min-width: calc(var(--space-8) * 2.8) !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+/* 4. Batch */
 .shell-page .pricing-markdown-table th.pricing-th-batch,
 .pricing-markdown-table th.pricing-th-batch,
-.pricing-col-batch {
-  width: 14% !important;
-  min-width: 0 !important;
-  max-width: 14% !important;
-  text-align: center !important;
-  vertical-align: middle !important;
-}
-
 .shell-page .pricing-markdown-table td.pricing-cell-batch,
-.pricing-markdown-table td.pricing-cell-batch {
-  width: 14% !important;
-  min-width: 0 !important;
-  max-width: 14% !important;
+.pricing-markdown-table td.pricing-cell-batch,
+.pricing-col-batch {
+  min-width: calc(var(--space-8) * 2.2) !important;
   text-align: center !important;
-  vertical-align: middle !important;
+  white-space: nowrap !important;
 }
 
-/* 3. Expiry Date (12%) */
+/* 5. Expiry Date */
 .shell-page .pricing-markdown-table th.pricing-th-expiry,
 .shell-page .pricing-markdown-table td.pricing-cell-expiry,
 .pricing-col-expiry,
 .pricing-th-expiry,
 .pricing-cell-expiry {
-  width: 12% !important;
-  min-width: 0 !important;
-  max-width: 12% !important;
+  min-width: calc(var(--space-8) * 1.9) !important;
   text-align: center !important;
-  vertical-align: middle !important;
+  white-space: nowrap !important;
 }
 
-/* 4. Days Remaining (12%) */
+/* 6. Days Remaining */
 .shell-page .pricing-markdown-table th.pricing-th-days,
 .shell-page .pricing-markdown-table td.pricing-cell-days,
 .pricing-col-days,
 .pricing-th-days,
 .pricing-cell-days {
-  width: 12% !important;
-  min-width: 0 !important;
-  max-width: 12% !important;
+  min-width: calc(var(--space-8) * 2.2) !important;
   text-align: center !important;
-  vertical-align: middle !important;
+  white-space: nowrap !important;
 }
 
-/* 5. Qty on Hand (10%) */
+/* 7. Qty on Hand */
 .shell-page .pricing-markdown-table th.pricing-th-qty,
 .shell-page .pricing-markdown-table td.pricing-cell-qty,
 .pricing-col-qty,
 .pricing-th-qty,
 .pricing-markdown-table .pricing-cell-qty {
-  width: 10% !important;
-  min-width: 0 !important;
-  max-width: 10% !important;
+  min-width: calc(var(--space-8) * 1.8) !important;
   text-align: center !important;
-  vertical-align: middle !important;
   font-variant-numeric: tabular-nums !important;
 }
 
-/* 6. Condition (11%) */
+/* 8. Condition */
 .shell-page .pricing-markdown-table th.pricing-th-condition,
 .shell-page .pricing-markdown-table td.pricing-cell-condition,
 .pricing-col-condition,
 .pricing-th-condition,
 .pricing-markdown-table .pricing-cell-condition {
-  width: 11% !important;
-  min-width: 0 !important;
-  max-width: 11% !important;
+  min-width: calc(var(--space-8) * 1.6) !important;
   text-align: center !important;
-  vertical-align: middle !important;
+  white-space: nowrap !important;
 }
 
-/* 7. Applicable Markdown Rule (21%) */
+/* 9. Applicable Markdown Rule */
 .shell-page .pricing-markdown-table th.pricing-th-rule,
 .pricing-col-rule,
-.pricing-th-rule {
-  width: 21% !important;
-  min-width: 0 !important;
-  max-width: 21% !important;
-  text-align: center !important;
-  vertical-align: middle !important;
-}
-
+.pricing-th-rule,
 .shell-page .pricing-markdown-table td.pricing-cell-rule,
 .pricing-cell-rule {
-  width: 21% !important;
-  min-width: 0 !important;
-  max-width: 21% !important;
-  text-align: left !important;
-  vertical-align: middle !important;
+  min-width: calc(var(--space-8) * 3.4) !important;
+  text-align: center !important;
+}
+
+/* 10. Discounted Price */
+.shell-page .pricing-markdown-table th.pricing-th-price,
+.pricing-col-price,
+.pricing-th-price,
+.shell-page .pricing-markdown-table td.pricing-cell-price,
+.pricing-cell-price {
+  min-width: calc(var(--space-8) * 1.8) !important;
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* 11. Status */
+.shell-page .pricing-markdown-table th.pricing-th-status,
+.pricing-col-status,
+.pricing-th-status,
+.shell-page .pricing-markdown-table td.pricing-cell-status,
+.pricing-cell-status {
+  min-width: calc(var(--space-8) * 1.5) !important;
+  text-align: center !important;
+  white-space: nowrap !important;
 }
 
 /* Centering child elements for center-aligned columns */
@@ -2035,9 +2213,9 @@ select.pricing-select option:focus {
 .pricing-cell-rule .pricing-markdown-rule-badge {
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  gap: var(--space-1) !important;
-  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: var(--space-2) !important;
+  flex-wrap: nowrap !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -2366,11 +2544,7 @@ select.pricing-select option:focus {
 }
 
 /* ---- Markdown Queue Enhancements (PGL-M1-07) -------------------------------- */
-.pricing-markdown-action-cell {
-  display: flex;
-  align-items: flex-end;
-  margin-bottom: var(--space-2);
-}
+/* Action cell styles managed in Markdown Queue Filter Panel */
 
 .pricing-markdown-feedback {
   margin: var(--space-4) 0;
