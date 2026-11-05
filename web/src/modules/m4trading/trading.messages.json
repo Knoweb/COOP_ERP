@@ -291,7 +291,11 @@
     "trading.claim.return": "Send the goods back",
     "trading.claims.empty": "No claims",
     "trading.claims.received.title": "Claims received",
-    "trading.claims.raised.title": "Claims raised"
+    "trading.claims.raised.title": "Claims raised",
+    "trading.order.manual_branch": "Manual branch",
+    "trading.order.on_behalf.badge": "On-behalf order",
+    "trading.order.on_behalf.description": "Entering order on behalf of non-computerized branch: {branch}. Head-office user recorded as acting operator.",
+    "trading.order.acting_user": "Entered by"
   },
   "si": {
     "trading.nav": "වෙළඳාම",
@@ -585,7 +589,11 @@
     "trading.claim.return": "භාණ්ඩ ආපසු යවන්න",
     "trading.claims.empty": "හිමිකම් ඉල්ලීම් නැත",
     "trading.claims.received.title": "ලැබුණු හිමිකම් ඉල්ලීම්",
-    "trading.claims.raised.title": "ඉදිරිපත් කළ හිමිකම් ඉල්ලීම්"
+    "trading.claims.raised.title": "ඉදිරිපත් කළ හිමිකම් ඉල්ලීම්",
+    "trading.order.manual_branch": "අතින් ක්‍රියාත්මක ශාඛාව",
+    "trading.order.on_behalf.badge": "වෙනුවෙන් නියෝගය",
+    "trading.order.on_behalf.description": "පරිගණකගත නොකළ ශාඛාව වෙනුවෙන් නියෝගය ඇතුළත් කිරීම: {branch}. ක්‍රියාකාරී ක්‍රියාකරු ලෙස ප්‍රධාන කාර්යාල පරිශීලක සටහන් වේ.",
+    "trading.order.acting_user": "ඇතුළත් කළේ"
   },
   "ta": {
     "trading.nav": "வர்த்தகம்",
@@ -879,6 +887,10 @@
     "trading.claim.return": "பொருட்களைத் திருப்பி அனுப்புங்கள்",
     "trading.claims.empty": "உரிமைகோரல்கள் இல்லை",
     "trading.claims.received.title": "பெறப்பட்ட உரிமைகோரல்கள்",
-    "trading.claims.raised.title": "எழுப்பிய உரிமைகோரல்கள்"
+    "trading.claims.raised.title": "எழுப்பிய உரிமைகோரல்கள்",
+    "trading.order.manual_branch": "கையேடு கிளை",
+    "trading.order.on_behalf.badge": "சார்பாக ஆணை",
+    "trading.order.on_behalf.description": "கணினிமயமாக்கப்படாத கிளை சார்பாக ஆணை உள்ளிடப்படுகிறது: {branch}. தலைமை அலுவலக பயனர் செயல்படும் ஆபரேட்டராக பதிவு செய்யப்பட்டுள்ளார்.",
+    "trading.order.acting_user": "உள்ளிட்டவர்"
   }
 }

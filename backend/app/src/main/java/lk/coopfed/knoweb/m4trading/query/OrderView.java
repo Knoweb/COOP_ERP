@@ -41,7 +41,51 @@ public record OrderView(
         DeliveryPoint deliverTo,
         int version,
         UUID amendsOrderId,
-        UUID amendedByOrderId) {
+        UUID amendedByOrderId,
+        UUID operatorUserId) {
+
+    public OrderView(
+            UUID orderId,
+            String docNumberDisplay,
+            String status,
+            UUID relationshipId,
+            UUID buyerEntityId,
+            UUID sellerEntityId,
+            LocalDate requestedEta,
+            LocalDate committedEta,
+            Instant lockAt,
+            Instant submittedAt,
+            String rejectReasonCode,
+            BigDecimal netAmount,
+            String notes,
+            List<OrderLineView> lines,
+            UUID deliverToLocationId,
+            DeliveryPoint deliverTo,
+            int version,
+            UUID amendsOrderId,
+            UUID amendedByOrderId) {
+        this(
+                orderId,
+                docNumberDisplay,
+                status,
+                relationshipId,
+                buyerEntityId,
+                sellerEntityId,
+                requestedEta,
+                committedEta,
+                lockAt,
+                submittedAt,
+                rejectReasonCode,
+                netAmount,
+                notes,
+                lines,
+                deliverToLocationId,
+                deliverTo,
+                version,
+                amendsOrderId,
+                amendedByOrderId,
+                null);
+    }
 
     /** A location as the order names it: a snapshot taken at drafting, never changed after. */
     public record DeliveryPoint(String code, String nameEn, String nameSi, String nameTa, String address) {}
