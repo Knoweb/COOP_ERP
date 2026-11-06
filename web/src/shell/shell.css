@@ -2259,8 +2259,9 @@ textarea {
 }
 
 .dropdown-select__native {
+  display: none !important;
   position: absolute !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
   pointer-events: none !important;
   width: 0 !important;
   height: 0 !important;
@@ -2351,7 +2352,7 @@ textarea {
   list-style: none;
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 8px 24px var(--color-polish-1);
   max-height: calc(var(--space-8) * 4);
   overflow-y: auto;
@@ -3294,7 +3295,7 @@ textarea {
 @media (max-width: 640px) {
   .register-society-card {
     padding: 16px;
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
 }
 
@@ -3683,7 +3684,7 @@ textarea {
 .bulk-excel-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
   margin-bottom: 28px;
   box-shadow: 0 2px 8px var(--color-polish-23);
@@ -4650,7 +4651,7 @@ textarea {
     max-width: calc(100vw - 20px);
     min-width: 0;
     padding: var(--space-3);
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
 
   /* Off-canvas mobile drawer sidebar */
@@ -5523,7 +5524,7 @@ textarea {
   .shell-message {
     padding: 16px;
     margin: 0 0 16px;
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
 
   .page-heading {
@@ -5587,7 +5588,7 @@ textarea {
   }
 
   .users-table-card {
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
 }
 
@@ -5717,7 +5718,7 @@ textarea {
   list-style: none;
   background: var(--color-surface);
   border: 1px solid var(--color-polish-14);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 10px 28px var(--color-polish-21), 0 2px 6px var(--color-polish-3);
   overflow-y: auto;
   max-height: 280px;
@@ -5822,7 +5823,7 @@ textarea {
 /* User details card (UserCardPage) */
 .user-card-header .document-header {
   padding: 18px 24px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--color-polish-14);
   border-top: 4px solid var(--color-accent);
   background: var(--color-surface);
@@ -6719,7 +6720,7 @@ textarea {
 .catalogue-image-card,
 .catalogue-image-settings-panel {
   border: 1.5px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 18px 20px;
   background-color: var(--color-surface);
   display: flex;
@@ -6885,7 +6886,7 @@ textarea {
 }
 
 .catalogue-dropzone {
-  border: var(--border-width-strong) dashed var(--color-border);
+  border: 1.5px dashed var(--color-border);
   border-radius: var(--radius);
   padding: var(--space-6) var(--space-4);
   display: flex;
@@ -6896,7 +6897,7 @@ textarea {
   background-color: var(--color-surface);
   cursor: pointer;
   transition: border-color 0.2s ease, background-color 0.2s ease;
-  min-height: calc(var(--space-8) * 3 + var(--space-4));
+  min-height: 120px;
 }
 
 .catalogue-dropzone:hover,
@@ -7621,7 +7622,7 @@ textarea {
   padding: 14px;
   background: var(--color-polish-29);
   border: 1px solid var(--color-polish-14);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .suspect-card__side {
@@ -7958,7 +7959,7 @@ textarea {
 @media (max-width: 640px) {
   .sku-editor-card {
     padding: 18px 20px;
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
 }
 
@@ -8049,6 +8050,8 @@ textarea {
 }
 
 .catalogue-form-field .register-dropdown-trigger {
+  position: relative !important;
+  z-index: 1 !important;
   width: 100% !important;
 }
 
@@ -8252,7 +8255,7 @@ textarea {
   padding: 24px;
   background: var(--color-surface-subtle);
   border: 1px dashed var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   text-align: center;
   color: var(--color-text-muted);
   font-size: 14px;
@@ -8373,7 +8376,7 @@ textarea {
   padding: 22px 24px;
   background: var(--color-surface);
   border: 1.5px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-sizing: border-box;
   max-width: 620px;
   box-shadow: 0 4px 16px var(--color-polish-22);
@@ -8725,7 +8728,7 @@ textarea {
   text-align: center;
   background: var(--color-surface);
   border: 1.5px dashed var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--color-text-muted);
   font-size: 14px;
   max-width: 620px;
@@ -10145,7 +10148,7 @@ textarea {
 }
 
 .custom-status-dropdown__option--selected::before,
-.register-dropdown-option--selected::before,
+/* .register-dropdown-option--selected::before removed so only hover displays the moving wine line */
 .reason-capture .register-dropdown-option--selected::before {
   content: "" !important;
   position: static !important;
@@ -10217,9 +10220,9 @@ textarea {
 }
 
 
-/* ==========================================================================
+/* ====
    Reason Capture Modal Dialog & Custom Dropdown Polish
-   ========================================================================== */
+   ==== */
 .reason-capture {
   overflow: visible !important;
 }
@@ -10362,7 +10365,7 @@ textarea {
   height: 18px !important;
   background-color: var(--color-accent) !important;
   border-radius: 2px !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
   display: block !important;
   transition: opacity 0.15s ease !important;
 }
@@ -10370,10 +10373,10 @@ textarea {
 /* Show the dark line on hover, active (when opening), or selected */
 .reason-capture .register-dropdown-option:hover::before,
 .reason-capture .register-dropdown-option--active::before,
-.reason-capture .register-dropdown-option--selected::before,
+/* selected line removed */
 .reason-dropdown-menu .register-dropdown-option:hover::before,
 .reason-dropdown-menu .register-dropdown-option--active::before,
-.reason-dropdown-menu .register-dropdown-option--selected::before,
+/* selected line removed */
 .reason-dropdown-menu .custom-status-dropdown__option:hover::before,
 .reason-dropdown-menu .custom-status-dropdown__option--active::before,
 .reason-dropdown-menu .custom-status-dropdown__option--selected::before {
@@ -10418,9 +10421,10 @@ textarea {
 }
 
 
-/* ==========================================================================
+
+/* ====
    Society Register Compact Dropdown & Seamless Floating Scrollbar
-   ========================================================================== */
+   ==== */
 .register-dropdown-menu--compact,
 .register-field-group .register-dropdown-menu--compact {
   max-height: 168px !important;
@@ -10453,8 +10457,229 @@ textarea {
 }
 
 .register-field-group .register-dropdown-menu::-webkit-scrollbar-button,
-.register-dropdown-menu--compact::-webkit-scrollbar-button {
+.register-dropdown-menu--compact::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; } /*
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+
+/* =
+   M2 Catalogue Polish: Directory Card Matching Dropzone & Unified Dropdowns
+   = */
+
+/* 1. Suppliers Bulk Import Dropzone - Exact size and proportions matching Directory card (620px max-width) */
+.catalogue-dropzone {
+  width: 100% !important;
+  max-width: 620px !important;
+  min-height: 120px !important;
+  padding: 20px 24px !important;
+  border: 1.5px dashed var(--color-border) !important;
+  border-radius: 14px !important;
+  background-color: var(--color-surface) !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.catalogue-dropzone:hover,
+.catalogue-dropzone--active {
+  border-color: var(--color-accent) !important;
+  background-color: var(--color-surface-subtle) !important;
+  box-shadow: 0 4px 14px var(--color-polish-23) !important;
+}
+
+.catalogue-dropzone__icon {
+  color: var(--color-accent) !important;
+  margin-bottom: 6px !important;
+  transition: transform 0.2s ease !important;
+}
+
+.catalogue-dropzone:hover .catalogue-dropzone__icon {
+  transform: translateY(-2px) !important;
+}
+
+.catalogue-dropzone__prompt {
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  color: var(--color-text) !important;
+  margin: 0 0 4px 0 !important;
+}
+
+.catalogue-dropzone__hint {
+  font-size: 12.5px !important;
+  color: var(--color-text-muted) !important;
+}
+
+.catalogue-file-card {
+  max-width: 620px !important;
+  border-radius: 14px !important;
+}
+
+/* 2. Unified Dropdowns in Catalogue & Form Fields (Wine accent line, pink hover, checkmark) */
+.catalogue-dropdown-native,
+.dropdown-select__native {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+.catalogue-form-field .register-dropdown-trigger {
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  border: 1.5px solid var(--color-border) !important;
+  background: var(--color-surface-subtle) !important;
+  font-size: 14.5px !important;
+  font-weight: 500 !important;
+  color: var(--color-text) !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+}
+
+.catalogue-form-field .register-dropdown-trigger:hover {
+  border-color: var(--color-text-muted) !important;
+  background: var(--color-surface) !important;
+}
+
+.catalogue-form-field .register-dropdown-trigger:focus-visible,
+.catalogue-form-field .register-dropdown-trigger[aria-expanded="true"] {
+  border-color: var(--color-accent) !important;
+  background: var(--color-surface) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+}
+
+.catalogue-form-field .register-dropdown-menu {
+  max-height: 260px !important;
+  border: 1.5px solid var(--color-accent) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 25px var(--color-polish-8) !important;
+  padding: 6px !important;
+  background: var(--color-surface) !important;
+  z-index: 9999 !important;
+}
+
+/* Unified option indicator: Left vertical accent wine line */
+.catalogue-form-field .register-dropdown-option,
+.register-dropdown-menu .register-dropdown-option {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 14px 0 28px !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+
+.catalogue-form-field .register-dropdown-option--selected::before,
+.register-dropdown-menu .register-dropdown-option--selected::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 3.5px !important;
+  height: 18px !important;
+  background-color: var(--color-accent) !important;
+  border-radius: 2px !important;
+  opacity: 1 !important;
+  display: block !important;
+  transition: opacity 0.15s ease !important;
+}
+
+.catalogue-form-field .register-dropdown-option:not(.register-dropdown-option--selected)::before,
+.register-dropdown-menu .register-dropdown-option:not(.register-dropdown-option--selected)::before {
+  display: none !important;
+  opacity: 0 !important;
+  content: none !important;
+}
+/*
+  display: none !important;
+}
+.dropdown-unused-cleanup-2 {
+  opacity: 0 !important;
+}
+.dropdown-unused-cleanup-3 {
+}
+.dropdown-unused-cleanup-4 {
+  display: none !important;
+}
+.dropdown-unused-cleanup-5 {
+}
+.dropdown-unused-cleanup-6 {
+  display: none !important;
+}
+.dropdown-unused-cleanup-7 {
+  display: none !important;
+  opacity: 0 !important;
+  content: none !important;
+}
+
+
+
+
+
+
+
+  opacity: 1 !important;
+  display: block !important;
+}
+
+
+  display: none !important;
+  opacity: 1 !important;
+}
+
+*/ .catalogue-form-field .register-dropdown-option:hover,
+.catalogue-form-field .register-dropdown-option--active,
+.register-dropdown-menu .register-dropdown-option:hover,
+.register-dropdown-menu .register-dropdown-option--active {
+  background: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+}
+
+.catalogue-form-field .register-dropdown-option--selected,
+.register-dropdown-menu .register-dropdown-option--selected {
+  background: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: 600 !important;
+}
+
+.catalogue-form-field .register-dropdown-option .custom-status-dropdown__check,
+.register-dropdown-menu .register-dropdown-option .custom-status-dropdown__check {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--color-accent) !important;
+  stroke: var(--color-accent) !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.supplier-import-section {
+  max-width: 620px !important;
+
 }

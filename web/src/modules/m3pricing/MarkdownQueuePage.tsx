@@ -275,115 +275,135 @@ export function MarkdownQueuePage() {
       <p className="modern-intro-text">{t("pricing.markdown.intro").text}</p>
 
       <section className="pricing-section">
-        <div className="pricing-filter-bar">
-          <label className="pricing-form-field pricing-location-filter-field">
-            <span className="pricing-filter-label">
-              {t("pricing.markdown.select_location").text}
-            </span>
-            <PricingSelect
-              aria-label={t("pricing.markdown.select_location").text}
-              value={locationId}
-              onChange={setLocationId}
-              disabled={locationsQuery.isLoading}
-              options={
-                locationsQuery.data?.map((loc) => ({
-                  value: loc.locationId,
-                  label: `${loc.locationCode} — ${inLocale(locale, loc.nameEn, loc.nameSi, loc.nameTa)}`
-                })) ?? []
-              }
-            />
-          </label>
-
-          <label className="pricing-form-field">
-            <span className="pricing-filter-label">{t("pricing.markdown.filter_reason").text}</span>
-            <PricingSelect
-              aria-label={t("pricing.markdown.filter_reason").text}
-              value={reasonFilter}
-              onChange={(val) => setReasonFilter(val as ReasonFilter)}
-              options={[
-                { value: "ALL", label: t("pricing.markdown.reason.all").text },
-                { value: "NEAR_EXPIRY", label: t("pricing.markdown.reason.near_expiry").text },
-                { value: "SLOW_MOVING", label: t("pricing.markdown.reason.slow_moving").text }
-              ]}
-            />
-          </label>
-
-          <label className="pricing-form-field">
-            <span className="pricing-filter-label">{t("pricing.markdown.filter_status").text}</span>
-            <PricingSelect
-              aria-label={t("pricing.markdown.filter_status").text}
-              value={statusFilter}
-              onChange={(val) => setStatusFilter(val as StatusFilter)}
-              options={[
-                { value: "ACTIVE", label: t("pricing.markdown.status.active").text },
-                { value: "ALL", label: t("pricing.markdown.status.all").text }
-              ]}
-            />
-          </label>
-
-          <label className="pricing-form-field pricing-markdown-search-field">
-            <span className="pricing-filter-label">
-              {t("pricing.markdown.search_label").text}
-            </span>
-            <div className="pricing-markdown-search-wrapper">
-              <svg
-                className="pricing-markdown-search-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="search"
-                className="pricing-markdown-search-input"
-                placeholder={t("pricing.markdown.search_placeholder").text}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setSearchQuery("");
+        <div className="pricing-markdown-filter-card">
+          <div className="pricing-markdown-filter-container">
+            <div className="pricing-markdown-row-top">
+              <label className="pricing-form-field pricing-markdown-cell--location">
+                <span className="pricing-filter-label">
+                  {t("pricing.markdown.select_location").text}
+                </span>
+                <PricingSelect
+                  aria-label={t("pricing.markdown.select_location").text}
+                  value={locationId}
+                  onChange={setLocationId}
+                  disabled={locationsQuery.isLoading}
+                  options={
+                    locationsQuery.data?.map((loc) => ({
+                      value: loc.locationId,
+                      label: `${loc.locationCode} — ${inLocale(locale, loc.nameEn, loc.nameSi, loc.nameTa)}`
+                    })) ?? []
                   }
-                }}
-                aria-label={t("pricing.markdown.search_placeholder").text}
-              />
-              {searchQuery && (
+                />
+              </label>
+
+              <label className="pricing-form-field pricing-markdown-cell--reason">
+                <span className="pricing-filter-label">{t("pricing.markdown.filter_reason").text}</span>
+                <PricingSelect
+                  aria-label={t("pricing.markdown.filter_reason").text}
+                  value={reasonFilter}
+                  onChange={(val) => setReasonFilter(val as ReasonFilter)}
+                  options={[
+                    { value: "ALL", label: t("pricing.markdown.reason.all").text },
+                    { value: "NEAR_EXPIRY", label: t("pricing.markdown.reason.near_expiry").text },
+                    { value: "SLOW_MOVING", label: t("pricing.markdown.reason.slow_moving").text }
+                  ]}
+                />
+              </label>
+
+              <label className="pricing-form-field pricing-markdown-cell--status">
+                <span className="pricing-filter-label">{t("pricing.markdown.filter_status").text}</span>
+                <PricingSelect
+                  aria-label={t("pricing.markdown.filter_status").text}
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(val as StatusFilter)}
+                  options={[
+                    { value: "ACTIVE", label: t("pricing.markdown.status.active").text },
+                    { value: "ALL", label: t("pricing.markdown.status.all").text }
+                  ]}
+                />
+              </label>
+            </div>
+
+            <div className="pricing-markdown-row-bottom">
+              <label className="pricing-form-field pricing-markdown-cell--search">
+                <span className="pricing-filter-label">
+                  {t("pricing.markdown.search_label").text}
+                </span>
+                <div className="pricing-markdown-search-wrapper">
+                  <svg
+                    className="pricing-markdown-search-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="search"
+                    className="pricing-markdown-search-input"
+                    placeholder={t("pricing.markdown.search_placeholder").text}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setSearchQuery("");
+                      }
+                    }}
+                    aria-label={t("pricing.markdown.search_placeholder").text}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="pricing-markdown-search-clear"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSearchQuery("");
+                      }}
+                      aria-label={t("pricing.search.clear").text}
+                      title={t("pricing.search.clear").text}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </label>
+
+              <div className="pricing-markdown-cell--action">
                 <button
                   type="button"
-                  className="pricing-markdown-search-clear"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSearchQuery("");
-                  }}
-                  aria-label={t("pricing.search.clear").text}
-                  title={t("pricing.search.clear").text}
+                  className="btn btn--primary pricing-markdown-btn-evaluate"
+                  disabled={!locationId || evaluateMutation.isPending}
+                  onClick={() => evaluateMutation.mutate()}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                  <svg
+                    className={`pricing-markdown-btn-icon ${evaluateMutation.isPending ? "pricing-markdown-spin" : ""}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
                   </svg>
+                  <span>
+                    {evaluateMutation.isPending
+                      ? t("pricing.markdown.evaluating").text
+                      : t("pricing.markdown.evaluate").text}
+                  </span>
                 </button>
-              )}
+              </div>
             </div>
-          </label>
-
-          <div className="pricing-markdown-action-cell">
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={!locationId || evaluateMutation.isPending}
-              onClick={() => evaluateMutation.mutate()}
-            >
-              {evaluateMutation.isPending
-                ? t("pricing.markdown.evaluating").text
-                : t("pricing.markdown.evaluate").text}
-            </button>
           </div>
         </div>
 

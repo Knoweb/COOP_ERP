@@ -73,6 +73,7 @@ export function DropdownSelect({
       ref={containerRef}
       className={`dropdown-select ${isOpen ? "dropdown-select--open" : ""} ${disabled ? "dropdown-select--disabled" : ""} ${className}`.trim()}
       onKeyDown={handleKeyDown}
+      style={{ position: "relative" }}
     >
       {/* Hidden native select for accessibility & Playwright selectOption support */}
       <select

@@ -405,7 +405,7 @@ function FormDropdown<T extends string | number>(props: {
 
       <button
         type="button"
-        className="register-dropdown-trigger"
+        className="register-input-control register-dropdown-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-invalid={props.error ? true : undefined}
@@ -433,15 +433,15 @@ function FormDropdown<T extends string | number>(props: {
                   aria-selected={isSelected}
                   className={
                     isSelected
-                      ? "register-dropdown-option register-dropdown-option--selected"
-                      : "register-dropdown-option"
+                      ? "custom-status-dropdown__option custom-status-dropdown__option--selected register-dropdown-option register-dropdown-option--selected"
+                      : "custom-status-dropdown__option register-dropdown-option"
                   }
                   onClick={() => {
                     props.onChange(opt.value);
                     setOpen(false);
                   }}
                 >
-                  <span>{opt.label}</span>
+                  <span className="register-dropdown-option-label custom-status-dropdown__option-label">{opt.label}</span>
                   {isSelected && (
                     <span className="custom-status-dropdown__check" aria-hidden="true">
                       <svg
