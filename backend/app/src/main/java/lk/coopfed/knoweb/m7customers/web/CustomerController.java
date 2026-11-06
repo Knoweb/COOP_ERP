@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.AmendCustomer;
 import lk.coopfed.knoweb.m7customers.api.BulkImportMembers;
 import lk.coopfed.knoweb.m7customers.api.BulkMemberReport;
@@ -56,6 +58,7 @@ import lk.coopfed.knoweb.m7customers.web.generated.SubmitInsuranceClaimRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.UpdateInsuranceClaimStatusRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.UpdateRegionalRegistrationRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
 /** The customer register of the society office (27A section 5): translates requests to commands. */
@@ -79,6 +82,7 @@ class CustomerController implements CustomersApi {
     private final Handles<UpdateInsuranceClaimStatus, Void> updateClaimStatus;
     private final CustomerQueries queries;
     private final LoyaltyCustomerQueries loyaltyQueries;
+    private final AuditFacade audit;
     private final CurrentScope currentScope;
 
     CustomerController(
@@ -97,6 +101,7 @@ class CustomerController implements CustomersApi {
             Handles<UpdateInsuranceClaimStatus, Void> updateClaimStatus,
             CustomerQueries queries,
             LoyaltyCustomerQueries loyaltyQueries,
+            AuditFacade audit,
             CurrentScope currentScope) {
         this.register = register;
         this.bulkImporter = bulkImporter;
@@ -113,6 +118,7 @@ class CustomerController implements CustomersApi {
         this.updateClaimStatus = updateClaimStatus;
         this.queries = queries;
         this.loyaltyQueries = loyaltyQueries;
+        this.audit = audit;
         this.currentScope = currentScope;
     }
 
@@ -179,10 +185,15 @@ class CustomerController implements CustomersApi {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<CustomerCard> getCustomer(UUID customerId) {
-        return queries.card(customerId, currentScope.get())
+        ScopeContext scope = currentScope.get();
+        return queries.card(customerId, scope)
                 .map(CustomerResponses::card)
-                .map(ResponseEntity::ok)
+                .map(card -> {
+                    audit.record("CUSTOMER_VIEWED", Subject.of("customer", customerId), null, null, scope);
+                    return ResponseEntity.ok(card);
+                })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
