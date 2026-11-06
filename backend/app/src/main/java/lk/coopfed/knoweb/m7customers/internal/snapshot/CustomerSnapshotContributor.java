@@ -30,6 +30,9 @@ import org.springframework.stereotype.Component;
  * last four, the attributes or the consents (27A section 7.3: "never: nic_hash, nic_last4,
  * attributes, consent details").
  *
+ * <p>Snapshot table {@code member_discount_eligibility} (PGL-M1-06): minimum sanitized member
+ * discount eligibility facts for till offline verification. Excludes all private customer data.
+ *
  * <p>The change log (27A: "customer.*, account.* ... -> UPSERT; account.suspended -> urgent") is
  * fed by {@link CustomerChangeLogFanOut} from the module's own events (wave 2, M7CR-14).
  */
@@ -37,6 +40,7 @@ import org.springframework.stereotype.Component;
 class CustomerSnapshotContributor implements SnapshotContributor {
 
     static final String CUSTOMER = "customer";
+    static final String MEMBER_DISCOUNT_ELIGIBILITY = "member_discount_eligibility";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -46,7 +50,7 @@ class CustomerSnapshotContributor implements SnapshotContributor {
 
     @Override
     public Set<String> tables() {
-        return Set.of(CUSTOMER);
+        return Set.of(CUSTOMER, MEMBER_DISCOUNT_ELIGIBILITY);
     }
 
     @Override
@@ -54,12 +58,59 @@ class CustomerSnapshotContributor implements SnapshotContributor {
         if (rowIds.isEmpty()) {
             return Map.of();
         }
-        return customers(shop, rowIds);
+        if (CUSTOMER.equals(table)) {
+            return customers(shop, rowIds);
+        } else if (MEMBER_DISCOUNT_ELIGIBILITY.equals(table)) {
+            return memberEligibility(shop, rowIds);
+        }
+        return Map.of();
     }
 
     @Override
     public Map<UUID, Map<String, Object>> allRows(String table, Shop shop) {
-        return customers(shop, null);
+        if (CUSTOMER.equals(table)) {
+            return customers(shop, null);
+        } else if (MEMBER_DISCOUNT_ELIGIBILITY.equals(table)) {
+            return memberEligibility(shop, null);
+        }
+        return Map.of();
+    }
+
+    /**
+     * Sanitized member discount eligibility facts for till offline verification (PGL-M1-06).
+     * Excludes all sensitive customer data (NIC, phone, address, credit, balances).
+     */
+    private Map<UUID, Map<String, Object>> memberEligibility(Shop shop, Collection<UUID> loyaltyIds) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("entity", shop.ownerEntityId())
+                .addValue("shopLocationId", shop.locationId())
+                .addValue("ids", loyaltyIds);
+        String onlyIds = loyaltyIds == null ? "" : " and lc.loyalty_id in (:ids)";
+        Map<UUID, Map<String, Object>> rows = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select lc.loyalty_id, lc.regional_member_no, lc.status
+                  from customers.loyalty_customer lc
+                 where lc.owner_entity_id = :entity
+                   and lc.status = 'ACTIVE'
+                   and lc.regional_member_no is not null
+                   and (
+                        lc.all_locations_permitted
+                        or lc.registered_location_id = :shopLocationId
+                        or :shopLocationId = any(array(select lpl.permitted_location_id from customers.loyalty_permitted_location lpl
+                                                        where lpl.loyalty_id = lc.loyalty_id and lpl.revoked_at is null))
+                   )
+                """
+                        + onlyIds
+                        + " order by lc.loyalty_id",
+                params,
+                rs -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("member_no", rs.getString("regional_member_no"));
+                    row.put("active", "ACTIVE".equals(rs.getString("status")));
+                    rows.put(rs.getObject("loyalty_id", UUID.class), row);
+                });
+        return rows;
     }
 
     /** The society's credit customers; {@code customerIds} null for all of them. */

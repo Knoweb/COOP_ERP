@@ -91,6 +91,35 @@ class TillController(
     var clockDate by mutableStateOf<LocalDate?>(null)
         private set
 
+    enum class BeneficiaryMode { NONE, MEMBER, EMPLOYEE }
+
+    var beneficiaryMode by mutableStateOf(BeneficiaryMode.NONE)
+        private set
+    var customerClass by mutableStateOf<String?>(null)
+        private set
+    var beneficiaryIdentifier by mutableStateOf<String?>(null)
+        private set
+
+    fun selectBeneficiaryMode(mode: BeneficiaryMode) {
+        recordActivity()
+        beneficiaryMode = mode
+        message = when (mode) {
+            BeneficiaryMode.MEMBER -> "Scan or enter Member card barcode"
+            BeneficiaryMode.EMPLOYEE -> "Enter Employee number"
+            BeneficiaryMode.NONE -> null
+        }
+        messageIsError = false
+    }
+
+    fun clearBeneficiary() {
+        recordActivity()
+        beneficiaryMode = BeneficiaryMode.NONE
+        customerClass = null
+        beneficiaryIdentifier = null
+        basket.clearBeneficiary()
+        say("Beneficiary cleared: General customer")
+    }
+
     private val basket = Basket()
     val lines = mutableStateListOf<BasketLine>()
     var total by mutableStateOf(Money.ZERO)
@@ -301,6 +330,32 @@ class TillController(
         recordActivity()
         val trimmed = code.trim()
         if (trimmed.isEmpty()) return emptyList()
+
+        if (beneficiaryMode == BeneficiaryMode.MEMBER) {
+            if (service.catalogue.isMemberEligible(trimmed)) {
+                customerClass = "MEMBER"
+                beneficiaryIdentifier = trimmed
+                basket.setBeneficiary("MEMBER", trimmed)
+                beneficiaryMode = BeneficiaryMode.NONE
+                say("Member verified: MEMBER class applied")
+            } else {
+                say("Member barcode \"$trimmed\" not recognized or inactive", error = true)
+            }
+            return emptyList()
+        }
+
+        if (beneficiaryMode == BeneficiaryMode.EMPLOYEE) {
+            if (service.catalogue.isEmployeeEligible(trimmed)) {
+                customerClass = "EMPLOYEE"
+                beneficiaryIdentifier = trimmed
+                basket.setBeneficiary("EMPLOYEE", trimmed)
+                beneficiaryMode = BeneficiaryMode.NONE
+                say("Employee verified: EMPLOYEE class applied")
+            } else {
+                say("Employee number \"$trimmed\" not recognized or inactive", error = true)
+            }
+            return emptyList()
+        }
 
         val scanResult = if (atMillis != null) scanLayer.parse(trimmed, atMillis) else scanLayer.parse(trimmed)
         if (scanResult == null) {

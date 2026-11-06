@@ -44,6 +44,76 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/LotBalanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/locations/{locationId}/stock-summary:
+    get:
+      tags: [Inventory]
+      operationId: getStockSummaries
+      summary: Stock balance summaries for a location with explainable quantities
+      description: >
+        Aggregated stock position summaries for a location with explainable on-hand, reserved,
+        in-transit, and count variance quantities, optionally filtered by department, UOM, or discrepancy.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: departmentId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uomCode
+          required: false
+          schema: { type: string }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: includeZero
+          required: false
+          schema: { type: boolean, default: false }
+        - in: query
+          name: discrepancyOnly
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Stock summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockSummaryResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/locations/{locationId}/skus/{skuId}/explanation:
+    get:
+      tags: [Inventory]
+      operationId: getStockExplanation
+      summary: Explainability drilldown for a SKU stock position at a location
+      description: >
+        Surfaces the individual lots, active pick list reservations, in-transit transfers,
+        and latest count session details explaining the stock quantities.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Stock explanation details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockExplanationResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: Stock explanation not found, or the caller's scope may not see it
   /v1/inventory/locations/{locationId}/movements:
     get:
       tags: [Inventory]
@@ -2272,3 +2342,126 @@ components:
         outcome: { type: string, enum: [POSTED, APPROVED, REJECTED] }
         reviewValue: { type: number }
         reviewBand: { type: integer }
+    StockSummaryResponse:
+      type: object
+      required:
+        - locationId
+        - skuId
+        - skuCode
+        - skuNameEn
+        - baseUomCode
+        - qtyOnHand
+        - reservedQty
+        - availableQty
+        - inTransitIncomingQty
+        - inTransitOutgoingQty
+        - remainingStockQty
+        - lotCount
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        skuNameSi: { type: string }
+        skuNameTa: { type: string }
+        baseUomCode: { type: string }
+        departmentId: { type: string, format: uuid }
+        departmentNameEn: { type: string }
+        departmentNameSi: { type: string }
+        departmentNameTa: { type: string }
+        qtyOnHand: { type: number }
+        reservedQty: { type: number }
+        availableQty: { type: number }
+        inTransitIncomingQty: { type: number }
+        inTransitOutgoingQty: { type: number }
+        countedVarianceQty: { type: number }
+        countedVarianceValue: { type: number }
+        latestCountStatus: { type: string }
+        latestCountedAt: { type: string, format: date-time }
+        remainingStockQty: { type: number }
+        lotCount: { type: integer }
+        lots:
+          type: array
+          items: { $ref: '#/components/schemas/LotBalanceResponse' }
+    StockExplanationResponse:
+      type: object
+      required:
+        - locationId
+        - skuId
+        - skuCode
+        - skuNameEn
+        - baseUomCode
+        - qtyOnHand
+        - reservedQty
+        - availableQty
+        - inTransitIncomingQty
+        - inTransitOutgoingQty
+        - remainingStockQty
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        skuNameSi: { type: string }
+        skuNameTa: { type: string }
+        baseUomCode: { type: string }
+        departmentId: { type: string, format: uuid }
+        departmentNameEn: { type: string }
+        departmentNameSi: { type: string }
+        departmentNameTa: { type: string }
+        qtyOnHand: { type: number }
+        reservedQty: { type: number }
+        availableQty: { type: number }
+        inTransitIncomingQty: { type: number }
+        inTransitOutgoingQty: { type: number }
+        countedVarianceQty: { type: number }
+        remainingStockQty: { type: number }
+        lots:
+          type: array
+          items: { $ref: '#/components/schemas/LotBalanceResponse' }
+        reservations:
+          type: array
+          items: { $ref: '#/components/schemas/StockReservationDetail' }
+        incomingTransfers:
+          type: array
+          items: { $ref: '#/components/schemas/StockInTransitDetail' }
+        outgoingTransfers:
+          type: array
+          items: { $ref: '#/components/schemas/StockInTransitDetail' }
+        latestCount:
+          $ref: '#/components/schemas/StockCountDetail'
+    StockReservationDetail:
+      type: object
+      required: [pickListId, reservedQty, pickStatus]
+      properties:
+        pickListId: { type: string, format: uuid }
+        deliveryDocumentId: { type: string, format: uuid }
+        deliveryDocNumber: { type: string }
+        reservedQty: { type: number }
+        pickStatus: { type: string }
+        reservedAt: { type: string, format: date-time }
+    StockInTransitDetail:
+      type: object
+      required: [transferId, qty, status]
+      properties:
+        transferId: { type: string, format: uuid }
+        documentNo: { type: string }
+        locationId: { type: string, format: uuid }
+        locationName: { type: string }
+        qty: { type: number }
+        dispatchedAt: { type: string, format: date-time }
+        status: { type: string }
+    StockCountDetail:
+      type: object
+      required: [taskId, status, expectedQty, countedQty, varianceQty]
+      properties:
+        taskId: { type: string, format: uuid }
+        scopeKind: { type: string }
+        status: { type: string }
+        outcome: { type: string }
+        expectedQty: { type: number }
+        countedQty: { type: number }
+        varianceQty: { type: number }
+        varianceValue: { type: number }
+        startedAt: { type: string, format: date-time }
+        submittedAt: { type: string, format: date-time }

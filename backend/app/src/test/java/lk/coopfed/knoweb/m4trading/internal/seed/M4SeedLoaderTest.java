@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class M4SeedLoaderTest extends PostgresIntegrationTest {
 
     /** 24A section 3.1's eleven rows, plus the two CN GOODS BUYER rows of wave 2 (CR-24A-3 item 5) and Debit Note rows. */
-    private static final int POSTING_MAP_ROWS = 14;
+    private static final int POSTING_MAP_ROWS = 16;
 
     @Autowired
     private M4SeedLoader loader;
@@ -63,5 +63,25 @@ class M4SeedLoaderTest extends PostgresIntegrationTest {
                         "BUYER PAYABLE/VAT_INPUT/tax",
                         "SELLER REVENUE/RECEIVABLE/net",
                         "SELLER VAT_OUTPUT/RECEIVABLE/tax");
+
+        // ACC-02: the debit note also increases the buyer's payable.
+        List<Map<String, Object>> debitNote = db.queryForList(
+                """
+                select side, debit_role, credit_role, amount_source
+                  from trading.posting_map
+                 where doc_type_code = 'DN2' and line_kind = 'CHARGE'
+                 order by side, debit_role, credit_role
+                """);
+
+        assertThat(debitNote)
+                .extracting(row -> row.get("side") + " "
+                        + row.get("debit_role") + "/"
+                        + row.get("credit_role") + "/"
+                        + row.get("amount_source"))
+                .containsExactly(
+                        "BUYER OTHER_EXPENSE/PAYABLE/net",
+                        "BUYER VAT_INPUT/PAYABLE/tax",
+                        "SELLER RECEIVABLE/OTHER_INCOME/net",
+                        "SELLER RECEIVABLE/VAT_OUTPUT/tax");
     }
 }

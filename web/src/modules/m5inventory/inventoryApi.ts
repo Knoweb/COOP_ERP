@@ -48,6 +48,13 @@ export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockRe
 export type ExpiryAlertItem = components["schemas"]["ExpiryAlertItemResponse"];
 export type SlowMovingStock = components["schemas"]["SlowMovingStockResponse"];
 export type ExpiryAlertScan = components["schemas"]["ExpiryAlertScanResponse"];
+export type StockSummary = components["schemas"]["StockSummaryResponse"];
+export type StockExplanation = components["schemas"]["StockExplanationResponse"];
+export type StockReservationDetail = components["schemas"]["StockReservationDetail"];
+export type StockInTransitDetail = components["schemas"]["StockInTransitDetail"];
+export type StockCountDetail = components["schemas"]["StockCountDetail"];
+export type DepartmentCategory = catalogueComponents["schemas"]["DepartmentCategoryResponse"];
+export type Uom = catalogueComponents["schemas"]["UomResponse"];
 export type OpenStockTakeSessionRequest = components["schemas"]["OpenStockTakeSessionRequest"];
 export type StockTakeSessionResponse = components["schemas"]["StockTakeSessionResponse"];
 export type StockTakeScanRequest = components["schemas"]["StockTakeScanRequest"];
@@ -71,6 +78,48 @@ export function useInventoryApi() {
       async locations(): Promise<Location[]> {
         const { data } = await party.GET("/v1/party/locations", { params: { query: { limit: 100 } } });
         return data?.items ?? [];
+      },
+
+      async stockSummaries(
+        locationId: string,
+        params?: {
+          departmentId?: string;
+          uomCode?: string;
+          skuId?: string;
+          includeZero?: boolean;
+          discrepancyOnly?: boolean;
+        }
+      ): Promise<StockSummary[]> {
+        const { data } = await api.GET("/v1/inventory/locations/{locationId}/stock-summary", {
+          params: {
+            path: { locationId },
+            query: {
+              departmentId: params?.departmentId,
+              uomCode: params?.uomCode,
+              skuId: params?.skuId,
+              includeZero: params?.includeZero,
+              discrepancyOnly: params?.discrepancyOnly
+            }
+          }
+        });
+        return data ?? [];
+      },
+
+      async stockExplanation(locationId: string, skuId: string): Promise<StockExplanation | null> {
+        const { data } = await api.GET("/v1/inventory/locations/{locationId}/skus/{skuId}/explanation", {
+          params: { path: { locationId, skuId } }
+        });
+        return data ?? null;
+      },
+
+      async departments(): Promise<DepartmentCategory[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/departments");
+        return data ?? [];
+      },
+
+      async uoms(): Promise<Uom[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/uoms");
+        return data ?? [];
       },
 
       async balances(locationId: string): Promise<LotBalance[]> {

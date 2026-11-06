@@ -6,6 +6,11 @@ audit_event_types:
     offline_capturable: false
     description_en: A customer was registered at a society
 
+  - code: CUSTOMER_VIEWED
+    severity: INFO
+    offline_capturable: false
+    description_en: An office user viewed a customer record
+
   - code: CUSTOMER_UPDATED
     severity: INFO
     offline_capturable: false

@@ -3,6 +3,9 @@ package lk.coopfed.knoweb.till.ui
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,8 +58,35 @@ class TillScanIntegrationTest {
         },
     )
 
-    private fun controllerWith(vararg skus: SnapshotRow): TillController = runBlocking {
-        val live = mapOf("sku" to skus.associateBy { it.rowId })
+    private fun makeMemberEligibility(memberNo: String, active: Boolean = true): SnapshotRow = SnapshotRow(
+        "member_discount_eligibility", memberNo, null,
+        buildJsonObject {
+            put("member_no", memberNo)
+            put("active", active)
+        },
+    )
+
+    private fun makeEmployeeEligibility(employeeNo: String, active: Boolean = true): SnapshotRow = SnapshotRow(
+        "employee_discount_eligibility", employeeNo, null,
+        buildJsonObject {
+            put("employee_no", employeeNo)
+            put("active", active)
+        },
+    )
+
+    private fun controllerWith(vararg skus: SnapshotRow): TillController =
+        controllerWithAll(skus.toList(), emptyList(), emptyList())
+
+    private fun controllerWithAll(
+        skus: List<SnapshotRow> = emptyList(),
+        members: List<SnapshotRow> = emptyList(),
+        employees: List<SnapshotRow> = emptyList(),
+    ): TillController = runBlocking {
+        val live = mapOf(
+            "sku" to skus.associateBy { it.rowId },
+            "member_discount_eligibility" to members.associateBy { it.rowId },
+            "employee_discount_eligibility" to employees.associateBy { it.rowId },
+        )
         val snapshot = SnapshotState(1, live, emptyList())
         val localPrices = mapOf(
             "sku-rice" to Money.parse("150.00"),
@@ -310,5 +340,112 @@ class TillScanIntegrationTest {
         val results = c.scan("Rice", atMillis = 1000)
         assertEquals(1, results.size, "Manual search query must return catalogue search results")
         assertEquals(0, c.lines.size, "Manual search query must not add line directly")
+    }
+
+    @Test
+    fun beneficiaryScanValidMemberSetsCustomerClassAndAllowsSubsequentItemScanning() {
+        val c = controllerWithAll(
+            skus = listOf(makeSku("sku-rice", "RICE", "Rice 5kg", "4791234567891")),
+            members = listOf(makeMemberEligibility("MEM-101", active = true)),
+        )
+
+        assertEquals(TillController.BeneficiaryMode.NONE, c.beneficiaryMode)
+        assertNull(c.customerClass)
+
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.MEMBER)
+        assertEquals(TillController.BeneficiaryMode.MEMBER, c.beneficiaryMode)
+
+        // Scan member barcode with whitespace
+        val res = c.scan("  MEM-101  ", atMillis = 1000)
+        assertTrue(res.isEmpty())
+        assertEquals("MEMBER", c.customerClass)
+        assertEquals("MEM-101", c.beneficiaryIdentifier)
+        assertEquals(TillController.BeneficiaryMode.NONE, c.beneficiaryMode)
+        assertFalse(c.messageIsError)
+        assertEquals(0, c.lines.size)
+
+        // Now scan item
+        c.scan("4791234567891", atMillis = 1050)
+        assertEquals(1, c.lines.size)
+        assertEquals("MEMBER", c.customerClass)
+    }
+
+    @Test
+    fun beneficiaryScanUnknownOrInactiveMemberRefused() {
+        val c = controllerWithAll(
+            skus = listOf(makeSku("sku-rice", "RICE", "Rice 5kg", "4791234567891")),
+            members = listOf(
+                makeMemberEligibility("MEM-101", active = true),
+                makeMemberEligibility("MEM-INACTIVE", active = false),
+            ),
+        )
+
+        // Unknown member
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.MEMBER)
+        c.scan("MEM-UNKNOWN", atMillis = 1000)
+        assertNull(c.customerClass)
+        assertTrue(c.messageIsError)
+        assertTrue(c.message?.contains("not recognized or inactive") == true)
+
+        // Inactive member
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.MEMBER)
+        c.scan("MEM-INACTIVE", atMillis = 1000)
+        assertNull(c.customerClass)
+        assertTrue(c.messageIsError)
+    }
+
+    @Test
+    fun beneficiaryScanValidEmployeeSetsCustomerClass() {
+        val c = controllerWithAll(
+            skus = listOf(makeSku("sku-rice", "RICE", "Rice 5kg", "4791234567891")),
+            employees = listOf(makeEmployeeEligibility("EMP-007", active = true)),
+        )
+
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.EMPLOYEE)
+        val res = c.scan("  EMP-007  ", atMillis = 1000)
+        assertTrue(res.isEmpty())
+        assertEquals("EMPLOYEE", c.customerClass)
+        assertEquals("EMP-007", c.beneficiaryIdentifier)
+        assertEquals(TillController.BeneficiaryMode.NONE, c.beneficiaryMode)
+        assertFalse(c.messageIsError)
+    }
+
+    @Test
+    fun beneficiaryScanUnknownOrInactiveEmployeeRefused() {
+        val c = controllerWithAll(
+            skus = listOf(makeSku("sku-rice", "RICE", "Rice 5kg", "4791234567891")),
+            employees = listOf(
+                makeEmployeeEligibility("EMP-007", active = true),
+                makeEmployeeEligibility("EMP-INACTIVE", active = false),
+            ),
+        )
+
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.EMPLOYEE)
+        c.scan("EMP-UNKNOWN", atMillis = 1000)
+        assertNull(c.customerClass)
+        assertTrue(c.messageIsError)
+        assertTrue(c.message?.contains("not recognized or inactive") == true)
+
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.EMPLOYEE)
+        c.scan("EMP-INACTIVE", atMillis = 1000)
+        assertNull(c.customerClass)
+        assertTrue(c.messageIsError)
+    }
+
+    @Test
+    fun clearBeneficiaryResetsToAnonymous() {
+        val c = controllerWithAll(
+            skus = listOf(makeSku("sku-rice", "RICE", "Rice 5kg", "4791234567891")),
+            members = listOf(makeMemberEligibility("MEM-101", active = true)),
+        )
+
+        c.selectBeneficiaryMode(TillController.BeneficiaryMode.MEMBER)
+        c.scan("MEM-101", atMillis = 1000)
+        assertEquals("MEMBER", c.customerClass)
+
+        c.clearBeneficiary()
+        assertNull(c.customerClass)
+        assertNull(c.beneficiaryIdentifier)
+        assertEquals(TillController.BeneficiaryMode.NONE, c.beneficiaryMode)
     }
 }

@@ -10,10 +10,10 @@ object BasketResolver {
     fun resolve(basket: Basket, ix: PricingSnapshotIndex, date: LocalDate, tender: TenderKind): BasketResult {
         val lines = basket.lines
             .map { PriceResolver.resolveLine(it, ix, date) }
-            .map { RuleEvaluator.applyLineRules(it, ix, date, ix.stackingPolicy) }
+            .map { RuleEvaluator.applyLineRules(it, ix, date, ix.stackingPolicy, basket.customerClass) }
             .map { recheckCeiling(it, ix, date) }
 
-        val bill = RuleEvaluator.applyBillRule(lines, ix, date, ix.stackingPolicy)
+        val bill = RuleEvaluator.applyBillRule(lines, ix, date, ix.stackingPolicy, basket.customerClass)
         val billDiscount = bill?.amount ?: Money.ZERO
         val taxed = decomposeTax(lines, billDiscount)
 

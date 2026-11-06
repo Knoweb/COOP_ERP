@@ -34,7 +34,9 @@ import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
+import lk.coopfed.knoweb.m5inventory.query.StockExplanationView;
 import lk.coopfed.knoweb.m5inventory.query.StockRepricingView;
+import lk.coopfed.knoweb.m5inventory.query.StockSummaryView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.BulkImportStockRequest;
@@ -55,9 +57,14 @@ import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.RejectOpeningBalanceRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.RepriceStockLotRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockCountDetail;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockExplanationResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockInTransitDetail;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockProblem;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockRepricingResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockReservationDetail;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockRowPreview;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockSummaryResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
 import org.springframework.core.io.ByteArrayResource;
@@ -234,6 +241,46 @@ class InventoryController implements InventoryApi {
                         .map(lot -> toResponse(lot, showCost, batchNo(batchNumbers, lot.batchId(), scope)))
                         .toList();
         return ResponseEntity.ok(lots);
+    }
+
+    @Override
+    public ResponseEntity<List<StockSummaryResponse>> getStockSummaries(
+            UUID locationId,
+            UUID departmentId,
+            String uomCode,
+            UUID skuId,
+            Boolean includeZero,
+            Boolean discrepancyOnly) {
+        ScopeContext scope = currentScope.get();
+        boolean showCost = scope.policyClass() == PolicyClass.OWN && scope.deviceId() == null;
+        Map<UUID, String> batchNumbers = new HashMap<>();
+
+        List<StockSummaryResponse> summaries = queries
+                .stockSummaries(
+                        locationId,
+                        departmentId,
+                        uomCode,
+                        skuId,
+                        Boolean.TRUE.equals(includeZero),
+                        Boolean.TRUE.equals(discrepancyOnly),
+                        scope)
+                .stream()
+                .map(s -> toResponse(s, showCost, batchNumbers, scope))
+                .toList();
+
+        return ResponseEntity.ok(summaries);
+    }
+
+    @Override
+    public ResponseEntity<StockExplanationResponse> getStockExplanation(UUID locationId, UUID skuId) {
+        ScopeContext scope = currentScope.get();
+        boolean showCost = scope.policyClass() == PolicyClass.OWN && scope.deviceId() == null;
+        Map<UUID, String> batchNumbers = new HashMap<>();
+
+        return queries.stockExplanation(locationId, skuId, scope)
+                .map(e -> toResponse(e, showCost, batchNumbers, scope))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Override
@@ -593,5 +640,107 @@ class InventoryController implements InventoryApi {
                 .rejectedBy(balance.rejectedBy())
                 .rejectedAt(balance.rejectedAt())
                 .rejectionReason(balance.rejectionReason());
+    }
+
+    private StockSummaryResponse toResponse(
+            StockSummaryView s, boolean showCost, Map<UUID, String> batchNumbers, ScopeContext scope) {
+        StockSummaryResponse response = new StockSummaryResponse(
+                        s.locationId(),
+                        s.skuId(),
+                        s.skuCode(),
+                        s.skuNameEn(),
+                        s.baseUomCode(),
+                        s.qtyOnHand(),
+                        s.reservedQty(),
+                        s.availableQty(),
+                        s.inTransitIncomingQty(),
+                        s.inTransitOutgoingQty(),
+                        s.remainingStockQty(),
+                        s.lotCount())
+                .skuNameSi(s.skuNameSi())
+                .skuNameTa(s.skuNameTa())
+                .departmentId(s.departmentId())
+                .departmentNameEn(s.departmentNameEn())
+                .departmentNameSi(s.departmentNameSi())
+                .departmentNameTa(s.departmentNameTa())
+                .countedVarianceQty(s.countedVarianceQty())
+                .countedVarianceValue(s.countedVarianceValue())
+                .latestCountStatus(s.latestCountStatus())
+                .latestCountedAt(s.latestCountedAt());
+        if (s.lots() != null) {
+            response.lots(s.lots().stream()
+                    .map(lot -> toResponse(lot, showCost, batchNo(batchNumbers, lot.batchId(), scope)))
+                    .toList());
+        }
+        return response;
+    }
+
+    private StockExplanationResponse toResponse(
+            StockExplanationView e, boolean showCost, Map<UUID, String> batchNumbers, ScopeContext scope) {
+        StockExplanationResponse response = new StockExplanationResponse(
+                        e.locationId(),
+                        e.skuId(),
+                        e.skuCode(),
+                        e.skuNameEn(),
+                        e.baseUomCode(),
+                        e.qtyOnHand(),
+                        e.reservedQty(),
+                        e.availableQty(),
+                        e.inTransitIncomingQty(),
+                        e.inTransitOutgoingQty(),
+                        e.remainingStockQty())
+                .skuNameSi(e.skuNameSi())
+                .skuNameTa(e.skuNameTa())
+                .departmentId(e.departmentId())
+                .departmentNameEn(e.departmentNameEn())
+                .departmentNameSi(e.departmentNameSi())
+                .departmentNameTa(e.departmentNameTa())
+                .countedVarianceQty(e.countedVarianceQty());
+
+        if (e.lots() != null) {
+            response.lots(e.lots().stream()
+                    .map(lot -> toResponse(lot, showCost, batchNo(batchNumbers, lot.batchId(), scope)))
+                    .toList());
+        }
+        if (e.reservations() != null) {
+            response.reservations(e.reservations().stream()
+                    .map(r -> new StockReservationDetail(r.pickListId(), r.reservedQty(), r.pickStatus())
+                            .deliveryDocumentId(r.deliveryDocumentId())
+                            .deliveryDocNumber(r.deliveryDocNumber())
+                            .reservedAt(r.reservedAt()))
+                    .toList());
+        }
+        if (e.incomingTransfers() != null) {
+            response.incomingTransfers(e.incomingTransfers().stream()
+                    .map(t -> new StockInTransitDetail(t.transferId(), t.qty(), t.status())
+                            .documentNo(t.documentNo())
+                            .locationId(t.locationId())
+                            .locationName(t.locationName())
+                            .dispatchedAt(t.dispatchedAt()))
+                    .toList());
+        }
+        if (e.outgoingTransfers() != null) {
+            response.outgoingTransfers(e.outgoingTransfers().stream()
+                    .map(t -> new StockInTransitDetail(t.transferId(), t.qty(), t.status())
+                            .documentNo(t.documentNo())
+                            .locationId(t.locationId())
+                            .locationName(t.locationName())
+                            .dispatchedAt(t.dispatchedAt()))
+                    .toList());
+        }
+        if (e.latestCount() != null) {
+            response.latestCount(new StockCountDetail(
+                            e.latestCount().taskId(),
+                            e.latestCount().status(),
+                            e.latestCount().expectedQty(),
+                            e.latestCount().countedQty(),
+                            e.latestCount().varianceQty())
+                    .scopeKind(e.latestCount().scopeKind())
+                    .outcome(e.latestCount().outcome())
+                    .varianceValue(e.latestCount().varianceValue())
+                    .startedAt(e.latestCount().startedAt())
+                    .submittedAt(e.latestCount().submittedAt()));
+        }
+        return response;
     }
 }

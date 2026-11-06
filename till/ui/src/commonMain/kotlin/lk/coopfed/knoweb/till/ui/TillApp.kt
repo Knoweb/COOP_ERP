@@ -423,10 +423,48 @@ private fun SellScreen(c: TillController) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Column(Modifier.weight(3f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (c.customerClass == null && c.beneficiaryMode == TillController.BeneficiaryMode.NONE) {
+                    Button(onClick = { c.clearBeneficiary() }) { Text("General") }
+                } else {
+                    OutlinedButton(onClick = { c.clearBeneficiary() }) { Text("General") }
+                }
+
+                if (c.customerClass == "MEMBER" || c.beneficiaryMode == TillController.BeneficiaryMode.MEMBER) {
+                    Button(onClick = {
+                        if (c.customerClass == "MEMBER") c.clearBeneficiary()
+                        else c.selectBeneficiaryMode(TillController.BeneficiaryMode.MEMBER)
+                    }) {
+                        Text(if (c.customerClass == "MEMBER") "Member: Applied" else "Member (Scanning...)")
+                    }
+                } else {
+                    OutlinedButton(onClick = { c.selectBeneficiaryMode(TillController.BeneficiaryMode.MEMBER) }) {
+                        Text("Member")
+                    }
+                }
+
+                if (c.customerClass == "EMPLOYEE" || c.beneficiaryMode == TillController.BeneficiaryMode.EMPLOYEE) {
+                    Button(onClick = {
+                        if (c.customerClass == "EMPLOYEE") c.clearBeneficiary()
+                        else c.selectBeneficiaryMode(TillController.BeneficiaryMode.EMPLOYEE)
+                    }) {
+                        Text(if (c.customerClass == "EMPLOYEE") "Employee: Applied" else "Employee (Entering...)")
+                    }
+                } else {
+                    OutlinedButton(onClick = { c.selectBeneficiaryMode(TillController.BeneficiaryMode.EMPLOYEE) }) {
+                        Text("Employee")
+                    }
+                }
+            }
+            val scanLabel = when (c.beneficiaryMode) {
+                TillController.BeneficiaryMode.MEMBER -> "Scan or enter Member card barcode, then Enter"
+                TillController.BeneficiaryMode.EMPLOYEE -> "Enter Employee number, then Enter"
+                TillController.BeneficiaryMode.NONE -> "Scan or type a barcode or name, then Enter"
+            }
             OutlinedTextField(
                 scan,
-                { scan = it; results = if (it.length >= 2 && !it.all(Char::isDigit)) c.search(it) else emptyList() },
-                label = { Text("Scan or type a barcode or name, then Enter") },
+                { scan = it; results = if (c.beneficiaryMode == TillController.BeneficiaryMode.NONE && it.length >= 2 && !it.all(Char::isDigit)) c.search(it) else emptyList() },
+                label = { Text(scanLabel) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().focusRequester(scanFocus),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

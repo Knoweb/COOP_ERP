@@ -34,6 +34,7 @@ export function NewOrderPage() {
   const sellers = useQuery({ queryKey: ["trading", "sellers"], queryFn: () => api.sellers() });
   const locations = useQuery({ queryKey: ["trading", "own-locations"], queryFn: () => api.locations() });
   const relationship = sellers.data?.find((row) => row.relationshipId === relationshipId);
+  const selectedLocation = locations.data?.find((l) => l.locationId === deliverTo);
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -92,13 +93,25 @@ export function NewOrderPage() {
           {t("trading.field.deliver_to").text}
           <select value={deliverTo} onChange={(event) => setDeliverTo(event.target.value)} required>
             <option value="">{t("trading.field.choose").text}</option>
-            {(locations.data ?? []).map((location) => (
-              <option key={location.locationId} value={location.locationId}>
-                {`${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`}
-              </option>
-            ))}
+            {(locations.data ?? []).map((location) => {
+              const label = `${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`;
+              const isManual = location.connectivitySpecMet === false;
+              return (
+                <option key={location.locationId} value={location.locationId}>
+                  {isManual ? `${label} [${t("trading.order.manual_branch").text}]` : label}
+                </option>
+              );
+            })}
           </select>
         </label>
+        {selectedLocation && selectedLocation.connectivitySpecMet === false && (
+          <aside className="trading-on-behalf-notice" role="status">
+            <strong>{t("trading.order.on_behalf.badge").text}: </strong>
+            {t("trading.order.on_behalf.description", undefined, {
+              branch: `${selectedLocation.locationCode} ${inLocale(locale, selectedLocation.nameEn, selectedLocation.nameSi, selectedLocation.nameTa)}`
+            }).text}
+          </aside>
+        )}
 
         <table>
           <thead>

@@ -54,6 +54,69 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void customerCardReadsAreAuditedWithoutExposingPersonalData() {
+        ResponseEntity<JsonNode> registered = post(
+                "/v1/customers",
+                Map.of(
+                        "displayName", "Audit Test Customer",
+                        "phone", "0700000288",
+                        "consents", List.of("CREDIT_ACCOUNT"),
+                        "via", "PAPER"),
+                OFFICE_USER,
+                SOCIETY);
+
+        assertThat(registered.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID customerId = UUID.fromString(registered.getBody().get("customerId").asText());
+
+        String auditCountSql =
+                """
+                select count(*)
+                  from kernel.audit_event
+                 where event_type_code = 'CUSTOMER_VIEWED'
+                   and subject_table = 'customer'
+                   and subject_id = ?
+                """;
+
+        assertThat(superuserJdbc().queryForObject(auditCountSql, Long.class, customerId))
+                .isZero();
+
+        ResponseEntity<JsonNode> card = get("/v1/customers/" + customerId, OFFICE_USER, SOCIETY);
+
+        assertThat(card.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(superuserJdbc().queryForObject(auditCountSql, Long.class, customerId))
+                .isEqualTo(1L);
+
+        Long safeAudit = superuserJdbc()
+                .queryForObject(
+                        """
+                select count(*)
+                  from kernel.audit_event
+                 where event_type_code = 'CUSTOMER_VIEWED'
+                   and subject_id = ?
+                   and actor_user_id = ?
+                   and owner_entity_id = ?
+                   and before_state is null
+                   and after_state is null
+                """,
+                        Long.class,
+                        customerId,
+                        OFFICE_USER,
+                        SOCIETY);
+
+        assertThat(safeAudit).isEqualTo(1L);
+
+        assertThat(get("/v1/customers/" + customerId, OTHER_USER, OTHER).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThat(get("/v1/customers/" + UUID.randomUUID(), OFFICE_USER, SOCIETY)
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThat(superuserJdbc().queryForObject(auditCountSql, Long.class, customerId))
+                .isEqualTo(1L);
+    }
+
+    @Test
     void registerOpenChargeRepayAndTheStatementShowsIt() {
         ResponseEntity<JsonNode> registered = post(
                 "/v1/customers",
