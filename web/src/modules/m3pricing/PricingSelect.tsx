@@ -1,7 +1,9 @@
-import { DropdownSelect } from "../../shell/components/DropdownSelect";
-import type { DropdownOption } from "../../shell/components/DropdownSelect";
+import type { ChangeEvent } from "react";
 
-export type PricingSelectOption = DropdownOption;
+export interface PricingSelectOption {
+  value: string;
+  label: string;
+}
 
 export interface PricingSelectProps {
   id?: string;
@@ -15,11 +17,9 @@ export interface PricingSelectProps {
 }
 
 /**
- * Custom dropdown selector matching the Price Lists design:
- * - Rounded trigger with active border & rotating chevron
- * - Floating popup with smooth shadows
- * - Selected item with vertical accent bar, colored text & checkmark
- * - Synchronized hidden native <select> for full E2E & form accessibility
+ * Accessible dropdown selector matching the Price Lists design:
+ * Styled via pricing.css (.pricing-select, .pricing-filter-bar select, .pricing-form-field select)
+ * with rounded pill trigger, royal blue chevron, and full Playwright E2E compatibility.
  */
 export function PricingSelect({
   id,
@@ -32,15 +32,20 @@ export function PricingSelect({
   disabled = false
 }: PricingSelectProps) {
   return (
-    <DropdownSelect
+    <select
       id={id}
       aria-label={ariaLabel}
       value={value}
-      options={options}
-      onChange={onChange}
-      placeholder={placeholder}
-      className={`pricing-dropdown-select ${className}`.trim()}
+      onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
       disabled={disabled}
-    />
+      className={`pricing-select ${className}`.trim()}
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }
