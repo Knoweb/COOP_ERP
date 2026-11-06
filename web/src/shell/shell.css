@@ -10220,9 +10220,9 @@ textarea {
 }
 
 
-/* ==========================================================================
+/* ====
    Reason Capture Modal Dialog & Custom Dropdown Polish
-   ========================================================================== */
+   ==== */
 .reason-capture {
   overflow: visible !important;
 }
@@ -10421,9 +10421,50 @@ textarea {
 }
 
 
-/* ================================================================
+
+/* ====
+   Society Register Compact Dropdown & Seamless Floating Scrollbar
+   ==== */
+.register-dropdown-menu--compact,
+.register-field-group .register-dropdown-menu--compact {
+  max-height: 168px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--color-border-control) transparent !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar,
+.register-dropdown-menu--compact::-webkit-scrollbar {
+  width: 5px !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-track,
+.register-dropdown-menu--compact::-webkit-scrollbar-track {
+  background: transparent !important;
+  margin: 8px 0 !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-thumb,
+.register-dropdown-menu--compact::-webkit-scrollbar-thumb {
+  background: var(--color-border-control) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-thumb:hover,
+.register-dropdown-menu--compact::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted) !important;
+}
+
+.register-field-group .register-dropdown-menu::-webkit-scrollbar-button,
+.register-dropdown-menu--compact::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; } /*
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+
+/* =
    M2 Catalogue Polish: Directory Card Matching Dropzone & Unified Dropdowns
-   ================================================================ */
+   = */
 
 /* 1. Suppliers Bulk Import Dropzone - Exact size and proportions matching Directory card (620px max-width) */
 .catalogue-dropzone {
@@ -10640,4 +10681,5 @@ textarea {
 
 .supplier-import-section {
   max-width: 620px !important;
+
 }

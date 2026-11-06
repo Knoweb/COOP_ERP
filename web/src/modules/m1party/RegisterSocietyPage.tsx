@@ -223,6 +223,7 @@ export function RegisterSocietyPage() {
                 }))}
                 onChange={(v) => set("financialYearStartMonth", Number(v))}
                 error={fieldErrors.financialYearStartMonth}
+                menuClassName="register-dropdown-menu--compact"
               />
             </div>
 
@@ -334,6 +335,7 @@ function FormDropdown<T extends string | number>(props: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
+  menuClassName?: string;
   error?: string;
   required?: boolean;
 }) {
@@ -420,7 +422,7 @@ function FormDropdown<T extends string | number>(props: {
       </button>
 
       {open && (
-        <ul ref={menuRef} className="register-dropdown-menu" role="listbox">
+        <ul ref={menuRef} className={`register-dropdown-menu ${props.menuClassName ?? ""}`.trim()} role="listbox">
           {props.options.map((opt) => {
             const isSelected = props.value === opt.value;
             return (
