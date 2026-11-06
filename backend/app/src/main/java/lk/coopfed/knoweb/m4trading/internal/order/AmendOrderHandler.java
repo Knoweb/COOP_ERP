@@ -150,7 +150,14 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
 
         // the new version: the kernel draft, doc_order naming the order it amends, its lines.
         documents.save(TradingDocuments.draft(
-                orderId, OrderTypeHandler.ORD, buyer, seller, null, scope.userId(), null, command.notes()));
+                orderId,
+                OrderTypeHandler.ORD,
+                buyer,
+                seller,
+                (UUID) order.get("deliver_to_location_id"),
+                scope.userId(),
+                null,
+                command.notes()));
         documents.saveLines(orderId, priced.lines());
         jdbc.update(
                 """

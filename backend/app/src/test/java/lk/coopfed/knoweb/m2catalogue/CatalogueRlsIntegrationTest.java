@@ -123,6 +123,7 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
         admin.update("delete from catalogue.tag where tag_code like 't-%'");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.uom where uom_code like 'ZZ%'");
     }
 
     @Test
@@ -622,15 +623,30 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void theApplicationCannotAddAUnit() {
+    void onlyFederationInOwnScopeCanAddAUnit() {
+        int federation = inScope(
+                FEDERATION,
+                "OWN",
+                () -> jdbc.update("insert into catalogue.uom (uom_code, name_en) values ('ZZ', 'Governed Unit')"));
+        assertThat(federation).isEqualTo(1);
+
         assertThatThrownBy(() -> inScope(
-                        FEDERATION,
+                        MPCS_A,
                         "OWN",
                         () -> jdbc.update(
-                                "insert into catalogue.uom (uom_code, name_en) values ('ZZ', 'Not allowed')")))
+                                "insert into catalogue.uom (uom_code, name_en) values ('ZZ_MPCS', 'MPCS Unit')")))
                 .isInstanceOf(DataAccessException.class)
                 .rootCause()
-                .hasMessageContaining("permission denied");
+                .hasMessageContaining("row-level security");
+
+        assertThatThrownBy(() -> inScope(
+                        FEDERATION,
+                        "ANY",
+                        () -> jdbc.update(
+                                "insert into catalogue.uom (uom_code, name_en) values ('ZZ_ANY', 'Any Scope')")))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
     }
 
     private List<UUID> visibleSkus() {

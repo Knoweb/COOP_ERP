@@ -69,3 +69,16 @@
   color: var(--color-text-muted);
 }
 
+
+/* M3-10: on-behalf notice for non-computerized branches */
+.trading-on-behalf-notice {
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border);
+  border-left: var(--border-width-strong) solid var(--color-brand-info);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+}

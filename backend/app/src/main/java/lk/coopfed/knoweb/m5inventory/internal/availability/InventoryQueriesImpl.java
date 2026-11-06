@@ -12,13 +12,21 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.DepartmentCategoryView;
+import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
 import lk.coopfed.knoweb.m5inventory.internal.expiry.ExpiryAlertStore;
@@ -37,7 +45,9 @@ import lk.coopfed.knoweb.m5inventory.query.PickReplacementCandidate;
 import lk.coopfed.knoweb.m5inventory.query.ReorderControlView;
 import lk.coopfed.knoweb.m5inventory.query.SlowMovingStockView;
 import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
+import lk.coopfed.knoweb.m5inventory.query.StockExplanationView;
 import lk.coopfed.knoweb.m5inventory.query.StockRepricingView;
+import lk.coopfed.knoweb.m5inventory.query.StockSummaryView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -96,6 +106,8 @@ class InventoryQueriesImpl implements InventoryQueries {
     private final ReorderStore reorderStore;
     private final RepriceStore repriceStore;
     private final ExpiryAlertStore expiryAlertStore;
+    private final CatalogueQueries catalogueQueries;
+    private final PartyQueries partyQueries;
 
     InventoryQueriesImpl(
             JdbcTemplate jdbc,
@@ -104,6 +116,8 @@ class InventoryQueriesImpl implements InventoryQueries {
             ReorderStore reorderStore,
             RepriceStore repriceStore,
             ExpiryAlertStore expiryAlertStore,
+            CatalogueQueries catalogueQueries,
+            PartyQueries partyQueries,
             @Value("${coop-erp.business-timezone:Asia/Colombo}") String zone) {
         this.jdbc = jdbc;
         this.businessDay = businessDay;
@@ -112,6 +126,8 @@ class InventoryQueriesImpl implements InventoryQueries {
         this.reorderStore = reorderStore;
         this.repriceStore = repriceStore;
         this.expiryAlertStore = expiryAlertStore;
+        this.catalogueQueries = catalogueQueries;
+        this.partyQueries = partyQueries;
     }
 
     @Override
@@ -690,5 +706,477 @@ class InventoryQueriesImpl implements InventoryQueries {
         int evalDays = evaluationDays != null ? evaluationDays : policy.slowMovingDays(scope);
         int threshDos = thresholdDaysOfSupply != null ? thresholdDaysOfSupply : policy.slowMovingThresholdDos(scope);
         return expiryAlertStore.findSlowMovingStock(locationId, evalDays, threshDos, today, zone, scope);
+    }
+
+    @Override
+    public List<StockSummaryView> stockSummaries(
+            UUID locationId,
+            UUID departmentId,
+            String uomCode,
+            UUID skuId,
+            boolean includeZero,
+            boolean discrepancyOnly,
+            ScopeContext scope) {
+        if (locationId == null) {
+            return List.of();
+        }
+
+        Date today = today();
+
+        List<LotBalance> lots = balances(locationId, skuId, true, scope);
+        Map<UUID, List<LotBalance>> lotsBySku = new LinkedHashMap<>();
+        for (LotBalance lot : lots) {
+            lotsBySku.computeIfAbsent(lot.skuId(), k -> new ArrayList<>()).add(lot);
+        }
+
+        Map<UUID, BigDecimal> reservationsBySku = new HashMap<>();
+        jdbc.query(
+                """
+                select p.sku_id, coalesce(sum(p.qty), 0) as reserved_qty
+                  from inventory.pick_list_line p
+                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
+                  left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                  join inventory.stock_lot r on r.stock_lot_id = coalesce(o.replacement_stock_lot_id, p.stock_lot_id)
+                 where pl.status = 'OPEN'
+                   and coalesce(o.location_id, p.location_id) = ?
+                   and (r.expiry_date is null or r.expiry_date >= ?)
+                 group by p.sku_id
+                """,
+                rs -> {
+                    reservationsBySku.put(rs.getObject("sku_id", UUID.class), rs.getBigDecimal("reserved_qty"));
+                },
+                locationId,
+                today);
+
+        Map<UUID, BigDecimal> incomingTransfersBySku = new HashMap<>();
+        jdbc.query(
+                """
+                select tl.sku_id, coalesce(sum(tl.qty), 0) as incoming_qty
+                  from inventory.transfer t
+                  join inventory.transfer_line tl on tl.transfer_id = t.transfer_id
+                  join inventory.transfer_dispatch x on x.transfer_id = t.transfer_id
+                  left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                  left join inventory.transfer_cancellation c on c.transfer_id = t.transfer_id
+                 where t.to_location_id = ?
+                   and r.transfer_id is null
+                   and c.transfer_id is null
+                 group by tl.sku_id
+                """,
+                rs -> {
+                    incomingTransfersBySku.put(rs.getObject("sku_id", UUID.class), rs.getBigDecimal("incoming_qty"));
+                },
+                locationId);
+
+        Map<UUID, BigDecimal> outgoingTransfersBySku = new HashMap<>();
+        jdbc.query(
+                """
+                select tl.sku_id, coalesce(sum(tl.qty), 0) as outgoing_qty
+                  from inventory.transfer t
+                  join inventory.transfer_line tl on tl.transfer_id = t.transfer_id
+                  join inventory.transfer_dispatch x on x.transfer_id = t.transfer_id
+                  left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                  left join inventory.transfer_cancellation c on c.transfer_id = t.transfer_id
+                 where t.location_id = ?
+                   and r.transfer_id is null
+                   and c.transfer_id is null
+                 group by tl.sku_id
+                """,
+                rs -> {
+                    outgoingTransfersBySku.put(rs.getObject("sku_id", UUID.class), rs.getBigDecimal("outgoing_qty"));
+                },
+                locationId);
+
+        record SkuCountVariance(BigDecimal varianceQty, BigDecimal varianceValue, String status, Instant countedAt) {}
+        Map<UUID, SkuCountVariance> countVariancesBySku = new HashMap<>();
+        List<Map<String, Object>> latestTaskRows = jdbc.queryForList(
+                """
+                select task_id, status, outcome, scheduled_at, started_at, submitted_at
+                  from inventory.count_task
+                 where location_id = ?
+                 order by scheduled_at desc, task_id desc
+                 limit 1
+                """,
+                locationId);
+
+        if (!latestTaskRows.isEmpty()) {
+            Map<String, Object> taskRow = latestTaskRows.get(0);
+            UUID taskId = (UUID) taskRow.get("task_id");
+            String taskStatus = (String) taskRow.get("status");
+            String taskOutcome = (String) taskRow.get("outcome");
+            Timestamp submittedAtTs = (Timestamp) taskRow.get("submitted_at");
+            Timestamp startedAtTs = (Timestamp) taskRow.get("started_at");
+            Instant countTimestamp = submittedAtTs != null
+                    ? submittedAtTs.toInstant()
+                    : (startedAtTs != null ? startedAtTs.toInstant() : null);
+
+            List<Map<String, Object>> countLines = jdbc.queryForList(
+                    """
+                    select sku_id,
+                           coalesce(sum(variance_qty), 0) as var_qty,
+                           coalesce(sum(variance_value), 0) as var_val
+                      from inventory.count_line
+                     where task_id = ?
+                     group by sku_id
+                    """,
+                    taskId);
+
+            if (!countLines.isEmpty()) {
+                String effectiveStatus = taskOutcome != null ? taskOutcome : taskStatus;
+                for (Map<String, Object> line : countLines) {
+                    UUID sId = (UUID) line.get("sku_id");
+                    BigDecimal vQty = (BigDecimal) line.get("var_qty");
+                    BigDecimal vVal = (BigDecimal) line.get("var_val");
+                    String statusLabel =
+                            vQty != null && vQty.compareTo(BigDecimal.ZERO) == 0 ? "MATCHED" : effectiveStatus;
+                    countVariancesBySku.put(sId, new SkuCountVariance(vQty, vVal, statusLabel, countTimestamp));
+                }
+            } else {
+                List<Map<String, Object>> scanVariances = jdbc.queryForList(
+                        """
+                        select coalesce(e.sku_id, s.sku_id) as sku_id,
+                               coalesce(s.scanned_qty, 0) - coalesce(e.exp_qty, 0) as var_qty
+                          from (select sku_id, sum(expected_qty) as exp_qty
+                                  from inventory.count_expectation
+                                 where task_id = ? group by sku_id) e
+                          full outer join (select sku_id, sum(counted_qty) as scanned_qty
+                                             from inventory.stock_take_scan
+                                            where task_id = ? group by sku_id) s on s.sku_id = e.sku_id
+                        """,
+                        taskId,
+                        taskId);
+                for (Map<String, Object> line : scanVariances) {
+                    UUID sId = (UUID) line.get("sku_id");
+                    BigDecimal vQty = (BigDecimal) line.get("var_qty");
+                    if (sId != null && vQty != null) {
+                        String statusLabel = vQty.compareTo(BigDecimal.ZERO) == 0 ? "MATCHED" : "IN_PROGRESS";
+                        countVariancesBySku.put(
+                                sId, new SkuCountVariance(vQty, BigDecimal.ZERO, statusLabel, countTimestamp));
+                    }
+                }
+            }
+        }
+
+        Set<UUID> allSkuIds = new LinkedHashSet<>(lotsBySku.keySet());
+        allSkuIds.addAll(incomingTransfersBySku.keySet());
+        allSkuIds.addAll(outgoingTransfersBySku.keySet());
+        allSkuIds.addAll(reservationsBySku.keySet());
+
+        if (skuId != null) {
+            allSkuIds.removeIf(id -> !id.equals(skuId));
+        }
+
+        Map<UUID, DepartmentCategoryView> deptMap = new HashMap<>();
+        try {
+            for (DepartmentCategoryView dept : catalogueQueries.departmentCategories(scope)) {
+                deptMap.put(dept.departmentId(), dept);
+            }
+        } catch (Exception ignored) {
+        }
+
+        List<StockSummaryView> summaries = new ArrayList<>();
+        for (UUID sId : allSkuIds) {
+            Optional<SkuView> skuOpt = catalogueQueries.getSku(sId, scope);
+            if (skuOpt.isEmpty()) {
+                continue;
+            }
+            SkuView sku = skuOpt.get();
+
+            if (departmentId != null && !departmentId.equals(sku.departmentId())) {
+                continue;
+            }
+
+            if (uomCode != null && !uomCode.equalsIgnoreCase(sku.baseUomCode())) {
+                continue;
+            }
+
+            List<LotBalance> skuLots = lotsBySku.getOrDefault(sId, List.of());
+            BigDecimal onHand = skuLots.stream().map(LotBalance::qtyOnHand).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal reserved = reservationsBySku.getOrDefault(sId, BigDecimal.ZERO);
+            BigDecimal incoming = incomingTransfersBySku.getOrDefault(sId, BigDecimal.ZERO);
+            BigDecimal outgoing = outgoingTransfersBySku.getOrDefault(sId, BigDecimal.ZERO);
+
+            SkuCountVariance countVar = countVariancesBySku.get(sId);
+            BigDecimal varianceQty = countVar != null ? countVar.varianceQty() : null;
+            BigDecimal varianceVal = countVar != null ? countVar.varianceValue() : null;
+            String countStatus = countVar != null ? countVar.status() : null;
+            Instant countTime = countVar != null ? countVar.countedAt() : null;
+
+            if (!includeZero && onHand.compareTo(BigDecimal.ZERO) == 0) {
+                boolean hasVariance = varianceQty != null && varianceQty.compareTo(BigDecimal.ZERO) != 0;
+                if (incoming.compareTo(BigDecimal.ZERO) == 0
+                        && reserved.compareTo(BigDecimal.ZERO) == 0
+                        && !hasVariance) {
+                    continue;
+                }
+            }
+
+            BigDecimal goodInDateOnHand = skuLots.stream()
+                    .filter(l -> "GOOD".equals(l.condition())
+                            && !l.expired()
+                            && l.qtyOnHand().compareTo(BigDecimal.ZERO) > 0)
+                    .map(LotBalance::qtyOnHand)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal available = nonNegative(goodInDateOnHand.subtract(reserved));
+
+            if (discrepancyOnly) {
+                boolean hasDiscrepancy = (varianceQty != null && varianceQty.compareTo(BigDecimal.ZERO) != 0)
+                        || onHand.compareTo(BigDecimal.ZERO) < 0
+                        || skuLots.stream().anyMatch(LotBalance::negative);
+                if (!hasDiscrepancy) {
+                    continue;
+                }
+            }
+
+            BigDecimal remaining = available.add(incoming);
+            DepartmentCategoryView dept = sku.departmentId() != null ? deptMap.get(sku.departmentId()) : null;
+
+            summaries.add(new StockSummaryView(
+                    locationId,
+                    sId,
+                    sku.skuCode(),
+                    sku.nameEn(),
+                    sku.nameSi(),
+                    sku.nameTa(),
+                    sku.baseUomCode(),
+                    sku.departmentId(),
+                    dept != null ? dept.nameEn() : null,
+                    dept != null ? dept.nameSi() : null,
+                    dept != null ? dept.nameTa() : null,
+                    onHand,
+                    reserved,
+                    available,
+                    incoming,
+                    outgoing,
+                    varianceQty,
+                    varianceVal,
+                    countStatus,
+                    countTime,
+                    remaining,
+                    skuLots.size(),
+                    skuLots));
+        }
+
+        summaries.sort((a, b) -> a.skuCode().compareToIgnoreCase(b.skuCode()));
+        return summaries;
+    }
+
+    @Override
+    public Optional<StockExplanationView> stockExplanation(UUID locationId, UUID skuId, ScopeContext scope) {
+        if (locationId == null || skuId == null) {
+            return Optional.empty();
+        }
+
+        Optional<SkuView> skuOpt = catalogueQueries.getSku(skuId, scope);
+        if (skuOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        SkuView sku = skuOpt.get();
+
+        Date today = today();
+        List<LotBalance> lots = balances(locationId, skuId, true, scope);
+
+        BigDecimal onHand = lots.stream().map(LotBalance::qtyOnHand).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<StockExplanationView.ReservationDetail> reservations = jdbc.query(
+                """
+                select p.pick_list_id, pl.delivery_document_id, d.doc_number_display,
+                       p.qty as reserved_qty, pl.status as pick_status, pl.created_at as reserved_at
+                  from inventory.pick_list_line p
+                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
+                  left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                  join inventory.stock_lot r on r.stock_lot_id = coalesce(o.replacement_stock_lot_id, p.stock_lot_id)
+                  left join kernel.document d on d.document_id = pl.delivery_document_id
+                 where pl.status = 'OPEN'
+                   and coalesce(o.location_id, p.location_id) = ?
+                   and p.sku_id = ?
+                   and (r.expiry_date is null or r.expiry_date >= ?)
+                 order by pl.created_at desc
+                """,
+                (rs, n) -> new StockExplanationView.ReservationDetail(
+                        rs.getObject("pick_list_id", UUID.class),
+                        rs.getObject("delivery_document_id", UUID.class),
+                        rs.getString("doc_number_display"),
+                        rs.getBigDecimal("reserved_qty"),
+                        rs.getString("pick_status"),
+                        rs.getTimestamp("reserved_at") != null
+                                ? rs.getTimestamp("reserved_at").toInstant()
+                                : null),
+                locationId,
+                skuId,
+                today);
+
+        BigDecimal reserved = reservations.stream()
+                .map(StockExplanationView.ReservationDetail::reservedQty)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal goodInDateOnHand = lots.stream()
+                .filter(l -> "GOOD".equals(l.condition())
+                        && !l.expired()
+                        && l.qtyOnHand().compareTo(BigDecimal.ZERO) > 0)
+                .map(LotBalance::qtyOnHand)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal available = nonNegative(goodInDateOnHand.subtract(reserved));
+
+        List<StockExplanationView.InTransitDetail> incomingTransfers = jdbc.query(
+                """
+                select t.transfer_id, d.doc_number_display, t.location_id as from_loc_id,
+                       tl.qty, x.dispatched_at, 'IN_TRANSIT' as status
+                  from inventory.transfer t
+                  join inventory.transfer_line tl on tl.transfer_id = t.transfer_id
+                  join inventory.transfer_dispatch x on x.transfer_id = t.transfer_id
+                  left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                  left join inventory.transfer_cancellation c on c.transfer_id = t.transfer_id
+                  left join kernel.document d on d.document_id = t.transfer_id
+                 where t.to_location_id = ?
+                   and tl.sku_id = ?
+                   and r.transfer_id is null
+                   and c.transfer_id is null
+                 order by x.dispatched_at desc
+                """,
+                (rs, n) -> {
+                    UUID fromLocId = rs.getObject("from_loc_id", UUID.class);
+                    String fromLocName = partyQueries
+                            .getLocation(fromLocId, scope)
+                            .map(l -> l.nameEn())
+                            .orElse(null);
+                    return new StockExplanationView.InTransitDetail(
+                            rs.getObject("transfer_id", UUID.class),
+                            rs.getString("doc_number_display"),
+                            fromLocId,
+                            fromLocName,
+                            rs.getBigDecimal("qty"),
+                            rs.getTimestamp("dispatched_at") != null
+                                    ? rs.getTimestamp("dispatched_at").toInstant()
+                                    : null,
+                            rs.getString("status"));
+                },
+                locationId,
+                skuId);
+
+        BigDecimal inTransitIncoming = incomingTransfers.stream()
+                .map(StockExplanationView.InTransitDetail::qty)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<StockExplanationView.InTransitDetail> outgoingTransfers = jdbc.query(
+                """
+                select t.transfer_id, d.doc_number_display, t.to_location_id as to_loc_id,
+                       tl.qty, x.dispatched_at, 'IN_TRANSIT' as status
+                  from inventory.transfer t
+                  join inventory.transfer_line tl on tl.transfer_id = t.transfer_id
+                  join inventory.transfer_dispatch x on x.transfer_id = t.transfer_id
+                  left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                  left join inventory.transfer_cancellation c on c.transfer_id = t.transfer_id
+                  left join kernel.document d on d.document_id = t.transfer_id
+                 where t.location_id = ?
+                   and tl.sku_id = ?
+                   and r.transfer_id is null
+                   and c.transfer_id is null
+                 order by x.dispatched_at desc
+                """,
+                (rs, n) -> {
+                    UUID toLocId = rs.getObject("to_loc_id", UUID.class);
+                    String toLocName = partyQueries
+                            .getLocation(toLocId, scope)
+                            .map(l -> l.nameEn())
+                            .orElse(null);
+                    return new StockExplanationView.InTransitDetail(
+                            rs.getObject("transfer_id", UUID.class),
+                            rs.getString("doc_number_display"),
+                            toLocId,
+                            toLocName,
+                            rs.getBigDecimal("qty"),
+                            rs.getTimestamp("dispatched_at") != null
+                                    ? rs.getTimestamp("dispatched_at").toInstant()
+                                    : null,
+                            rs.getString("status"));
+                },
+                locationId,
+                skuId);
+
+        BigDecimal inTransitOutgoing = outgoingTransfers.stream()
+                .map(StockExplanationView.InTransitDetail::qty)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal remaining = available.add(inTransitIncoming);
+
+        List<StockExplanationView.CountDetail> countDetails = jdbc.query(
+                """
+                select ct.task_id, ct.scope_kind, ct.status, ct.outcome, ct.started_at, ct.submitted_at,
+                       coalesce(cl.expected_qty, exp.expected_qty, 0) as expected_qty,
+                       coalesce(cl.counted_qty, scans.counted_qty, 0) as counted_qty,
+                       coalesce(cl.variance_qty, coalesce(scans.counted_qty, 0) - coalesce(exp.expected_qty, 0)) as variance_qty,
+                       coalesce(cl.variance_value, 0) as variance_value
+                  from inventory.count_task ct
+                  left join (select task_id, sum(expected_qty) as expected_qty, sum(counted_qty) as counted_qty,
+                                    sum(variance_qty) as variance_qty, sum(variance_value) as variance_value
+                               from inventory.count_line where sku_id = ? group by task_id) cl on cl.task_id = ct.task_id
+                  left join (select task_id, sum(expected_qty) as expected_qty
+                               from inventory.count_expectation where sku_id = ? group by task_id) exp on exp.task_id = ct.task_id
+                  left join (select task_id, sum(counted_qty) as counted_qty
+                               from inventory.stock_take_scan where sku_id = ? group by task_id) scans on scans.task_id = ct.task_id
+                 where ct.location_id = ?
+                   and (cl.task_id is not null or exp.task_id is not null or scans.task_id is not null)
+                 order by ct.scheduled_at desc, ct.task_id desc
+                 limit 1
+                """,
+                (rs, n) -> new StockExplanationView.CountDetail(
+                        rs.getObject("task_id", UUID.class),
+                        rs.getString("scope_kind"),
+                        rs.getString("status"),
+                        rs.getString("outcome"),
+                        rs.getBigDecimal("expected_qty"),
+                        rs.getBigDecimal("counted_qty"),
+                        rs.getBigDecimal("variance_qty"),
+                        rs.getBigDecimal("variance_value"),
+                        rs.getTimestamp("started_at") != null
+                                ? rs.getTimestamp("started_at").toInstant()
+                                : null,
+                        rs.getTimestamp("submitted_at") != null
+                                ? rs.getTimestamp("submitted_at").toInstant()
+                                : null),
+                skuId,
+                skuId,
+                skuId,
+                locationId);
+
+        StockExplanationView.CountDetail latestCount = countDetails.isEmpty() ? null : countDetails.get(0);
+        BigDecimal varianceQty = latestCount != null ? latestCount.varianceQty() : null;
+
+        DepartmentCategoryView dept = null;
+        if (sku.departmentId() != null) {
+            try {
+                dept = catalogueQueries
+                        .getDepartmentCategory(sku.departmentId(), scope)
+                        .orElse(null);
+            } catch (Exception ignored) {
+            }
+        }
+
+        return Optional.of(new StockExplanationView(
+                locationId,
+                skuId,
+                sku.skuCode(),
+                sku.nameEn(),
+                sku.nameSi(),
+                sku.nameTa(),
+                sku.baseUomCode(),
+                sku.departmentId(),
+                dept != null ? dept.nameEn() : null,
+                dept != null ? dept.nameSi() : null,
+                dept != null ? dept.nameTa() : null,
+                onHand,
+                reserved,
+                available,
+                inTransitIncoming,
+                inTransitOutgoing,
+                varianceQty,
+                remaining,
+                lots,
+                reservations,
+                incomingTransfers,
+                outgoingTransfers,
+                latestCount));
     }
 }

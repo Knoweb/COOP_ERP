@@ -24,6 +24,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/locations/{locationId}/stock-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock balance summaries for a location with explainable quantities
+         * @description Aggregated stock position summaries for a location with explainable on-hand, reserved, in-transit, and count variance quantities, optionally filtered by department, UOM, or discrepancy.
+         */
+        get: operations["getStockSummaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/skus/{skuId}/explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explainability drilldown for a SKU stock position at a location
+         * @description Surfaces the individual lots, active pick list reservations, in-transit transfers, and latest count session details explaining the stock quantities.
+         */
+        get: operations["getStockExplanation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/locations/{locationId}/movements": {
         parameters: {
             query?: never;
@@ -892,6 +932,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/stock-take/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open or resume an active mobile stock-taking session for a location
+         * @description Opens or resumes a counting session for the specified location. If a count task is in COUNTING status, returns it. If in SCHEDULED, transitions it to COUNTING. If no count task is open, schedules and starts one.
+         */
+        post: operations["openStockTakeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the currently active stock-taking session for a location */
+        get: operations["getActiveStockTakeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get stock-taking session details */
+        get: operations["getStockTakeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record an individual barcode or SKU scan in a session
+         * @description Accepts a barcode or SKU scan, resolves the item and lot safely, and records the counted quantity. Idempotent by scanId: repeated submissions with identical attributes return the existing scan result without double-counting.
+         */
+        post: operations["recordStockTakeScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all recorded scans for a stock-taking session */
+        get: operations["listStockTakeScans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/scans/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest an offline batch of queued mobile scans
+         * @description Processes multiple queued scans with row-level deduplication. Already-recorded scans in the batch are safely skipped without double-counting.
+         */
+        post: operations["batchStockTakeScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review expected vs counted variances for a stock-taking session */
+        get: operations["reviewStockTakeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconcile and submit counted quantities into the inventory count workflow
+         * @description Aggregates session scans, processes uncounted items (ZERO or SKIP), and submits into M5's tolerance evaluation and approval workflow.
+         */
+        post: operations["reconcileStockTakeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1576,6 +1764,259 @@ export interface components {
             slowMovingAlertsEmitted: number;
             totalEvaluated: number;
         };
+        OpenStockTakeSessionRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /**
+             * @default FULL
+             * @enum {string}
+             */
+            scopeKind: "FULL" | "SKUS";
+            skuIds?: string[];
+        };
+        StockTakeSessionResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            scopeKind: "FULL" | "SKUS";
+            skuIds: string[];
+            /** @enum {string} */
+            status: "SCHEDULED" | "COUNTING" | "VARIANCE_REVIEW" | "CLOSED";
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: uuid */
+            startedBy?: string;
+            expectedLotsCount: number;
+            totalScansCount: number;
+            totalCountedUnits: number;
+        };
+        StockTakeScanRequest: {
+            /**
+             * Format: uuid
+             * @description Client-generated UUID for offline deduplication
+             */
+            scanId?: string;
+            barcode?: string;
+            /** Format: uuid */
+            skuId?: string;
+            skuCode?: string;
+            /** Format: uuid */
+            batchId?: string;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            quantity: number;
+            /** Format: date-time */
+            scannedAt?: string;
+            deviceId?: string;
+            notes?: string;
+        };
+        StockTakeScanResponse: {
+            /** Format: uuid */
+            scanId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            quantity: number;
+            totalCountedForLot: number;
+            wasDuplicate: boolean;
+        };
+        StockTakeScanItemResponse: {
+            /** Format: uuid */
+            scanId: string;
+            /** Format: uuid */
+            sessionId: string;
+            scannedCode: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            countedQty: number;
+            /** Format: date-time */
+            scannedAt: string;
+            /** Format: uuid */
+            scannedBy?: string;
+            deviceId?: string;
+            notes?: string;
+        };
+        StockTakeBatchScanRequest: {
+            scans: components["schemas"]["StockTakeScanRequest"][];
+        };
+        StockTakeBatchScanResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            processedCount: number;
+            duplicateCount: number;
+            totalScansCount: number;
+        };
+        StockTakeReviewResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            locationId: string;
+            status: string;
+            totalExpectedLots: number;
+            totalCountedLots: number;
+            matchedLots: number;
+            discrepantLots: number;
+            uncountedLots: number;
+            totalVarianceQty: number;
+            totalVarianceValue: number;
+            lines: components["schemas"]["StockTakeReviewLine"][];
+        };
+        StockTakeReviewLine: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            barcode?: string;
+            /** Format: uuid */
+            batchId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            expectedQty: number;
+            countedQty: number;
+            varianceQty: number;
+            unitCost: number;
+            varianceValue: number;
+            /** @enum {string} */
+            status: "MATCHED" | "OVER" | "SHORT" | "UNCOUNTED" | "UNEXPECTED";
+        };
+        StockTakeReconcileRequest: {
+            /**
+             * @default ZERO
+             * @enum {string}
+             */
+            uncountedHandling: "ZERO" | "SKIP";
+            skipReason?: string;
+        };
+        StockTakeReconcileResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            /** @enum {string} */
+            status: "SCHEDULED" | "COUNTING" | "VARIANCE_REVIEW" | "CLOSED";
+            /** @enum {string} */
+            outcome?: "POSTED" | "APPROVED" | "REJECTED";
+            reviewValue?: number;
+            reviewBand?: number;
+        };
+        StockSummaryResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            baseUomCode: string;
+            /** Format: uuid */
+            departmentId?: string;
+            departmentNameEn?: string;
+            departmentNameSi?: string;
+            departmentNameTa?: string;
+            qtyOnHand: number;
+            reservedQty: number;
+            availableQty: number;
+            inTransitIncomingQty: number;
+            inTransitOutgoingQty: number;
+            countedVarianceQty?: number;
+            countedVarianceValue?: number;
+            latestCountStatus?: string;
+            /** Format: date-time */
+            latestCountedAt?: string;
+            remainingStockQty: number;
+            lotCount: number;
+            lots?: components["schemas"]["LotBalanceResponse"][];
+        };
+        StockExplanationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            baseUomCode: string;
+            /** Format: uuid */
+            departmentId?: string;
+            departmentNameEn?: string;
+            departmentNameSi?: string;
+            departmentNameTa?: string;
+            qtyOnHand: number;
+            reservedQty: number;
+            availableQty: number;
+            inTransitIncomingQty: number;
+            inTransitOutgoingQty: number;
+            countedVarianceQty?: number;
+            remainingStockQty: number;
+            lots?: components["schemas"]["LotBalanceResponse"][];
+            reservations?: components["schemas"]["StockReservationDetail"][];
+            incomingTransfers?: components["schemas"]["StockInTransitDetail"][];
+            outgoingTransfers?: components["schemas"]["StockInTransitDetail"][];
+            latestCount?: components["schemas"]["StockCountDetail"];
+        };
+        StockReservationDetail: {
+            /** Format: uuid */
+            pickListId: string;
+            /** Format: uuid */
+            deliveryDocumentId?: string;
+            deliveryDocNumber?: string;
+            reservedQty: number;
+            pickStatus: string;
+            /** Format: date-time */
+            reservedAt?: string;
+        };
+        StockInTransitDetail: {
+            /** Format: uuid */
+            transferId: string;
+            documentNo?: string;
+            /** Format: uuid */
+            locationId?: string;
+            locationName?: string;
+            qty: number;
+            /** Format: date-time */
+            dispatchedAt?: string;
+            status: string;
+        };
+        StockCountDetail: {
+            /** Format: uuid */
+            taskId: string;
+            scopeKind?: string;
+            status: string;
+            outcome?: string;
+            expectedQty: number;
+            countedQty: number;
+            varianceQty: number;
+            varianceValue?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            submittedAt?: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1658,6 +2099,66 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    getStockSummaries: {
+        parameters: {
+            query?: {
+                departmentId?: string;
+                uomCode?: string;
+                skuId?: string;
+                includeZero?: boolean;
+                discrepancyOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSummaryResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getStockExplanation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock explanation details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockExplanationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Stock explanation not found, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listMovements: {
@@ -3062,6 +3563,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepackResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    openStockTakeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenStockTakeSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Stock-taking session opened or resumed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeSessionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getActiveStockTakeSession: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active session found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeSessionResponse"];
+                };
+            };
+            /** @description No active stock-taking session found for this location */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getStockTakeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeSessionResponse"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recordStockTakeScan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Scan recorded or recognized as identical retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeScanResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listStockTakeScans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of scans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeScanItemResponse"][];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    batchStockTakeScan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeBatchScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Batch processed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeBatchScanResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reviewStockTakeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Review report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeReviewResponse"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reconcileStockTakeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeReconcileRequest"];
+            };
+        };
+        responses: {
+            /** @description Session reconciled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeReconcileResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

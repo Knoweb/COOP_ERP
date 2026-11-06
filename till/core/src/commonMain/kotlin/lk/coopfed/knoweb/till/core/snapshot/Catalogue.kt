@@ -85,6 +85,8 @@ class Catalogue(
      */
     val config: Map<String, String>
     private val byBarcode: Map<String, Item>
+    private val memberEligibility: Map<String, Boolean>
+    private val employeeEligibility: Map<String, Boolean>
 
     init {
         config = snapshot.table("config").mapNotNull { row ->
@@ -181,6 +183,20 @@ class Catalogue(
                 language = Language.of(d.str("language")),
             )
         }
+
+        memberEligibility = snapshot.table("member_discount_eligibility").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            val no = d.str("member_no")?.trim() ?: return@mapNotNull null
+            val active = d["active"]?.jsonPrimitive?.booleanOrNull ?: (d.str("active") == "true")
+            no.lowercase() to active
+        }.toMap()
+
+        employeeEligibility = snapshot.table("employee_discount_eligibility").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            val no = d.str("employee_no")?.trim() ?: return@mapNotNull null
+            val active = d["active"]?.jsonPrimitive?.booleanOrNull ?: (d.str("active") == "true")
+            no.lowercase() to active
+        }.toMap()
     }
 
     fun byBarcode(code: String): Item? = byBarcode[code.trim()]
@@ -198,6 +214,14 @@ class Catalogue(
         val stripped = trimmed.trimStart('0')
         return byBarcode[trimmed] ?: (if (stripped.isNotEmpty()) byBarcode[stripped] else null)
     }
+
+    /** Resolves member discount eligibility offline: trimmed and case-insensitive (PGL-M1-06). */
+    fun isMemberEligible(memberNo: String): Boolean =
+        memberEligibility[memberNo.trim().lowercase()] == true
+
+    /** Resolves employee discount eligibility offline: trimmed and case-insensitive (PGL-M1-06). */
+    fun isEmployeeEligible(employeeNo: String): Boolean =
+        employeeEligibility[employeeNo.trim().lowercase()] == true
 
     /** Items whose name (any language), code or barcode contains [query]. */
     fun search(query: String, limit: Int = 20): List<Item> {

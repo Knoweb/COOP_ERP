@@ -295,3 +295,24 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Slow-moving stock alert emitted for a stagnant or low-velocity SKU at a location
+
+  # Polgolla M2-09: mobile stock-taking
+  - code: STOCK_TAKE_SESSION_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: A mobile stock-take session was opened for a location
+
+  - code: STOCK_TAKE_SCAN_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A mobile item scan was recorded into the stock-take session ledger
+
+  - code: STOCK_TAKE_BATCH_SCANNED
+    severity: INFO
+    offline_capturable: false
+    description_en: A batch of mobile item scans was synchronized into the session ledger
+
+  - code: STOCK_TAKE_SESSION_RECONCILED
+    severity: INFO
+    offline_capturable: false
+    description_en: A mobile stock-take session was reconciled into standard count submission

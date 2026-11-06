@@ -669,6 +669,152 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MonthlyDeliveryReportResponse' }
+
+  /v1/integration/payments/initiate:
+    post:
+      tags: [Integration]
+      operationId: initiatePayment
+      summary: Initiate an online payment, generate a dynamic LankaQR code, or record COD intent
+      x-permission: int.payment.initiate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InitiatePaymentRequest' }
+      responses:
+        '201':
+          description: Payment initiated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntentResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/integration/payments/{paymentId}/confirm:
+    post:
+      tags: [Integration]
+      operationId: confirmPayment
+      summary: Confirm payment settlement or capture failure from provider
+      x-permission: int.payment.manage
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmPaymentRequest' }
+      responses:
+        '200':
+          description: Payment confirmed and settled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntentResponse' }
+        '404':
+          description: Payment not found
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/integration/payments/{paymentId}/confirm-cod:
+    post:
+      tags: [Integration]
+      operationId: confirmCodPayment
+      summary: Confirm cash collection and settlement for a COD payment
+      x-permission: int.payment.manage
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmCodPaymentRequest' }
+      responses:
+        '200':
+          description: COD payment settled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntentResponse' }
+        '404':
+          description: Payment not found
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/integration/payments/{paymentId}/retry:
+    post:
+      tags: [Integration]
+      operationId: retryPayment
+      summary: Retry a pending or failed payment with a provider
+      x-permission: int.payment.manage
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RetryPaymentRequest' }
+      responses:
+        '200':
+          description: Payment retried
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntentResponse' }
+        '404':
+          description: Payment not found
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/integration/payments/{paymentId}:
+    get:
+      tags: [Integration]
+      operationId: getPayment
+      summary: Get details and status of a payment intent
+      x-permission: int.payment.view
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntentResponse' }
+        '404':
+          description: Payment not found
+
+  /v1/integration/payments/by-order/{orderReference}:
+    get:
+      tags: [Integration]
+      operationId: listPaymentsByOrder
+      summary: List all payment intents associated with an order reference
+      x-permission: int.payment.view
+      parameters:
+        - name: orderReference
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Payment intents for the order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PaymentIntentResponse' }
 components:
   parameters:
     ExportId:
@@ -1154,3 +1300,55 @@ components:
         vehicleBreakdown:
           type: array
           items: { $ref: '#/components/schemas/VehicleDeliveryBreakdownItem' }
+    InitiatePaymentRequest:
+      type: object
+      required: [orderReference, customerRef, amount, paymentMethod]
+      properties:
+        paymentId: { type: string, format: uuid }
+        orderReference: { type: string, minLength: 1, maxLength: 100 }
+        customerRef: { type: string, minLength: 1, maxLength: 100 }
+        amount: { type: number, minimum: 0.01 }
+        paymentMethod: { type: string, enum: [ONLINE, LANKA_QR, COD] }
+        provider: { type: string, maxLength: 50 }
+        description: { type: string, maxLength: 250 }
+        idempotencyKey: { type: string, maxLength: 100 }
+        metadata: { type: object, additionalProperties: true }
+    ConfirmPaymentRequest:
+      type: object
+      properties:
+        providerRef: { type: string, maxLength: 100 }
+        status: { type: string, enum: [PAID, FAILED] }
+        failureReason: { type: string, maxLength: 250 }
+        metadata: { type: object, additionalProperties: true }
+    ConfirmCodPaymentRequest:
+      type: object
+      properties:
+        receiptReference: { type: string, maxLength: 100 }
+        metadata: { type: object, additionalProperties: true }
+    RetryPaymentRequest:
+      type: object
+      properties:
+        provider: { type: string, maxLength: 50 }
+    PaymentIntentResponse:
+      type: object
+      required: [paymentId, ownerEntityId, orderReference, customerRef, amount, currency, paymentMethod, status, provider, idempotencyKey, initiatedAt, createdAt, updatedAt]
+      properties:
+        paymentId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        orderReference: { type: string }
+        customerRef: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        paymentMethod: { type: string }
+        status: { type: string }
+        provider: { type: string }
+        providerRef: { type: [string, 'null'] }
+        qrPayload: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        failureReason: { type: [string, 'null'] }
+        idempotencyKey: { type: string }
+        metadata: { type: object, additionalProperties: true }
+        initiatedAt: { type: string, format: date-time }
+        settledAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }

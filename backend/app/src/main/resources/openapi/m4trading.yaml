@@ -1992,6 +1992,10 @@ components:
         deliverToLocationId:
           type: string
           format: uuid
+        operatorUserId:
+          description: The user who drafted or entered the order (the acting head-office operator in on-behalf orders)
+          type: string
+          format: uuid
         deliverTo:
           $ref: '#/components/schemas/DeliveryPointResponse'
         version:

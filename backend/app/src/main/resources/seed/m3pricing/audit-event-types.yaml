@@ -107,3 +107,9 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Shelf-label print job failed
+
+  # PGL-M1-07: Expiry / slow-moving discount evaluation
+  - code: EXPIRY_SLOW_MOVING_DISCOUNTS_EVALUATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Expiry and slow-moving discount evaluation executed

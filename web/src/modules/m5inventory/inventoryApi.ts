@@ -48,6 +48,24 @@ export type EvaluateLowStockResponse = components["schemas"]["EvaluateLowStockRe
 export type ExpiryAlertItem = components["schemas"]["ExpiryAlertItemResponse"];
 export type SlowMovingStock = components["schemas"]["SlowMovingStockResponse"];
 export type ExpiryAlertScan = components["schemas"]["ExpiryAlertScanResponse"];
+export type StockSummary = components["schemas"]["StockSummaryResponse"];
+export type StockExplanation = components["schemas"]["StockExplanationResponse"];
+export type StockReservationDetail = components["schemas"]["StockReservationDetail"];
+export type StockInTransitDetail = components["schemas"]["StockInTransitDetail"];
+export type StockCountDetail = components["schemas"]["StockCountDetail"];
+export type DepartmentCategory = catalogueComponents["schemas"]["DepartmentCategoryResponse"];
+export type Uom = catalogueComponents["schemas"]["UomResponse"];
+export type OpenStockTakeSessionRequest = components["schemas"]["OpenStockTakeSessionRequest"];
+export type StockTakeSessionResponse = components["schemas"]["StockTakeSessionResponse"];
+export type StockTakeScanRequest = components["schemas"]["StockTakeScanRequest"];
+export type StockTakeScanResponse = components["schemas"]["StockTakeScanResponse"];
+export type StockTakeScanItemResponse = components["schemas"]["StockTakeScanItemResponse"];
+export type StockTakeBatchScanRequest = components["schemas"]["StockTakeBatchScanRequest"];
+export type StockTakeBatchScanResponse = components["schemas"]["StockTakeBatchScanResponse"];
+export type StockTakeReviewResponse = components["schemas"]["StockTakeReviewResponse"];
+export type StockTakeReviewLine = components["schemas"]["StockTakeReviewLine"];
+export type StockTakeReconcileRequest = components["schemas"]["StockTakeReconcileRequest"];
+export type StockTakeReconcileResponse = components["schemas"]["StockTakeReconcileResponse"];
 
 export function useInventoryApi() {
   const api = useApiClient<paths>();
@@ -60,6 +78,48 @@ export function useInventoryApi() {
       async locations(): Promise<Location[]> {
         const { data } = await party.GET("/v1/party/locations", { params: { query: { limit: 100 } } });
         return data?.items ?? [];
+      },
+
+      async stockSummaries(
+        locationId: string,
+        params?: {
+          departmentId?: string;
+          uomCode?: string;
+          skuId?: string;
+          includeZero?: boolean;
+          discrepancyOnly?: boolean;
+        }
+      ): Promise<StockSummary[]> {
+        const { data } = await api.GET("/v1/inventory/locations/{locationId}/stock-summary", {
+          params: {
+            path: { locationId },
+            query: {
+              departmentId: params?.departmentId,
+              uomCode: params?.uomCode,
+              skuId: params?.skuId,
+              includeZero: params?.includeZero,
+              discrepancyOnly: params?.discrepancyOnly
+            }
+          }
+        });
+        return data ?? [];
+      },
+
+      async stockExplanation(locationId: string, skuId: string): Promise<StockExplanation | null> {
+        const { data } = await api.GET("/v1/inventory/locations/{locationId}/skus/{skuId}/explanation", {
+          params: { path: { locationId, skuId } }
+        });
+        return data ?? null;
+      },
+
+      async departments(): Promise<DepartmentCategory[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/departments");
+        return data ?? [];
+      },
+
+      async uoms(): Promise<Uom[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/uoms");
+        return data ?? [];
       },
 
       async balances(locationId: string): Promise<LotBalance[]> {
@@ -540,6 +600,117 @@ export function useInventoryApi() {
             path: { locationId },
             header: { "Idempotency-Key": idempotencyKey }
           }
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async openStockTakeSession(
+        req: OpenStockTakeSessionRequest,
+        idempotencyKey: string
+      ): Promise<StockTakeSessionResponse> {
+        const { data, error } = await api.POST("/v1/inventory/stock-take/sessions", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: req
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async getActiveStockTakeSession(locationId: string): Promise<StockTakeSessionResponse | null> {
+        const { data, error, response } = await api.GET("/v1/inventory/stock-take/sessions/active", {
+          params: { query: { locationId } }
+        });
+        if (response?.status === 404) {
+          return null;
+        }
+        if (error) {
+          throw error;
+        }
+        return data ?? null;
+      },
+
+      async getStockTakeSession(sessionId: string): Promise<StockTakeSessionResponse> {
+        const { data, error } = await api.GET("/v1/inventory/stock-take/sessions/{sessionId}", {
+          params: { path: { sessionId } }
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async recordStockTakeScan(
+        sessionId: string,
+        req: StockTakeScanRequest,
+        idempotencyKey: string
+      ): Promise<StockTakeScanResponse> {
+        const { data, error } = await api.POST("/v1/inventory/stock-take/sessions/{sessionId}/scan", {
+          params: {
+            path: { sessionId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: req
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async listStockTakeScans(sessionId: string): Promise<StockTakeScanItemResponse[]> {
+        const { data, error } = await api.GET("/v1/inventory/stock-take/sessions/{sessionId}/scans", {
+          params: { path: { sessionId } }
+        });
+        if (error) {
+          throw error;
+        }
+        return data ?? [];
+      },
+
+      async batchStockTakeScan(
+        sessionId: string,
+        req: StockTakeBatchScanRequest,
+        idempotencyKey: string
+      ): Promise<StockTakeBatchScanResponse> {
+        const { data, error } = await api.POST("/v1/inventory/stock-take/sessions/{sessionId}/scans/batch", {
+          params: {
+            path: { sessionId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: req
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async reviewStockTakeSession(sessionId: string): Promise<StockTakeReviewResponse> {
+        const { data, error } = await api.GET("/v1/inventory/stock-take/sessions/{sessionId}/review", {
+          params: { path: { sessionId } }
+        });
+        if (error) {
+          throw error;
+        }
+        return data!;
+      },
+
+      async reconcileStockTakeSession(
+        sessionId: string,
+        req: StockTakeReconcileRequest,
+        idempotencyKey: string
+      ): Promise<StockTakeReconcileResponse> {
+        const { data, error } = await api.POST("/v1/inventory/stock-take/sessions/{sessionId}/reconcile", {
+          params: {
+            path: { sessionId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: req
         });
         if (error) {
           throw error;

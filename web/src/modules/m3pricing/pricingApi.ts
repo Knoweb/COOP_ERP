@@ -21,11 +21,17 @@ export type RescindControlPriceRequest = components["schemas"]["RescindControlPr
 export type MrpPolicy = components["schemas"]["MrpPolicyResponse"];
 export type SetMrpPolicyRequest = components["schemas"]["SetMrpPolicyRequest"];
 export type RetailPrice = components["schemas"]["RetailPriceResponse"];
+export type ResolveBasketRequest = components["schemas"]["ResolveBasketRequest"];
+export type BasketResult = components["schemas"]["BasketResult"];
+export type CustomerPriceLookup = components["schemas"]["CustomerPriceLookupResponse"];
 export type Rule = components["schemas"]["RuleResponse"];
 export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
 export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
 export type ReviewItem = components["schemas"]["ReviewItem"];
 export type LabelJob = components["schemas"]["LabelJobResponse"];
+export type ExpirySlowMovingDiscount = components["schemas"]["ExpirySlowMovingDiscountResponse"];
+export type ExpirySlowMovingEvaluation = components["schemas"]["ExpirySlowMovingEvaluationResponse"];
+export type EvaluateExpirySlowMovingDiscountsRequest = components["schemas"]["EvaluateExpirySlowMovingDiscountsRequest"];
 export type LotBalance = inventoryComponents["schemas"]["LotBalanceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type SkuConversion = catalogueComponents["schemas"]["ConversionResponse"];
@@ -180,9 +186,42 @@ export function usePricingApi() {
       },
 
       /** The shelf price of one unit of the item at the shop on the date; null when the shop is not visible. */
+      /** Customer price lookup for an item at a shop (M3-08). Strictly excludes internal costs/margins. */
+      async lookupCustomerPrice(
+        locationId: string,
+        params: { skuId?: string; barcode?: string; skuCode?: string; query?: string; uom?: string; date?: string }
+      ): Promise<CustomerPriceLookup | null> {
+        const { data } = await api.GET("/v1/pricing/customer/lookup", {
+          params: { query: { locationId, ...params } }
+        });
+        return data ?? null;
+      },
+
+      /** Customer price search for items at a shop (M3-08). */
+      async searchCustomerPrices(
+        locationId: string,
+        query?: string,
+        date?: string,
+        limit?: number
+      ): Promise<CustomerPriceLookup[]> {
+        const { data } = await api.GET("/v1/pricing/customer/search", {
+          params: { query: { locationId, query, date, limit } }
+        });
+        return data ?? [];
+      },
+
       async resolveRetailPrice(locationId: string, skuId: string, uom: string, date: string): Promise<RetailPrice | null> {
         const { data } = await api.GET("/v1/pricing/resolve/retail", {
           params: { query: { locationId, skuId, uom, qty: 1, date } }
+        });
+        return data ?? null;
+      },
+
+      /** Resolve a basket at a shop centrally with rules, caps, and optional customer-class targeting (PGL-M1-06). */
+      async resolveBasket(body: ResolveBasketRequest, idempotencyKey: string): Promise<BasketResult | null> {
+        const { data } = await api.POST("/v1/pricing/resolve/retail", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
         });
         return data ?? null;
       },
@@ -237,6 +276,30 @@ export function usePricingApi() {
           params: { path: { locationId } }
         });
         return data ?? [];
+      },
+
+      /** Active expiry and slow-moving discount markdowns (PGL-M1-07). */
+      async listExpirySlowMovingDiscounts(
+        locationId: string,
+        reason?: "ALL" | "NEAR_EXPIRY" | "SLOW_MOVING",
+        status?: "ALL" | "ACTIVE"
+      ): Promise<ExpirySlowMovingDiscount[]> {
+        const { data } = await api.GET("/v1/pricing/expiry-slow-moving-discounts", {
+          params: { query: { locationId, reason, status } }
+        });
+        return data ?? [];
+      },
+
+      /** Trigger evaluation of near-expiry and slow-moving discount markdowns (PGL-M1-07). */
+      async evaluateExpirySlowMovingDiscounts(
+        locationId: string,
+        idempotencyKey: string
+      ): Promise<ExpirySlowMovingEvaluation> {
+        const { data } = await api.POST("/v1/pricing/expiry-slow-moving-discounts/evaluate", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId }
+        });
+        return data!;
       }
     }),
     [api, catalogue, party, inventory]

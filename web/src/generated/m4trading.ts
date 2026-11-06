@@ -1114,6 +1114,11 @@ export interface components {
             notes?: string;
             /** Format: uuid */
             deliverToLocationId?: string;
+            /**
+             * Format: uuid
+             * @description The user who drafted or entered the order (the acting head-office operator in on-behalf orders)
+             */
+            operatorUserId?: string;
             deliverTo?: components["schemas"]["DeliveryPointResponse"];
             /** @description 1, or the version of an amendment (each amendment is a new order) */
             version?: number;

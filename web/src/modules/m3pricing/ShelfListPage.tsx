@@ -137,13 +137,25 @@ export function ShelfListPage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(detail.error, t("pricing.error.not_found").text)}</p>
-        <Link className="back-link" to="/pricing/shelf">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-            <path d="M15 18l-6-6 6-6" />
-            <path d="M9 12h10" />
+        <div>
+        <Link className="back-pill-btn" to="/pricing/shelf">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
           </svg>
-          <span>{t("pricing.shelf.back").text}</span>
+          {t("pricing.shelf.back").text}
         </Link>
+      </div>
       </main>
     );
   }
@@ -172,13 +184,25 @@ export function ShelfListPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/pricing/shelf">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-          <path d="M15 18l-6-6 6-6" />
-          <path d="M9 12h10" />
-        </svg>
-        <span>{t("pricing.shelf.back").text}</span>
-      </Link>
+      <div>
+        <Link className="back-pill-btn" to="/pricing/shelf">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("pricing.shelf.back").text}
+        </Link>
+      </div>
 
       <div className="pricing-header-card">
         <h1>{list.name}</h1>
