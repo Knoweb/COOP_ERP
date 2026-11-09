@@ -10681,5 +10681,91 @@ textarea {
 
 .supplier-import-section {
   max-width: 620px !important;
+}
 
+/* ==========================================================================
+   M2 Units of Measure (UOM) Polish: Responsive Toolbar & Brand Checkbox
+   ========================================================================== */
+
+.uom-filter-toolbar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+.uom-filter-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--space-1) !important;
+  padding: 6px 14px !important;
+  border-radius: var(--radius-pill) !important;
+  background-color: var(--color-surface) !important;
+  border: 1.5px solid var(--color-border) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.uom-filter-toggle:hover {
+  border-color: var(--color-accent) !important;
+  background-color: var(--color-surface-subtle) !important;
+}
+
+.uom-filter-toggle:has(.uom-filter-checkbox:checked) {
+  border-color: var(--color-accent) !important;
+  background-color: var(--color-polish-29) !important;
+}
+
+.uom-filter-checkbox {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 1.5px solid var(--color-border-control) !important;
+  border-radius: var(--radius) !important;
+  background-color: var(--color-surface) !important;
+  accent-color: var(--color-accent) !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.uom-filter-checkbox:hover {
+  border-color: var(--color-accent) !important;
+}
+
+.uom-filter-checkbox:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+}
+
+.uom-filter-label-text {
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+@media (max-width: 768px) {
+  .uom-filter-toolbar {
+    justify-content: flex-start !important;
+    width: 100% !important;
+    margin-bottom: var(--space-2) !important;
+  }
+
+  .uom-filter-toggle {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding: 8px 14px !important;
+  }
 }
