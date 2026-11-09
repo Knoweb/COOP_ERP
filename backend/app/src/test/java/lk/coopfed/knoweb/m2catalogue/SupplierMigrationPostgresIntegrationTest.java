@@ -120,6 +120,17 @@ class SupplierMigrationPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(rows.get(1).get("name")).isEqualTo("Lanka Sugar Ltd");
         assertThat(rows.get(1).get("supplier_code")).isEqualTo("SUP-LSL");
 
+        // Verify GET /v1/catalogue/suppliers returns persisted supplier codes
+        ResponseEntity<JsonNode> listResponse =
+                http.exchange("/v1/catalogue/suppliers", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(listResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode listJson = listResponse.getBody();
+        assertThat(listJson).isNotNull().hasSize(2);
+        assertThat(listJson.get(0).get("name").asText()).isEqualTo("Ceylon Tea Board");
+        assertThat(listJson.get(0).get("supplierCode").asText()).isEqualTo("SUP-CTB");
+        assertThat(listJson.get(1).get("name").asText()).isEqualTo("Lanka Sugar Ltd");
+        assertThat(listJson.get(1).get("supplierCode").asText()).isEqualTo("SUP-LSL");
+
         // Verify audit event
         assertThat(kernel.committedAudit())
                 .extracting(record -> record.eventType())

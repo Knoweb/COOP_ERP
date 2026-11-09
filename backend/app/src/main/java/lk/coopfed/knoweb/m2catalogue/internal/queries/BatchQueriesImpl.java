@@ -80,13 +80,14 @@ class BatchQueriesImpl implements BatchQueries {
             return List.of();
         }
         return jdbc.query(
-                "select supplier_id, owner_entity_id, name, status from catalogue.supplier"
+                "select supplier_id, owner_entity_id, name, status, supplier_code from catalogue.supplier"
                         + " where owner_entity_id = ? order by name",
                 (rs, row) -> new SupplierView(
                         rs.getObject("supplier_id", UUID.class),
                         rs.getObject("owner_entity_id", UUID.class),
                         rs.getString("name"),
-                        rs.getString("status")),
+                        rs.getString("status"),
+                        rs.getString("supplier_code")),
                 scope.entityId());
     }
 
