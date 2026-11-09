@@ -107,6 +107,39 @@ describe("NewOpeningBalancePage (PGL-M2-06)", () => {
     expect(api.downloadOpeningStockTemplate).toHaveBeenCalled();
   });
 
+  it("triggers Excel template file download with correct filename and blob url", async () => {
+    const mockBlob = new Blob(["dummy-xlsx-content"], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    api.downloadOpeningStockTemplate.mockResolvedValueOnce(mockBlob);
+
+    const createObjectURLSpy = vi.spyOn(window.URL, "createObjectURL").mockReturnValue("blob:http://localhost/template-url");
+    const revokeObjectURLSpy = vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => {});
+    let clickedDownload = "";
+    let clickedHref = "";
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clickedDownload = this.download;
+      clickedHref = this.href;
+    });
+
+    renderPage();
+
+    const downloadBtn = screen.getByRole("button", { name: text("inventory.opening.template.download") });
+    fireEvent.click(downloadBtn);
+
+    await waitFor(() => {
+      expect(api.downloadOpeningStockTemplate).toHaveBeenCalled();
+      expect(createObjectURLSpy).toHaveBeenCalledWith(mockBlob);
+      expect(clickSpy).toHaveBeenCalled();
+      expect(clickedDownload).toBe("opening_stock_template.xlsx");
+      expect(clickedHref).toBe("blob:http://localhost/template-url");
+    });
+
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+    clickSpy.mockRestore();
+  });
+
   it("switches to manual mode and shows manual entry table", async () => {
     renderPage();
 

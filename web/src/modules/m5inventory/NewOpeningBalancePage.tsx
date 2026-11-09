@@ -114,9 +114,9 @@ export function NewOpeningBalancePage() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      // download failed
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error("Failed to download opening stock template", err);
     } finally {
       setIsDownloading(false);
     }
