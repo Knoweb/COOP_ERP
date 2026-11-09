@@ -231,20 +231,64 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void registrationGuards() {
-        assertThatThrownBy(() -> register.handle(
-                        new RegisterCustomer(
-                                "No consent", null, null, "si", "0700000104", List.of(), "WEB", null, null, false),
-                        office()))
+        // RegisterCustomer succeeds with no consents
+        UUID noConsentId = register.handle(
+                new RegisterCustomer("No consent", null, null, "si", "0700000104", List.of(), "WEB", null, null, false),
+                office());
+        assertThat(noConsentId).isNotNull();
+
+        // RegisterCustomer succeeds with only SMS consent
+        UUID smsOnlyId = register.handle(
+                new RegisterCustomer(
+                        "SMS only",
+                        null,
+                        null,
+                        "si",
+                        "0700000105",
+                        List.of("STATEMENTS_NOTIFICATIONS"),
+                        "WEB",
+                        null,
+                        null,
+                        false),
+                office());
+        assertThat(smsOnlyId).isNotNull();
+
+        // Opening account for member without CREDIT_ACCOUNT consent is refused
+        assertThatThrownBy(() ->
+                        open.handle(new OpenAccount(noConsentId, new BigDecimal("5000"), null, null, null), office()))
                 .hasMessageContaining("m7.customer.consent_required");
+        assertThatThrownBy(() ->
+                        open.handle(new OpenAccount(smsOnlyId, new BigDecimal("5000"), null, null, null), office()))
+                .hasMessageContaining("m7.customer.consent_required");
+
+        // Invalid phone throws m7.customer.phone_invalid
         assertThatThrownBy(() -> registerMember("Bad phone", "12345", false))
                 .hasMessageContaining("m7.customer.phone_invalid");
+
+        // Invalid consent purpose throws m7.customer.consent_invalid
+        assertThatThrownBy(() -> register.handle(
+                        new RegisterCustomer(
+                                "Bad consent",
+                                null,
+                                null,
+                                "si",
+                                "0700000106",
+                                List.of("INVALID_CONSENT"),
+                                "WEB",
+                                null,
+                                null,
+                                false),
+                        office()))
+                .hasMessageContaining("m7.customer.consent_invalid");
+
+        // Invalid tag throws m7.customer.tag_invalid
         assertThatThrownBy(() -> register.handle(
                         new RegisterCustomer(
                                 "Bad tag",
                                 null,
                                 null,
                                 "si",
-                                "0700000105",
+                                "0700000107",
                                 List.of("CREDIT_ACCOUNT"),
                                 "WEB",
                                 null,
@@ -252,7 +296,6 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
                                 false),
                         office()))
                 .hasMessageContaining("m7.customer.tag_invalid");
-        assertThat(kernel.committedAudit()).isEmpty();
     }
 
     @Test

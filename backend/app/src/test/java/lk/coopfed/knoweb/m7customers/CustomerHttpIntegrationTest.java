@@ -377,8 +377,24 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
                 Map.of("displayName", "No consent", "phone", "0700000202", "consents", List.of()),
                 OFFICE_USER,
                 SOCIETY);
-        assertThat(noConsent.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(String.valueOf(noConsent.getBody())).contains("m7.customer.consent_required");
+        assertThat(noConsent.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID noConsentCustId =
+                UUID.fromString(noConsent.getBody().get("customerId").asText());
+
+        // Opening an account for a member without CREDIT_ACCOUNT consent is refused with m7.customer.consent_required
+        ResponseEntity<JsonNode> openWithoutConsent = post(
+                "/v1/customers/" + noConsentCustId + "/accounts", Map.of("creditLimit", 5000), OFFICE_USER, SOCIETY);
+        assertThat(openWithoutConsent.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(String.valueOf(openWithoutConsent.getBody())).contains("m7.customer.consent_required");
+
+        // Invalid consent purpose returns 422 m7.customer.consent_invalid
+        ResponseEntity<JsonNode> badConsent = post(
+                "/v1/customers",
+                Map.of("displayName", "Bad consent", "phone", "0700000203", "consents", List.of("INVALID_PURPOSE")),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(badConsent.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(String.valueOf(badConsent.getBody())).contains("m7.customer.consent_invalid");
     }
 
     private ResponseEntity<JsonNode> post(String path, Object body, UUID user, UUID entity) {

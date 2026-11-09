@@ -89,9 +89,6 @@ class RegisterCustomerHandler implements Handles<RegisterCustomer, UUID> {
                 throw new ProblemException("m7.customer.consent_invalid", Map.of("purpose", String.valueOf(purpose)));
             }
         }
-        if (!consents.contains(CREDIT_ACCOUNT)) {
-            throw new ProblemException("m7.customer.consent_required");
-        }
         List<String> tags = CustomerGuards.tags(command.tags());
         CustomerGuards.attributes(command.attributes());
 

@@ -130,7 +130,7 @@ public class BulkMemberImporter implements Handles<BulkImportMembers, BulkMember
                             "m7.customer.consent_invalid", Map.of("purpose", String.valueOf(purpose)));
                 }
             }
-            if (!consents.contains(RegisterCustomerHandler.CREDIT_ACCOUNT)) {
+            if (row.creditLimit() != null && !consents.contains(RegisterCustomerHandler.CREDIT_ACCOUNT)) {
                 throw new ProblemException("m7.customer.consent_required");
             }
 
