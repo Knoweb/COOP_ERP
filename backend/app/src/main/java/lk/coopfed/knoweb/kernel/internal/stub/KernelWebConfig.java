@@ -30,7 +30,7 @@ public class KernelWebConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Location", TokenCurrentScope.HEADER_CORRELATION));
+        config.setExposedHeaders(List.of("Location", TokenCurrentScope.HEADER_CORRELATION, "Content-Disposition"));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

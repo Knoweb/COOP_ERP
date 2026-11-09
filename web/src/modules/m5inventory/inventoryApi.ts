@@ -180,10 +180,15 @@ export function useInventoryApi() {
       },
 
       async downloadOpeningStockTemplate(): Promise<Blob> {
-        const { response } = await api.GET("/v1/inventory/opening-balances/template", {
+        const { data } = await api.GET("/v1/inventory/opening-balances/template", {
           parseAs: "blob"
         });
-        return await response.blob();
+        if (data instanceof Blob) {
+          return data;
+        }
+        return new Blob([data as unknown as BlobPart], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
       },
 
       async bulkImportOpeningStock(
