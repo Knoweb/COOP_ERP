@@ -12,7 +12,10 @@ export type PageIconName =
   | "rules"
   | "markdown"
   | "queue"
-  | "reviews";
+  | "reviews"
+  | "customer-lookup"
+  | "customer_lookup"
+  | "customer";
 
 export function PageHeader({
   icon,
@@ -128,6 +131,17 @@ function PageIcon({ name }: { name: PageIconName }) {
         <path d="M4 6h1v4" />
         <path d="M4 10h2" />
         <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+      </svg>
+    );
+  }
+
+  if (name === "customer-lookup" || name === "customer_lookup" || name === "customer") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        <line x1="11" y1="8" x2="11" y2="14" />
+        <line x1="8" y1="11" x2="14" y2="11" />
       </svg>
     );
   }

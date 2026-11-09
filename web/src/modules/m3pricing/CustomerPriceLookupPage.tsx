@@ -3,7 +3,9 @@ import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { usePricingApi, type CustomerPriceLookup } from "./pricingApi";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { PricingTabs } from "./PricingTabs";
+import { PricingSelect } from "./PricingSelect";
 import "./pricing.css";
 
 /**
@@ -86,47 +88,102 @@ export function CustomerPriceLookupPage() {
 
   return (
     <main className="shell-page customer-price-portal">
-      <h1>{t("pricing.customer.portal_title").text}</h1>
+      <PageHeader icon="customer-lookup" title={t("pricing.customer.portal_title").text} />
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.customer.portal_intro").text}</p>
 
       <form onSubmit={handleSearch} className="customer-price-search-bar" role="search">
         <label className="modern-field customer-shop-select">
-          <span className="modern-field__label">{t("pricing.customer.shop_label").text}</span>
-          <select
-            value={selectedLocationId}
-            onChange={(e) => handleLocationChange(e.target.value)}
-            disabled={locationsQuery.isLoading}
+          <span className="modern-field__label pricing-filter-label">{t("pricing.customer.shop_label").text}</span>
+          <PricingSelect
             aria-label={t("pricing.customer.shop_label").text}
-          >
-            {locations.length === 0 && (
-              <option value="">{t("pricing.customer.choose_shop").text}</option>
-            )}
-            {locations.map((loc) => (
-              <option key={loc.locationId} value={loc.locationId}>
-                {loc.nameEn || loc.locationCode}
-              </option>
-            ))}
-          </select>
+            value={selectedLocationId}
+            onChange={handleLocationChange}
+            disabled={locationsQuery.isLoading}
+            options={locations.map((loc) => ({
+              value: loc.locationId,
+              label: loc.nameEn || loc.locationCode
+            }))}
+          />
         </label>
 
         <label className="modern-field customer-query-input">
-          <span className="modern-field__label">{t("pricing.find").text}</span>
-          <input
-            type="search"
-            value={searchQuery}
-            placeholder={t("pricing.customer.search_placeholder").text}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label={t("pricing.customer.search_placeholder").text}
-          />
+          <span className="modern-field__label pricing-filter-label">{t("pricing.find").text}</span>
+          <div className="customer-price-search-wrapper">
+            <svg
+              className="customer-price-search-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="search"
+              className="customer-price-search-input"
+              value={searchQuery}
+              placeholder={t("pricing.customer.search_placeholder").text}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchQuery("");
+                }
+              }}
+              aria-label={t("pricing.customer.search_placeholder").text}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="customer-price-search-clear"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSearchQuery("");
+                }}
+                aria-label={t("pricing.search.clear").text}
+                title={t("pricing.search.clear").text}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </label>
 
         <button
           type="submit"
-          className="modern-btn modern-btn--primary customer-search-submit"
+          className="btn btn--primary customer-search-submit"
           disabled={isSearching || !selectedLocationId}
         >
-          {isSearching ? t("pricing.list.loading").text : t("pricing.customer.search_button").text}
+          <svg
+            className={`customer-search-btn-icon ${isSearching ? "customer-search-spin" : ""}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {isSearching ? (
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            ) : (
+              <>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </>
+            )}
+          </svg>
+          <span>
+            {isSearching ? t("pricing.list.loading").text : t("pricing.customer.search_button").text}
+          </span>
         </button>
       </form>
 
@@ -152,28 +209,52 @@ export function CustomerPriceLookupPage() {
         <div className="customer-price-grid" data-testid="customer-price-results">
           {results.map((item) => (
             <article key={item.skuId} className="customer-price-card">
-              <header className="customer-price-card__header">
-                <h2 className="customer-price-card__title">{item.productName}</h2>
-                <div className="customer-price-card__meta">
-                  <span className="customer-price-chip sku-chip">{item.skuCode}</span>
-                  <span className="customer-price-chip uom-chip">
-                    {t("pricing.customer.per_unit", undefined, { unit: item.uom }).text}
-                  </span>
+              <div className="customer-price-card__header">
+                <div className="customer-price-card__top">
+                  <div className="customer-price-card__icon-badge" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M4 5h9l7 7-8 8-8-8V5Z" />
+                      <circle cx="9" cy="10" r="1.5" />
+                    </svg>
+                  </div>
                   <span
                     className={`customer-price-chip status-chip ${
                       item.isAvailable ? "status-chip--available" : "status-chip--unavailable"
                     }`}
                   >
+                    <span className="status-chip__dot" aria-hidden="true" />
                     {item.isAvailable
                       ? t("pricing.customer.available").text
                       : t("pricing.customer.unavailable").text}
                   </span>
                 </div>
-              </header>
+
+                <h2 className="customer-price-card__title">{item.productName}</h2>
+
+                <div className="customer-price-card__meta">
+                  <span className="customer-price-chip sku-chip">
+                    <svg viewBox="0 0 24 24" className="chip-icon" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path d="M4 6v12M7 6v12M11 6v12M14 6v12M17 6v12M20 6v12" />
+                    </svg>
+                    <span>{item.skuCode}</span>
+                  </span>
+                  <span className="customer-price-chip uom-chip">
+                    <svg viewBox="0 0 24 24" className="chip-icon" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                      <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+                    </svg>
+                    <span>{t("pricing.customer.per_unit", undefined, { unit: item.uom }).text}</span>
+                  </span>
+                </div>
+              </div>
 
               <div className="customer-price-card__body">
                 <div className="customer-price-card__amount-row">
                   <span className="customer-price-card__price-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="8 12 11 15 16 9" />
+                    </svg>
                     {t("pricing.customer.verified_price").text}
                   </span>
                   <strong className="customer-price-card__price-value">
@@ -183,7 +264,7 @@ export function CustomerPriceLookupPage() {
 
                 {item.isPriceControlled && item.controlPrice != null && (
                   <div className="customer-price-card__control-notice">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
                     <span>
@@ -201,10 +282,12 @@ export function CustomerPriceLookupPage() {
 
       <footer className="customer-privacy-footer" role="contentinfo">
         <div className="customer-privacy-footer__content">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
+          <div className="customer-privacy-footer__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
           <p>{t("pricing.customer.privacy_banner").text}</p>
         </div>
       </footer>
