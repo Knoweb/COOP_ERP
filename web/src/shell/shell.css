@@ -1546,12 +1546,17 @@ textarea {
 }
 
 .action-link--primary {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
+  border-color: var(--color-polish-19);
 }
 
 .action-link--primary:hover {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  filter: brightness(0.95);
+  box-shadow: 0 4px 12px var(--color-polish-21);
   color: var(--color-on-accent);
 }
 
@@ -1740,8 +1745,9 @@ textarea {
 }
 
 .shell-page .action-link--primary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
 }
 
@@ -1752,7 +1758,10 @@ textarea {
 }
 
 .shell-page .action-link--primary:hover {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  filter: brightness(0.95);
+  box-shadow: 0 4px 12px var(--color-polish-21);
 }
 
 .action-link__icon svg,
@@ -1928,13 +1937,18 @@ textarea {
 .modern-control input:hover,
 .modern-select select:hover,
 .modern-location-picker select:hover {
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background-color: var(--color-polish-29);
+  box-shadow: 0 0 0 3px var(--color-polish-27);
 }
 
 .modern-control input:focus,
+.modern-control input:not(:placeholder-shown),
 .modern-select select:focus,
 .modern-location-picker select:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background-color: var(--color-polish-29);
+  box-shadow: 0 0 0 3.5px var(--color-polish-21);
 }
 
 /* ---------- Table card --------------------------------------------------------------- */
@@ -3371,14 +3385,16 @@ textarea {
 }
 
 .register-input-control:hover {
-  border-color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
-.register-input-control:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+.register-input-control:focus,
+.register-input-control:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .register-input-control[aria-invalid="true"] {
@@ -3419,15 +3435,16 @@ textarea {
 }
 
 .register-dropdown-trigger:hover {
-  border-color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .register-dropdown-trigger:focus-visible,
 .register-dropdown-trigger[aria-expanded="true"] {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .register-dropdown-trigger .custom-status-dropdown__arrow {
@@ -4261,14 +4278,17 @@ textarea {
 }
 
 .approval-bar__button--primary {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   box-shadow: 0 2px 6px var(--color-polish-6) !important;
 }
 
 .approval-bar__button--primary:hover:not(:disabled) {
-  background: var(--color-polish-19) !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  filter: brightness(0.95);
   border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   box-shadow: 0 4px 12px var(--color-polish-21) !important;
@@ -5718,22 +5738,28 @@ textarea {
 .reason-capture textarea:hover,
 .new-user-input:hover,
 .new-user-select:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-polish-4);
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .shell-page input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus,
+.shell-page input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):not(:placeholder-shown),
 .shell-page select:focus,
 .shell-page textarea:focus,
+.shell-page textarea:not(:placeholder-shown),
 .party-form-field select:focus,
 .party-form-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus,
+.party-form-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):not(:placeholder-shown),
 .reason-capture select:focus,
 .reason-capture textarea:focus,
+.reason-capture textarea:not(:placeholder-shown),
 .new-user-input:focus,
+.new-user-input:not(:placeholder-shown),
 .new-user-select:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-polish-4);
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .new-user-select-wrap {
@@ -6383,17 +6409,20 @@ textarea {
 .party-grant-form textarea:hover,
 .party-grant-form .custom-dropdown__trigger:hover,
 .party-grant-form .cdp__trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface-subtle) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .party-grant-form input[type="text"]:focus,
+.party-grant-form input[type="text"]:not(:placeholder-shown),
 .party-grant-form textarea:focus,
+.party-grant-form textarea:not(:placeholder-shown),
 .party-grant-form .custom-dropdown--open .custom-dropdown__trigger,
 .party-grant-form .cdp--open .cdp__trigger {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .party-grant-form textarea {
@@ -8334,12 +8363,22 @@ textarea {
   resize: vertical;
 }
 
+.catalogue-form-field input:hover,
+.catalogue-form-field select:hover,
+.catalogue-form-field textarea:hover {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
+}
+
 .catalogue-form-field input:focus,
+.catalogue-form-field input:not(:placeholder-shown),
 .catalogue-form-field select:focus,
-.catalogue-form-field textarea:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+.catalogue-form-field textarea:focus,
+.catalogue-form-field textarea:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .catalogue-form-field .register-dropdown-trigger {
@@ -8997,13 +9036,16 @@ textarea {
 }
 
 .supplier-name-input:hover {
-  border-color: var(--color-accent) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
-.supplier-name-input:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+.supplier-name-input:focus,
+.supplier-name-input:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .supplier-register-btn {
@@ -9072,15 +9114,16 @@ textarea {
 }
 
 .catalogue-datepicker-trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .catalogue-datepicker-trigger--open,
 .catalogue-datepicker-trigger:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .catalogue-datepicker-trigger__value {
@@ -9452,15 +9495,16 @@ textarea {
 }
 
 .register-dropdown-trigger:hover:not(:disabled) {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .register-dropdown-trigger[aria-expanded="true"],
 .register-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .register-dropdown-trigger:disabled {
@@ -9654,15 +9698,16 @@ textarea {
 
 .reason-capture select:hover,
 .reason-capture .reason-capture__field select:hover {
-  border-color: var(--color-accent) !important;
-  background-color: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background-color: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture select:focus,
 .reason-capture .reason-capture__field select:focus {
-  border-color: var(--color-accent) !important;
-  background-color: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background-color: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .reason-capture textarea,
@@ -9686,15 +9731,18 @@ textarea {
 
 .reason-capture textarea:hover,
 .reason-capture .reason-capture__textarea:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture textarea:focus,
-.reason-capture .reason-capture__textarea:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+.reason-capture textarea:not(:placeholder-shown),
+.reason-capture .reason-capture__textarea:focus,
+.reason-capture .reason-capture__textarea:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .reason-capture__actions {
@@ -10221,15 +10269,16 @@ textarea {
 }
 
 .reason-capture .register-dropdown-trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture .register-dropdown-trigger[aria-expanded="true"],
 .reason-capture .register-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
+  background: var(--color-polish-29) !important;
 }
 
 .reason-capture .register-dropdown-menu {
@@ -10336,8 +10385,9 @@ textarea {
 .custom-status-dropdown__trigger:hover:not(:disabled),
 .register-dropdown-trigger:hover:not(:disabled),
 .reason-capture .register-dropdown-trigger:hover:not(:disabled) {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .custom-status-dropdown__trigger[aria-expanded="true"],
@@ -10346,9 +10396,9 @@ textarea {
 .register-dropdown-trigger:focus-visible,
 .reason-capture .register-dropdown-trigger[aria-expanded="true"],
 .reason-capture .register-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .custom-status-dropdown__menu,
@@ -10509,6 +10559,22 @@ textarea {
   border-radius: 8px !important;
 }
 
+.register-field-group .register-input-control:hover,
+.register-field-group .register-dropdown-trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
+}
+
+.register-field-group .register-input-control:focus,
+.register-field-group .register-input-control:not(:placeholder-shown),
+.register-field-group .register-dropdown-trigger[aria-expanded="true"],
+.register-field-group .register-dropdown-trigger:focus-visible {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
+}
+
 .register-field-group .register-dropdown-menu {
   border: 1.5px solid var(--color-accent) !important;
   border-radius: 12px !important;
@@ -10561,17 +10627,18 @@ textarea {
 
 .reason-capture .register-dropdown-trigger:hover,
 .reason-dropdown-trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture .register-dropdown-trigger[aria-expanded="true"],
 .reason-capture .register-dropdown-trigger:focus-visible,
 .reason-dropdown-trigger[aria-expanded="true"],
 .reason-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
+  background: var(--color-polish-29) !important;
 }
 
 .reason-capture .register-dropdown-menu,
@@ -10609,10 +10676,20 @@ textarea {
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
+.reason-capture textarea:hover,
+.reason-capture .reason-capture__textarea:hover {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
+}
+
 .reason-capture textarea:focus,
-.reason-capture .reason-capture__textarea:focus {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+.reason-capture textarea:not(:placeholder-shown),
+.reason-capture .reason-capture__textarea:focus,
+.reason-capture .reason-capture__textarea:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .reason-capture__actions {
@@ -10848,15 +10925,16 @@ textarea {
 }
 
 .catalogue-form-field .register-dropdown-trigger:hover {
-  border-color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .catalogue-form-field .register-dropdown-trigger:focus-visible,
 .catalogue-form-field .register-dropdown-trigger[aria-expanded="true"] {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .catalogue-form-field .register-dropdown-menu {
