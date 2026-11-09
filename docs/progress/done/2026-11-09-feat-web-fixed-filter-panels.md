@@ -1,0 +1,1 @@
+- **Fixed filter panels on Catalogue and Society Register pages** (branch `feat/web-fixed-filter-panels`): Removed collapsible filter toggle buttons from both CataloguePage and SocietyRegisterPage, making search, status, and district filter panels permanently visible, and updated dropdown scrollbars to clean neutral gray tokens (`--color-border-control` / `--color-text-muted`).

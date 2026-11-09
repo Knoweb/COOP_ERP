@@ -178,7 +178,6 @@ export function CataloguePage() {
   const language = languageOf(intl.locale);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<SkuStatus | "">("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const skus = useQuery({
     queryKey: ["catalogue", "skus", q.trim(), language, status],
@@ -233,60 +232,44 @@ export function CataloguePage() {
         }
       />
 
-      <button
-        type="button"
-        className="filter-toggle"
-        onClick={() => setFiltersOpen(!filtersOpen)}
-        aria-expanded={filtersOpen}
-        aria-controls="catalogue-filters"
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 7h16M7 12h10M10 17h4" />
-        </svg>
-        {t("catalogue.filter.toggle").text}
-        <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
-      </button>
+      <section id="catalogue-filters" className="catalogue-filter-panel">
+        <label className="modern-field catalogue-filter-field">
+          <span className="modern-field__label catalogue-filter-label">
+            {t("catalogue.filter.search").text}
+          </span>
 
-      {filtersOpen && (
-        <section id="catalogue-filters" className="catalogue-filter-panel">
-          <label className="modern-field catalogue-filter-field">
-            <span className="modern-field__label catalogue-filter-label">
-              {t("catalogue.filter.search").text}
-            </span>
+          <span className="catalogue-search-wrapper">
+            <svg
+              className="catalogue-search-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="11" cy="11" r="6" />
+              <path d="m16 16 4 4" />
+            </svg>
 
-            <span className="catalogue-search-wrapper">
-              <svg
-                className="catalogue-search-icon"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <circle cx="11" cy="11" r="6" />
-                <path d="m16 16 4 4" />
-              </svg>
-
-              <input
-                type="search"
-                className="catalogue-filter-input"
-                value={q}
-                maxLength={200}
-                onChange={(event) => setQ(event.target.value)}
-              />
-            </span>
-          </label>
-
-          <div className="modern-field catalogue-filter-field">
-            <span className="modern-field__label catalogue-filter-label">
-              {t("catalogue.filter.status").text}
-            </span>
-            <SkuStatusDropdown
-              value={status}
-              onChange={(val) => setStatus(val)}
-              anyLabel={t("catalogue.filter.status.all").text}
+            <input
+              type="search"
+              className="catalogue-filter-input"
+              value={q}
+              maxLength={200}
+              onChange={(event) => setQ(event.target.value)}
             />
-          </div>
-        </section>
-      )}
+          </span>
+        </label>
+
+        <div className="modern-field catalogue-filter-field">
+          <span className="modern-field__label catalogue-filter-label">
+            {t("catalogue.filter.status").text}
+          </span>
+          <SkuStatusDropdown
+            value={status}
+            onChange={(val) => setStatus(val)}
+            anyLabel={t("catalogue.filter.status.all").text}
+          />
+        </div>
+      </section>
 
       {skus.isLoading && (
         <div className="catalogue-state-card catalogue-state-card--loading">
