@@ -142,9 +142,11 @@ class CustomerController implements CustomersApi {
                                 ? null
                                 : request.getLanguage().getValue(),
                         request.getPhone(),
-                        request.getConsents().stream()
-                                .map(RegisterCustomerRequest.ConsentsEnum::getValue)
-                                .toList(),
+                        request.getConsents() == null
+                                ? List.of()
+                                : request.getConsents().stream()
+                                        .map(RegisterCustomerRequest.ConsentsEnum::getValue)
+                                        .toList(),
                         request.getVia() == null ? null : request.getVia().getValue(),
                         request.getAttributes(),
                         request.getTags(),

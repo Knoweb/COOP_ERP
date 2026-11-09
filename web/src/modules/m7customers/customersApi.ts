@@ -3,8 +3,9 @@
 // hand: change the slice, run `make gen-clients`, and the compiler shows every place to follow.
 
 import { useMemo } from "react";
-import { useApiClient } from "../../shell/api/client";
+import { useApiClient, ApiProblem } from "../../shell/api/client";
 import type { components, paths } from "../../generated/m7customers";
+import type { paths as partyPaths, components as partyComponents } from "../../generated/m1party";
 
 export type CustomerSummary = components["schemas"]["CustomerSummary"];
 export type CustomerCard = components["schemas"]["CustomerCard"];
@@ -22,9 +23,17 @@ export type AdjustmentRequest = components["schemas"]["AdjustmentRequest"];
 export type PrivacyRequest = components["schemas"]["PrivacyRequest"];
 export type PrivacyRequestRequest = components["schemas"]["PrivacyRequestRequest"];
 export type AccountAction = "suspend" | "reinstate" | "close" | "reopen";
+export type LoyaltyCustomerResponse = components["schemas"]["LoyaltyCustomerResponse"];
+export type LoyaltyEligibilityResponse = components["schemas"]["LoyaltyEligibilityResponse"];
+export type RegisterLoyaltyCustomerRequest = components["schemas"]["RegisterLoyaltyCustomerRequest"];
+export type UpdateRegionalRegistrationRequest = components["schemas"]["UpdateRegionalRegistrationRequest"];
+export type LoyaltyTier = components["schemas"]["RegisterLoyaltyCustomerRequest"]["loyaltyTier"];
+export type LoyaltyStatus = components["schemas"]["UpdateRegionalRegistrationRequest"]["status"];
+export type Location = partyComponents["schemas"]["LocationResponse"];
 
 export function useCustomersApi() {
   const api = useApiClient<paths>();
+  const party = useApiClient<partyPaths>();
 
   return useMemo(
     () => ({
@@ -178,8 +187,74 @@ export function useCustomersApi() {
           body: request
         });
         return data!;
+      },
+
+      /** Look up a centralized loyalty customer across permitted branches. Returns null if not found (404). */
+      async lookupLoyalty(params: {
+        phone?: string;
+        nic?: string;
+        customerId?: string;
+        memberNo?: string;
+      }): Promise<LoyaltyCustomerResponse | null> {
+        try {
+          const { data } = await api.GET("/v1/customers/loyalty/lookup", {
+            params: {
+              query: {
+                phone: params.phone || undefined,
+                nic: params.nic || undefined,
+                customerId: params.customerId || undefined,
+                memberNo: params.memberNo || undefined
+              }
+            }
+          });
+          return data ?? null;
+        } catch (error) {
+          if (error instanceof ApiProblem && error.problem.status === 404) {
+            return null;
+          }
+          throw error;
+        }
+      },
+
+      /** Check loyalty eligibility and tier for a customer at a specified branch/location. */
+      async checkLoyaltyEligibility(identifier: string, locationId?: string): Promise<LoyaltyEligibilityResponse> {
+        const { data } = await api.GET("/v1/customers/loyalty/eligibility", {
+          params: { query: { identifier, locationId: locationId || undefined } }
+        });
+        return data!;
+      },
+
+      /** Enroll an existing customer or register a new member in centralized loyalty (PGL-M3-01). */
+      async registerLoyalty(
+        request: RegisterLoyaltyCustomerRequest,
+        idempotencyKey: string
+      ): Promise<LoyaltyCustomerResponse> {
+        const { data } = await api.POST("/v1/customers/loyalty", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      /** Update regional registration details and permitted branch access (PGL-M3-01). */
+      async updateRegionalRegistration(
+        customerId: string,
+        request: UpdateRegionalRegistrationRequest,
+        idempotencyKey: string
+      ): Promise<LoyaltyCustomerResponse> {
+        const { data } = await api.PUT("/v1/customers/{customerId}/regional-registration", {
+          params: { path: { customerId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      /** List the locations visible in the caller's scope from M1 published list. */
+      async locations(): Promise<Location[]> {
+        const { data } = await party.GET("/v1/party/locations", { params: { query: { limit: 100 } } });
+        return data?.items ?? [];
       }
     }),
-    [api]
+    [api, party]
   );
 }

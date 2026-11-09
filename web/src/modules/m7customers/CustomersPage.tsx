@@ -43,16 +43,60 @@ export function CustomersPage() {
   const canRegister = useHasPermission("cus.customer.register");
   const canSeePrivacy = useHasPermission("cus.privacy.record");
 
-  const [query, setQuery] = useState({ q: "", phone: "" });
-  const [search, setSearch] = useState({ q: "", phone: "" });
+  const [query, setQuery] = useState({ q: "", phone: "", memberNo: "" });
+  const [search, setSearch] = useState({ q: "", phone: "", memberNo: "" });
   const [form, setForm] = useState<Form>(EMPTY);
   const [consent, setConsent] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const set = (patch: Partial<Form>) => setForm((current) => ({ ...current, ...patch }));
 
   const found = useQuery({
-    queryKey: ["customers", "search", search.q, search.phone],
-    queryFn: () => api.search(search.q, search.phone)
+    queryKey: ["customers", "search", search.q, search.phone, search.memberNo],
+    queryFn: async () => {
+      if (search.memberNo) {
+        const loyalty = await api.lookupLoyalty({ memberNo: search.memberNo });
+        if (!loyalty) {
+          return [];
+        }
+        try {
+          const card = await api.customer(loyalty.customerId);
+          if (card) {
+            return [
+              {
+                customerId: card.customerId,
+                displayName: card.displayName,
+                displayNameSi: card.displayNameSi,
+                displayNameTa: card.displayNameTa,
+                language: card.language,
+                phone: card.phone,
+                status: card.status,
+                accountId: card.account?.accountId,
+                accountNo: card.account?.accountNo,
+                balance: card.account?.balance,
+                creditLimit: card.account?.creditLimit
+              }
+            ];
+          }
+        } catch {
+          // Fallback to loyalty summary
+        }
+        return [
+          {
+            customerId: loyalty.customerId,
+            displayName: loyalty.displayName ?? "",
+            displayNameSi: loyalty.displayNameSi ?? null,
+            displayNameTa: loyalty.displayNameTa ?? null,
+            language: "en" as const,
+            phone: loyalty.phone ?? "",
+            status: loyalty.status,
+            accountNo: null,
+            balance: null,
+            creditLimit: null
+          }
+        ];
+      }
+      return api.search(search.q, search.phone);
+    }
   });
   const similar = useQuery({
     queryKey: ["customers", "search", form.displayName.trim(), ""],
@@ -62,13 +106,16 @@ export function CustomersPage() {
 
   const register = useMutation({
     mutationFn: () => {
+      const consents: ("CREDIT_ACCOUNT" | "STATEMENTS_NOTIFICATIONS")[] = [];
+      if (consent) consents.push("CREDIT_ACCOUNT");
+      if (form.statements) consents.push("STATEMENTS_NOTIFICATIONS");
       const request: RegisterCustomerRequest = {
         displayName: form.displayName.trim(),
         displayNameSi: form.displayNameSi.trim() || null,
         displayNameTa: form.displayNameTa.trim() || null,
         language: form.language,
         phone: form.phone,
-        consents: form.statements ? ["CREDIT_ACCOUNT", "STATEMENTS_NOTIFICATIONS"] : ["CREDIT_ACCOUNT"],
+        consents,
         via: "PAPER",
         tags: form.tags
           .split(",")
@@ -92,7 +139,7 @@ export function CustomersPage() {
 
   const find = (event: FormEvent) => {
     event.preventDefault();
-    setSearch({ q: query.q.trim(), phone: query.phone.trim() });
+    setSearch({ q: query.q.trim(), phone: query.phone.trim(), memberNo: query.memberNo.trim() });
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -117,6 +164,15 @@ export function CustomersPage() {
           {t("customers.search.phone").text}
           <input type="tel" maxLength={20} value={query.phone} onChange={(e) => setQuery({ ...query, phone: e.target.value })} />
         </label>
+        <label className="customers-field">
+          {t("customers.search.member_no").text}
+          <input
+            type="search"
+            maxLength={60}
+            value={query.memberNo}
+            onChange={(e) => setQuery({ ...query, memberNo: e.target.value })}
+          />
+        </label>
         <button type="submit">{t("customers.search.find").text}</button>
       </form>
 
@@ -124,7 +180,7 @@ export function CustomersPage() {
         <h2>{t("customers.list.title").text}</h2>
         {found.isLoading && <p>{t("customers.loading").text}</p>}
         {found.isError && <p role="alert">{errorText(found.error, t("customers.error.generic").text)}</p>}
-        {found.data?.length === 0 && <p>{t("customers.list.empty").text}</p>}
+        {found.data?.length === 0 && <p>{search.memberNo ? t("customers.loyalty.not_found").text : t("customers.list.empty").text}</p>}
         {found.data && found.data.length > 0 && (
           <table>
             <thead>
@@ -230,7 +286,7 @@ export function CustomersPage() {
             )}
             <button
               type="submit"
-              disabled={register.isPending || !consent || !form.displayName.trim() || !form.phone.trim() || (needsConfirmation && !confirmed)}
+              disabled={register.isPending || !form.displayName.trim() || !form.phone.trim() || (needsConfirmation && !confirmed)}
             >
               {t("customers.register.submit").text}
             </button>
