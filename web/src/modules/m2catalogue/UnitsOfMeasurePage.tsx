@@ -258,6 +258,7 @@ export function UnitsOfMeasurePage() {
               <input
                 type="checkbox"
                 id="define-is-weight"
+                className="uom-filter-checkbox"
                 checked={isWeight}
                 onChange={(e) => setIsWeight(e.target.checked)}
               />
@@ -360,6 +361,7 @@ export function UnitsOfMeasurePage() {
               <input
                 type="checkbox"
                 id="edit-is-weight"
+                className="uom-filter-checkbox"
                 checked={editIsWeight}
                 onChange={(e) => setEditIsWeight(e.target.checked)}
               />
@@ -389,14 +391,15 @@ export function UnitsOfMeasurePage() {
       )}
 
       {/* Filter Toolbar */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)", cursor: "pointer" }}>
+      <div className="uom-filter-toolbar">
+        <label className="uom-filter-toggle">
           <input
             type="checkbox"
+            className="uom-filter-checkbox"
             checked={includeInactive}
             onChange={(e) => setIncludeInactive(e.target.checked)}
           />
-          <span>{t("catalogue.uom.filter.include_inactive").text}</span>
+          <span className="uom-filter-label-text">{t("catalogue.uom.filter.include_inactive").text}</span>
         </label>
       </div>
 
