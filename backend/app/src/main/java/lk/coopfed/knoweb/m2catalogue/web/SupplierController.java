@@ -118,10 +118,12 @@ class SupplierController implements SupplierApi {
     }
 
     private static SupplierResponse toResponse(SupplierView supplier) {
-        return new SupplierResponse(
+        SupplierResponse response = new SupplierResponse(
                 supplier.supplierId(),
                 supplier.ownerEntityId(),
                 supplier.name(),
                 SupplierResponse.StatusEnum.fromValue(supplier.status()));
+        response.setSupplierCode(supplier.supplierCode());
+        return response;
     }
 }
