@@ -230,6 +230,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/integration/notifications/{notificationId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a failed or pending notification delivery */
+        post: operations["retryNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/integration/hr/employees": {
         parameters: {
             query?: never;
@@ -792,6 +811,15 @@ export interface components {
              * @description when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)
              */
             nextAttemptAt?: string | null;
+        };
+        NotificationResultResponse: {
+            /** Format: uuid */
+            requestId: string;
+            /** @enum {string} */
+            status: "SENT" | "PENDING" | "FAILED";
+            providerRef?: string | null;
+            error?: string | null;
+            duplicate?: boolean;
         };
         RegisterEmployeeRequest: {
             employeeNo: string;
@@ -1561,6 +1589,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationLogResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retryNotification: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification retried */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationResultResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

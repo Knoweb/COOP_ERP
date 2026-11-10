@@ -18,6 +18,8 @@ import lk.coopfed.knoweb.m9integration.api.ConfirmPayment;
 import lk.coopfed.knoweb.m9integration.api.CreateDeliveryTrip;
 import lk.coopfed.knoweb.m9integration.api.ImportAttendanceRecords;
 import lk.coopfed.knoweb.m9integration.api.InitiatePayment;
+import lk.coopfed.knoweb.m9integration.api.NotificationGateway;
+import lk.coopfed.knoweb.m9integration.api.NotificationResult;
 import lk.coopfed.knoweb.m9integration.api.RecordDeliveryDrop;
 import lk.coopfed.knoweb.m9integration.api.RecordVehicleLocation;
 import lk.coopfed.knoweb.m9integration.api.RegisterEmployee;
@@ -62,6 +64,7 @@ import lk.coopfed.knoweb.m9integration.web.generated.JournalLineResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.LiveVehicleLocationResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.MonthlyDeliveryReportResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationLogResponse;
+import lk.coopfed.knoweb.m9integration.web.generated.NotificationResultResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationRuleResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.NotificationTemplateResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.OvertimeCalculationResponse;
@@ -120,6 +123,7 @@ class IntegrationController implements IntegrationApi {
     private final Handles<ConfirmPayment, PaymentIntentView> confirmPayment;
     private final Handles<ConfirmCodSettlement, PaymentIntentView> confirmCodPayment;
     private final Handles<RetryPayment, PaymentIntentView> retryPayment;
+    private final NotificationGateway notificationGateway;
 
     IntegrationController(
             IntegrationQueries queries,
@@ -143,7 +147,8 @@ class IntegrationController implements IntegrationApi {
             Handles<InitiatePayment, PaymentIntentView> initiatePayment,
             Handles<ConfirmPayment, PaymentIntentView> confirmPayment,
             Handles<ConfirmCodSettlement, PaymentIntentView> confirmCodPayment,
-            Handles<RetryPayment, PaymentIntentView> retryPayment) {
+            Handles<RetryPayment, PaymentIntentView> retryPayment,
+            NotificationGateway notificationGateway) {
         this.queries = queries;
         this.employeeQueries = employeeQueries;
         this.attendanceQueries = attendanceQueries;
@@ -166,6 +171,7 @@ class IntegrationController implements IntegrationApi {
         this.confirmPayment = confirmPayment;
         this.confirmCodPayment = confirmCodPayment;
         this.retryPayment = retryPayment;
+        this.notificationGateway = notificationGateway;
     }
 
     @Override
@@ -323,6 +329,18 @@ class IntegrationController implements IntegrationApi {
                         .recipientTag(e.recipientTag())
                         .nextAttemptAt(e.nextAttemptAt()))
                 .toList());
+    }
+
+    @Override
+    public ResponseEntity<NotificationResultResponse> retryNotification(String idempotencyKey, UUID notificationId) {
+        ScopeContext scope = currentScope.get();
+        NotificationResult res = notificationGateway.retry(notificationId, scope);
+        NotificationResultResponse resp = new NotificationResultResponse(
+                        res.requestId(), NotificationResultResponse.StatusEnum.fromValue(res.status()))
+                .providerRef(res.providerRef())
+                .error(res.error())
+                .duplicate(res.duplicate());
+        return ResponseEntity.ok(resp);
     }
 
     // --- Employee Endpoints ---

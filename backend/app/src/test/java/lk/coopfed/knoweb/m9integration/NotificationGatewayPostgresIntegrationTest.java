@@ -1,7 +1,9 @@
 package lk.coopfed.knoweb.m9integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
@@ -23,11 +25,19 @@ import lk.coopfed.knoweb.m9integration.internal.notify.PriceUpdateNotificationCo
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries;
 import lk.coopfed.knoweb.m9integration.query.NotificationRequestView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -84,6 +94,9 @@ class NotificationGatewayPostgresIntegrationTest extends PostgresIntegrationTest
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    TestRestTemplate http;
+
     @BeforeEach
     void setup() {
         JdbcTemplate admin = superuserJdbc();
@@ -122,6 +135,18 @@ class NotificationGatewayPostgresIntegrationTest extends PostgresIntegrationTest
                     entityId.toString());
             return work.get();
         });
+    }
+
+    private ResponseEntity<JsonNode> postHttp(String url, Object body, HttpHeaders headers) {
+        HttpHeaders withKey = new HttpHeaders();
+        withKey.addAll(headers);
+        withKey.set("Idempotency-Key", Ids.next().toString());
+        withKey.setContentType(MediaType.APPLICATION_JSON);
+        return http.exchange(url, HttpMethod.POST, new HttpEntity<>(body, withKey), JsonNode.class);
+    }
+
+    private static HttpHeaders asUser(UUID entity) {
+        return TestIdentityProvider.entityWideHeaders(USER, entity);
     }
 
     @Nested
@@ -213,6 +238,128 @@ class NotificationGatewayPostgresIntegrationTest extends PostgresIntegrationTest
         }
 
         @Test
+        @DisplayName(
+                "Price-update raw event payload (PriceListPublished direct JSON) creates a notification request and records delivery outcome")
+        void priceUpdateRawPayloadCreatesNotificationRequestAndRecordsDeliveryOutcome() {
+            UUID priceListId = Ids.next();
+
+            ObjectNode rawPayload = json.createObjectNode();
+            rawPayload.put("priceListId", priceListId.toString());
+            rawPayload.put("rootPriceListId", priceListId.toString());
+            rawPayload.put("kind", "RETAIL");
+            rawPayload.put("ownerEntityId", SOCIETY_A.toString());
+            rawPayload.put("version", 3);
+            rawPayload.put("applyFrom", "2026-11-10");
+
+            NotificationResult result =
+                    inScope(SOCIETY_A, () -> priceUpdateConsumer.onPriceUpdate(rawPayload, scope(SOCIETY_A)));
+
+            assertThat(result).isNotNull();
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.status()).isEqualTo("SENT");
+            assertThat(result.duplicate()).isFalse();
+
+            Optional<NotificationRequestView> request =
+                    inScope(SOCIETY_A, () -> gateway.findById(result.requestId(), scope(SOCIETY_A)));
+            assertThat(request).isPresent();
+            NotificationRequestView view = request.get();
+            assertThat(view.ownerEntityId()).isEqualTo(SOCIETY_A);
+            assertThat(view.messageType()).isEqualTo("PRICE_UPDATE");
+            assertThat(view.channel()).isEqualTo("SMS");
+            assertThat(view.status()).isEqualTo("SENT");
+            assertThat(view.content()).contains("Price Update Notice", "v3", "2026-11-10");
+            assertThat(view.recipientTag()).doesNotContain("0771000002"); // Masked, no PII
+
+            // Verify mock provider took message for the active contact of Society A
+            assertThat(mockSmsGateway.sentMessages())
+                    .anyMatch(msg ->
+                            "0771000002".equals(msg.phone()) && msg.body().contains("v3"));
+        }
+
+        @Test
+        @DisplayName("Price-update raw event payload is idempotently deduplicated on redelivery")
+        void priceUpdateRawPayloadIdempotentDeduplication() {
+            UUID priceListId = Ids.next();
+
+            ObjectNode rawPayload = json.createObjectNode();
+            rawPayload.put("priceListId", priceListId.toString());
+            rawPayload.put("rootPriceListId", priceListId.toString());
+            rawPayload.put("kind", "RETAIL");
+            rawPayload.put("ownerEntityId", SOCIETY_A.toString());
+            rawPayload.put("version", 1);
+            rawPayload.put("applyFrom", "2026-11-10");
+
+            NotificationResult first =
+                    inScope(SOCIETY_A, () -> priceUpdateConsumer.onPriceUpdate(rawPayload, scope(SOCIETY_A)));
+            assertThat(first).isNotNull();
+            assertThat(first.duplicate()).isFalse();
+            int countAfterFirst = mockSmsGateway.sentMessages().size();
+
+            NotificationResult second =
+                    inScope(SOCIETY_A, () -> priceUpdateConsumer.onPriceUpdate(rawPayload, scope(SOCIETY_A)));
+            assertThat(second).isNotNull();
+            assertThat(second.duplicate()).isTrue();
+            assertThat(second.requestId()).isEqualTo(first.requestId());
+            assertThat(mockSmsGateway.sentMessages()).hasSize(countAfterFirst);
+        }
+
+        @Test
+        @DisplayName("Price-update event missing required priceListId throws IllegalArgumentException")
+        void priceUpdateMissingPriceListIdThrows() {
+            ObjectNode rawPayload = json.createObjectNode();
+            rawPayload.put("kind", "RETAIL");
+            rawPayload.put("ownerEntityId", SOCIETY_A.toString());
+
+            assertThatThrownBy(() ->
+                            inScope(SOCIETY_A, () -> priceUpdateConsumer.onPriceUpdate(rawPayload, scope(SOCIETY_A))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("missing required priceListId");
+        }
+
+        @Test
+        @DisplayName(
+                "Price-update event for entity without active contact records explicit actionable failure and does not use hardcoded fallback")
+        void priceUpdateWithoutEligibleContactRecordsExplicitActionableFailure() {
+            UUID priceListId = Ids.next();
+
+            ObjectNode rawPayload = json.createObjectNode();
+            rawPayload.put("priceListId", priceListId.toString());
+            rawPayload.put("rootPriceListId", priceListId.toString());
+            rawPayload.put("kind", "RETAIL");
+            rawPayload.put("ownerEntityId", SOCIETY_B.toString()); // Society B has NO active contacts
+            rawPayload.put("version", 1);
+            rawPayload.put("applyFrom", "2026-11-10");
+
+            int initialSentCount = mockSmsGateway.sentMessages().size();
+
+            NotificationResult result =
+                    inScope(SOCIETY_B, () -> priceUpdateConsumer.onPriceUpdate(rawPayload, scope(SOCIETY_B)));
+
+            assertThat(result).isNotNull();
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.status()).isEqualTo("FAILED");
+            assertThat(result.error()).contains("No active notification contact configured for entity");
+
+            // Verify database record has FAILED status, 0 attempts, and lastError
+            Optional<NotificationRequestView> request =
+                    inScope(SOCIETY_B, () -> gateway.findById(result.requestId(), scope(SOCIETY_B)));
+            assertThat(request).isPresent();
+            NotificationRequestView view = request.get();
+            assertThat(view.ownerEntityId()).isEqualTo(SOCIETY_B);
+            assertThat(view.status()).isEqualTo("FAILED");
+            assertThat(view.attempts()).isEqualTo(0);
+            assertThat(view.lastError()).contains("No active notification contact configured for entity");
+
+            // Verify no SMS was dispatched to any fallback number
+            assertThat(mockSmsGateway.sentMessages()).hasSize(initialSentCount);
+
+            // Verify audit trail recorded NOTIFICATION_FAILED
+            assertThat(kernel.committedAudit())
+                    .filteredOn(a -> "NOTIFICATION_FAILED".equals(a.eventType()))
+                    .hasSize(1);
+        }
+
+        @Test
         @DisplayName("Birthday alert event from M7 creates a notification request and records delivery outcome")
         void birthdayAlertEventCreatesNotificationRequestAndRecordsDeliveryOutcome() {
             UUID customerId = Ids.next();
@@ -240,6 +387,27 @@ class NotificationGatewayPostgresIntegrationTest extends PostgresIntegrationTest
             assertThat(request).isPresent();
             assertThat(request.get().messageType()).isEqualTo("BIRTHDAY_ALERT");
             assertThat(request.get().content()).contains("Happy Birthday", "MEM-0042", "2026");
+        }
+
+        @Test
+        @DisplayName("Draft price-update event does NOT trigger notifications")
+        void draftPriceUpdateDoesNotTriggerNotification() {
+            UUID priceListId = Ids.next();
+            ObjectNode envelope = json.createObjectNode();
+            envelope.put("eventType", "price_list.drafted.v1");
+            envelope.put("eventId", Ids.next().toString());
+
+            ObjectNode payload = envelope.putObject("payload");
+            payload.put("ownerEntityId", SOCIETY_A.toString());
+            payload.put("priceListId", priceListId.toString());
+            payload.put("kind", "RETAIL");
+            payload.put("version", 1);
+
+            NotificationResult result =
+                    inScope(SOCIETY_A, () -> priceUpdateConsumer.onPriceUpdate(envelope, scope(SOCIETY_A)));
+
+            assertThat(result).isNull();
+            assertThat(mockSmsGateway.sentMessages()).isEmpty();
         }
     }
 
@@ -367,6 +535,59 @@ class NotificationGatewayPostgresIntegrationTest extends PostgresIntegrationTest
             assertThat(kernel.committedAudit())
                     .filteredOn(a -> "NOTIFICATION_FAILED".equals(a.eventType()))
                     .hasSize(1);
+        }
+
+        @Test
+        @DisplayName("POST /v1/integration/notifications/{id}/retry endpoint retries failed delivery via HTTP")
+        void retryEndpointRetriesFailedDeliveryViaHttp() {
+            UUID requestId = Ids.next();
+            NotificationRequest req = new NotificationRequest(
+                    requestId,
+                    SOCIETY_A,
+                    "SMS",
+                    "0771000001",
+                    "LOW_STOCK",
+                    "Low stock alert",
+                    "dedup-http-retry-1",
+                    Map.of());
+
+            // Fail on first send so it is PENDING
+            mockSmsGateway.failNext(1);
+            NotificationResult initial = inScope(SOCIETY_A, () -> gateway.dispatch(req, scope(SOCIETY_A)));
+            assertThat(initial.status()).isEqualTo("PENDING");
+
+            // Now retry via HTTP endpoint
+            ResponseEntity<JsonNode> response =
+                    postHttp("/v1/integration/notifications/" + requestId + "/retry", null, asUser(SOCIETY_A));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().path("requestId").asText()).isEqualTo(requestId.toString());
+            assertThat(response.getBody().path("status").asText()).isEqualTo("SENT");
+            assertThat(response.getBody().path("providerRef").asText()).startsWith("mock-");
+
+            NotificationRequestView view = inScope(SOCIETY_A, () -> gateway.findById(requestId, scope(SOCIETY_A)))
+                    .orElseThrow();
+            assertThat(view.status()).isEqualTo("SENT");
+            assertThat(view.attempts()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("IntegrationQueries.log returns unified rows including low-stock alerts")
+        void logReturnsUnifiedAlerts() {
+            NotificationRequest req = new NotificationRequest(
+                    SOCIETY_A, "SMS", "0771000001", "LOW_STOCK", "Low stock alert SKU-99", "dedup-log-unified-1");
+            NotificationResult res = inScope(SOCIETY_A, () -> gateway.dispatch(req, scope(SOCIETY_A)));
+            assertThat(res.isSuccess()).isTrue();
+
+            List<IntegrationQueries.LogEntry> logEntries =
+                    inScope(SOCIETY_A, () -> queries.log("SENT", 10, scope(SOCIETY_A)));
+            assertThat(logEntries).isNotEmpty();
+            assertThat(logEntries)
+                    .anyMatch(e -> e.notificationId().equals(res.requestId())
+                            && "SMS".equals(e.channel())
+                            && "low-stock-alert-sms".equals(e.templateId())
+                            && "SENT".equals(e.status())
+                            && "STORE_KEEPER".equals(e.audienceRole()));
         }
     }
 

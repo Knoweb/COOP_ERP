@@ -37,10 +37,12 @@ export function NotificationsPage() {
   const formatInstant = useFormatInstant();
   const canManage = useHasPermission("int.notify.manage");
   const ruleKey = useIdempotencyKey();
+  const retryKey = useIdempotencyKey();
   const language = (["si", "ta"].includes(intl.locale) ? intl.locale : "en") as "en" | "si" | "ta";
 
   const [status, setStatus] = useState<LogStatus | "">("");
   const [message, setMessage] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +98,21 @@ export function NotificationsPage() {
       await queryClient.invalidateQueries({ queryKey: ["integration", "rules"] });
     } catch (error) {
       setMessage(errorText(error, t("integration.error.generic").text));
+    }
+  }
+
+  async function handleRetry(notificationId: string) {
+    setMessage(null);
+    setRetryingId(notificationId);
+    try {
+      await api.retryNotification(notificationId, retryKey.current());
+      retryKey.next();
+      setMessage(t("integration.log.retried").text);
+      await queryClient.invalidateQueries({ queryKey: ["integration", "log"] });
+    } catch (error) {
+      setMessage(errorText(error, t("integration.error.generic").text));
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -328,6 +345,7 @@ export function NotificationsPage() {
                 <col className="log-col-status" />
                 <col className="log-col-attempts" />
                 <col className="log-col-note" />
+                {canManage && <col className="log-col-actions" />}
               </colgroup>
                 <thead>
                   <tr>
@@ -339,6 +357,7 @@ export function NotificationsPage() {
                     <th scope="col" className="log-col-status">{t("integration.log.col.status").text}</th>
                     <th scope="col" className="integration-number log-col-attempts">{t("integration.log.col.attempts").text}</th>
                     <th scope="col" className="log-col-note">{t("integration.log.col.note").text}</th>
+                    {canManage && <th scope="col" className="log-col-actions">{t("integration.log.col.actions").text}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -354,6 +373,23 @@ export function NotificationsPage() {
                       </td>
                       <td className="integration-number log-col-attempts">{entry.attempts}</td>
                       <td className="log-col-note">{noteText(entry)}</td>
+                      {canManage && (
+                        <td className="log-col-actions">
+                          {entry.status === "FAILED" && (
+                            <button
+                              type="button"
+                              className="modern-btn notification-retry-btn"
+                              disabled={retryingId === entry.notificationId}
+                              aria-label={t("integration.log.retry.label", undefined, { id: entry.notificationId }).text}
+                              onClick={() => void handleRetry(entry.notificationId)}
+                            >
+                              {retryingId === entry.notificationId
+                                ? t("integration.log.retrying").text
+                                : t("integration.log.retry").text}
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -267,6 +267,24 @@ paths:
                 items: { $ref: '#/components/schemas/NotificationLogResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/notifications/{notificationId}/retry:
+    parameters:
+      - { in: path, name: notificationId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Integration]
+      operationId: retryNotification
+      summary: Retry a failed or pending notification delivery
+      x-permission: int.notify.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Notification retried
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationResultResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/integration/hr/employees:
     get:
       tags: [Integration]
@@ -979,6 +997,15 @@ components:
           type: [string, 'null']
           format: date-time
           description: when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)
+    NotificationResultResponse:
+      type: object
+      required: [requestId, status]
+      properties:
+        requestId: { type: string, format: uuid }
+        status: { type: string, enum: [SENT, PENDING, FAILED] }
+        providerRef: { type: [string, 'null'] }
+        error: { type: [string, 'null'] }
+        duplicate: { type: boolean }
     RegisterEmployeeRequest:
       type: object
       required: [employeeNo, fullName, hourlyRate]
