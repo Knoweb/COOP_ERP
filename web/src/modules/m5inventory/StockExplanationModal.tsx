@@ -108,7 +108,21 @@ export function StockExplanationModal({
             onClick={onClose}
             aria-label={t("inventory.stock.explain.close").text}
           >
-            ✕
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 
@@ -127,33 +141,109 @@ export function StockExplanationModal({
         {data && (
           <>
             <div className="stock-modal-kpi-summary">
-              <div className="stock-modal-kpi-item">
-                <span className="stock-modal-kpi-label">
-                  {t("inventory.stock.column.on_hand").text}
-                </span>
-                <span className="stock-modal-kpi-val">{data.qtyOnHand}</span>
+              <div className="stock-modal-kpi-item stock-modal-kpi-item--on-hand">
+                <div className="stock-modal-kpi-content">
+                  <span className="stock-modal-kpi-label">
+                    {t("inventory.stock.column.on_hand").text}
+                  </span>
+                  <span className="stock-modal-kpi-val">{data.qtyOnHand}</span>
+                </div>
+                <div className="stock-modal-kpi-icon-badge" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    focusable="false"
+                  >
+                    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                    <path d="m3.3 7 8.7 5 8.7-5" />
+                    <path d="M12 22V12" />
+                  </svg>
+                </div>
               </div>
-              <div className="stock-modal-kpi-item">
-                <span className="stock-modal-kpi-label">
-                  {t("inventory.stock.column.reserved").text}
-                </span>
-                <span className="stock-modal-kpi-val stock-modal-kpi-val--warn">
-                  {data.reservedQty}
-                </span>
+
+              <div className="stock-modal-kpi-item stock-modal-kpi-item--reserved">
+                <div className="stock-modal-kpi-content">
+                  <span className="stock-modal-kpi-label">
+                    {t("inventory.stock.column.reserved").text}
+                  </span>
+                  <span className="stock-modal-kpi-val stock-modal-kpi-val--warn">
+                    {data.reservedQty}
+                  </span>
+                </div>
+                <div className="stock-modal-kpi-icon-badge" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    focusable="false"
+                  >
+                    <rect x="4" y="11" width="16" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                </div>
               </div>
-              <div className="stock-modal-kpi-item">
-                <span className="stock-modal-kpi-label">
-                  {t("inventory.stock.column.available").text}
-                </span>
-                <span className="stock-modal-kpi-val stock-modal-kpi-val--strong">
-                  {data.availableQty}
-                </span>
+
+              <div className="stock-modal-kpi-item stock-modal-kpi-item--available">
+                <div className="stock-modal-kpi-content">
+                  <span className="stock-modal-kpi-label">
+                    {t("inventory.stock.column.available").text}
+                  </span>
+                  <span className="stock-modal-kpi-val stock-modal-kpi-val--strong">
+                    {data.availableQty}
+                  </span>
+                </div>
+                <div className="stock-modal-kpi-icon-badge" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    focusable="false"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <polyline points="8.5 12 11 14.5 15.5 9.5" />
+                  </svg>
+                </div>
               </div>
-              <div className="stock-modal-kpi-item">
-                <span className="stock-modal-kpi-label">
-                  {t("inventory.stock.explain.remaining").text}
-                </span>
-                <span className="stock-modal-kpi-val">{data.remainingStockQty}</span>
+
+              <div className="stock-modal-kpi-item stock-modal-kpi-item--projected">
+                <div className="stock-modal-kpi-content">
+                  <span className="stock-modal-kpi-label">
+                    {t("inventory.stock.explain.remaining").text}
+                  </span>
+                  <span className="stock-modal-kpi-val">{data.remainingStockQty}</span>
+                </div>
+                <div className="stock-modal-kpi-icon-badge" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    focusable="false"
+                  >
+                    <path d="m22 7-8.5 8.5-5-5L2 17" />
+                    <polyline points="16 7 22 7 22 13" />
+                  </svg>
+                </div>
               </div>
             </div>
 
