@@ -8,6 +8,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
+import { CustomDatePicker } from "../../shell/components/CustomDatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { ExposurePanel } from "./ExposurePanel";
@@ -234,10 +235,16 @@ export function OrderPage() {
         )}
         {amendRows && (
           <>
-            <label className="trading-form-field">
-              {t("trading.order.amend.eta").text}
-              <input type="date" min={businessToday()} value={amendEta} onChange={(event) => setAmendEta(event.target.value)} />
-            </label>
+            <div className="trading-form-field">
+              <span className="trading-form-field__label">{t("trading.order.amend.eta").text}</span>
+              <CustomDatePicker
+                value={amendEta}
+                onChange={(val) => setAmendEta(val)}
+                min={businessToday()}
+                ariaLabel={t("trading.order.amend.eta").text}
+                required
+              />
+            </div>
             <label className="trading-form-field">
               {t("trading.order.amend.reason").text ?? "Reason"}
               <input type="text" value={amendReason} onChange={(event) => setAmendReason(event.target.value)} required />
@@ -262,10 +269,16 @@ export function OrderPage() {
         )}
         {deciding && (
           <>
-            <label className="trading-form-field">
-              {t("trading.field.committed_eta").text}
-              <input type="date" min={businessToday()} value={eta} onChange={(event) => setEta(event.target.value)} />
-            </label>
+            <div className="trading-form-field">
+              <span className="trading-form-field__label">{t("trading.field.committed_eta").text}</span>
+              <CustomDatePicker
+                value={eta}
+                onChange={(val) => setEta(val)}
+                min={businessToday()}
+                ariaLabel={t("trading.field.committed_eta").text}
+                required
+              />
+            </div>
             <button type="button" disabled={accept.isPending || !eta || relationship.isLoading} onClick={() => accept.mutate()}>
               {t("trading.order.accept").text}
             </button>

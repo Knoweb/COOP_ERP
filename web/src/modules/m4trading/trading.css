@@ -20,6 +20,16 @@
   gap: var(--space-half);
 }
 
+.trading-form-field__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong, 600);
+  color: var(--color-text);
+}
+
+.trading-filter-bar .trading-form-field {
+  min-width: calc(var(--space-8) * 2.2);
+}
+
 .trading-search-form {
   display: grid;
   gap: var(--space-1);
