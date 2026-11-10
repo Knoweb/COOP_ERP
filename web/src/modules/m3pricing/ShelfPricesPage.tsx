@@ -12,6 +12,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { PriceList } from "./pricingApi";
 import { chipOf, errorText } from "./priceListState";
+import { PricingSelect } from "./PricingSelect";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -82,11 +83,16 @@ export function ShelfPricesPage() {
         <form onSubmit={submit} className="pricing-filter-bar">
           <label className="modern-field">
             <span className="modern-field__label pricing-filter-label">{t("pricing.shelf.field.kind").text}</span>
-            <select value={kind} onChange={(event) => setKind(event.target.value as PriceList["kind"])}>
-              {!hasRetail && <option value="RETAIL">{t("pricing.kind.retail").text}</option>}
-              {!hasCommercial && <option value="COMMERCIAL">{t("pricing.kind.commercial").text}</option>}
-              <option value="ADVISORY">{t("pricing.kind.advisory").text}</option>
-            </select>
+            <PricingSelect
+              ariaLabel={t("pricing.shelf.field.kind").text}
+              value={kind}
+              onChange={(val) => setKind(val as PriceList["kind"])}
+              options={[
+                ...(!hasRetail ? [{ value: "RETAIL", label: t("pricing.kind.retail").text }] : []),
+                ...(!hasCommercial ? [{ value: "COMMERCIAL", label: t("pricing.kind.commercial").text }] : []),
+                { value: "ADVISORY", label: t("pricing.kind.advisory").text }
+              ]}
+            />
           </label>
           <label className="modern-field">
             <span className="modern-field__label pricing-filter-label">{t("pricing.field.name").text}</span>

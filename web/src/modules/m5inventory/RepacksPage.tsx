@@ -13,6 +13,7 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Sku } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { SkuLabel } from "./SkuLabel";
 import { expectedOutputOf, quantityOf } from "./stockControl";
 import { errorText, isSyntheticBatchNo } from "./stockView";
@@ -334,34 +335,34 @@ export function RepacksPage() {
         <section className="modern-table-card inventory-section" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
           <h2>{t("inventory.repack.execute_section").text}</h2>
           <label className="inventory-form-field">
-            {t("inventory.repack.recipe").text}
-            <select
-              aria-label={t("inventory.repack.recipe").text}
+            <span>{t("inventory.repack.recipe").text}</span>
+            <CustomSelect
+              ariaLabel={t("inventory.repack.recipe").text}
               value={run.recipeId}
-              onChange={(event) => setRun({ ...run, recipeId: event.target.value, batchId: "" })}
-            >
-              <option value="" />
-              {active.map((r) => (
-                <option key={r.recipeId} value={r.recipeId}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setRun({ ...run, recipeId: val, batchId: "" })}
+              options={[
+                { value: "", label: "" },
+                ...active.map((r) => ({
+                  value: r.recipeId,
+                  label: r.name
+                }))
+              ]}
+            />
           </label>
           <label className="inventory-form-field">
-            {t("inventory.repack.input_lot").text}
-            <select
-              aria-label={t("inventory.repack.input_lot").text}
+            <span>{t("inventory.repack.input_lot").text}</span>
+            <CustomSelect
+              ariaLabel={t("inventory.repack.input_lot").text}
               value={run.batchId}
-              onChange={(event) => setRun({ ...run, batchId: event.target.value })}
-            >
-              <option value="" />
-              {inputLots.map((lot) => (
-                <option key={lot.stockLotId} value={lot.batchId}>
-                  {`${isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")} · ${lot.qtyOnHand}`}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setRun({ ...run, batchId: val })}
+              options={[
+                { value: "", label: "" },
+                ...inputLots.map((lot) => ({
+                  value: lot.batchId,
+                  label: `${isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")} · ${lot.qtyOnHand}`
+                }))
+              ]}
+            />
           </label>
           <label className="inventory-form-field">
             {t("inventory.repack.input_qty").text}

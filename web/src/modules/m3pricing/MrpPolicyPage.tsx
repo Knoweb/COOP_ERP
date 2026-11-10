@@ -10,6 +10,7 @@ import { usePricingApi } from "./pricingApi";
 import type { MrpPolicy, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { errorText } from "./priceListState";
+import { PricingSelect } from "./PricingSelect";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -185,16 +186,18 @@ function SetPolicyForm({ onSet }: { onSet: () => void }) {
               );
             })}
           </div>
-          <select
+          <PricingSelect
             id="pricing-policy-select"
-            className="pricing-select pricing-policy-native-select"
+            className="pricing-policy-select"
+            ariaLabel={t("pricing.column.policy").text}
             value={policy}
-            onChange={(event) => setPolicy(event.target.value as PolicyKind)}
-          >
-            <option value="AUTO_LOWEST">{t("pricing.policy.auto_lowest").text}</option>
-            <option value="BARCODE_RESOLVED">{t("pricing.policy.barcode_resolved").text}</option>
-            <option value="PICKER">{t("pricing.policy.picker").text}</option>
-          </select>
+            onChange={(nextValue) => setPolicy(nextValue as PolicyKind)}
+            options={[
+              { value: "AUTO_LOWEST", label: t("pricing.policy.auto_lowest").text },
+              { value: "BARCODE_RESOLVED", label: t("pricing.policy.barcode_resolved").text },
+              { value: "PICKER", label: t("pricing.policy.picker").text }
+            ]}
+          />
         </div>
         {policy === "PICKER" && (
           <>

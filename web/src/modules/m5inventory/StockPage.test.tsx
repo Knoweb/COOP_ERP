@@ -157,6 +157,22 @@ describe("StockPage", () => {
     ).toBeTruthy();
   });
 
+  it("links stock users to reorder controls", () => {
+    renderPage();
+
+    expect(screen.getByRole("link", { name: "Reorder controls" }).getAttribute("href")).toBe(
+      "/inventory/reorder-controls"
+    );
+  });
+
+  it("links stock viewers to expiry and slow-moving stock", () => {
+    renderPage();
+
+    expect(
+      screen.getByRole("link", { name: "Expiry & Slow-Moving Stock" }).getAttribute("href")
+    ).toBe("/inventory/expiry");
+  });
+
   it("renders KPI cards and stock summary rows once location is chosen", async () => {
     renderPage();
 

@@ -5,6 +5,8 @@ import { useSearchParams } from "react-router-dom";
 import { useT } from "../../shell/i18n/useT";
 import { businessToday } from "../../shell/i18n/formats";
 import { locationText } from "../../shell/i18n/localName";
+import "./pos.css";
+import { PosSelect } from "./PosSelect";
 import { usePosApi } from "./posApi";
 import { errorText } from "./posView";
 
@@ -70,15 +72,19 @@ export function ShopPicker({ value, onChange }: { value: string; onChange: (loca
 
   return (
     <label className="pos-field">
-      {t("pos.field.shop").text}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{t("pos.field.shop.choose").text}</option>
-        {shops.map((location) => (
-          <option key={location.locationId} value={location.locationId}>
-            {locationText(location, locale)}
-          </option>
-        ))}
-      </select>
+      <span>{t("pos.field.shop").text}</span>
+      <PosSelect
+        ariaLabel={t("pos.field.shop").text}
+        value={value}
+        onChange={onChange}
+        options={[
+          { value: "", label: t("pos.field.shop.choose").text },
+          ...shops.map((location) => ({
+            value: location.locationId,
+            label: locationText(location, locale)
+          }))
+        ]}
+      />
     </label>
   );
 }

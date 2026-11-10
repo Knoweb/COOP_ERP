@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
 import { inLocale, skuText } from "../../shell/i18n/localName";
+import { PricingSelect } from "./PricingSelect";
 import { usePricingApi } from "./pricingApi";
 import type { Sku } from "./pricingApi";
 
@@ -111,16 +112,16 @@ export function SkuUomPicker({
   choices.add(uomCode);
 
   return (
-    <select
-      aria-label={t("pricing.column.unit").text}
+    <PricingSelect
+      portal
+      compact
+      ariaLabel={t("pricing.column.unit").text}
       value={uomCode}
-      onChange={(event) => onChange(event.target.value)}
-    >
-      {[...choices].map((code) => (
-        <option value={code} key={code}>
-          {code}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={[...choices].map((code) => ({
+        value: code,
+        label: code
+      }))}
+    />
   );
 }

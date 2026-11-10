@@ -11,6 +11,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Location, type TransferRequest } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import "./inventory.css";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, requestChip, requestLinesOf, sourceFor } from "./stockView";
@@ -267,21 +268,21 @@ export function TransferRequestsPage() {
           {request.status === "REQUESTED" && canDecide && (
             <div className="inventory-control-links">
               <label className="inventory-form-field">
-                {t("inventory.request.source").text}
-                <select
-                  aria-label={t("inventory.request.source").text}
+                <span>{t("inventory.request.source").text}</span>
+                <CustomSelect
+                  ariaLabel={t("inventory.request.source").text}
                   value={sourceFor(request, sources, locations.data ?? []) ?? ""}
-                  onChange={(event) => setSources({ ...sources, [request.requestId]: event.target.value })}
-                >
-                  <option value="" />
-                  {(locations.data ?? [])
-                    .filter((l) => l.locationId !== request.toLocationId)
-                    .map((l) => (
-                      <option key={l.locationId} value={l.locationId}>
-                        {locationText(l, locale)}
-                      </option>
-                    ))}
-                </select>
+                  onChange={(val) => setSources({ ...sources, [request.requestId]: val })}
+                  options={[
+                    { value: "", label: "" },
+                    ...(locations.data ?? [])
+                      .filter((l) => l.locationId !== request.toLocationId)
+                      .map((l) => ({
+                        value: l.locationId,
+                        label: locationText(l, locale)
+                      }))
+                  ]}
+                />
               </label>
               <button
                 type="button"

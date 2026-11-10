@@ -8,6 +8,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useInventoryApi, type ExpiryAlertItem, type SlowMovingStock } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 import "./inventory.css";
@@ -166,18 +167,20 @@ export function ExpiryListPage() {
                 <label htmlFor="urgency-tier-filter" className="field-label">
                   {t("inventory.expiry.filter_tier").text}:
                 </label>
-                <select
+                <CustomSelect
                   id="urgency-tier-filter"
                   className="expiry-tier-select"
+                  ariaLabel={t("inventory.expiry.filter_tier").text}
                   value={tierFilter}
-                  onChange={(e) => setTierFilter(e.target.value as UrgencyTierFilter)}
-                >
-                  <option value="ALL">{t("inventory.expiry.filter_all").text}</option>
-                  <option value="CRITICAL">{t("inventory.expiry.filter_critical").text}</option>
-                  <option value="WARNING">{t("inventory.expiry.filter_warning").text}</option>
-                  <option value="APPROACHING">{t("inventory.expiry.filter_approaching").text}</option>
-                  <option value="EXPIRED">{t("inventory.expiry.filter_expired").text}</option>
-                </select>
+                  onChange={(val) => setTierFilter(val as UrgencyTierFilter)}
+                  options={[
+                    { value: "ALL", label: t("inventory.expiry.filter_all").text },
+                    { value: "CRITICAL", label: t("inventory.expiry.filter_critical").text },
+                    { value: "WARNING", label: t("inventory.expiry.filter_warning").text },
+                    { value: "APPROACHING", label: t("inventory.expiry.filter_approaching").text },
+                    { value: "EXPIRED", label: t("inventory.expiry.filter_expired").text }
+                  ]}
+                />
               </div>
             ) : (
               <div />

@@ -16,6 +16,7 @@ import {
   type StockRowRequest
 } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { errorText, lineOf, rowReady, type CountedRow } from "./stockView";
 import "./inventory.css";
 
@@ -456,13 +457,17 @@ export function NewOpeningBalancePage() {
                               />
                             </td>
                             <td>
-                              <select
+                              <CustomSelect
+                                portal
+                                compact
+                                ariaLabel={t("inventory.column.condition").text}
                                 value={row.condition ?? "GOOD"}
-                                onChange={(e) => updatePreviewRow(idx, { condition: e.target.value as "GOOD" | "DAMAGED" })}
-                              >
-                                <option value="GOOD">{t("inventory.condition.GOOD").text}</option>
-                                <option value="DAMAGED">{t("inventory.condition.DAMAGED").text}</option>
-                              </select>
+                                onChange={(val) => updatePreviewRow(idx, { condition: val as "GOOD" | "DAMAGED" })}
+                                options={[
+                                  { value: "GOOD", label: t("inventory.condition.GOOD").text },
+                                  { value: "DAMAGED", label: t("inventory.condition.DAMAGED").text }
+                                ]}
+                              />
                             </td>
                             <td>
                               <span
@@ -535,16 +540,19 @@ export function NewOpeningBalancePage() {
                         {cell(index, "qty", "number", "inventory.column.qty")}
                         {cell(index, "unitCost", "number", "inventory.column.unit_cost")}
                         <td>
-                          <select
-                            aria-label={t("inventory.column.condition").text}
+                          <CustomSelect
+                            portal
+                            compact
+                            ariaLabel={t("inventory.column.condition").text}
                             value={row.condition}
-                            onChange={(event) =>
-                              setRow(index, { condition: event.target.value as CountedRow["condition"] })
+                            onChange={(val) =>
+                              setRow(index, { condition: val as CountedRow["condition"] })
                             }
-                          >
-                            <option value="GOOD">{t("inventory.condition.GOOD").text}</option>
-                            <option value="DAMAGED">{t("inventory.condition.DAMAGED").text}</option>
-                          </select>
+                            options={[
+                              { value: "GOOD", label: t("inventory.condition.GOOD").text },
+                              { value: "DAMAGED", label: t("inventory.condition.DAMAGED").text }
+                            ]}
+                          />
                         </td>
                         <td>
                           <button
