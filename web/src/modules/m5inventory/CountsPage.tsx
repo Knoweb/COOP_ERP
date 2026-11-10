@@ -10,6 +10,7 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { SkuLabel } from "./SkuLabel";
 import { countChip } from "./stockControl";
 import { errorText } from "./stockView";
@@ -169,15 +170,16 @@ export function CountsPage() {
         <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)' }}>
           <h2>{t("inventory.count.start_section").text}</h2>
           <label className="inventory-form-field">
-            {t("inventory.count.scope").text}
-            <select
-              aria-label={t("inventory.count.scope").text}
+            <span>{t("inventory.count.scope").text}</span>
+            <CustomSelect
+              ariaLabel={t("inventory.count.scope").text}
               value={scopeKind}
-              onChange={(event) => setScopeKind(event.target.value as "FULL" | "SKUS")}
-            >
-              <option value="SKUS">{t("inventory.count.scope.SKUS").text}</option>
-              <option value="FULL">{t("inventory.count.scope.FULL").text}</option>
-            </select>
+              onChange={(val) => setScopeKind(val as "FULL" | "SKUS")}
+              options={[
+                { value: "SKUS", label: t("inventory.count.scope.SKUS").text },
+                { value: "FULL", label: t("inventory.count.scope.FULL").text }
+              ]}
+            />
           </label>
           {scopeKind === "SKUS" && (
             <fieldset className="inventory-form-row">

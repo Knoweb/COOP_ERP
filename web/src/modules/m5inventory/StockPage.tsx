@@ -16,6 +16,7 @@ import {
   type Uom
 } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { StockRepriceModal } from "./StockRepriceModal";
 import { StockExplanationModal } from "./StockExplanationModal";
 import { errorText, isSyntheticBatchNo } from "./stockView";
@@ -29,6 +30,9 @@ export function StockPage() {
   const queryClient = useQueryClient();
   const canPrepare = useHasPermission("inv.opening.prepare");
   const canReprice = useHasPermission("inv.stock.reprice");
+  const canViewStock = useHasPermission("inv.stock.view");
+  const canManageReorderControls = useHasPermission("inv.reorder.manage");
+  const canViewReorderControls = canViewStock || canManageReorderControls;
 
   const [locationId, setLocationId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -364,20 +368,20 @@ export function StockPage() {
               <span className="inventory-form-field__label">
                 {t("inventory.stock.filter.department").text}
               </span>
-              <select
+              <CustomSelect
                 id="filter-department"
                 value={departmentFilter}
-                onChange={(event) => setDepartmentFilter(event.target.value)}
-                aria-label={t("inventory.stock.filter.department").text}
+                onChange={setDepartmentFilter}
+                ariaLabel={t("inventory.stock.filter.department").text}
                 className="stock-select-input"
-              >
-                <option value="">{t("inventory.stock.filter.all_departments").text}</option>
-                {(departmentsQuery.data ?? []).map((dept: DepartmentCategory) => (
-                  <option key={dept.departmentId} value={dept.departmentId}>
-                    {dept.nameEn}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: t("inventory.stock.filter.all_departments").text },
+                  ...(departmentsQuery.data ?? []).map((dept: DepartmentCategory) => ({
+                    value: dept.departmentId,
+                    label: dept.nameEn
+                  }))
+                ]}
+              />
             </label>
           </div>
 
@@ -386,20 +390,20 @@ export function StockPage() {
               <span className="inventory-form-field__label">
                 {t("inventory.stock.filter.uom").text}
               </span>
-              <select
+              <CustomSelect
                 id="filter-uom"
                 value={uomFilter}
-                onChange={(event) => setUomFilter(event.target.value)}
-                aria-label={t("inventory.stock.filter.uom").text}
+                onChange={setUomFilter}
+                ariaLabel={t("inventory.stock.filter.uom").text}
                 className="stock-select-input"
-              >
-                <option value="">{t("inventory.stock.filter.all_uoms").text}</option>
-                {(uomsQuery.data ?? []).map((uom: Uom) => (
-                  <option key={uom.uomCode} value={uom.uomCode}>
-                    {uom.nameEn} ({uom.uomCode})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: t("inventory.stock.filter.all_uoms").text },
+                  ...(uomsQuery.data ?? []).map((uom: Uom) => ({
+                    value: uom.uomCode,
+                    label: `${uom.nameEn} (${uom.uomCode})`
+                  }))
+                ]}
+              />
             </label>
           </div>
         </div>
@@ -440,6 +444,27 @@ export function StockPage() {
             </svg>
             <span>{t("inventory.request.link").text}</span>
           </Link>
+          {canViewStock && (
+            <Link className="action-link" to="/inventory/expiry">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              <span>{t("inventory.expiry.link").text}</span>
+            </Link>
+          )}
+          {canViewReorderControls && (
+            <Link className="action-link" to="/inventory/reorder-controls">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="M4 6h16" />
+                <path d="M4 12h10" />
+                <path d="M4 18h7" />
+                <path d="m16 15 3 3 3-3" />
+                <path d="M19 18V9" />
+              </svg>
+              <span>{t("inventory.reorder.link").text}</span>
+            </Link>
+          )}
         </div>
       </section>
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import "./m1party.css";
 import { useT } from "../../shell/i18n/useT";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
@@ -8,6 +9,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
@@ -81,12 +83,18 @@ export function RelationshipPage() {
   });
 
   if (row.isLoading) {
-    return <main className="shell-page">{t("party.list.loading").text}</main>;
+    return (
+      <main className="shell-page">
+        <div className="catalogue-state-card catalogue-state-card--loading">
+          <div className="catalogue-state-spinner" aria-hidden="true" />
+          <p>{t("party.list.loading").text}</p>
+        </div>
+      </main>
+    );
   }
   if (row.isError || !row.data) {
     return (
       <main className="shell-page">
-        <p role="alert">{errorText(row.error, t("party.error.generic").text)}</p>
         <div>
           <Link className="back-pill-btn" to="/party/relationships">
             <svg
@@ -105,6 +113,14 @@ export function RelationshipPage() {
             </svg>
             {t("party.relationship.back").text}
           </Link>
+        </div>
+        <div className="catalogue-state-card catalogue-state-card--error" role="alert">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p>{errorText(row.error, t("party.error.generic").text)}</p>
         </div>
       </main>
     );
@@ -141,34 +157,54 @@ export function RelationshipPage() {
           {t("party.relationship.back").text}
         </Link>
       </div>
-      <DocumentHeader
-        code={formatDate(r.effectiveFrom)}
-        title={t("party.relationship.title").text}
-        state={{ look: relationshipChip(r, today), label: t(`party.relationship.status.${r.status}`).text }}
-        facts={[
-          { label: t("party.relationship.seller").text, value: <PartyName entityId={r.sellerEntityId} /> },
-          { label: t("party.relationship.buyer").text, value: <PartyName entityId={r.buyerEntityId} /> },
-          { label: t("party.relationship.credit_limit").text, value: <MoneyDisplay amount={r.creditLimit} size="total" /> },
-          { label: t("party.relationship.terms_days").text, value: r.paymentTermsDays ?? undefined },
-          { label: t("party.relationship.effective_from").text, value: formatDate(r.effectiveFrom) },
-          { label: t("party.relationship.effective_to").text, value: r.effectiveTo ? formatDate(r.effectiveTo) : undefined }
-        ]}
-      />
+      <div className="relationship-header-wrap">
+        <DocumentHeader
+          code={formatDate(r.effectiveFrom)}
+          title={t("party.relationship.title").text}
+          state={{ look: relationshipChip(r, today), label: t(`party.relationship.status.${r.status}`).text }}
+          facts={[
+            { label: t("party.relationship.seller").text, value: <PartyName entityId={r.sellerEntityId} /> },
+            { label: t("party.relationship.buyer").text, value: <PartyName entityId={r.buyerEntityId} /> },
+            { label: t("party.relationship.credit_limit").text, value: <MoneyDisplay amount={r.creditLimit} size="total" /> },
+            { label: t("party.relationship.terms_days").text, value: r.paymentTermsDays ?? undefined },
+            { label: t("party.relationship.effective_from").text, value: formatDate(r.effectiveFrom) },
+            { label: t("party.relationship.effective_to").text, value: r.effectiveTo ? formatDate(r.effectiveTo) : undefined }
+          ]}
+        />
+      </div>
 
       {mayChange && (
-        <section className="party-form-row-margin">
-          <h2>{t("party.relationship.limit.title").text}</h2>
-          <label className="party-form-field">
-            {t("party.relationship.limit.new").text}
-            <input type="text" inputMode="decimal" value={limit} onChange={(event) => setLimit(event.target.value)} />
-          </label>
-          <label className="party-form-field">
-            {t("party.relationship.limit.from").text}
-            <input type="date" min={firstDay} value={from} onChange={(event) => setEffectiveFrom(event.target.value)} />
-          </label>
-          <p>{t("party.relationship.limit.note").text}</p>
-          <div>
-            <button type="button" disabled={amend.isPending || !limitReady(limit, from)} onClick={() => setAsking(true)}>
+        <section className="relationship-amend-card">
+          <h2 className="relationship-section-title">{t("party.relationship.limit.title").text}</h2>
+          <div className="relationship-amend-grid">
+            <label className="relationship-field">
+              <span className="relationship-field__label">{t("party.relationship.limit.new").text}</span>
+              <input
+                className="relationship-field__input"
+                type="text"
+                inputMode="decimal"
+                value={limit}
+                onChange={(event) => setLimit(event.target.value)}
+              />
+            </label>
+            <div className="relationship-field">
+              <DatePicker
+                id="relationship-effective-from"
+                label={t("party.relationship.limit.from").text}
+                value={from}
+                min={firstDay}
+                onChange={(val) => setEffectiveFrom(val)}
+              />
+            </div>
+          </div>
+          <p className="relationship-amend-note">{t("party.relationship.limit.note").text}</p>
+          <div className="relationship-amend-actions">
+            <button
+              type="button"
+              className="action-button--primary"
+              disabled={amend.isPending || !limitReady(limit, from)}
+              onClick={() => setAsking(true)}
+            >
               {t("party.relationship.limit.change").text}
             </button>
           </div>
@@ -185,40 +221,44 @@ export function RelationshipPage() {
       )}
       {amend.isError && <p role="alert">{errorText(amend.error, t("party.error.generic").text)}</p>}
 
-      <section>
-        <h2>{t("party.relationship.history").text}</h2>
-        <table className="party-table-full">
-          <thead>
-            <tr>
-              <th>{t("party.relationship.effective_from").text}</th>
-              <th>{t("party.relationship.effective_to").text}</th>
-              <th>{t("party.col.status").text}</th>
-              <th>{t("party.relationship.credit_limit").text}</th>
-              <th>{t("party.relationship.terms_days").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((h) => (
-              <tr key={h.relationshipId}>
-                <td>
-                  {h.relationshipId === r.relationshipId ? (
-                    formatDate(h.effectiveFrom)
-                  ) : (
-                    <Link to={`/party/relationships/${h.relationshipId}`}>{formatDate(h.effectiveFrom)}</Link>
-                  )}
-                </td>
-                <td>{h.effectiveTo ? formatDate(h.effectiveTo) : ""}</td>
-                <td>
-                  <StateChip state={relationshipChip(h, today)} label={t(`party.relationship.status.${h.status}`).text} />
-                </td>
-                <td>
-                  <MoneyDisplay amount={h.creditLimit} />
-                </td>
-                <td>{h.paymentTermsDays ?? ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <section className="relationship-history-section">
+        <h2 className="relationship-section-title">{t("party.relationship.history").text}</h2>
+        <div className="modern-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t("party.relationship.effective_from").text}</th>
+                  <th scope="col">{t("party.relationship.effective_to").text}</th>
+                  <th scope="col">{t("party.col.status").text}</th>
+                  <th scope="col" className="table-numeric-head">{t("party.relationship.credit_limit").text}</th>
+                  <th scope="col" className="table-numeric-head">{t("party.relationship.terms_days").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.relationshipId}>
+                    <td className="table-primary-text">
+                      {h.relationshipId === r.relationshipId ? (
+                        <strong>{formatDate(h.effectiveFrom)}</strong>
+                      ) : (
+                        <Link to={`/party/relationships/${h.relationshipId}`}>{formatDate(h.effectiveFrom)}</Link>
+                      )}
+                    </td>
+                    <td>{h.effectiveTo ? formatDate(h.effectiveTo) : "—"}</td>
+                    <td>
+                      <StateChip state={relationshipChip(h, today)} label={t(`party.relationship.status.${h.status}`).text} />
+                    </td>
+                    <td className="numeric-cell">
+                      <MoneyDisplay amount={h.creditLimit} />
+                    </td>
+                    <td className="numeric-cell">{h.paymentTermsDays ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
   );

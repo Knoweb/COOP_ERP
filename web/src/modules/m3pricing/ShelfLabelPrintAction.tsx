@@ -9,6 +9,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useT } from "../../shell/i18n/useT";
 import { inLocale } from "../../shell/i18n/localName";
 import { errorText } from "./priceListState";
+import { PricingSelect } from "./PricingSelect";
 import { usePricingApi } from "./pricingApi";
 
 /** The PRC-03 action for the currently effective shelf list. */
@@ -56,15 +57,17 @@ export function ShelfLabelPrintAction({ skuIds }: { skuIds: string[] }) {
       <h2 id="pricing-labels-title">{t("pricing.labels.title").text}</h2>
       <div className="pricing-form-grid">
         <label className="pricing-form-field">
-          {t("pricing.labels.shop").text}
-          <select aria-label={t("pricing.labels.shop").text} value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-            <option value="">{t("pricing.labels.choose").text}</option>
-            {shops.map((shop) => (
-              <option key={shop.locationId} value={shop.locationId}>
-                {inLocale(locale, shop.nameEn, shop.nameSi, shop.nameTa)}
-              </option>
-            ))}
-          </select>
+          <span className="pricing-filter-label">{t("pricing.labels.shop").text}</span>
+          <PricingSelect
+            ariaLabel={t("pricing.labels.shop").text}
+            value={locationId}
+            onChange={setLocationId}
+            placeholder={t("pricing.labels.choose").text}
+            options={shops.map((shop) => ({
+              value: shop.locationId,
+              label: inLocale(locale, shop.nameEn, shop.nameSi, shop.nameTa)
+            }))}
+          />
         </label>
         <button
           type="button"

@@ -9,6 +9,7 @@ import { usePricingApi } from "./pricingApi";
 import type { ReviewItem } from "./pricingApi";
 import { SkuName } from "./SkuPicker";
 import { errorText } from "./priceListState";
+import { PricingSelect } from "./PricingSelect";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -44,16 +45,17 @@ export function PricingReviewsPage() {
         <div className="pricing-filter-bar">
           <label className="pricing-form-field">
             <span className="pricing-filter-label">{t("pricing.reviews.filter_kind").text}</span>
-            <select
+            <PricingSelect
               aria-label={t("pricing.reviews.filter_kind").text}
               value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value)}
-            >
-              <option value="ALL">{t("pricing.reviews.kind.ALL").text}</option>
-              <option value="BATCH_MRP_BELOW_LIST">{t("pricing.reviews.kind.BATCH_MRP_BELOW_LIST").text}</option>
-              <option value="TRADE_ABOVE_MRP">{t("pricing.reviews.kind.TRADE_ABOVE_MRP").text}</option>
-              <option value="LIST_ABOVE_CEILING_AT_GAZETTE">{t("pricing.reviews.kind.LIST_ABOVE_CEILING_AT_GAZETTE").text}</option>
-            </select>
+              onChange={setKindFilter}
+              options={[
+                { value: "ALL", label: t("pricing.reviews.kind.ALL").text },
+                { value: "BATCH_MRP_BELOW_LIST", label: t("pricing.reviews.kind.BATCH_MRP_BELOW_LIST").text },
+                { value: "TRADE_ABOVE_MRP", label: t("pricing.reviews.kind.TRADE_ABOVE_MRP").text },
+                { value: "LIST_ABOVE_CEILING_AT_GAZETTE", label: t("pricing.reviews.kind.LIST_ABOVE_CEILING_AT_GAZETTE").text }
+              ]}
+            />
           </label>
         </div>
 
