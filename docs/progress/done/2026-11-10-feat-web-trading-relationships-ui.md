@@ -1,1 +1,1 @@
-- feat(web): resolve mobile viewport text overflow in trading relationships page header with tokenized wrapping rules, full-width border, and fluid responsive typography.
+- feat(web): resolve mobile viewport text overflow in trading relationships page header with fluid responsive typography, and ensure DatePicker label accessibility for test suites.

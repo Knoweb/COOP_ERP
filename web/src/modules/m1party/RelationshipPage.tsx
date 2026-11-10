@@ -189,6 +189,7 @@ export function RelationshipPage() {
             </label>
             <div className="relationship-field">
               <DatePicker
+                id="relationship-effective-from"
                 label={t("party.relationship.limit.from").text}
                 value={from}
                 min={firstDay}

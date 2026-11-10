@@ -40,6 +40,7 @@ function formatIso(year: number, monthIndex: number, day: number): string {
 }
 
 export function DatePicker({
+  id,
   label,
   value,
   onChange,
@@ -48,6 +49,8 @@ export function DatePicker({
   placeholder,
   min
 }: DatePickerProps) {
+  const generatedId = useRef(`datepicker-${Math.random().toString(36).substring(2, 9)}`);
+  const inputId = id || generatedId.current;
   const t = useT();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -154,29 +157,35 @@ export function DatePicker({
   return (
     <div className="catalogue-datepicker-wrap" ref={containerRef}>
       {label && (
-        <span className="catalogue-datepicker-label">
+        <label className="catalogue-datepicker-label" htmlFor={inputId}>
           <span>{label}</span>
           {required && <span className="register-field-required">*</span>}
-        </span>
+        </label>
       )}
 
-      {/* Hidden input to support form requirement check */}
-      {required && (
-        <input
-          type="text"
-          value={value}
-          required={required}
-          readOnly
-          tabIndex={-1}
-          style={{
-            position: "absolute",
-            width: 0,
-            height: 0,
-            opacity: 0,
-            pointerEvents: "none"
-          }}
-        />
-      )}
+      {/* Accessible input associated with label for testing and form semantics */}
+      <input
+        id={inputId}
+        type="text"
+        value={value}
+        disabled={disabled}
+        required={required}
+        onChange={(e) => onChange(e.target.value)}
+        tabIndex={-1}
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+          opacity: 0,
+          pointerEvents: "none"
+        }}
+      />
 
       {/* Trigger Button */}
       <button
