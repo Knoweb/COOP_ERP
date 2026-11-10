@@ -136,38 +136,42 @@ export function GrnPage() {
         ]}
       />
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("trading.column.item").text}</th>
-            <th>{t("trading.column.expected").text}</th>
-            <th>{t("trading.column.received").text}</th>
-            <th>{t("trading.column.damaged").text}</th>
-            <th>{t("trading.column.batch").text}</th>
-            <th>{t("trading.column.expiry").text}</th>
-            <th>{t("trading.column.mrp").text}</th>
-            <th>{t("trading.column.unit_cost").text}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {g.lines.map((line) => (
-            <tr key={line.lineId}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{line.expectedQty}</td>
-              <td>{line.receivedQty}</td>
-              <td>{line.damagedQty}</td>
-              <td>{isSyntheticBatchNo(line.batchNo) ? t("trading.field.batch_not_tracked").text : line.batchNo}</td>
-              <td>{line.expiryDate && formatDate(line.expiryDate)}</td>
-              <td>{line.printedMrp !== undefined && <MoneyDisplay amount={line.printedMrp} />}</td>
-              <td>{line.unitCost !== undefined && <MoneyDisplay amount={line.unitCost} />}</td>
-              <td>{line.expectedQty !== undefined && line.receivedQty < line.expectedQty && <strong>{t("trading.grn.short").text}</strong>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="modern-table-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("trading.column.item").text}</th>
+                <th scope="col">{t("trading.column.expected").text}</th>
+                <th scope="col">{t("trading.column.received").text}</th>
+                <th scope="col">{t("trading.column.damaged").text}</th>
+                <th scope="col">{t("trading.column.batch").text}</th>
+                <th scope="col">{t("trading.column.expiry").text}</th>
+                <th scope="col">{t("trading.column.mrp").text}</th>
+                <th scope="col">{t("trading.column.unit_cost").text}</th>
+                <th scope="col" />
+              </tr>
+            </thead>
+            <tbody>
+              {g.lines.map((line) => (
+                <tr key={line.lineId}>
+                  <td className="trading-item-cell">
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>{line.expectedQty}</td>
+                  <td>{line.receivedQty}</td>
+                  <td>{line.damagedQty}</td>
+                  <td>{isSyntheticBatchNo(line.batchNo) ? t("trading.field.batch_not_tracked").text : line.batchNo}</td>
+                  <td>{line.expiryDate && formatDate(line.expiryDate)}</td>
+                  <td>{line.printedMrp !== undefined && <MoneyDisplay amount={line.printedMrp} />}</td>
+                  <td>{line.unitCost !== undefined && <MoneyDisplay amount={line.unitCost} />}</td>
+                  <td>{line.expectedQty !== undefined && line.receivedQty < line.expectedQty && <strong>{t("trading.grn.short").text}</strong>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {isReceiver && canConfirm && g.status === "DRAFT" && (
         <section className="trading-section">
