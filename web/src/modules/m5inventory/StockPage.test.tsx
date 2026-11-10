@@ -157,6 +157,14 @@ describe("StockPage", () => {
     ).toBeTruthy();
   });
 
+  it("links stock users to reorder controls", () => {
+    renderPage();
+
+    expect(screen.getByRole("link", { name: "Reorder controls" }).getAttribute("href")).toBe(
+      "/inventory/reorder-controls"
+    );
+  });
+
   it("renders KPI cards and stock summary rows once location is chosen", async () => {
     renderPage();
 
