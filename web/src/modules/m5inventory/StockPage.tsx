@@ -641,7 +641,7 @@ export function StockPage() {
                       <th className="col-item">{t("inventory.stock.column.sku").text}</th>
                       <th className="col-dept">{t("inventory.stock.column.department").text}</th>
                       <th className="col-uom">{t("inventory.stock.column.uom").text}</th>
-                      <th className="col-on-hand numeric-cell">{t("inventory.stock.column.on_hand").text}</th>
+                      <th className="col-on-hand numeric-cell">{t("inventory.column.on_hand").text}</th>
                       <th className="col-reserved numeric-cell">{t("inventory.stock.column.reserved").text}</th>
                       <th className="col-available numeric-cell">{t("inventory.stock.column.available").text}</th>
                       <th className="col-in-transit">{t("inventory.stock.column.in_transit").text}</th>
