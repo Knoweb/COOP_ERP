@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiProblem } from "../../shell/api/client";
 import { messages } from "../../shell/i18n/messages";
 import type { Transfer, LotBalance, Location } from "./inventoryApi";
 import { TransfersPage } from "./TransfersPage";
@@ -184,8 +185,33 @@ describe("TransfersPage", () => {
     fireEvent.click(receiveButton);
 
     await waitFor(() => {
-      expect(api.receiveTransfer).toHaveBeenCalledWith(TRANSFER_2, expect.any(String));
+      expect(api.receiveTransfer).toHaveBeenCalledWith(TRANSFER_2, expect.any(String), {
+        lines: [{ transferLineId: "line-1", receivedQty: 10 }]
+      });
     });
+  }, 15000);
+
+  it("shows the backend problem when receiving is refused", async () => {
+    api.receiveTransfer.mockRejectedValueOnce(
+      new ApiProblem({
+        status: 409,
+        code: "m5.transfer.not_in_transit",
+        title: "Only an in-transit transfer can be received"
+      })
+    );
+    renderPage();
+
+    await screen.findByText("Issued", {}, { timeout: 10000 });
+    fireEvent.change(screen.getByRole("combobox", { name: text("inventory.field.location") }), {
+      target: { value: SHOP }
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: text("inventory.transfer.receive") }, { timeout: 10000 })
+    );
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Only an in-transit transfer can be received"
+    );
   }, 15000);
 
   it("allows source store issuer to cancel an unreceived transfer with reason", async () => {
