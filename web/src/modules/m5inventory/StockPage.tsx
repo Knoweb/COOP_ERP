@@ -31,6 +31,7 @@ export function StockPage() {
   const canReprice = useHasPermission("inv.stock.reprice");
 
   const [locationId, setLocationId] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [uomFilter, setUomFilter] = useState("");
@@ -252,7 +253,7 @@ export function StockPage() {
       />
 
       <div className="stock-filter-pills-wrapper">
-        <div className="stock-filter-pills" role="radiogroup" aria-label={t("inventory.filter.toggle").text}>
+        <div className="stock-filter-pills" role="radiogroup" aria-label={t("inventory.opening.column.status").text}>
           <button
             type="button"
             className={`stock-pill-btn ${statusFilter === "all" ? "stock-pill-btn--active" : ""}`}
@@ -350,8 +351,35 @@ export function StockPage() {
         </div>
       </div>
 
+      <div className="stock-controls-toolbar">
+        <button
+          type="button"
+          className="filter-toggle"
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          aria-expanded={filtersOpen}
+          aria-controls="stock-filters"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h16M7 12h10M10 17h4" />
+          </svg>
+          {t("inventory.filter.toggle").text}
+          <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+        </button>
+      </div>
+
       <section
         id="stock-filters"
+        hidden={!filtersOpen}
         className="modern-filter-panel modern-filter-panel--stock stock-positions-filters"
       >
         <div className="stock-filters-row">
