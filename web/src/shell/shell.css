@@ -416,9 +416,10 @@ button:disabled {
 
 /* The one button that moves the document forward: the accent, like a link. */
 .approval-bar__button--primary:not(:disabled) {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
 }
 
 .approval-bar__reason {
@@ -591,17 +592,20 @@ button:hover:not(:disabled) {
 }
 
 .approval-bar__button--primary:not(:disabled) {
-  background: var(--color-brand-dark);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-polish-4);
-  border-color: var(--color-brand-dark);
-  box-shadow: 0 2px 8px var(--color-polish-5);
+  border-color: var(--color-polish-19);
+  box-shadow: 0 2px 8px var(--color-polish-21);
 }
 
 .approval-bar__button--primary:not(:disabled):hover {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  border-color: var(--color-polish-19);
+  filter: brightness(0.95);
   color: var(--color-polish-4);
-  box-shadow: 0 4px 12px var(--color-polish-6);
+  box-shadow: 0 4px 12px var(--color-polish-21);
 }
 
 input,
@@ -1362,6 +1366,7 @@ textarea {
 }
 
 /* Main submit / forward actions */
+button[type="submit"]:not(:disabled),
 .shell-page button[type="submit"]:not(:disabled),
 .approval-bar__button--primary:not(:disabled) {
   border-color: var(--color-polish-19);
@@ -1370,6 +1375,7 @@ textarea {
   color: var(--color-on-accent);
 }
 
+button[type="submit"]:not(:disabled):hover,
 .shell-page button[type="submit"]:not(:disabled):hover,
 .approval-bar__button--primary:not(:disabled):hover {
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
@@ -4305,17 +4311,17 @@ textarea {
 
 .approval-bar__button--suspend:hover:not(:disabled),
 .approval-bar__button[data-action="suspend"]:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
-  box-shadow: 0 4px 14px var(--color-polish-6) !important;
+  box-shadow: 0 4px 14px var(--color-polish-21) !important;
   transform: translateY(-1px) !important;
 }
 
 .approval-bar__button--suspend:active:not(:disabled),
 .approval-bar__button[data-action="suspend"]:active:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   transform: translateY(0) !important;
 }
@@ -6484,9 +6490,9 @@ textarea {
 }
 
 .party-grant-submit-btn:disabled {
-  background: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
   color: var(--color-on-accent) !important;
-  opacity: 0.9 !important;
+  opacity: 0.55 !important;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -7303,7 +7309,11 @@ textarea {
 
 .action-button--primary,
 .btn-primary:not(:disabled),
-.button--primary:not(:disabled) {
+.btn--primary:not(:disabled),
+.button--primary:not(:disabled),
+.modern-btn--primary:not(:disabled),
+.pricing-markdown-btn-evaluate:not(:disabled),
+.mobile-stock-take-submit-btn:not(:disabled) {
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
   background-color: var(--color-polish-19) !important;
   color: var(--color-on-accent) !important;
@@ -7312,7 +7322,11 @@ textarea {
 
 .action-button--primary:hover:not(:disabled),
 .btn-primary:hover:not(:disabled),
-.button--primary:hover:not(:disabled) {
+.btn--primary:hover:not(:disabled),
+.button--primary:hover:not(:disabled),
+.modern-btn--primary:hover:not(:disabled),
+.pricing-markdown-btn-evaluate:hover:not(:disabled),
+.mobile-stock-take-submit-btn:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
   background-color: var(--color-polish-19) !important;
   filter: brightness(0.95);
@@ -8767,8 +8781,9 @@ textarea {
 }
 
 .linking-barcode-actions .action-button--primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  border-color: var(--color-polish-19);
   color: var(--color-surface);
   box-shadow: 0 2px 8px var(--color-polish-6);
 }
@@ -8943,8 +8958,8 @@ textarea {
 }
 
 .action-btn--correct-batch:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 12px var(--color-polish-21) !important;
@@ -9931,8 +9946,8 @@ textarea {
 }
 
 .action-btn--correct-batch:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 14px var(--color-polish-21) !important;

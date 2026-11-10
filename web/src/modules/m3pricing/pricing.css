@@ -1673,7 +1673,7 @@ select.pricing-select option:focus {
   padding: 0 var(--space-4) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-strong) !important;
-  color: var(--color-polish-4) !important;
+  color: var(--color-surface) !important;
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
   background-color: var(--color-polish-19) !important;
   border: none !important;
@@ -1687,7 +1687,8 @@ select.pricing-select option:focus {
 .pricing-markdown-btn-evaluate:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
   background-color: var(--color-polish-19) !important;
-  color: var(--color-polish-4) !important;
+  color: var(--color-surface) !important;
+  filter: brightness(0.95);
   transform: translateY(calc(var(--border-width-strong) * -1)) !important;
   box-shadow: 0 var(--space-1) calc(var(--space-2) + var(--space-half)) var(--color-polish-21) !important;
 }
