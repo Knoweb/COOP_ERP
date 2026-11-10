@@ -5305,7 +5305,7 @@ textarea {
 
   .stock-modal-kpi-item {
     padding: var(--space-1) !important;
-    min-height: calc(var(--space-5) + var(--space-1)) !important;
+    min-height: calc(var(--space-4) + var(--space-2)) !important;
   }
 
   .stock-modal-kpi-icon-badge {
