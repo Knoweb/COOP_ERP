@@ -1,0 +1,1 @@
+- feat(web): resolve mobile viewport text overflow in trading relationships page header with fluid responsive typography, and use visually-hidden class for DatePicker label accessibility.
