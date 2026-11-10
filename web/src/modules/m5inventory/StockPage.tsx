@@ -16,6 +16,7 @@ import {
   type Uom
 } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { StockRepriceModal } from "./StockRepriceModal";
 import { StockExplanationModal } from "./StockExplanationModal";
 import { errorText, isSyntheticBatchNo } from "./stockView";
@@ -364,20 +365,20 @@ export function StockPage() {
               <span className="inventory-form-field__label">
                 {t("inventory.stock.filter.department").text}
               </span>
-              <select
+              <CustomSelect
                 id="filter-department"
                 value={departmentFilter}
-                onChange={(event) => setDepartmentFilter(event.target.value)}
-                aria-label={t("inventory.stock.filter.department").text}
+                onChange={setDepartmentFilter}
+                ariaLabel={t("inventory.stock.filter.department").text}
                 className="stock-select-input"
-              >
-                <option value="">{t("inventory.stock.filter.all_departments").text}</option>
-                {(departmentsQuery.data ?? []).map((dept: DepartmentCategory) => (
-                  <option key={dept.departmentId} value={dept.departmentId}>
-                    {dept.nameEn}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: t("inventory.stock.filter.all_departments").text },
+                  ...(departmentsQuery.data ?? []).map((dept: DepartmentCategory) => ({
+                    value: dept.departmentId,
+                    label: dept.nameEn
+                  }))
+                ]}
+              />
             </label>
           </div>
 
@@ -386,20 +387,20 @@ export function StockPage() {
               <span className="inventory-form-field__label">
                 {t("inventory.stock.filter.uom").text}
               </span>
-              <select
+              <CustomSelect
                 id="filter-uom"
                 value={uomFilter}
-                onChange={(event) => setUomFilter(event.target.value)}
-                aria-label={t("inventory.stock.filter.uom").text}
+                onChange={setUomFilter}
+                ariaLabel={t("inventory.stock.filter.uom").text}
                 className="stock-select-input"
-              >
-                <option value="">{t("inventory.stock.filter.all_uoms").text}</option>
-                {(uomsQuery.data ?? []).map((uom: Uom) => (
-                  <option key={uom.uomCode} value={uom.uomCode}>
-                    {uom.nameEn} ({uom.uomCode})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: t("inventory.stock.filter.all_uoms").text },
+                  ...(uomsQuery.data ?? []).map((uom: Uom) => ({
+                    value: uom.uomCode,
+                    label: `${uom.nameEn} (${uom.uomCode})`
+                  }))
+                ]}
+              />
             </label>
           </div>
         </div>

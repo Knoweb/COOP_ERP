@@ -10,6 +10,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type RequestWriteOffRequest } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { SkuLabel } from "./SkuLabel";
 import { lotKey, writeOffChip, writeOffLinesOf } from "./stockControl";
 import { errorText, isSyntheticBatchNo } from "./stockView";
@@ -196,19 +197,19 @@ export function WriteOffsPage() {
         <section className="modern-table-card inventory-section" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
           <h2>{t("inventory.writeoff.new").text}</h2>
           <label className="inventory-form-field">
-            {t("inventory.writeoff.category").text}
-            <select
-              aria-label={t("inventory.writeoff.category").text}
+            <span>{t("inventory.writeoff.category").text}</span>
+            <CustomSelect<string>
+              ariaLabel={t("inventory.writeoff.category").text}
               value={category}
-              onChange={(event) => setCategory(event.target.value as Category)}
-            >
-              <option value="" />
-              {CATEGORIES.map((code) => (
-                <option key={code} value={code}>
-                  {t(`inventory.writeoff.category.${code}`).text}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setCategory(val as Category)}
+              options={[
+                { value: "", label: "" },
+                ...CATEGORIES.map((code) => ({
+                  value: code,
+                  label: t(`inventory.writeoff.category.${code}`).text
+                }))
+              ]}
+            />
           </label>
           {available.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
           {available.length > 0 && (

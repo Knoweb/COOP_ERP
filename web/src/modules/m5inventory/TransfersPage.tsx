@@ -16,6 +16,7 @@ import {
   type CancelTransferRequest
 } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import "./inventory.css";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, transferLinesOf, transferChip } from "./stockView";
@@ -351,15 +352,19 @@ export function TransfersPage() {
         <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
           <h2>{t("inventory.transfer.send").text}</h2>
           <label className="inventory-form-field">
-            {t("inventory.transfer.destination").text}
-            <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)}>
-              <option value="" />
-              {destinations.map((l) => (
-                <option key={l.locationId} value={l.locationId}>
-                  {locationText(l, locale)}
-                </option>
-              ))}
-            </select>
+            <span>{t("inventory.transfer.destination").text}</span>
+            <CustomSelect
+              ariaLabel={t("inventory.transfer.destination").text}
+              value={toLocationId}
+              onChange={setToLocationId}
+              options={[
+                { value: "", label: "" },
+                ...destinations.map((l) => ({
+                  value: l.locationId,
+                  label: locationText(l, locale)
+                }))
+              ]}
+            />
           </label>
           {sendable.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
           {sendable.length > 0 && (
