@@ -10461,7 +10461,13 @@ textarea {
   flex-shrink: 0 !important;
 }
 
-/* Custom Scrollbars across all catalogue dropdowns */
+/* Custom Scrollbars across all dropdowns (neutral gray scrollbar matching system standard) */
+.register-dropdown-menu,
+.custom-status-dropdown__menu {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-control) var(--color-surface-subtle);
+}
+
 .register-dropdown-menu::-webkit-scrollbar,
 .custom-status-dropdown__menu::-webkit-scrollbar {
   width: 6px !important;
@@ -10475,13 +10481,13 @@ textarea {
 
 .register-dropdown-menu::-webkit-scrollbar-thumb,
 .custom-status-dropdown__menu::-webkit-scrollbar-thumb {
-  background: var(--color-polish-20) !important;
+  background: var(--color-border-control) !important;
   border-radius: 4px !important;
 }
 
 .register-dropdown-menu::-webkit-scrollbar-thumb:hover,
 .custom-status-dropdown__menu::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent) !important;
+  background: var(--color-text-muted) !important;
 }
 
 /* Register form controls matching border */
