@@ -112,6 +112,22 @@ public class ExpiryTaskStore {
     }
 
     /**
+     * Locations that currently hold positive stock. The scheduled alert review intersects these
+     * M5-owned references with M1's active stock-holding locations before deriving an OWN scope.
+     */
+    public List<LocationRef> findLocationsWithPositiveStock(ScopeContext scope) {
+        return jdbc.query(
+                """
+                select distinct owner_entity_id, location_id
+                  from inventory.stock_lot
+                 where qty_on_hand > 0
+                 order by owner_entity_id, location_id
+                """,
+                (rs, n) -> new LocationRef(
+                        rs.getObject("owner_entity_id", UUID.class), rs.getObject("location_id", UUID.class)));
+    }
+
+    /**
      * Active count task for a location (status <> 'CLOSED').
      *
      * @param scope the caller's OWN scope; the {@link ScopeConnectionCustomizer} applies it to the

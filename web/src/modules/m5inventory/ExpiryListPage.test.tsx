@@ -115,6 +115,19 @@ describe("ExpiryListPage", () => {
     expect(await screen.findByText("Critical")).toBeDefined();
   });
 
+  it("renders the translated healthy expiry tier instead of its message id", async () => {
+    api.expiryFeed.mockResolvedValueOnce([{ ...mockExpiryItem, urgencyTier: "HEALTHY" }]);
+    renderPage();
+
+    const select = (await screen.findByRole("combobox", {
+      name: text("inventory.field.location")
+    })) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: SHOP } });
+
+    expect(await screen.findByText(text("inventory.expiry.tier.HEALTHY"))).toBeDefined();
+    expect(screen.queryByText("inventory.expiry.tier.HEALTHY")).toBeNull();
+  });
+
   it("switches to slow-moving stock tab and renders stagnant items", async () => {
     renderPage();
 
@@ -129,7 +142,7 @@ describe("ExpiryListPage", () => {
     fireEvent.click(slowTabButton);
 
     await waitFor(() => {
-      expect(api.slowMovingStock).toHaveBeenCalledWith(SHOP, 30, 90);
+      expect(api.slowMovingStock).toHaveBeenCalledWith(SHOP);
     });
 
     expect(await screen.findByText(SKU_2)).toBeDefined();
