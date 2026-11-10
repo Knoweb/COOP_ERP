@@ -157,3 +157,43 @@ own delivery test stands in its test channels).
    nothing from it.
 6. No IN_APP adapter (the shell's bell does not exist); no rule uses IN_APP. No provider_config
    table: the SMS provider is a configuration property.
+
+## ACC-10 — E-invoicing seam (M9-06)
+
+The M9 integration module provides a provider-neutral e-invoicing boundary.
+
+### Implemented
+
+- `EInvoiceAdapter` defines the immutable invoice submission contract.
+- `StubEInvoiceAdapter` returns `PENDING` without external network calls.
+- `InvoiceSubmissionConsumer` subscribes to `invoice.issued.v1`.
+- Processing requires `integration.einvoice.enabled = true` for the issuing entity.
+- The configuration defaults to `false` and requires MFA when changed.
+- Submission metadata is stored in `integration.e_invoice_submission`.
+- PostgreSQL row-level security isolates entity-owned submissions.
+- Duplicate events do not create duplicate submissions or audits.
+- New submissions record the `EINVOICE_PENDING` audit event.
+- Problem messages are available in English, Sinhala and Tamil.
+
+### Submission lifecycle
+
+In this phase, an enabled entity's issued invoice enters `PENDING`.
+
+The following states are reserved for later integration:
+
+`NOT_SUBMITTED`, `SUBMITTED`, `ACCEPTED`, `REJECTED`.
+
+No invoice is sent to IRD or another external provider. The issued
+invoice and its immutable snapshot are not modified during processing.
+
+### Verification
+
+`EInvoiceSubmissionPostgresIntegrationTest` covers configuration,
+submission creation, idempotency, cross-entity isolation, malformed
+events, and kernel dispatcher/inbox delivery.
+
+### Future work
+
+A production provider adapter, external submission/retry orchestration,
+and provider acknowledgement handling belong to the later live
+e-invoicing integration phase.

@@ -50,5 +50,9 @@
   "m9.payment.already_cancelled": "ගෙවීම අවලංගු කර ඇති අතර පියවිය නොහැක",
   "m9.payment.not_cod": "මෙය භාණ්ඩ ලැබුණු පසු මුදල් ගෙවීමේ (COD) ක්‍රමයක් නොවේ",
   "m9.payment.invalid_state_transition": "ගෙවීම් තත්ත්වය {0} සිට {1} දක්වා මාරු කළ නොහැක",
-  "m9.payment.webhook_signature_invalid": "ගෙවීම් webhook අත්සන සත්‍යාපනය අසාර්ථක විය"
+  "m9.payment.webhook_signature_invalid": "ගෙවීම් webhook අත්සන සත්‍යාපනය අසාර්ථක විය",
+  "m9.einvoice.invalid_scope": "විද්‍යුත් ඉන්වොයිස් සඳහා නිකුත් කරන ආයතනයේම විෂය පථය අවශ්‍ය වේ",
+  "m9.einvoice.owner_mismatch": "ඉන්වොයිසිය වෙනත් නිකුත් කරන ආයතනයකට අයත් වේ",
+  "m9.einvoice.invoice_malformed": "නිකුත් කළ ඉන්වොයිසියේ ඉදිරිපත් කිරීමේ තොරතුරු අසම්පූර්ණ හෝ වලංගු නොවේ",
+  "m9.einvoice.stub_invalid": "විද්‍යුත් ඉන්වොයිස් අනුකරණ සේවාව අනපේක්ෂිත තත්ත්වයක් ලබා දුන්නේය"
 }

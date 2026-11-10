@@ -1251,3 +1251,15 @@ config_items:
     sensitive: false
     till_visible: false
     module: m7customers
+
+  # ACC-10: Per-entity e-invoicing readiness.
+  - key: integration.einvoice.enabled
+    value_type: BOOLEAN
+    description_en: Enable the e-invoicing submission seam for this entity
+    description_si: මෙම ආයතනය සඳහා විද්‍යුත් ඉන්වොයිස් ඉදිරිපත් කිරීම සක්‍රීය කරන්න
+    description_ta: இந்த நிறுவனத்திற்கான மின்னணு விலைப்பட்டியல் சமர்ப்பிப்பை இயக்கவும்
+    default: "false"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: true
+    till_visible: false
