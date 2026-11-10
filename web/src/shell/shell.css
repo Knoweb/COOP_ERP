@@ -416,9 +416,10 @@ button:disabled {
 
 /* The one button that moves the document forward: the accent, like a link. */
 .approval-bar__button--primary:not(:disabled) {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
 }
 
 .approval-bar__reason {
@@ -591,17 +592,20 @@ button:hover:not(:disabled) {
 }
 
 .approval-bar__button--primary:not(:disabled) {
-  background: var(--color-brand-dark);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-polish-4);
-  border-color: var(--color-brand-dark);
-  box-shadow: 0 2px 8px var(--color-polish-5);
+  border-color: var(--color-polish-19);
+  box-shadow: 0 2px 8px var(--color-polish-21);
 }
 
 .approval-bar__button--primary:not(:disabled):hover {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  border-color: var(--color-polish-19);
+  filter: brightness(0.95);
   color: var(--color-polish-4);
-  box-shadow: 0 4px 12px var(--color-polish-6);
+  box-shadow: 0 4px 12px var(--color-polish-21);
 }
 
 input,
@@ -1362,16 +1366,21 @@ textarea {
 }
 
 /* Main submit / forward actions */
+button[type="submit"]:not(:disabled),
 .shell-page button[type="submit"]:not(:disabled),
 .approval-bar__button--primary:not(:disabled) {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
 }
 
+button[type="submit"]:not(:disabled):hover,
 .shell-page button[type="submit"]:not(:disabled):hover,
 .approval-bar__button--primary:not(:disabled):hover {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  filter: brightness(0.95);
   color: var(--color-on-accent);
 }
 
@@ -1543,12 +1552,17 @@ textarea {
 }
 
 .action-link--primary {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
+  border-color: var(--color-polish-19);
 }
 
 .action-link--primary:hover {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  filter: brightness(0.95);
+  box-shadow: 0 4px 12px var(--color-polish-21);
   color: var(--color-on-accent);
 }
 
@@ -1737,8 +1751,9 @@ textarea {
 }
 
 .shell-page .action-link--primary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
   color: var(--color-on-accent);
 }
 
@@ -1749,7 +1764,10 @@ textarea {
 }
 
 .shell-page .action-link--primary:hover {
-  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  filter: brightness(0.95);
+  box-shadow: 0 4px 12px var(--color-polish-21);
 }
 
 .action-link__icon svg,
@@ -1925,13 +1943,18 @@ textarea {
 .modern-control input:hover,
 .modern-select select:hover,
 .modern-location-picker select:hover {
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background-color: var(--color-polish-29);
+  box-shadow: 0 0 0 3px var(--color-polish-27);
 }
 
 .modern-control input:focus,
+.modern-control input:not(:placeholder-shown),
 .modern-select select:focus,
 .modern-location-picker select:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background-color: var(--color-polish-29);
+  box-shadow: 0 0 0 3.5px var(--color-polish-21);
 }
 
 /* ---------- Table card --------------------------------------------------------------- */
@@ -3368,14 +3391,16 @@ textarea {
 }
 
 .register-input-control:hover {
-  border-color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
-.register-input-control:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+.register-input-control:focus,
+.register-input-control:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .register-input-control[aria-invalid="true"] {
@@ -3416,15 +3441,16 @@ textarea {
 }
 
 .register-dropdown-trigger:hover {
-  border-color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .register-dropdown-trigger:focus-visible,
 .register-dropdown-trigger[aria-expanded="true"] {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .register-dropdown-trigger .custom-status-dropdown__arrow {
@@ -3894,21 +3920,22 @@ textarea {
   min-width: 210px;
   min-height: 42px;
   padding: 9px 22px;
-  border-radius: 8px;
-  background: var(--color-accent);
-  color: var(--color-surface);
+  border-radius: 50px !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  color: var(--color-surface) !important;
   font-size: 14.5px;
   font-weight: 600;
-  border: 1px solid var(--color-accent);
+  border: none !important;
   cursor: pointer;
-  box-shadow: 0 2px 8px var(--color-polish-6);
+  box-shadow: 0 4px 15px var(--color-polish-6);
   transition: all 0.2s ease;
 }
 
 .bulk-submit-btn:hover:not(:disabled) {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  box-shadow: 0 4px 12px var(--color-polish-21);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  filter: brightness(0.95);
+  box-shadow: 0 6px 18px var(--color-polish-21);
 }
 
 .bulk-submit-btn:active:not(:disabled) {
@@ -3916,8 +3943,7 @@ textarea {
 }
 
 .bulk-submit-btn:disabled {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-polish-19) !important;
   color: var(--color-surface);
   opacity: 0.45;
   cursor: not-allowed;
@@ -4258,14 +4284,17 @@ textarea {
 }
 
 .approval-bar__button--primary {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   box-shadow: 0 2px 6px var(--color-polish-6) !important;
 }
 
 .approval-bar__button--primary:hover:not(:disabled) {
-  background: var(--color-polish-19) !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  filter: brightness(0.95);
   border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   box-shadow: 0 4px 12px var(--color-polish-21) !important;
@@ -4282,17 +4311,17 @@ textarea {
 
 .approval-bar__button--suspend:hover:not(:disabled),
 .approval-bar__button[data-action="suspend"]:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
-  box-shadow: 0 4px 14px var(--color-polish-6) !important;
+  box-shadow: 0 4px 14px var(--color-polish-21) !important;
   transform: translateY(-1px) !important;
 }
 
 .approval-bar__button--suspend:active:not(:disabled),
 .approval-bar__button[data-action="suspend"]:active:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   transform: translateY(0) !important;
 }
@@ -5715,22 +5744,28 @@ textarea {
 .reason-capture textarea:hover,
 .new-user-input:hover,
 .new-user-select:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-polish-4);
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .shell-page input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus,
+.shell-page input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):not(:placeholder-shown),
 .shell-page select:focus,
 .shell-page textarea:focus,
+.shell-page textarea:not(:placeholder-shown),
 .party-form-field select:focus,
 .party-form-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus,
+.party-form-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):not(:placeholder-shown),
 .reason-capture select:focus,
 .reason-capture textarea:focus,
+.reason-capture textarea:not(:placeholder-shown),
 .new-user-input:focus,
+.new-user-input:not(:placeholder-shown),
 .new-user-select:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-polish-4);
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .new-user-select-wrap {
@@ -6380,17 +6415,20 @@ textarea {
 .party-grant-form textarea:hover,
 .party-grant-form .custom-dropdown__trigger:hover,
 .party-grant-form .cdp__trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface-subtle) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .party-grant-form input[type="text"]:focus,
+.party-grant-form input[type="text"]:not(:placeholder-shown),
 .party-grant-form textarea:focus,
+.party-grant-form textarea:not(:placeholder-shown),
 .party-grant-form .custom-dropdown--open .custom-dropdown__trigger,
 .party-grant-form .cdp--open .cdp__trigger {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .party-grant-form textarea {
@@ -6431,18 +6469,19 @@ textarea {
   font-size: 14px;
   font-weight: 600;
   border-radius: 50px !important;
-  background: var(--color-accent) !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
   color: var(--color-on-accent) !important;
   border: none !important;
   cursor: pointer;
-  box-shadow: 0 3px 12px var(--color-polish-6);
+  box-shadow: 0 4px 15px var(--color-polish-6);
   transition: all 0.2s ease;
 }
 
 .party-grant-submit-btn:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  filter: brightness(0.9);
-  box-shadow: 0 4px 16px var(--color-polish-21);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  filter: brightness(0.95);
+  box-shadow: 0 6px 18px var(--color-polish-21);
   transform: translateY(-1px);
 }
 
@@ -6451,9 +6490,9 @@ textarea {
 }
 
 .party-grant-submit-btn:disabled {
-  background: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
   color: var(--color-on-accent) !important;
-  opacity: 0.9 !important;
+  opacity: 0.55 !important;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -7268,14 +7307,30 @@ textarea {
   cursor: not-allowed;
 }
 
-.action-button--primary {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  border-color: var(--color-accent);
+.action-button--primary,
+.btn-primary:not(:disabled),
+.btn--primary:not(:disabled),
+.button--primary:not(:disabled),
+.modern-btn--primary:not(:disabled),
+.pricing-markdown-btn-evaluate:not(:disabled),
+.mobile-stock-take-submit-btn:not(:disabled) {
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  color: var(--color-on-accent) !important;
+  border-color: var(--color-polish-19) !important;
 }
 
-.action-button--primary:hover:not(:disabled) {
-  opacity: 0.9;
+.action-button--primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.btn--primary:hover:not(:disabled),
+.button--primary:hover:not(:disabled),
+.modern-btn--primary:hover:not(:disabled),
+.pricing-markdown-btn-evaluate:hover:not(:disabled),
+.mobile-stock-take-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  filter: brightness(0.95);
+  box-shadow: 0 4px 12px var(--color-polish-21);
 }
 
 .action-button--secondary {
@@ -8322,12 +8377,22 @@ textarea {
   resize: vertical;
 }
 
+.catalogue-form-field input:hover,
+.catalogue-form-field select:hover,
+.catalogue-form-field textarea:hover {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
+}
+
 .catalogue-form-field input:focus,
+.catalogue-form-field input:not(:placeholder-shown),
 .catalogue-form-field select:focus,
-.catalogue-form-field textarea:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+.catalogue-form-field textarea:focus,
+.catalogue-form-field textarea:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .catalogue-form-field .register-dropdown-trigger {
@@ -8716,8 +8781,9 @@ textarea {
 }
 
 .linking-barcode-actions .action-button--primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
+  background-color: var(--color-polish-19);
+  border-color: var(--color-polish-19);
   color: var(--color-surface);
   box-shadow: 0 2px 8px var(--color-polish-6);
 }
@@ -8892,8 +8958,8 @@ textarea {
 }
 
 .action-btn--correct-batch:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 12px var(--color-polish-21) !important;
@@ -8985,13 +9051,16 @@ textarea {
 }
 
 .supplier-name-input:hover {
-  border-color: var(--color-accent) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
-.supplier-name-input:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+.supplier-name-input:focus,
+.supplier-name-input:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .supplier-register-btn {
@@ -9060,15 +9129,16 @@ textarea {
 }
 
 .catalogue-datepicker-trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .catalogue-datepicker-trigger--open,
 .catalogue-datepicker-trigger:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .catalogue-datepicker-trigger__value {
@@ -9440,15 +9510,16 @@ textarea {
 }
 
 .register-dropdown-trigger:hover:not(:disabled) {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .register-dropdown-trigger[aria-expanded="true"],
 .register-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .register-dropdown-trigger:disabled {
@@ -9642,15 +9713,16 @@ textarea {
 
 .reason-capture select:hover,
 .reason-capture .reason-capture__field select:hover {
-  border-color: var(--color-accent) !important;
-  background-color: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background-color: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture select:focus,
 .reason-capture .reason-capture__field select:focus {
-  border-color: var(--color-accent) !important;
-  background-color: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background-color: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .reason-capture textarea,
@@ -9674,15 +9746,18 @@ textarea {
 
 .reason-capture textarea:hover,
 .reason-capture .reason-capture__textarea:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture textarea:focus,
-.reason-capture .reason-capture__textarea:focus {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+.reason-capture textarea:not(:placeholder-shown),
+.reason-capture .reason-capture__textarea:focus,
+.reason-capture .reason-capture__textarea:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .reason-capture__actions {
@@ -9871,8 +9946,8 @@ textarea {
 }
 
 .action-btn--correct-batch:hover:not(:disabled) {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
   color: var(--color-surface) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 14px var(--color-polish-21) !important;
@@ -10209,15 +10284,16 @@ textarea {
 }
 
 .reason-capture .register-dropdown-trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture .register-dropdown-trigger[aria-expanded="true"],
 .reason-capture .register-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
+  background: var(--color-polish-29) !important;
 }
 
 .reason-capture .register-dropdown-menu {
@@ -10324,8 +10400,9 @@ textarea {
 .custom-status-dropdown__trigger:hover:not(:disabled),
 .register-dropdown-trigger:hover:not(:disabled),
 .reason-capture .register-dropdown-trigger:hover:not(:disabled) {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .custom-status-dropdown__trigger[aria-expanded="true"],
@@ -10334,9 +10411,9 @@ textarea {
 .register-dropdown-trigger:focus-visible,
 .reason-capture .register-dropdown-trigger[aria-expanded="true"],
 .reason-capture .register-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .custom-status-dropdown__menu,
@@ -10497,6 +10574,22 @@ textarea {
   border-radius: 8px !important;
 }
 
+.register-field-group .register-input-control:hover,
+.register-field-group .register-dropdown-trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
+}
+
+.register-field-group .register-input-control:focus,
+.register-field-group .register-input-control:not(:placeholder-shown),
+.register-field-group .register-dropdown-trigger[aria-expanded="true"],
+.register-field-group .register-dropdown-trigger:focus-visible {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
+}
+
 .register-field-group .register-dropdown-menu {
   border: 1.5px solid var(--color-accent) !important;
   border-radius: 12px !important;
@@ -10549,17 +10642,18 @@ textarea {
 
 .reason-capture .register-dropdown-trigger:hover,
 .reason-dropdown-trigger:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .reason-capture .register-dropdown-trigger[aria-expanded="true"],
 .reason-capture .register-dropdown-trigger:focus-visible,
 .reason-dropdown-trigger[aria-expanded="true"],
 .reason-dropdown-trigger:focus-visible {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
+  background: var(--color-polish-29) !important;
 }
 
 .reason-capture .register-dropdown-menu,
@@ -10597,10 +10691,20 @@ textarea {
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
+.reason-capture textarea:hover,
+.reason-capture .reason-capture__textarea:hover {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
+}
+
 .reason-capture textarea:focus,
-.reason-capture .reason-capture__textarea:focus {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px var(--color-polish-13) !important;
+.reason-capture textarea:not(:placeholder-shown),
+.reason-capture .reason-capture__textarea:focus,
+.reason-capture .reason-capture__textarea:not(:placeholder-shown) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .reason-capture__actions {
@@ -10836,15 +10940,16 @@ textarea {
 }
 
 .catalogue-form-field .register-dropdown-trigger:hover {
-  border-color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3px var(--color-polish-27) !important;
 }
 
 .catalogue-form-field .register-dropdown-trigger:focus-visible,
 .catalogue-form-field .register-dropdown-trigger[aria-expanded="true"] {
-  border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  box-shadow: 0 0 0 3.5px var(--color-polish-13) !important;
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  box-shadow: 0 0 0 3.5px var(--color-polish-21) !important;
 }
 
 .catalogue-form-field .register-dropdown-menu {
