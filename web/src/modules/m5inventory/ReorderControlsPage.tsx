@@ -1,15 +1,97 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
+import { inLocale } from "../../shell/i18n/localName";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useHasPermission } from "../../shell/auth/permissions";
-import { useInventoryApi, type ReorderControl } from "./inventoryApi";
+import { useInventoryApi, type ReorderControl, type Sku } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
 import { SkuLabel } from "./SkuLabel";
 import { errorText } from "./stockView";
 import "./inventory.css";
+
+function skuText(sku: Sku, locale: string): string {
+  return `${sku.skuCode} — ${inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa)}`;
+}
+
+/** Search M2's authorized catalogue and keep the internal UUID out of the user's input. */
+function ReorderSkuSelector({ selectedSkuId, onSelect }: { selectedSkuId: string; onSelect: (sku: Sku) => void }) {
+  const t = useT();
+  const { locale } = useIntl();
+  const api = useInventoryApi();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Sku[] | null>(null);
+
+  const selectedSku = useQuery({
+    queryKey: ["catalogue", "sku", selectedSkuId],
+    queryFn: () => api.getSku(selectedSkuId),
+    enabled: selectedSkuId !== "",
+    staleTime: Infinity
+  });
+  const search = useMutation({
+    mutationFn: (term: string) => api.searchSkus(term),
+    onMutate: () => setResults(null),
+    onSuccess: setResults
+  });
+
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault();
+    const term = query.trim();
+    if (term !== "") {
+      search.mutate(term);
+    }
+  };
+
+  return (
+    <div className="inventory-search-form">
+      {selectedSkuId !== "" && (
+        <p aria-live="polite">
+          <strong>{t("inventory.reorder.item").text}:</strong>{" "}
+          {selectedSku.isLoading && t("inventory.loading").text}
+          {selectedSku.isError && errorText(selectedSku.error, t("inventory.error.generic").text)}
+          {selectedSku.data && skuText(selectedSku.data, locale)}
+        </p>
+      )}
+      <form onSubmit={submitSearch} className="inventory-search-form">
+        <label className="inventory-form-field">
+          {t("inventory.field.find_item").text}
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <div>
+          <button type="submit" disabled={query.trim() === "" || search.isPending}>
+            {t("inventory.find").text}
+          </button>
+        </div>
+      </form>
+      {search.isPending && <p>{t("inventory.loading").text}</p>}
+      {search.isError && <p role="alert">{errorText(search.error, t("inventory.error.generic").text)}</p>}
+      {results?.length === 0 && <p>{t("inventory.find.none").text}</p>}
+      {results && results.length > 0 && (
+        <ul className="inventory-list">
+          {results.map((sku) => (
+            <li key={sku.skuId}>
+              <button
+                type="button"
+                aria-pressed={selectedSkuId === sku.skuId}
+                onClick={() => onSelect(sku)}
+              >
+                {skuText(sku, locale)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function ReorderControlsPage() {
   const t = useT();
@@ -167,24 +249,15 @@ export function ReorderControlsPage() {
         <section className="inventory-reorder-card">
           <h3>{t("inventory.reorder.add").text}</h3>
           {formError && <p role="alert" className="error-text">{formError}</p>}
+          <ReorderSkuSelector selectedSkuId={skuId} onSelect={(sku) => setSkuId(sku.skuId)} />
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              saveMutation.mutate();
+              if (skuId !== "") {
+                saveMutation.mutate();
+              }
             }}
           >
-            <label className="inventory-form-field">
-              {t("inventory.reorder.item").text}
-              <input
-                id="reorder-skuId"
-                type="text"
-                className="input"
-                required
-                value={skuId}
-                onChange={(e) => setSkuId(e.target.value)}
-              />
-            </label>
-
             <div className="inventory-reorder-grid">
               <label className="inventory-form-field">
                 {t("inventory.reorder.level").text}
@@ -232,7 +305,7 @@ export function ReorderControlsPage() {
               <button
                 type="submit"
                 className="button button--primary"
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || skuId === ""}
               >
                 {t("inventory.reorder.save").text}
               </button>
