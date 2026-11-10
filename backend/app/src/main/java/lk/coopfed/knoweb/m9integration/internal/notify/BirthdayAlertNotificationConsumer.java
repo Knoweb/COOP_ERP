@@ -54,8 +54,8 @@ public class BirthdayAlertNotificationConsumer {
             return null;
         }
 
-        JsonNode payload = envelope.path("payload");
-        if (payload.isMissingNode() || payload.isNull()) {
+        JsonNode payload = envelope.hasNonNull("payload") ? envelope.get("payload") : envelope;
+        if (payload == null || !payload.isObject()) {
             return null;
         }
 
@@ -88,27 +88,6 @@ public class BirthdayAlertNotificationConsumer {
     }
 
     private String resolveCustomerPhone(String customerId, UUID entityId) {
-        if (customerId != null && !customerId.isBlank()) {
-            try {
-                UUID custId = UUID.fromString(customerId);
-                List<String> phones = jdbc.queryForList(
-                        """
-                        select phone
-                          from customers.customer_phone
-                         where customer_id = ?
-                           and is_primary = true
-                         limit 1
-                        """,
-                        String.class,
-                        custId);
-                if (!phones.isEmpty() && phones.get(0) != null && !phones.get(0).isBlank()) {
-                    return phones.get(0);
-                }
-            } catch (Exception ignored) {
-                // Ignore parsing errors and fallback to contact/default
-            }
-        }
-
         List<String> contacts = jdbc.queryForList(
                 """
                 select address
@@ -116,6 +95,7 @@ public class BirthdayAlertNotificationConsumer {
                  where owner_entity_id = ?
                    and channel = 'SMS'
                    and status = 'ACTIVE'
+                   and role_code in ('CUSTOMER', 'MEMBER')
                  limit 1
                 """,
                 String.class,
