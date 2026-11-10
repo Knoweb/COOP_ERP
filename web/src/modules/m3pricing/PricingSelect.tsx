@@ -8,6 +8,7 @@ export interface PricingSelectOption {
 export interface PricingSelectProps {
   id?: string;
   "aria-label"?: string;
+  ariaLabel?: string;
   value: string;
   options: PricingSelectOption[];
   onChange: (value: string) => void;
@@ -23,7 +24,8 @@ export interface PricingSelectProps {
  */
 export function PricingSelect({
   id,
-  "aria-label": ariaLabel,
+  "aria-label": ariaLabelProp,
+  ariaLabel,
   value,
   options,
   onChange,
@@ -31,10 +33,12 @@ export function PricingSelect({
   className = "",
   disabled = false
 }: PricingSelectProps) {
+  const effectiveAriaLabel = ariaLabelProp ?? ariaLabel;
+
   return (
     <select
       id={id}
-      aria-label={ariaLabel}
+      aria-label={effectiveAriaLabel}
       value={value}
       onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
       disabled={disabled}
