@@ -5037,6 +5037,283 @@ textarea {
   }
 }
 
+/* ==========================================================================
+   Responsive Breakpoints for Inventory (M5)
+   ========================================================================== */
+
+/* 1. Large Tablet / Small Laptop Breakpoint (max-width: 1024px) */
+@media (max-width: 1024px) {
+  .stock-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: var(--space-2) !important;
+  }
+
+  .stock-filters-row {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: var(--space-2) !important;
+  }
+
+  .modern-table-scroll.stock-positions-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .shell-page table.modern-table.stock-positions-table,
+  .stock-table.stock-positions-table {
+    min-width: 760px !important;
+  }
+}
+
+/* 2. Tablet & Mobile Landscape Breakpoint (max-width: 768px) */
+@media (max-width: 768px) {
+  .stock-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: var(--space-2) !important;
+  }
+
+  .stock-kpi-card:last-child {
+    grid-column: 1 / -1 !important;
+  }
+
+  .stock-controls-toolbar {
+    flex-direction: column-reverse !important;
+    align-items: stretch !important;
+    gap: var(--space-2) !important;
+  }
+
+  .stock-search-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .stock-search-control {
+    width: 100% !important;
+  }
+
+  .stock-controls-toolbar .filter-toggle {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .stock-positions-filters {
+    padding: var(--space-2) !important;
+  }
+
+  .stock-filters-row {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-2) !important;
+  }
+
+  .stock-filter-col {
+    width: 100% !important;
+  }
+
+  .modern-filter-panel--stock .custom-dropdown,
+  .modern-location-picker .custom-dropdown,
+  .stock-positions-filters .custom-dropdown {
+    min-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .modern-filter-panel--stock select,
+  .modern-location-picker select,
+  .stock-positions-filters select {
+    min-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .stock-filter-pills-wrapper {
+    justify-content: flex-start !important;
+    padding-inline: var(--space-1) !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .inventory-control-links {
+    flex-wrap: wrap !important;
+    gap: var(--space-1) !important;
+  }
+
+  .inventory-control-links .action-link {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    min-height: calc(var(--space-4) + var(--space-half)) !important;
+  }
+
+  .modern-table-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .shell-page .stock-table th,
+  .stock-table th,
+  .shell-page .stock-table td,
+  .stock-table td {
+    padding: calc(var(--space-1) - var(--border-width)) var(--space-1) !important;
+  }
+
+  .stock-nested-cell {
+    padding: var(--space-1) !important;
+  }
+
+  .stock-nested-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+  }
+
+  .stock-nested-table {
+    min-width: 580px !important;
+  }
+}
+
+/* 3. Mobile Phones Breakpoint (max-width: 480px) */
+@media (max-width: 480px) {
+  .stock-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: var(--space-1) !important;
+  }
+
+  .stock-kpi-card {
+    padding: calc(var(--space-1) - var(--border-width)) var(--space-1) !important;
+  }
+
+  .stock-kpi-title {
+    font-size: var(--font-size-xs) !important;
+    line-height: 1.1 !important;
+  }
+
+  .stock-kpi-value {
+    font-size: var(--font-size-md) !important;
+    line-height: 1.1 !important;
+  }
+
+  .stock-kpi-sub {
+    font-size: calc(var(--font-size-xs) - 1px) !important;
+  }
+
+  .stock-kpi-icon-badge {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+  }
+
+  .stock-kpi-icon-badge svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .stock-filter-pills-wrapper {
+    padding-inline: 4px !important;
+    margin-bottom: var(--space-2) !important;
+  }
+
+  .stock-filter-pills {
+    padding: 3px 6px !important;
+    gap: 4px !important;
+  }
+
+  .shell-page .stock-filter-pills .stock-pill-btn,
+  .stock-filter-pills .stock-pill-btn,
+  .stock-pill-btn {
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    min-height: 34px !important;
+    gap: 4px !important;
+  }
+
+  .stock-pill-btn__icon svg {
+    width: 12px !important;
+    height: 12px !important;
+    min-width: 12px !important;
+    min-height: 12px !important;
+  }
+
+  .stock-search-input {
+    height: 38px !important;
+    font-size: 13px !important;
+  }
+
+  .stock-positions-filters {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .shell-page .stock-positions-table,
+  .stock-positions-table {
+    min-width: 680px !important;
+  }
+
+  .shell-page .stock-table th,
+  .stock-table th {
+    padding: 6px 8px !important;
+    font-size: 10.5px !important;
+  }
+
+  .shell-page .stock-table td,
+  .stock-table td {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+
+  .shell-page .stock-positions-table .col-expand,
+  .stock-positions-table .col-expand {
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+  }
+
+  .stock-expand-btn {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .stock-positions-table .col-item {
+    min-width: 180px !important;
+  }
+
+  .stock-positions-table .entity-link {
+    display: inline-flex !important;
+    flex-wrap: wrap !important;
+    align-items: baseline !important;
+    gap: 2px 4px !important;
+  }
+
+  .stock-positions-table .stock-sku-code {
+    font-size: 11.5px !important;
+  }
+
+  .stock-positions-table .stock-sku-name {
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+
+  .stock-explanation-modal {
+    max-width: 96vw !important;
+    padding: var(--space-2) !important;
+  }
+
+  .stock-modal-kpi-summary {
+    grid-template-columns: 1fr 1fr !important;
+    gap: var(--space-1) !important;
+    padding: 0 !important;
+  }
+
+  .stock-modal-kpi-item {
+    padding: var(--space-1) !important;
+    min-height: calc(var(--space-4) + var(--space-2)) !important;
+  }
+
+  .stock-modal-kpi-icon-badge {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
 /* ---- Users List & New User Page Enhancement -------------------------------------------- */
 
 .users-filter-panel {
@@ -5589,6 +5866,10 @@ textarea {
 
   .users-table-card {
     border-radius: var(--radius);
+  }
+
+  .roles-filter-bar {
+    grid-template-columns: 1fr !important;
   }
 }
 
