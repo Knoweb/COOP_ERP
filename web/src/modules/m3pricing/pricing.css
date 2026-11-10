@@ -747,7 +747,7 @@ span.pricing-version-text {
 }
 
 /* Action buttons inside tables with rich vibrant theme colors */
-.modern-table button,
+.modern-table button:not(.custom-dropdown__trigger),
 .modern-table .btn {
   box-sizing: border-box;
   display: inline-flex;
@@ -768,7 +768,7 @@ span.pricing-version-text {
   white-space: nowrap;
 }
 
-.modern-table button:hover,
+.modern-table button:not(.custom-dropdown__trigger):hover,
 .modern-table .btn:hover {
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
   border-color: var(--color-polish-19);
@@ -777,18 +777,18 @@ span.pricing-version-text {
   transform: translateY(calc(var(--border-width) * -1));
 }
 
-.modern-table button:active,
+.modern-table button:not(.custom-dropdown__trigger):active,
 .modern-table .btn:active {
   transform: translateY(0) scale(0.98);
 }
 
-.modern-table button:focus,
+.modern-table button:not(.custom-dropdown__trigger):focus,
 .modern-table .btn:focus {
   outline: var(--border-width-strong) solid var(--color-accent);
   outline-offset: var(--border-width-strong);
 }
 
-.modern-table button:disabled,
+.modern-table button:not(.custom-dropdown__trigger):disabled,
 .modern-table .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1190,15 +1190,16 @@ span.pricing-version-text {
   visibility: visible !important;
 }
 
-.pricing-policy-native-select {
+.pricing-policy-native-select,
+.pricing-policy-select {
   margin-top: var(--space-1);
 }
 
 /* ---- Selectable Dropdowns & Options (MRP Policy & Rules) ---------- */
 
-.pricing-filter-bar select,
-.pricing-form-field select,
-select.pricing-select {
+.pricing-filter-bar select:not(.visually-hidden),
+.pricing-form-field select:not(.visually-hidden),
+select.pricing-select:not(.visually-hidden) {
   box-sizing: border-box;
   min-height: calc(var(--space-4) + var(--space-1));
   padding: var(--space-1) var(--space-4) var(--space-1) var(--space-2);
@@ -1221,9 +1222,9 @@ select.pricing-select {
   accent-color: var(--color-polish-25);
 }
 
-.pricing-filter-bar select:hover,
-.pricing-form-field select:hover,
-select.pricing-select:hover {
+.pricing-filter-bar select:not(.visually-hidden):hover,
+.pricing-form-field select:not(.visually-hidden):hover,
+select.pricing-select:not(.visually-hidden):hover {
   background-color: var(--color-polish-31);
   border-color: var(--color-polish-21);
   color: var(--color-brand-dark);
@@ -1231,9 +1232,9 @@ select.pricing-select:hover {
   transform: translateY(calc(var(--border-width) * -1));
 }
 
-.pricing-filter-bar select:focus,
-.pricing-form-field select:focus,
-select.pricing-select:focus {
+.pricing-filter-bar select:not(.visually-hidden):focus,
+.pricing-form-field select:not(.visually-hidden):focus,
+select.pricing-select:not(.visually-hidden):focus {
   background-color: var(--color-surface);
   border: var(--border-width-strong) solid var(--color-polish-25);
   color: var(--color-brand-dark);
@@ -1242,9 +1243,9 @@ select.pricing-select:focus {
 }
 
 /* Selectable options inside dropdown list */
-.pricing-filter-bar select option,
-.pricing-form-field select option,
-select.pricing-select option {
+.pricing-filter-bar select:not(.visually-hidden) option,
+.pricing-form-field select:not(.visually-hidden) option,
+select.pricing-select:not(.visually-hidden) option {
   background: var(--color-surface);
   background-color: var(--color-surface);
   color: var(--color-brand-dark);
@@ -1253,9 +1254,9 @@ select.pricing-select option {
   padding: var(--space-1) var(--space-2);
 }
 
-.pricing-filter-bar select option:checked,
-.pricing-form-field select option:checked,
-select.pricing-select option:checked {
+.pricing-filter-bar select:not(.visually-hidden) option:checked,
+.pricing-form-field select:not(.visually-hidden) option:checked,
+select.pricing-select:not(.visually-hidden) option:checked {
   background-color: var(--color-accent-light) !important;
   background: linear-gradient(0deg, var(--color-accent-light) 0%, var(--color-accent-light) 100%) !important;
   color: var(--color-brand-dark) !important;
@@ -1263,12 +1264,12 @@ select.pricing-select option:checked {
   box-shadow: inset 0 0 calc(var(--space-8) * 10) var(--color-accent-light) !important;
 }
 
-.pricing-filter-bar select option:hover,
-.pricing-form-field select option:hover,
-select.pricing-select option:hover,
-.pricing-filter-bar select option:focus,
-.pricing-form-field select option:focus,
-select.pricing-select option:focus {
+.pricing-filter-bar select:not(.visually-hidden) option:hover,
+.pricing-form-field select:not(.visually-hidden) option:hover,
+select.pricing-select:not(.visually-hidden) option:hover,
+.pricing-filter-bar select:not(.visually-hidden) option:focus,
+.pricing-form-field select:not(.visually-hidden) option:focus,
+select.pricing-select:not(.visually-hidden) option:focus {
   background-color: var(--color-polish-31) !important;
   background: linear-gradient(0deg, var(--color-polish-31) 0%, var(--color-polish-31) 100%) !important;
   color: var(--color-brand-dark) !important;
@@ -1432,7 +1433,245 @@ select.pricing-select option:focus {
 }
 
 .pricing-dropdown-select {
-  width: 100%;
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.pricing-filter-bar .pricing-dropdown-select:not(.pricing-dropdown-select--compact) {
+  min-width: calc(var(--space-8) * 2 + var(--space-4)) !important;
+}
+
+.pricing-dropdown-select > select.visually-hidden {
+  position: absolute !important;
+  width: var(--border-width) !important;
+  height: var(--border-width) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-half)) !important;
+  height: auto !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height) !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+}
+
+.pricing-dropdown-select--compact {
+  width: auto !important;
+  min-width: calc(var(--space-8) + var(--space-2)) !important;
+}
+
+.modern-table .pricing-dropdown-select--compact .custom-dropdown__trigger,
+.pricing-dropdown-select--compact .custom-dropdown__trigger {
+  min-height: calc(var(--target-min) * 0.75) !important;
+  padding: var(--space-half) var(--space-1) !important;
+  border-width: var(--border-width) !important;
+  border-color: var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__trigger:hover,
+.pricing-dropdown-select .custom-dropdown__trigger:focus-visible,
+.pricing-dropdown-select .custom-dropdown__trigger:active,
+.pricing-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
+  border-color: var(--color-accent) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  transform: none !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__trigger:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__value {
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-text) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__arrow {
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-accent) !important;
+  fill: none !important;
+  stroke-width: var(--border-width-strong) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  transition: transform 0.2s ease !important;
+  flex-shrink: 0 !important;
+  margin-left: var(--space-1) !important;
+}
+
+.pricing-dropdown-select.custom-dropdown--open .custom-dropdown__arrow {
+  transform: rotate(180deg) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__menu,
+.pricing-dropdown-menu {
+  position: absolute !important;
+  top: calc(100% + var(--space-half)) !important;
+  left: 0 !important;
+  right: auto !important;
+  min-width: 100% !important;
+  width: max-content !important;
+  max-width: min(calc(var(--space-8) * 7), 90vw) !important;
+  box-sizing: border-box !important;
+  padding: var(--space-half) 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-border) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
+  z-index: 100 !important;
+  max-height: calc(var(--space-8) * 4) !important;
+  overflow-y: auto !important;
+}
+
+.pricing-dropdown-select.custom-dropdown--up .custom-dropdown__menu {
+  top: auto !important;
+  bottom: calc(100% + var(--space-half)) !important;
+}
+
+.pricing-dropdown-menu.pricing-dropdown-portal {
+  position: fixed !important;
+  top: auto;
+  bottom: auto;
+  right: auto !important;
+  min-width: auto;
+  width: max-content !important;
+  max-width: min(calc(var(--space-8) * 7), 90vw) !important;
+  margin-top: var(--space-half) !important;
+  z-index: 10100 !important;
+}
+
+.pricing-dropdown-menu.pricing-dropdown-portal.custom-dropdown__menu--up {
+  margin-top: 0 !important;
+  margin-bottom: var(--space-half) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item,
+.pricing-dropdown-menu .custom-dropdown__item {
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
+  background: var(--color-surface) !important;
+  border: none !important;
+  border-left: none !important;
+  border-radius: 0 !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-polish-25) !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  text-transform: none !important;
+  white-space: normal !important;
+  user-select: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item:not(:last-child),
+.pricing-dropdown-menu .custom-dropdown__item:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--color-polish-14) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item:hover,
+.pricing-dropdown-select .custom-dropdown__item:focus-visible,
+.pricing-dropdown-menu .custom-dropdown__item:hover,
+.pricing-dropdown-menu .custom-dropdown__item:focus-visible {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-polish-25) !important;
+  outline: none !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item--selected,
+.pricing-dropdown-select .custom-dropdown__item--selected:hover,
+.pricing-dropdown-menu .custom-dropdown__item--selected,
+.pricing-dropdown-menu .custom-dropdown__item--selected:hover {
+  background-color: var(--color-surface) !important;
+  color: var(--color-polish-25) !important;
+  font-weight: var(--font-weight-strong) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item--selected:hover,
+.pricing-dropdown-menu .custom-dropdown__item--selected:hover {
+  background-color: var(--color-polish-29) !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item-bar,
+.pricing-dropdown-menu .custom-dropdown__item-bar {
+  width: var(--border-width-strong) !important;
+  height: var(--space-2) !important;
+  background-color: var(--color-polish-25) !important;
+  border-radius: var(--radius-pill) !important;
+  margin-right: var(--space-1) !important;
+  flex-shrink: 0 !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item-spacer,
+.pricing-dropdown-menu .custom-dropdown__item-spacer {
+  width: var(--border-width-strong) !important;
+  margin-right: var(--space-1) !important;
+  flex-shrink: 0 !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__item-label,
+.pricing-dropdown-menu .custom-dropdown__item-label {
+  flex: 1 !important;
+}
+
+.pricing-dropdown-select .custom-dropdown__checkmark,
+.pricing-dropdown-menu .custom-dropdown__checkmark {
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-polish-25) !important;
+  stroke-width: var(--border-width-strong) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  fill: none !important;
+  margin-left: var(--space-2) !important;
+  flex-shrink: 0 !important;
 }
 
 /* ---- Markdown Queue Filter Panel & Search (PGL-M1-07) ------------------ */
@@ -2625,8 +2864,8 @@ select.pricing-select option:focus {
 }
 
 /* Select matching user screenshot: pure white background, magenta border, radius 10px */
-.customer-shop-select select,
-.customer-shop-select select.pricing-select {
+.customer-shop-select select:not(.visually-hidden),
+.customer-shop-select select.pricing-select:not(.visually-hidden) {
   box-sizing: border-box !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -2651,12 +2890,12 @@ select.pricing-select option:focus {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.customer-shop-select select:hover {
+.customer-shop-select select:not(.visually-hidden):hover {
   background-color: var(--color-polish-4) !important;
   border-color: var(--color-accent) !important;
 }
 
-.customer-shop-select select:focus {
+.customer-shop-select select:not(.visually-hidden):focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
   box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;

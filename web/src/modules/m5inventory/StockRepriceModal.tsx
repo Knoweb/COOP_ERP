@@ -3,6 +3,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useInventoryApi, type LotBalance, type Sku } from "./inventoryApi";
+import { CustomSelect } from "./CustomSelect";
 import { errorText } from "./stockView";
 
 export interface StockRepriceModalProps {
@@ -194,17 +195,19 @@ export function StockRepriceModal({
 
           <div className="inventory-modal-field-group">
             <label htmlFor="reprice-target-condition" className="inventory-form-field">
-              {t("inventory.reprice.target_condition").text} *
-              <select
+              <span>{t("inventory.reprice.target_condition").text} *</span>
+              <CustomSelect
                 id="reprice-target-condition"
+                portal
                 value={targetCondition}
-                onChange={(e) => setTargetCondition(e.target.value as "GOOD" | "DAMAGED")}
-                className="input"
+                onChange={(val) => setTargetCondition(val as "GOOD" | "DAMAGED")}
+                ariaLabel={t("inventory.reprice.target_condition").text}
                 disabled={submitting}
-              >
-                <option value="GOOD">{t("inventory.condition.GOOD").text}</option>
-                <option value="DAMAGED">{t("inventory.condition.DAMAGED").text}</option>
-              </select>
+                options={[
+                  { value: "GOOD", label: t("inventory.condition.GOOD").text },
+                  { value: "DAMAGED", label: t("inventory.condition.DAMAGED").text }
+                ]}
+              />
             </label>
           </div>
 

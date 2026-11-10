@@ -1,0 +1,1 @@
+- feat(web): unify all Price Lists (`m3pricing`) and Stock/Inventory (`m5inventory`) dropdowns using custom trigger, portal-aware divided menu, left indicator bar, aligned spacer, and checkmark design with hidden native `<select>` synchronization on branch `feat/custom-dropdowns-stock-pricing`.

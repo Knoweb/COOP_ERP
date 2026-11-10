@@ -9,6 +9,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 
 import { SkuLabel } from "./SkuLabel";
+import { CustomSelect } from "./CustomSelect";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 import "./inventory.css";
 import { type Batch, type PickList, useInventoryApi } from "./inventoryApi";
@@ -79,15 +80,18 @@ function PickOverrideForm({ deliveryNoteId, line, onClose }: { deliveryNoteId: s
       )}
       {(candidates.data?.length ?? 0) > 0 && (
         <label className="inventory-form-field">
-          {t("inventory.pick.override.replacement").text}
-          <select value={replacementStockLotId} onChange={(event) => setReplacementStockLotId(event.target.value)} required>
-            <option value="">{t("inventory.pick.override.choose").text}</option>
-            {candidates.data!.map((candidate) => (
-              <option key={candidate.stockLotId} value={candidate.stockLotId}>
-                {candidate.batchNo ?? t("inventory.field.batch_not_tracked").text} · {t("inventory.pick.override.available", undefined, { qty: candidate.availableQty }).text}
-              </option>
-            ))}
-          </select>
+          <span>{t("inventory.pick.override.replacement").text}</span>
+          <CustomSelect
+            ariaLabel={t("inventory.pick.override.replacement").text}
+            value={replacementStockLotId}
+            onChange={setReplacementStockLotId}
+            placeholder={t("inventory.pick.override.choose").text}
+            required
+            options={candidates.data!.map((candidate) => ({
+              value: candidate.stockLotId,
+              label: `${candidate.batchNo ?? t("inventory.field.batch_not_tracked").text} · ${t("inventory.pick.override.available", undefined, { qty: candidate.availableQty }).text}`
+            }))}
+          />
         </label>
       )}
       <label className="inventory-form-field">

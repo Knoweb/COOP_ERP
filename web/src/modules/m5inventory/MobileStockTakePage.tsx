@@ -9,6 +9,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import {
   useInventoryApi,
   type StockTakeScanRequest,
@@ -523,16 +524,17 @@ export function MobileStockTakePage() {
                       </label>
 
                       <label htmlFor={conditionInputId} className="inventory-form-field">
-                        {t("inventory.stock_take.condition_label").text}
-                        <select
+                        <span>{t("inventory.stock_take.condition_label").text}</span>
+                        <CustomSelect
                           id={conditionInputId}
+                          ariaLabel={t("inventory.stock_take.condition_label").text}
                           value={conditionInput}
-                          onChange={(e) => setConditionInput(e.target.value as "GOOD" | "DAMAGED")}
-                          className="modern-text-input"
-                        >
-                          <option value="GOOD">{t("inventory.stock_take.condition_good").text}</option>
-                          <option value="DAMAGED">{t("inventory.stock_take.condition_damaged").text}</option>
-                        </select>
+                          onChange={(val) => setConditionInput(val as "GOOD" | "DAMAGED")}
+                          options={[
+                            { value: "GOOD", label: t("inventory.stock_take.condition_good").text },
+                            { value: "DAMAGED", label: t("inventory.stock_take.condition_damaged").text }
+                          ]}
+                        />
                       </label>
                     </div>
 
@@ -707,16 +709,17 @@ export function MobileStockTakePage() {
                   <h3>{t("inventory.stock_take.reconcile_section").text}</h3>
                   <div className="mobile-stock-take-form-grid">
                     <label htmlFor={uncountedHandlingId} className="inventory-form-field">
-                      {t("inventory.stock_take.uncounted_handling").text}
-                      <select
+                      <span>{t("inventory.stock_take.uncounted_handling").text}</span>
+                      <CustomSelect
                         id={uncountedHandlingId}
+                        ariaLabel={t("inventory.stock_take.uncounted_handling").text}
                         value={uncountedHandling}
-                        onChange={(e) => setUncountedHandling(e.target.value as "ZERO" | "SKIP")}
-                        className="modern-text-input"
-                      >
-                        <option value="ZERO">{t("inventory.stock_take.uncounted_zero").text}</option>
-                        <option value="SKIP">{t("inventory.stock_take.uncounted_skip").text}</option>
-                      </select>
+                        onChange={(val) => setUncountedHandling(val as "ZERO" | "SKIP")}
+                        options={[
+                          { value: "ZERO", label: t("inventory.stock_take.uncounted_zero").text },
+                          { value: "SKIP", label: t("inventory.stock_take.uncounted_skip").text }
+                        ]}
+                      />
                     </label>
 
                     {uncountedHandling === "SKIP" && (
