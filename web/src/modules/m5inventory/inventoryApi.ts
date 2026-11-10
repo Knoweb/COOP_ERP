@@ -280,7 +280,7 @@ export function useInventoryApi() {
       async receiveTransfer(
         transferId: string,
         idempotencyKey: string,
-        request?: ReceiveTransferRequest
+        request: ReceiveTransferRequest
       ): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
           params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
