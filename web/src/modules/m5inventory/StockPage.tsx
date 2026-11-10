@@ -31,7 +31,6 @@ export function StockPage() {
   const canReprice = useHasPermission("inv.stock.reprice");
 
   const [locationId, setLocationId] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [uomFilter, setUomFilter] = useState("");
@@ -252,181 +251,193 @@ export function StockPage() {
         }
       />
 
-      <div className="stock-controls-toolbar">
-        <button
-          type="button"
-          className="filter-toggle"
-          onClick={() => setFiltersOpen(!filtersOpen)}
-          aria-expanded={filtersOpen}
-          aria-controls="stock-filters"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+      <div className="stock-filter-pills-wrapper">
+        <div className="stock-filter-pills" role="radiogroup" aria-label={t("inventory.opening.column.status").text}>
+          <button
+            type="button"
+            className={`stock-pill-btn ${statusFilter === "all" ? "stock-pill-btn--active" : ""}`}
+            onClick={() => setStatusFilter("all")}
+            role="radio"
+            aria-checked={statusFilter === "all"}
           >
-            <path d="M4 7h16M7 12h10M10 17h4" />
-          </svg>
-          {t("inventory.filter.toggle").text}
-          <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
-        </button>
-
-        <div className="stock-search-wrap">
-          <span className="modern-control modern-control--search stock-search-control">
-            <svg
-              className="modern-control__leading-icon"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <circle cx="11" cy="11" r="6" />
-              <path d="m16 16 4 4" />
-            </svg>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder={t("inventory.stock.search_placeholder").text}
-              aria-label={t("inventory.stock.search_placeholder").text}
-              className="stock-search-input"
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                className="stock-search-clear"
-                onClick={() => setSearchQuery("")}
-                aria-label={t("inventory.remove").text}
-              >
-                ✕
-              </button>
-            ) : null}
-          </span>
+            <span className="stock-pill-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+            </span>
+            <span className="stock-pill-btn__label">{t("inventory.stock.filter.all").text}</span>
+          </button>
+          <button
+            type="button"
+            className={`stock-pill-btn ${statusFilter === "in_stock" ? "stock-pill-btn--active" : ""}`}
+            onClick={() => setStatusFilter("in_stock")}
+            role="radio"
+            aria-checked={statusFilter === "in_stock"}
+          >
+            <span className="stock-pill-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <circle cx="12" cy="12" r="9" />
+                <polyline points="8.5 12 11 14.5 15.5 9.5" />
+              </svg>
+            </span>
+            <span className="stock-pill-btn__label">{t("inventory.stock.filter.in_stock").text}</span>
+          </button>
+          <button
+            type="button"
+            className={`stock-pill-btn ${statusFilter === "out_of_stock" ? "stock-pill-btn--active" : ""}`}
+            onClick={() => setStatusFilter("out_of_stock")}
+            role="radio"
+            aria-checked={statusFilter === "out_of_stock"}
+          >
+            <span className="stock-pill-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <circle cx="12" cy="12" r="9" />
+                <line x1="5.64" y1="5.64" x2="18.36" y2="18.36" />
+              </svg>
+            </span>
+            <span className="stock-pill-btn__label">{t("inventory.stock.filter.out_of_stock").text}</span>
+          </button>
+          <button
+            type="button"
+            className={`stock-pill-btn ${statusFilter === "reserved" ? "stock-pill-btn--active" : ""}`}
+            onClick={() => setStatusFilter("reserved")}
+            role="radio"
+            aria-checked={statusFilter === "reserved"}
+          >
+            <span className="stock-pill-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            </span>
+            <span className="stock-pill-btn__label">{t("inventory.stock.filter.reserved").text}</span>
+          </button>
+          <button
+            type="button"
+            className={`stock-pill-btn ${statusFilter === "in_transit" ? "stock-pill-btn--active" : ""}`}
+            onClick={() => setStatusFilter("in_transit")}
+            role="radio"
+            aria-checked={statusFilter === "in_transit"}
+          >
+            <span className="stock-pill-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <rect x="1" y="4" width="14" height="12" rx="1" />
+                <polygon points="15 8 19 8 22 11 22 16 15 16 15 8" />
+                <circle cx="5.5" cy="18.5" r="2" />
+                <circle cx="17.5" cy="18.5" r="2" />
+              </svg>
+            </span>
+            <span className="stock-pill-btn__label">{t("inventory.stock.filter.in_transit").text}</span>
+          </button>
+          <button
+            type="button"
+            className={`stock-pill-btn ${statusFilter === "discrepant" ? "stock-pill-btn--active" : ""}`}
+            onClick={() => setStatusFilter("discrepant")}
+            role="radio"
+            aria-checked={statusFilter === "discrepant"}
+          >
+            <span className="stock-pill-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <circle cx="12" cy="17" r="0.75" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="stock-pill-btn__label">{t("inventory.stock.filter.discrepant").text}</span>
+          </button>
         </div>
-      </div>
-
-      <div className="stock-filter-pills" role="radiogroup" aria-label={t("inventory.filter.toggle").text}>
-        <button
-          type="button"
-          className={`stock-pill-btn ${statusFilter === "all" ? "stock-pill-btn--active" : ""}`}
-          onClick={() => setStatusFilter("all")}
-          role="radio"
-          aria-checked={statusFilter === "all"}
-        >
-          {t("inventory.stock.filter.all").text}
-        </button>
-        <button
-          type="button"
-          className={`stock-pill-btn ${statusFilter === "in_stock" ? "stock-pill-btn--active" : ""}`}
-          onClick={() => setStatusFilter("in_stock")}
-          role="radio"
-          aria-checked={statusFilter === "in_stock"}
-        >
-          {t("inventory.stock.filter.in_stock").text}
-        </button>
-        <button
-          type="button"
-          className={`stock-pill-btn ${statusFilter === "out_of_stock" ? "stock-pill-btn--active" : ""}`}
-          onClick={() => setStatusFilter("out_of_stock")}
-          role="radio"
-          aria-checked={statusFilter === "out_of_stock"}
-        >
-          {t("inventory.stock.filter.out_of_stock").text}
-        </button>
-        <button
-          type="button"
-          className={`stock-pill-btn ${statusFilter === "reserved" ? "stock-pill-btn--active" : ""}`}
-          onClick={() => setStatusFilter("reserved")}
-          role="radio"
-          aria-checked={statusFilter === "reserved"}
-        >
-          {t("inventory.stock.filter.reserved").text}
-        </button>
-        <button
-          type="button"
-          className={`stock-pill-btn ${statusFilter === "in_transit" ? "stock-pill-btn--active" : ""}`}
-          onClick={() => setStatusFilter("in_transit")}
-          role="radio"
-          aria-checked={statusFilter === "in_transit"}
-        >
-          {t("inventory.stock.filter.in_transit").text}
-        </button>
-        <button
-          type="button"
-          className={`stock-pill-btn ${statusFilter === "discrepant" ? "stock-pill-btn--active" : ""}`}
-          onClick={() => setStatusFilter("discrepant")}
-          role="radio"
-          aria-checked={statusFilter === "discrepant"}
-        >
-          {t("inventory.stock.filter.discrepant").text}
-        </button>
       </div>
 
       <section
         id="stock-filters"
-        hidden={!filtersOpen}
         className="modern-filter-panel modern-filter-panel--stock stock-positions-filters"
       >
-        <div className="modern-location-picker">
-          <LocationPicker value={locationId} onChange={setLocationId} />
-        </div>
-
-        <div className="stock-advanced-selectors">
-          <div className="stock-filter-select-wrap">
-            <label htmlFor="filter-department" className="stock-filter-label">
-              {t("inventory.stock.filter.department").text}
-            </label>
-            <select
-              id="filter-department"
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="stock-select-input"
-            >
-              <option value="">{t("inventory.stock.filter.all_departments").text}</option>
-              {(departmentsQuery.data ?? []).map((dept: DepartmentCategory) => (
-                <option key={dept.departmentId} value={dept.departmentId}>
-                  {dept.nameEn}
-                </option>
-              ))}
-            </select>
+        <div className="stock-filters-row">
+          <div className="stock-filter-col stock-filter-col--location">
+            <LocationPicker value={locationId} onChange={setLocationId} />
           </div>
 
-          <div className="stock-filter-select-wrap">
-            <label htmlFor="filter-uom" className="stock-filter-label">
-              {t("inventory.stock.filter.uom").text}
+          <div className="stock-filter-col">
+            <label className="inventory-form-field">
+              <span className="inventory-form-field__label">
+                {t("inventory.stock.filter.department").text}
+              </span>
+              <select
+                id="filter-department"
+                value={departmentFilter}
+                onChange={(event) => setDepartmentFilter(event.target.value)}
+                aria-label={t("inventory.stock.filter.department").text}
+                className="stock-select-input"
+              >
+                <option value="">{t("inventory.stock.filter.all_departments").text}</option>
+                {(departmentsQuery.data ?? []).map((dept: DepartmentCategory) => (
+                  <option key={dept.departmentId} value={dept.departmentId}>
+                    {dept.nameEn}
+                  </option>
+                ))}
+              </select>
             </label>
-            <select
-              id="filter-uom"
-              value={uomFilter}
-              onChange={(e) => setUomFilter(e.target.value)}
-              className="stock-select-input"
-            >
-              <option value="">{t("inventory.stock.filter.all_uoms").text}</option>
-              {(uomsQuery.data ?? []).map((uom: Uom) => (
-                <option key={uom.uomCode} value={uom.uomCode}>
-                  {uom.nameEn} ({uom.uomCode})
-                </option>
-              ))}
-            </select>
+          </div>
+
+          <div className="stock-filter-col">
+            <label className="inventory-form-field">
+              <span className="inventory-form-field__label">
+                {t("inventory.stock.filter.uom").text}
+              </span>
+              <select
+                id="filter-uom"
+                value={uomFilter}
+                onChange={(event) => setUomFilter(event.target.value)}
+                aria-label={t("inventory.stock.filter.uom").text}
+                className="stock-select-input"
+              >
+                <option value="">{t("inventory.stock.filter.all_uoms").text}</option>
+                {(uomsQuery.data ?? []).map((uom: Uom) => (
+                  <option key={uom.uomCode} value={uom.uomCode}>
+                    {uom.nameEn} ({uom.uomCode})
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
+
+        <div className="stock-filters-divider" />
 
         <div className="inventory-control-links">
           <Link className="action-link" to="/inventory/counts">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
             <span>{t("inventory.counts.link").text}</span>
           </Link>
           <Link className="action-link" to="/inventory/write-offs">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
             <span>{t("inventory.writeoffs.link").text}</span>
           </Link>
           <Link className="action-link" to="/inventory/repacks">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <path d="m21 16-4 4-4-4" />
+              <path d="M17 20V4" />
+              <path d="m3 8 4-4 4 4" />
+              <path d="M7 4v16" />
+            </svg>
             <span>{t("inventory.repacks.link").text}</span>
           </Link>
           <Link className="action-link" to="/inventory/transfer-requests">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <rect x="1" y="3" width="15" height="13" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
             <span>{t("inventory.request.link").text}</span>
           </Link>
         </div>
@@ -442,41 +453,94 @@ export function StockPage() {
         <>
           <div className="stock-kpi-grid">
             <div className="stock-kpi-card stock-kpi-card--primary">
-              <span className="stock-kpi-title">{t("inventory.stock.kpi.total_items").text}</span>
-              <span className="stock-kpi-value">{kpis.totalItems}</span>
-              <span className="stock-kpi-subtitle">
-                {kpis.isSingleUom && kpis.singleUom ? kpis.singleUom : t("inventory.stock.kpi.mixed_uom").text}
-              </span>
+              <div className="stock-kpi-card__content">
+                <span className="stock-kpi-title">{t("inventory.stock.kpi.total_items").text}</span>
+                <span className="stock-kpi-value">{kpis.totalItems}</span>
+                <span className="stock-kpi-subtitle">
+                  {kpis.isSingleUom && kpis.singleUom ? kpis.singleUom : t("inventory.stock.kpi.mixed_uom").text}
+                </span>
+              </div>
+              <div className="stock-kpi-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                </svg>
+              </div>
             </div>
-            <div className="stock-kpi-card">
-              <span className="stock-kpi-title">{t("inventory.stock.kpi.on_hand").text}</span>
-              <span className="stock-kpi-value">
-                {kpis.isSingleUom && kpis.singleUom
-                  ? `${kpis.onHand} ${kpis.singleUom}`
-                  : t("inventory.stock.kpi.unit_skus", undefined, { count: kpis.inStockCount }).text}
-              </span>
+            <div className="stock-kpi-card stock-kpi-card--on-hand">
+              <div className="stock-kpi-card__content">
+                <span className="stock-kpi-title">{t("inventory.stock.kpi.on_hand").text}</span>
+                <span className="stock-kpi-value">
+                  {kpis.isSingleUom && kpis.singleUom
+                    ? `${kpis.onHand} ${kpis.singleUom}`
+                    : t("inventory.stock.kpi.unit_skus", undefined, { count: kpis.inStockCount }).text}
+                </span>
+              </div>
+              <div className="stock-kpi-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                  <path d="m3.3 7 8.7 5 8.7-5" />
+                  <path d="M12 22V12" />
+                </svg>
+              </div>
             </div>
             <div className="stock-kpi-card stock-kpi-card--warning">
-              <span className="stock-kpi-title">{t("inventory.stock.kpi.reserved").text}</span>
-              <span className="stock-kpi-value">
-                {kpis.isSingleUom && kpis.singleUom
-                  ? `${kpis.reserved} ${kpis.singleUom}`
-                  : t("inventory.stock.kpi.unit_skus", undefined, { count: kpis.reservedCount }).text}
-              </span>
+              <div className="stock-kpi-card__content">
+                <span className="stock-kpi-title">{t("inventory.stock.kpi.reserved").text}</span>
+                <span className="stock-kpi-value">
+                  {kpis.isSingleUom && kpis.singleUom
+                    ? `${kpis.reserved} ${kpis.singleUom}`
+                    : t("inventory.stock.kpi.unit_skus", undefined, { count: kpis.reservedCount }).text}
+                </span>
+              </div>
+              <div className="stock-kpi-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                  <rect x="4" y="11" width="16" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+              </div>
             </div>
             <div className="stock-kpi-card stock-kpi-card--info">
-              <span className="stock-kpi-title">{t("inventory.stock.kpi.in_transit").text}</span>
-              <span className="stock-kpi-value">
-                {kpis.isSingleUom && kpis.singleUom
-                  ? `+${kpis.inTransitIncoming} / -${kpis.inTransitOutgoing} ${kpis.singleUom}`
-                  : t("inventory.stock.kpi.unit_skus", undefined, { count: kpis.inTransitCount }).text}
-              </span>
+              <div className="stock-kpi-card__content">
+                <span className="stock-kpi-title">{t("inventory.stock.kpi.in_transit").text}</span>
+                <span className="stock-kpi-value">
+                  {kpis.isSingleUom && kpis.singleUom
+                    ? `+${kpis.inTransitIncoming} / -${kpis.inTransitOutgoing} ${kpis.singleUom}`
+                    : t("inventory.stock.kpi.unit_skus", undefined, { count: kpis.inTransitCount }).text}
+                </span>
+              </div>
+              <div className="stock-kpi-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                  <rect x="1" y="4" width="14" height="12" rx="1" />
+                  <polygon points="15 8 19 8 22 11 22 16 15 16 15 8" />
+                  <circle cx="5.5" cy="18.5" r="2" />
+                  <circle cx="17.5" cy="18.5" r="2" />
+                </svg>
+              </div>
             </div>
             <div
-              className={`stock-kpi-card ${kpis.discrepancies > 0 ? "stock-kpi-card--alert" : "stock-kpi-card--success"}`}
+              className={`stock-kpi-card ${kpis.discrepancies > 0 ? "stock-kpi-card--alert" : "stock-kpi-card--discrepancies"}`}
             >
-              <span className="stock-kpi-title">{t("inventory.stock.kpi.discrepancies").text}</span>
-              <span className="stock-kpi-value">{kpis.discrepancies}</span>
+              <div className="stock-kpi-card__content">
+                <span className="stock-kpi-title">{t("inventory.stock.kpi.discrepancies").text}</span>
+                <span className="stock-kpi-value">{kpis.discrepancies}</span>
+              </div>
+              <div className="stock-kpi-card__icon-badge" aria-hidden="true">
+                {kpis.discrepancies > 0 ? (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <circle cx="12" cy="17" r="0.75" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                    <circle cx="12" cy="12" r="9" />
+                    <polyline points="8.5 12 11 14.5 15.5 9.5" />
+                  </svg>
+                )}
+              </div>
             </div>
           </div>
 
@@ -493,7 +557,42 @@ export function StockPage() {
           )}
 
           {summariesQuery.data && summariesQuery.data.length > 0 && (
-            <section className="modern-table-card stock-positions-card">
+            <>
+              <div className="stock-table-toolbar">
+                <div className="stock-search-wrap">
+                  <span className="modern-control modern-control--search stock-search-control">
+                    <svg
+                      className="modern-control__leading-icon"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <circle cx="11" cy="11" r="6" />
+                      <path d="m16 16 4 4" />
+                    </svg>
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder={t("inventory.stock.search_placeholder").text}
+                      aria-label={t("inventory.stock.search_placeholder").text}
+                      className="stock-search-input"
+                    />
+                    {searchQuery ? (
+                      <button
+                        type="button"
+                        className="stock-search-clear"
+                        onClick={() => setSearchQuery("")}
+                        aria-label={t("inventory.remove").text}
+                      >
+                        ✕
+                      </button>
+                    ) : null}
+                  </span>
+                </div>
+              </div>
+
+              <section className="modern-table-card stock-positions-card">
               <div className="modern-table-scroll stock-positions-scroll">
                 <table className="modern-table stock-table stock-positions-table">
                   <colgroup>
@@ -514,7 +613,7 @@ export function StockPage() {
                       <th className="col-item">{t("inventory.stock.column.sku").text}</th>
                       <th className="col-dept">{t("inventory.stock.column.department").text}</th>
                       <th className="col-uom">{t("inventory.stock.column.uom").text}</th>
-                      <th className="col-on-hand numeric-cell">{t("inventory.stock.column.on_hand").text}</th>
+                      <th className="col-on-hand numeric-cell">{t("inventory.column.on_hand").text}</th>
                       <th className="col-reserved numeric-cell">{t("inventory.stock.column.reserved").text}</th>
                       <th className="col-available numeric-cell">{t("inventory.stock.column.available").text}</th>
                       <th className="col-in-transit">{t("inventory.stock.column.in_transit").text}</th>
@@ -554,7 +653,21 @@ export function StockPage() {
                                       : t("inventory.stock.action.expand_lots").text
                                   }
                                 >
-                                  {isExpanded ? "▾" : "▸"}
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    width="12"
+                                    height="12"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className={`stock-expand-chevron ${isExpanded ? "stock-expand-chevron--expanded" : ""}`}
+                                    aria-hidden="true"
+                                    focusable="false"
+                                  >
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
                                 </button>
                               </td>
 
@@ -759,7 +872,8 @@ export function StockPage() {
                 </table>
               </div>
             </section>
-          )}
+          </>
+        )}
         </>
       )}
 

@@ -96,7 +96,13 @@ export function TransfersPage() {
   });
 
   const receive = useMutation({
-    mutationFn: (transferId: string) => api.receiveTransfer(transferId, receiveKey.current()),
+    mutationFn: (transfer: Transfer) =>
+      api.receiveTransfer(transfer.transferId, receiveKey.current(), {
+        lines: transfer.lines.map((line) => ({
+          transferLineId: line.transferLineId,
+          receivedQty: line.qty
+        }))
+      }),
     onSuccess: () => {
       receiveKey.next();
       refresh();
@@ -268,7 +274,7 @@ export function TransfersPage() {
                   <button
                     type="button"
                     disabled={receive.isPending}
-                    onClick={() => receive.mutate(transfer.transferId)}
+                    onClick={() => receive.mutate(transfer)}
                   >
                     {t("inventory.transfer.receive").text}
                   </button>

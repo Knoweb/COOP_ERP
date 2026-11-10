@@ -101,7 +101,7 @@ export function RolesPage() {
 
       {roles.isSuccess && roles.data.length > 0 && (
         <>
-          <form role="search" onSubmit={(e) => e.preventDefault()} className="modern-filter-panel roles-filter-bar">
+          <form role="search" onSubmit={(e) => e.preventDefault()} className="roles-filter-bar">
             <div className="roles-filter-bar__search">
               <label className="modern-field">
                 <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>

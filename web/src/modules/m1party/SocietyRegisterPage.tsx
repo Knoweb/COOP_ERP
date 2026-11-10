@@ -286,7 +286,6 @@ export function SocietyRegisterPage() {
   const [district, setDistrict] = useState("");
 
   const [search, setSearch] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filter = {
@@ -326,71 +325,30 @@ export function SocietyRegisterPage() {
       </div>
 
       <div className="society-filters-wrap">
-        <button
-          type="button"
-          className="society-filter-toggle-btn"
-          aria-expanded={filtersOpen}
-          aria-controls="society-filters"
-          onClick={() => setFiltersOpen((prev) => !prev)}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="4" y1="6" x2="20" y2="6" />
-            <line x1="7" y1="12" x2="17" y2="12" />
-            <line x1="10" y1="18" x2="14" y2="18" />
-          </svg>
-          <span>{t("party.filter.toggle").text}</span>
-          <svg
-            className={`society-filter-arrow ${filtersOpen ? "society-filter-arrow--open" : ""}`}
-            viewBox="0 0 24 24"
-            width="14"
-            height="14"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </button>
-
-        {filtersOpen && (
-          <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">
-            <label className="modern-field">
-              <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
-              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
-            </label>
-            <div className="modern-field">
-              <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
-              <StatusDropdown
-                value={status}
-                onChange={(val) => setStatus(val)}
-                anyLabel={t("party.filter.status.any").text}
-              />
-            </div>
-            <div className="modern-field">
-              <span className="modern-field__label party-filter-label">
-                {t("party.filter.district").text}
-              </span>
-              <DistrictDropdown
-                value={district}
-                onChange={(val) => setDistrict(val)}
-                anyLabel={t("party.filter.district.any").text}
-              />
-            </div>
-          </form>
-        )}
+        <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">
+          <label className="modern-field">
+            <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
+          </label>
+          <div className="modern-field">
+            <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
+            <StatusDropdown
+              value={status}
+              onChange={(val) => setStatus(val)}
+              anyLabel={t("party.filter.status.any").text}
+            />
+          </div>
+          <div className="modern-field">
+            <span className="modern-field__label party-filter-label">
+              {t("party.filter.district").text}
+            </span>
+            <DistrictDropdown
+              value={district}
+              onChange={(val) => setDistrict(val)}
+              anyLabel={t("party.filter.district.any").text}
+            />
+          </div>
+        </form>
       </div>
 
       {societies.isLoading && <p>{t("party.list.loading").text}</p>}

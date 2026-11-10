@@ -1,0 +1,1 @@
+- Fixed the Goods Transfer receive screen to send the OpenAPI-defined full-receipt JSON body, preventing Spring's JSON-only route from rejecting the browser request before domain validation; retained localized backend problem details and added focused web regressions. PostgreSQL integration and the existing local transfer were not mutated.

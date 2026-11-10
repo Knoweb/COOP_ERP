@@ -46,8 +46,8 @@ public class LowStockNotificationConsumer {
             return null;
         }
 
-        JsonNode payload = envelope.path("payload");
-        if (payload.isMissingNode() || payload.isNull()) {
+        JsonNode payload = envelope.hasNonNull("payload") ? envelope.get("payload") : envelope;
+        if (payload == null || !payload.isObject()) {
             return null;
         }
 

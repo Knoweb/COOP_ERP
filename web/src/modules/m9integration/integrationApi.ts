@@ -14,6 +14,7 @@ export type SupplementDue = components["schemas"]["SupplementDueResponse"];
 export type NotificationTemplate = components["schemas"]["NotificationTemplateResponse"];
 export type NotificationRule = components["schemas"]["NotificationRuleResponse"];
 export type NotificationLogEntry = components["schemas"]["NotificationLogResponse"];
+export type NotificationResult = components["schemas"]["NotificationResultResponse"];
 export type LogStatus = NonNullable<NotificationLogEntry["status"]>;
 
 export function useIntegrationApi() {
@@ -102,6 +103,16 @@ export function useIntegrationApi() {
           params: { query: status ? { status } : {} }
         });
         return data ?? [];
+      },
+
+      async retryNotification(notificationId: string, idempotencyKey: string): Promise<NotificationResult> {
+        const { data } = await api.POST("/v1/integration/notifications/{notificationId}/retry", {
+          params: {
+            path: { notificationId },
+            header: { "Idempotency-Key": idempotencyKey }
+          }
+        });
+        return data!;
       }
     }),
     [api]

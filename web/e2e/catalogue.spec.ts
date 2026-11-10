@@ -35,7 +35,6 @@ test("a new item is created as a draft, shared, and found by its Sinhala name", 
 
   // The browser finds it by the Sinhala name.
   await page.getByRole("link", { name: textOf(FED_OFFICER, "catalogue.back") }).click();
-  await page.getByRole("button", { name: textOf(FED_OFFICER, "catalogue.filter.toggle") }).click();
   await page.getByLabel(textOf(FED_OFFICER, "catalogue.filter.search")).fill(nameSi);
   const row = page.getByRole("row", { name: new RegExp(nameEn) });
   await expect(row).toBeVisible();
@@ -104,7 +103,6 @@ test("a mis-keyed MRP on a batch can be successfully corrected via the screen", 
 
   // Navigate to an existing catalogue item that has batch tracking (from demo data: Samba rice 5 kg)
   await openSignedIn(page, FED_OFFICER, "/catalogue");
-  await page.getByRole("button", { name: textOf(FED_OFFICER, "catalogue.filter.toggle") }).click();
   await page.getByLabel(textOf(FED_OFFICER, "catalogue.filter.search")).fill("Samba rice 5 kg");
 
   const itemRow = page.getByRole("row", { name: /Samba rice 5 kg/ });

@@ -3,16 +3,35 @@ import { renderHook } from "@testing-library/react";
 import { useInventoryApi } from "./inventoryApi";
 
 const mockGet = vi.fn();
+const mockPost = vi.fn();
 vi.mock("../../shell/api/client", () => ({
   useApiClient: () => ({
     GET: mockGet,
-    POST: vi.fn(),
+    POST: mockPost,
     PUT: vi.fn(),
     DELETE: vi.fn()
   })
 }));
 
 describe("inventoryApi", () => {
+  it("sends an explicit JSON body for a full transfer receipt", async () => {
+    const request = {
+      lines: [{ transferLineId: "0190f000-0000-7000-8000-0000000000a1", receivedQty: 20 }]
+    };
+    mockPost.mockResolvedValueOnce({ data: { transferId: "transfer-1" } });
+
+    const { result } = renderHook(() => useInventoryApi());
+    await result.current.receiveTransfer("transfer-1", "receipt-key-1", request);
+
+    expect(mockPost).toHaveBeenCalledWith("/v1/inventory/transfers/{transferId}/receive", {
+      params: {
+        path: { transferId: "transfer-1" },
+        header: { "Idempotency-Key": "receipt-key-1" }
+      },
+      body: request
+    });
+  });
+
   it("downloadOpeningStockTemplate returns parsed Blob without consuming response twice", async () => {
     const mockBlob = new Blob(["excel-content"], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

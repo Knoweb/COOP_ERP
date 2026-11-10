@@ -89,6 +89,11 @@ public class CentralNotificationGateway implements NotificationGateway {
                     log.info("Deduplicating notification request for dedupKey {}", request.dedupKey());
                     return new NotificationResult(view.requestId(), "SENT", view.providerRef(), null, true);
                 }
+                if ("FAILED".equalsIgnoreCase(view.status())) {
+                    log.info("Deduplicating notification request for dedupKey {} (already FAILED)", request.dedupKey());
+                    return new NotificationResult(
+                            view.requestId(), "FAILED", view.providerRef(), view.lastError(), true);
+                }
                 if ("PENDING".equalsIgnoreCase(view.status())) {
                     log.info("Notification request {} already PENDING, attempting send", view.requestId());
                     return executeSend(
@@ -106,6 +111,43 @@ public class CentralNotificationGateway implements NotificationGateway {
 
         Instant now = clock.instant();
         UUID requestId = request.requestId();
+
+        boolean missingRecipient = (request.recipient() == null
+                || request.recipient().isBlank()
+                || "UNCONFIGURED".equalsIgnoreCase(request.recipient().trim()));
+        if (missingRecipient) {
+            String errorMsg = "No active notification contact configured for entity " + ownerEntityId;
+            log.warn("Notification request {} has no eligible recipient: {}", requestId, errorMsg);
+            jdbc.update(
+                    """
+                    insert into integration.notification_request
+                        (request_id, owner_entity_id, channel, recipient, recipient_tag, message_type, content,
+                         status, attempts, provider, last_error, dedup_key, created_at, updated_at)
+                    values (?, ?, ?, 'UNCONFIGURED', '***', ?, ?, 'FAILED', 0, 'NONE', ?, ?, ?, ?)
+                    """,
+                    requestId,
+                    ownerEntityId,
+                    request.channel(),
+                    request.messageType(),
+                    request.content(),
+                    errorMsg,
+                    request.dedupKey(),
+                    Timestamp.from(now),
+                    Timestamp.from(now));
+
+            recordAudit(
+                    "NOTIFICATION_FAILED",
+                    requestId,
+                    request.channel(),
+                    request.messageType(),
+                    "NONE",
+                    errorMsg,
+                    scope,
+                    "Delivery failed: " + errorMsg);
+            publishDispatched(requestId, ownerEntityId, request.channel(), request.messageType(), "FAILED");
+            return new NotificationResult(requestId, "FAILED", null, errorMsg, false);
+        }
+
         String recipientTag = maskRecipient(request.recipient());
         SmsGateway gateway = resolveGateway();
 
@@ -155,6 +197,30 @@ public class CentralNotificationGateway implements NotificationGateway {
 
         String recipient = jdbc.queryForObject(
                 "select recipient from integration.notification_request where request_id = ?", String.class, requestId);
+
+        if (recipient == null || recipient.isBlank() || "UNCONFIGURED".equalsIgnoreCase(recipient.trim())) {
+            List<String> contacts = jdbc.queryForList(
+                    """
+                    select address
+                      from integration.notification_contact
+                     where owner_entity_id = ?
+                       and channel = ?
+                       and status = 'ACTIVE'
+                     limit 1
+                    """,
+                    String.class,
+                    view.ownerEntityId(),
+                    view.channel());
+            if (contacts.isEmpty()) {
+                throw new ProblemException("m9.gateway.no_recipient_configured");
+            }
+            recipient = contacts.get(0);
+            jdbc.update(
+                    "update integration.notification_request set recipient = ?, recipient_tag = ? where request_id = ?",
+                    recipient,
+                    maskRecipient(recipient),
+                    requestId);
+        }
 
         return executeSend(
                 view.requestId(),

@@ -281,10 +281,48 @@ class IntegrationQueriesImpl implements IntegrationQueries {
                 """
                 select notification_id, created_at, rule_id, event_id, channel, template_id, language, status,
                        attempts, suppressed_reason, last_error, recipient_entity_id, audience_role,
-                       next_attempt_at,
-                       case when recipient_hash_key_id is not null then left(recipient_hash, 8) end as recipient_tag
-                  from kernel.notification_log
-                 where (?::text is null or status = ?::text)
+                       next_attempt_at, recipient_tag
+                  from (
+                      select notification_id, created_at, rule_id, event_id, channel, template_id, language, status,
+                             attempts, suppressed_reason, last_error, recipient_entity_id, audience_role,
+                             next_attempt_at,
+                             case when recipient_hash_key_id is not null then left(recipient_hash, 8) end as recipient_tag
+                        from kernel.notification_log
+                       where (?::text is null or status = ?::text)
+                      union all
+                      select request_id as notification_id,
+                             created_at,
+                             case message_type
+                                 when 'LOW_STOCK' then '0190f9a0-0000-7000-8000-000000000007'::uuid
+                                 when 'PRICE_UPDATE' then '0190f9a0-0000-7000-8000-000000000008'::uuid
+                                 when 'BIRTHDAY_ALERT' then '0190f9a0-0000-7000-8000-000000000009'::uuid
+                                 else null
+                             end as rule_id,
+                             null::uuid as event_id,
+                             channel,
+                             case message_type
+                                 when 'LOW_STOCK' then 'low-stock-alert-sms'
+                                 when 'PRICE_UPDATE' then 'price-update-sms'
+                                 when 'BIRTHDAY_ALERT' then 'birthday-greeting-sms'
+                                 else lower(message_type)
+                             end as template_id,
+                             'en' as language,
+                             case when status = 'PENDING' then 'QUEUED' else status end as status,
+                             attempts,
+                             null::text as suppressed_reason,
+                             last_error,
+                             owner_entity_id as recipient_entity_id,
+                             case message_type
+                                 when 'LOW_STOCK' then 'STORE_KEEPER'
+                                 when 'PRICE_UPDATE' then 'CUSTOMER'
+                                 when 'BIRTHDAY_ALERT' then 'CUSTOMER'
+                                 else null
+                             end as audience_role,
+                             next_attempt_at,
+                             recipient_tag
+                        from integration.notification_request
+                       where (?::text is null or status = (case when ?::text = 'QUEUED' then 'PENDING' else ?::text end))
+                  ) combined
                  order by created_at desc, notification_id desc
                  limit ?
                 """,
@@ -308,6 +346,9 @@ class IntegrationQueriesImpl implements IntegrationQueries {
                         // give nothing back without the key; a row whose hash V0085 replaced has none.
                         rs.getString("recipient_tag"),
                         instant(rs.getTimestamp("next_attempt_at"))),
+                status,
+                status,
+                status,
                 status,
                 status,
                 rows);
