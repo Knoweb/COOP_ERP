@@ -1153,6 +1153,18 @@ config_items:
     sensitive: false
     till_visible: true
     module: m6pos
+  - key: integration.journal_unacknowledged_review_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 3650 }
+    description_en: Days a generated journal export may remain unacknowledged before review
+    description_si: ජනනය කළ ජර්නල් අපනයනයක් සමාලෝචනයට පෙර තහවුරු නොකර පැවතිය හැකි දින ගණන
+    description_ta: உருவாக்கப்பட்ட ஜர்னல் ஏற்றுமதி மதிப்பாய்வுக்கு முன் உறுதிப்படுத்தப்படாமல் இருக்கக்கூடிய நாட்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
   # M3-05: HR Fingerprint Attendance and Overtime calculation rules
   - key: hr.attendance.standard_daily_minutes
     value_type: INTEGER
