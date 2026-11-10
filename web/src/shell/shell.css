@@ -9886,7 +9886,7 @@ button[type="submit"]:not(:disabled):hover,
 
 .document-header__facts {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
   gap: 14px 16px !important;
   margin: 20px 0 !important;
   padding: 0 !important;
@@ -9898,7 +9898,7 @@ button[type="submit"]:not(:disabled):hover,
   background: var(--color-surface-subtle) !important;
   border: 1.5px solid var(--color-border) !important;
   border-radius: 12px !important;
-  padding: 14px 18px !important;
+  padding: 12px 16px !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 4px !important;
@@ -9921,11 +9921,13 @@ button[type="submit"]:not(:disabled):hover,
 }
 
 .document-header__fact dd {
-  font-size: 16px !important;
+  font-size: 15px !important;
   font-weight: 600 !important;
   color: var(--color-text) !important;
   margin: 0 !important;
-  word-break: break-all !important;
+  line-height: 1.35 !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
 }
 
 .document-header__fact dd .money-display {
@@ -10226,7 +10228,7 @@ button[type="submit"]:not(:disabled):hover,
    ==== */
 .shell-page .document-header__facts {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
   gap: 14px 16px !important;
   margin: 20px 0 !important;
   padding: 0 !important;
@@ -10239,7 +10241,7 @@ button[type="submit"]:not(:disabled):hover,
   background: var(--color-polish-29) !important;
   border: 1.5px solid var(--color-polish-22) !important;
   border-radius: 12px !important;
-  padding: 14px 18px !important;
+  padding: 12px 16px !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 5px !important;
@@ -10267,11 +10269,13 @@ button[type="submit"]:not(:disabled):hover,
 
 .shell-page .document-header__fact dd,
 .batch-detail-value {
-  font-size: 15.5px !important;
+  font-size: 15px !important;
   font-weight: 600 !important;
   color: var(--color-text) !important;
   margin: 0 !important;
-  word-break: break-all !important;
+  line-height: 1.35 !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
 }
 
 .shell-page .document-header__fact dd .money-display {
