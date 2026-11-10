@@ -222,21 +222,17 @@ function RegisterCard({
 
   return (
     <section className="trading-register-card">
-      <div className="trading-register-card__header">
-        <div className="trading-register-card__heading">
-          <span className="trading-register-card__icon" aria-hidden="true">
-            <RegisterIcon kind={icon} />
+      <span className="trading-register-card__icon" aria-hidden="true">
+        <RegisterIcon kind={icon} />
+      </span>
+      <h2 className="trading-register-card__title">{title}</h2>
+      {count !== undefined && (
+        <div className="trading-register-card__meta">
+          <span className={pillClass} aria-hidden="true">
+            {count}
           </span>
-          <h2 className="trading-register-card__title">{title}</h2>
         </div>
-        {count !== undefined && (
-          <div className="trading-register-card__meta">
-            <span className={pillClass} aria-hidden="true">
-              {count}
-            </span>
-          </div>
-        )}
-      </div>
+      )}
 
       <div className="trading-register-card__body">
         {isLoading && (

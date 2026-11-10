@@ -116,4 +116,25 @@ describe("TradingPage", () => {
       expect(docLink.getAttribute("href")).toBe("/trading/orders/0190f4cc-0000-7000-8000-000000000001");
     });
   });
+
+  it("keeps each register heading directly inside the section containing its document links", async () => {
+    state.permissions = new Set(["del.note.draft"]);
+    api.deliveryNotes.mockResolvedValue([
+      {
+        deliveryNoteId: "0190f4ef-0000-7000-8000-000000000001",
+        docNumber: "FED-DN-0000001",
+        status: "IN_TRANSIT",
+        buyerEntityId: "0190f0de-0000-7000-8000-0000000000e1",
+        sellerEntityId: "0190f000-0000-7000-8000-000000000001"
+      } as unknown as DeliveryNote
+    ]);
+
+    renderTradingPage();
+
+    const heading = screen.getByRole("heading", { level: 2, name: text("trading.notes.title") });
+    await waitFor(() => {
+      const link = heading.parentElement?.querySelector('a[href^="/trading/delivery-notes/"]');
+      expect(link?.getAttribute("href")).toBe("/trading/delivery-notes/0190f4ef-0000-7000-8000-000000000001");
+    });
+  });
 });
