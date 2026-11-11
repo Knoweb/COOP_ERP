@@ -1,0 +1,1 @@
+- feat(m8reporting): polish Shop Reports UI with compact `.cdp` custom date (`ShopReportDatePicker`) and month (`ShopReportMonthPicker`) pickers matching `CustomDatePicker`, aligned filter controls, responsive KPI grid sizing, and no-wrap table column styling on branch `feat/m8-shop-reports-polish`.
