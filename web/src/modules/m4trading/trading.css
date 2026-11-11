@@ -167,8 +167,10 @@
 }
 
 .trading-dispatch-card__grid input[type="text"],
-.trading-dispatch-card__grid select {
+.trading-dispatch-card__grid select:not(.visually-hidden),
+.trading-dispatch-card__grid .ui-select {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -201,9 +203,15 @@
   text-align: right;
 }
 
+.trading-batch-cell .ui-select,
 .trading-table-select {
+  min-width: calc(var(--space-8) * 3);
   width: 100%;
   box-sizing: border-box;
+}
+
+.trading-form-row .ui-select {
+  max-width: calc(var(--space-8) * 7.2);
 }
 
 .trading-table-input {

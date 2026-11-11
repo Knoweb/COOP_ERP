@@ -7,6 +7,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { CustomSelect } from "../../shell/components/CustomSelect";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
 import { useTradingApi, type LotBalance } from "./tradingApi";
@@ -147,17 +148,22 @@ export function NewDeliveryNotePage() {
           </div>
 
           <div className="trading-dispatch-card__grid">
-            <label className="trading-form-field">
+            <div className="trading-form-field">
               <span className="trading-form-field__label">{t("trading.field.from_location").text}</span>
-              <select value={fromLocationId} onChange={(event) => setFromLocationId(event.target.value)} required>
-                <option value="">{t("trading.field.choose").text}</option>
-                {(warehouses.data ?? []).map((location) => (
-                  <option key={location.locationId} value={location.locationId}>
-                    {`${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <CustomSelect
+                ariaLabel={t("trading.field.from_location").text}
+                value={fromLocationId}
+                onChange={setFromLocationId}
+                required
+                options={[
+                  { value: "", label: t("trading.field.choose").text },
+                  ...(warehouses.data ?? []).map((location) => ({
+                    value: location.locationId,
+                    label: `${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`
+                  }))
+                ]}
+              />
+            </div>
             <label className="trading-form-field">
               <span className="trading-form-field__label">{t("trading.field.vehicle").text}</span>
               <input
@@ -199,21 +205,23 @@ export function NewDeliveryNotePage() {
                         <SkuLabel skuId={row.skuId} />
                       </td>
                       <td className="trading-batch-cell">
-                        <select
-                          className="trading-table-select"
-                          aria-label={t("trading.column.batch").text}
+                        <CustomSelect
+                          portal
+                          compact
+                          ariaLabel={t("trading.column.batch").text}
                           value={row.batchId}
-                          onChange={(event) => setRow(index, { batchId: event.target.value })}
-                        >
-                          <option value="">{t("trading.field.no_batch").text}</option>
-                          {(lots.data ?? [])
-                            .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
-                            .map((lot) => (
-                              <option key={lot.stockLotId} value={lot.batchId}>
-                                {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`}
-                              </option>
-                            ))}
-                        </select>
+                          onChange={(val) => setRow(index, { batchId: val })}
+                          options={[
+                            { value: "", label: t("trading.field.no_batch").text },
+                            ...(lots.data ?? [])
+                              .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
+                              .map((lot) => ({
+                                key: lot.stockLotId,
+                                value: lot.batchId,
+                                label: `${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`
+                              }))
+                          ]}
+                        />
                       </td>
                       <td className="trading-qty-cell">
                         <input
