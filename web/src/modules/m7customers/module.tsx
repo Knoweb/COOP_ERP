@@ -8,6 +8,7 @@ import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { CustomerCardPage } from "./CustomerCardPage";
 import { CustomersPage } from "./CustomersPage";
 import { PrivacyRequestsPage } from "./PrivacyRequestsPage";
+import { ReceivablesPage } from "./ReceivablesPage";
 import { StatementPage } from "./StatementPage";
 
 export const customersModule: ModuleDefinition = {
@@ -16,6 +17,7 @@ export const customersModule: ModuleDefinition = {
   routes: [
     { path: "customers", element: <CustomersPage /> },
     { path: "customers/privacy", element: <PrivacyRequestsPage /> },
+    { path: "customers/receivables", element: <ReceivablesPage /> },
     { path: "customers/:customerId", element: <CustomerCardPage /> },
     { path: "customers/:customerId/accounts/:accountId/statement", element: <StatementPage /> }
   ],

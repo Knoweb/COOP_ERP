@@ -374,6 +374,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/receivables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List outstanding credit accounts belonging to the caller's society */
+        get: operations["listReceivables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/{accountId}": {
         parameters: {
             query?: never;
@@ -927,6 +944,12 @@ export interface components {
                 reason?: string | null;
             }[];
             account?: components["schemas"]["Account"];
+        };
+        Receivable: {
+            account: components["schemas"]["Account"];
+            displayName: string;
+            displayNameSi?: string | null;
+            displayNameTa?: string | null;
         };
         Account: {
             /** Format: uuid */
@@ -1940,6 +1963,29 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listReceivables: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Outstanding accounts with customer names and ageing */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Receivable"][];
+                };
+            };
         };
     };
     getAccount: {

@@ -608,6 +608,42 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
                 .add(view.ageing().over90());
     }
 
+    @Test
+    void receivablesListOutstandingAccountsWithAgeingAndSocietyIsolation() {
+        UUID first = account("0700000491", "190000000491", "10000");
+        UUID second = account("0700000492", "190000000492", "10000");
+        UUID settled = account("0700000493", "190000000493", "10000");
+
+        charge(first, "120.00");
+        charge(second, "350.00");
+        charge(settled, "80.00");
+
+        pay.handle(payment(second, "100.00"), office());
+        pay.handle(payment(settled, "80.00"), office());
+
+        List<AccountQueries.Receivable> rows = accounts.receivables(0, 50, office());
+
+        assertThat(rows).extracting(row -> row.account().accountId()).containsExactly(first, second);
+
+        assertThat(rows.get(0).displayName()).isEqualTo("Member 491");
+        assertThat(rows.get(0).account().balance()).isEqualByComparingTo("120.00");
+        assertThat(rows.get(1).account().balance()).isEqualByComparingTo("250.00");
+
+        assertThat(rows.get(0).account().ageing())
+                .isEqualTo(accounts.account(first, office()).orElseThrow().ageing());
+
+        assertThat(accounts.receivables(0, 1, office()))
+                .extracting(row -> row.account().accountId())
+                .containsExactly(first);
+
+        assertThat(accounts.receivables(1, 1, office()))
+                .extracting(row -> row.account().accountId())
+                .containsExactly(second);
+
+        assertThat(accounts.receivables(2, 1, office())).isEmpty();
+        assertThat(accounts.receivables(0, 50, other())).isEmpty();
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------
 
     private ScopeContext clerk() {
