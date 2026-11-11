@@ -9,10 +9,14 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry.ConfigScope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.JobExecution;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.InventoryFixture;
@@ -43,6 +47,8 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e67e-0000-7000-8000-000000000002");
     private static final UUID OTHER_ENTITY = UUID.fromString("0190e67e-0000-7000-8000-000000000003");
+    private static final String SLOW_MOVING_DAYS = "inventory.slow_moving_days";
+    private static final String SLOW_MOVING_THRESHOLD_DOS = "inventory.slow_moving_threshold_dos";
 
     @Autowired
     Handles<EvaluateExpiryAlerts, ExpiryAlertScanResult> evaluateAlertsHandler;
@@ -59,10 +65,17 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     Clock clock;
 
+    @Autowired
+    ExpiryAlertReviewJob reviewJob;
+
+    @Autowired
+    ConfigRegistry config;
+
     private InventoryFixture fixture;
     private UUID shop1;
     private UUID otherShop;
     private LocalDate today;
+    private boolean slowMovingOverrideSet;
 
     @BeforeEach
     void setUp() {
@@ -78,6 +91,20 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        if (slowMovingOverrideSet) {
+            ScopeContext scope = own(OTHER_ENTITY);
+            outer.run(scope, () -> {
+                config.set(SLOW_MOVING_DAYS, ConfigScope.entity(OTHER_ENTITY), "30", scope, "test cleanup");
+                config.set(SLOW_MOVING_THRESHOLD_DOS, ConfigScope.entity(OTHER_ENTITY), "90", scope, "test cleanup");
+                return null;
+            });
+            superuserJdbc()
+                    .update(
+                            "delete from kernel.config_value where key in (?, ?) and scope_entity_id = ?",
+                            SLOW_MOVING_DAYS,
+                            SLOW_MOVING_THRESHOLD_DOS,
+                            OTHER_ENTITY);
+        }
         fixture.clean();
     }
 
@@ -95,7 +122,7 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID batch2 = fixture.batch(sku2, MPCS, "B-WARN", today.plusDays(20));
         postGood(shop1, batch2, "15.000", "80.00", MPCS);
 
-        // 3. Approaching batch: 50 days to expiry (<= 90)
+        // 3. Approaching batch: 50 days to expiry (31-60 under the current resolver)
         UUID sku3 = fixture.sku(MPCS, "BISCUIT_APPR");
         UUID batch3 = fixture.batch(sku3, MPCS, "B-APPR", today.plusDays(50));
         postGood(shop1, batch3, "30.000", "150.00", MPCS);
@@ -185,6 +212,29 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void slowMovingQueryUsesEntityScopedEffectiveConfigurationWhenParametersAreOmitted() {
+        ScopeContext scope = own(OTHER_ENTITY);
+        UUID sku = fixture.sku(OTHER_ENTITY, "CONFIGURED_SLOW_ITEM");
+        UUID batch = fixture.batch(sku, OTHER_ENTITY, "B-CONFIG-SLOW", today.plusDays(180));
+        postGood(otherShop, batch, "110.000", "100.00", OTHER_ENTITY);
+        postSale(otherShop, batch, "10.000", OTHER_ENTITY);
+
+        assertThat(inventoryQueries.slowMovingStock(otherShop, 30, 90, scope))
+                .extracting(SlowMovingStockView::skuId)
+                .containsExactly(sku);
+
+        outer.run(scope, () -> {
+            config.set(SLOW_MOVING_DAYS, ConfigScope.entity(OTHER_ENTITY), "10", scope, "test override");
+            config.set(SLOW_MOVING_THRESHOLD_DOS, ConfigScope.entity(OTHER_ENTITY), "200", scope, "test override");
+            return null;
+        });
+        slowMovingOverrideSet = true;
+
+        assertThat(inventoryQueries.slowMovingStock(otherShop, null, null, scope))
+                .isEmpty();
+    }
+
+    @Test
     void alertScanEvaluatesAndDeduplicatesRepeatedScans() {
         ScopeContext scope = own(MPCS);
 
@@ -224,6 +274,71 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(secondResult.nearExpiryAlertsEmitted()).isEqualTo(0);
         assertThat(secondResult.slowMovingAlertsEmitted()).isEqualTo(0);
 
+        assertThat(events(NearExpiryDetected.class)).isEmpty();
+        assertThat(events(SlowMovingDetected.class)).isEmpty();
+    }
+
+    @Test
+    void urgencyTierBoundariesMatchTheCurrentResolver() {
+        assertThat(ExpiryAlertStore.resolveTier(-1, 7, 30)).isEqualTo("EXPIRED");
+        assertThat(ExpiryAlertStore.resolveTier(0, 7, 30)).isEqualTo("CRITICAL");
+        assertThat(ExpiryAlertStore.resolveTier(7, 7, 30)).isEqualTo("CRITICAL");
+        assertThat(ExpiryAlertStore.resolveTier(8, 7, 30)).isEqualTo("WARNING");
+        assertThat(ExpiryAlertStore.resolveTier(30, 7, 30)).isEqualTo("WARNING");
+        assertThat(ExpiryAlertStore.resolveTier(31, 7, 30)).isEqualTo("APPROACHING");
+        assertThat(ExpiryAlertStore.resolveTier(60, 7, 30)).isEqualTo("APPROACHING");
+        assertThat(ExpiryAlertStore.resolveTier(61, 7, 30)).isEqualTo("HEALTHY");
+    }
+
+    @Test
+    void scheduledReviewScansActiveStockLocationsWithoutExpiryTasksAndKeepsEntitiesIsolated() {
+        UUID activeMpcsShop = fixture.location(MPCS, "SHOP", "ACTIVE");
+        UUID activeOtherWarehouse = fixture.location(OTHER_ENTITY, "WAREHOUSE", "ACTIVE");
+        UUID dormantMpcsShop = fixture.location(MPCS, "SHOP", "DORMANT");
+
+        UUID mpcsSku = fixture.sku(MPCS, "JOB_MPCS");
+        UUID mpcsBatch = fixture.batch(mpcsSku, MPCS, "B-JOB-MPCS", today.plusDays(5));
+        postGood(activeMpcsShop, mpcsBatch, "20.000", "100.00", MPCS);
+        postSale(activeMpcsShop, mpcsBatch, "10.000", MPCS);
+
+        UUID otherSku = fixture.sku(OTHER_ENTITY, "JOB_OTHER");
+        UUID otherBatch = fixture.batch(otherSku, OTHER_ENTITY, "B-JOB-OTHER", today.plusDays(5));
+        postGood(activeOtherWarehouse, otherBatch, "20.000", "100.00", OTHER_ENTITY);
+        postSale(activeOtherWarehouse, otherBatch, "10.000", OTHER_ENTITY);
+
+        UUID dormantSku = fixture.sku(MPCS, "JOB_DORMANT");
+        UUID dormantBatch = fixture.batch(dormantSku, MPCS, "B-JOB-DORMANT", today.plusDays(5));
+        postGood(dormantMpcsShop, dormantBatch, "20.000", "100.00", MPCS);
+        postSale(dormantMpcsShop, dormantBatch, "10.000", MPCS);
+
+        assertThat(superuserJdbc().queryForObject("select count(*) from inventory.expiry_task", Integer.class))
+                .isZero();
+        kernel.reset();
+
+        assertThat(reviewJob.review(execution())).isEqualTo(2);
+        assertThat(events(NearExpiryDetected.class)).hasSize(2);
+        assertThat(events(NearExpiryDetected.class).stream().map(NearExpiryDetected::locationId))
+                .containsExactlyInAnyOrder(activeMpcsShop, activeOtherWarehouse)
+                .doesNotContain(dormantMpcsShop);
+        assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY).stream()
+                        .map(a -> a.scope().entityId()))
+                .containsExactlyInAnyOrder(MPCS, OTHER_ENTITY);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_alert_state where location_id in (?, ?)",
+                                Integer.class,
+                                activeMpcsShop,
+                                activeOtherWarehouse))
+                .isEqualTo(2);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_alert_state where location_id = ?",
+                                Integer.class,
+                                dormantMpcsShop))
+                .isZero();
+
+        kernel.reset();
+        assertThat(reviewJob.review(execution())).isZero();
         assertThat(events(NearExpiryDetected.class)).isEmpty();
         assertThat(events(SlowMovingDetected.class)).isEmpty();
     }
@@ -287,5 +402,22 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .filter(type::isInstance)
                 .map(type::cast)
                 .toList();
+    }
+
+    private static JobExecution execution() {
+        return new JobExecution() {
+            @Override
+            public UUID runId() {
+                return UUID.randomUUID();
+            }
+
+            @Override
+            public void itemsProcessed(int count) {}
+
+            @Override
+            public Optional<ScopeContext> systemScope() {
+                return Optional.empty();
+            }
+        };
     }
 }
