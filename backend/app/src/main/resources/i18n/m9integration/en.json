@@ -51,5 +51,9 @@
   "m9.payment.already_cancelled": "Payment has been cancelled and cannot be settled",
   "m9.payment.not_cod": "Payment is not a Cash on Delivery (COD) payment",
   "m9.payment.invalid_state_transition": "Payment status cannot transition from {0} to {1}",
-  "m9.payment.webhook_signature_invalid": "Payment webhook signature verification failed"
+  "m9.payment.webhook_signature_invalid": "Payment webhook signature verification failed",
+  "m9.einvoice.invalid_scope": "E-invoicing requires the issuing entity’s own scope",
+  "m9.einvoice.owner_mismatch": "The invoice belongs to a different issuing entity",
+  "m9.einvoice.invoice_malformed": "The issued invoice contains missing or invalid submission details",
+  "m9.einvoice.stub_invalid": "The e-invoicing stub returned an unexpected submission status"
 }

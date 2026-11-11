@@ -1,0 +1,1 @@
+- feat(m9integration): implement ACC-10 e-invoicing seam with an EInvoiceAdapter, no-network stub, invoice.issued.v1 consumer, per-entity MFA-protected enablement, RLS-protected PENDING submissions, idempotency, auditing, three-language messages, and PostgreSQL integration tests including kernel event dispatch and inbox deduplication. Live IRD integration remains future work.

@@ -95,3 +95,9 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A provider webhook callback was received and processed idempotently
+
+  # ACC-10: Phase 1 e-invoicing readiness.
+  - code: EINVOICE_PENDING
+    severity: INFO
+    offline_capturable: false
+    description_en: An issued invoice was recorded as pending electronic submission
