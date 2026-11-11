@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
@@ -29,12 +29,16 @@ export function JournalExportsPage() {
   const formatInstant = useFormatInstant();
   const canExport = useHasPermission("int.journal.export");
   const exportKey = useIdempotencyKey();
+  const canAcknowledge = useHasPermission("int.journal.ack");
+  const acknowledgeKey = useIdempotencyKey();
+  const lastAcknowledgeAttempt = useRef<string | null>(null);
 
   const today = businessToday();
   const [period, setPeriod] = useState(() => defaultExportPeriod(today));
   const [provisional, setProvisional] = useState(false);
   const [message, setMessage] = useState<{ kind: "status" | "alert"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
   const periodValid = period.from !== "" && period.to !== "" && period.from <= period.to;
@@ -73,6 +77,33 @@ export function JournalExportsPage() {
       setMessage({ kind: "alert", text: errorText(error, t("integration.error.generic").text) });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function acknowledge(journal: JournalExport) {
+    setMessage(null);
+
+    // Retry the same action with the same key after a network failure.
+    // Choosing another export starts a new action with a new key.
+    if (lastAcknowledgeAttempt.current !== journal.exportId) {
+      acknowledgeKey.next();
+      lastAcknowledgeAttempt.current = journal.exportId;
+    }
+
+    setAcknowledgingId(journal.exportId);
+    try {
+      await api.acknowledgeExport(journal.exportId, acknowledgeKey.current());
+      acknowledgeKey.next();
+      lastAcknowledgeAttempt.current = null;
+      setMessage({ kind: "status", text: t("integration.journal.acknowledged").text });
+      await queryClient.invalidateQueries({ queryKey: ["integration", "exports"] });
+    } catch (error) {
+      setMessage({
+        kind: "alert",
+        text: errorText(error, t("integration.error.generic").text)
+      });
+    } finally {
+      setAcknowledgingId(null);
     }
   }
 
@@ -227,6 +258,18 @@ export function JournalExportsPage() {
                             onClick={() => void download(journal)}
                           >
                             {t("integration.journal.download").text}
+                          </button>
+                        )}
+                        {canAcknowledge && journal.status === "GENERATED" && (
+                          <button
+                            type="button"
+                            className="modern-btn modern-btn--primary"
+                            disabled={acknowledgingId !== null}
+                            onClick={() => void acknowledge(journal)}
+                          >
+                            {acknowledgingId === journal.exportId
+                              ? t("integration.journal.acknowledging").text
+                              : t("integration.journal.acknowledge").text}
                           </button>
                         )}
                         <button

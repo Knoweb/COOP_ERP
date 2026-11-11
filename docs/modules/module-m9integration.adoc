@@ -19,5 +19,6 @@
 * `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
 * `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
+* `l.c.k.k.api.AuditReviewReader` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===

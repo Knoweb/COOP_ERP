@@ -11,6 +11,16 @@ audit_event_types:
     offline_capturable: false
     description_en: A journal export was generated for an entity and a period
 
+  - code: JOURNAL_EXPORT_ACKNOWLEDGED
+    severity: INFO
+    offline_capturable: false
+    description_en: A generated journal export was acknowledged by its recipient
+
+  - code: JOURNAL_EXPORT_UNACKNOWLEDGED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A generated journal export remained unacknowledged past the configured threshold
+
   - code: NOTIFICATION_RULE_STATUS_CHANGED
     severity: INFO
     offline_capturable: false

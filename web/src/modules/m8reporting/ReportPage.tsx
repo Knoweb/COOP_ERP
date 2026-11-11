@@ -9,6 +9,9 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { isOpenableFileUrl, openServerFile } from "../../shell/api/openServerFile";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
+import { StateChip } from "../../shell/components/StateChip";
+import { ReportingSelect } from "./ReportingSelect";
 import { useReportingApi, type ReportQuery, type ReportRun } from "./reportingApi";
 import { csvFileName, defaultPeriod, errorText, isNumeric, queryOf } from "./reportView";
 import "./reporting.css";
@@ -86,12 +89,17 @@ export function ReportPage() {
   }
   if (!definition) {
     return (
-      <main className="shell-page">
+      <main className="shell-page report-viewer-page">
+        <div className="report-back-bar">
+          <Link className="back-pill-btn" to="/reporting">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+            {t("reporting.back").text}
+          </Link>
+        </div>
         <p role="alert">{t("reporting.report.unknown").text}</p>
-        <Link className="back-link" to="/reporting">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("reporting.back").text}
-      </Link>
       </main>
     );
   }
@@ -124,78 +132,134 @@ export function ReportPage() {
     }
   }
 
+  const freshnessBadge = data.data ? (
+    <p className="dashboard-freshness-pill">
+      <svg className="dashboard-freshness-pill__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+      <span>
+        {data.data.freshness
+          ? t("reporting.freshness", undefined, { when: formatInstant(data.data.freshness) }).text
+          : t("reporting.freshness.none").text}
+      </span>
+    </p>
+  ) : null;
+
   return (
-    <main className="shell-page">
-      <p>
-        <Link className="back-link" to="/reporting">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("reporting.back").text}
-      </Link>
-      </p>
-      <h1>{t(definition.titleId).text}</h1>
-      <p>{t(definition.decisionId).text}</p>
+    <main className="shell-page report-viewer-page">
+      <div className="report-back-bar">
+        <Link className="back-pill-btn" to="/reporting">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("reporting.back").text}
+        </Link>
+      </div>
+
+      <PageHeader
+        icon={
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+            <path d="M8 13h8" />
+            <path d="M8 17h5" />
+          </svg>
+        }
+        title={t(definition.titleId).text}
+        actions={freshnessBadge}
+      />
+      <p className="report-viewer-subtitle">{t(definition.decisionId).text}</p>
 
       <form
-        className="modern-filter-panel reporting-filter-bar"
+        className="modern-filter-panel report-viewer-controls"
         onSubmit={(event) => {
           event.preventDefault();
           setQuery(current);
         }}
       >
-        {definition.period && (
-          <>
-            <label className="modern-field">
-              <span className="modern-field__label reporting-filter-label">{t("reporting.field.from").text}</span>
-              <input
-                type="date"
-                value={form.from}
-                required
-                onChange={(event) => setForm({ ...form, from: event.target.value })}
-              />
-            </label>
-            <label className="modern-field">
-              <span className="modern-field__label reporting-filter-label">{t("reporting.field.to").text}</span>
-              <input
-                type="date"
-                value={form.to}
-                required
-                onChange={(event) => setForm({ ...form, to: event.target.value })}
-              />
-            </label>
-          </>
+        {(definition.period || definition.location) && (
+          <div className="report-viewer-controls__query">
+            {definition.period && (
+              <>
+                <label className="report-viewer-field">
+                  <span className="report-viewer-field__label">{t("reporting.field.from").text}</span>
+                  <input
+                    type="date"
+                    value={form.from}
+                    required
+                    onChange={(event) => setForm({ ...form, from: event.target.value })}
+                  />
+                </label>
+                <label className="report-viewer-field">
+                  <span className="report-viewer-field__label">{t("reporting.field.to").text}</span>
+                  <input
+                    type="date"
+                    value={form.to}
+                    required
+                    onChange={(event) => setForm({ ...form, to: event.target.value })}
+                  />
+                </label>
+              </>
+            )}
+            {definition.location && (
+              <label className="report-viewer-field report-viewer-field--location">
+                <span className="report-viewer-field__label">{t("reporting.field.location").text}</span>
+                <ReportingSelect
+                  ariaLabel={t("reporting.field.location").text}
+                  value={form.locationId}
+                  onChange={(nextValue) => setForm({ ...form, locationId: nextValue })}
+                  options={[
+                    { value: "", label: t("reporting.field.location.all").text },
+                    ...(locations.data ?? []).map((location) => ({
+                      value: location.locationId,
+                      label: locationText(location, intl.locale)
+                    }))
+                  ]}
+                />
+              </label>
+            )}
+          </div>
         )}
-        {definition.location && (
-          <label className="modern-field">
-            <span className="modern-field__label reporting-filter-label">{t("reporting.field.location").text}</span>
-            <div className="modern-select">
-              <select value={form.locationId} onChange={(event) => setForm({ ...form, locationId: event.target.value })}>
-                <option value="">{t("reporting.field.location.all").text}</option>
-                {(locations.data ?? []).map((location) => (
-                  <option key={location.locationId} value={location.locationId}>
-                    {locationText(location, intl.locale)}
-                  </option>
-                ))}
-              </select>
-              <svg className="modern-select__arrow" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" /></svg>
+        <div className="report-viewer-controls__actions">
+          <button type="submit" className="modern-btn modern-btn--primary report-viewer-btn">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>{t("reporting.show").text}</span>
+          </button>
+          {canExport && (
+            <div className="report-viewer-controls__exports">
+              <button type="button" className="report-viewer-btn report-viewer-btn--secondary" onClick={downloadCsv}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>{t("reporting.csv").text}</span>
+              </button>
+              <button
+                type="button"
+                className="report-viewer-btn report-viewer-btn--secondary"
+                onClick={print}
+                disabled={run?.status === "REQUESTED"}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <polyline points="6 9 6 2 18 2 18 9" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" />
+                </svg>
+                <span>{t("reporting.print").text}</span>
+              </button>
             </div>
-          </label>
-        )}
-        <button type="submit" className="modern-btn modern-btn--primary">{t("reporting.show").text}</button>
-        {canExport && (
-          <>
-            <button type="button" className="modern-btn" onClick={downloadCsv}>
-              {t("reporting.csv").text}
-            </button>
-            <button type="button" className="modern-btn" onClick={print} disabled={run?.status === "REQUESTED"}>
-              {t("reporting.print").text}
-            </button>
-          </>
-        )}
+          )}
+        </div>
       </form>
 
       {exportError && <p role="alert">{exportError}</p>}
       {run && (
-        <p role="status">
+        <p role="status" className="report-status-banner">
           {run.status === "REQUESTED" && t("reporting.print.waiting").text}
           {/* The link is the server's: anchored only when it is http(s) to our own origins (React 18 does not stop a javascript: href). */}
           {run.status === "READY" && run.downloadUrl && isOpenableFileUrl(run.downloadUrl) && (
@@ -207,19 +271,14 @@ export function ReportPage() {
         </p>
       )}
 
-      {data.isLoading && <p>{t("reporting.loading").text}</p>}
+      {data.isLoading && <p className="dashboard-status-note">{t("reporting.loading").text}</p>}
       {data.isError && <p role="alert">{errorText(data.error, t("reporting.error.generic").text)}</p>}
       {data.data && (
-        <>
-          <p>
-            {data.data.freshness
-              ? t("reporting.freshness", undefined, { when: formatInstant(data.data.freshness) }).text
-              : t("reporting.freshness.none").text}
-          </p>
+        <section className="dashboard-section">
           {data.data.rows.length === 0 ? (
             <p>{t("reporting.empty").text}</p>
           ) : (
-            <div className="modern-table-card">
+            <div className="modern-table-card report-viewer-table-card">
               <div className="modern-table-scroll">
                 <table className="modern-table reporting-data-table">
                   <thead>
@@ -259,12 +318,14 @@ export function ReportPage() {
               </div>
             </div>
           )}
-        </>
+        </section>
       )}
 
       {canExport && runs.data && (
-        <section>
-          <h2>{t("reporting.runs.title").text}</h2>
+        <section className="dashboard-section">
+          <div className="dashboard-section__header">
+            <h2>{t("reporting.runs.title").text}</h2>
+          </div>
           {runs.data.length === 0 ? (
             <p>{t("reporting.runs.empty").text}</p>
           ) : (
@@ -284,12 +345,17 @@ export function ReportPage() {
                       <tr key={earlier.runId}>
                         <td>{formatInstant(earlier.requestedAt)}</td>
                         <td>{earlier.language}</td>
-                        <td>{t(`reporting.runs.status.${earlier.status}`).text}</td>
+                        <td>
+                          <StateChip
+                            state={earlier.status === "READY" ? "issued" : earlier.status === "FAILED" ? "alert" : "draft"}
+                            label={t(`reporting.runs.status.${earlier.status}`).text}
+                          />
+                        </td>
                         <td>
                           {earlier.status === "READY" && (
                             <button
                               type="button"
-                              className="modern-btn"
+                              className="report-viewer-btn report-viewer-btn--secondary"
                               onClick={() =>
                                 openServerFile(() => api.run(earlier.runId).then((fresh) => fresh.downloadUrl)).catch(
                                   (error) => setExportError(errorText(error, t("reporting.error.generic").text))
