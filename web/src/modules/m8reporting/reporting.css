@@ -657,6 +657,8 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--space-half);
   margin-bottom: var(--space-3);
   border-radius: calc(var(--radius) * 3);
@@ -664,7 +666,7 @@
   border: var(--border-width) solid var(--color-polish-14);
 }
 
-.shop-reports-tab {
+.shop-reports-page .shop-reports-tablist .shop-reports-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -675,13 +677,16 @@
   border: var(--border-width) solid transparent;
   background: transparent;
   color: var(--color-brand-dark);
+  box-shadow: none;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+  overflow-wrap: normal;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.shop-reports-tab svg {
+.shop-reports-page .shop-reports-tablist .shop-reports-tab svg {
   width: var(--space-2);
   height: var(--space-2);
   stroke: currentColor;
@@ -692,25 +697,35 @@
   flex-shrink: 0;
 }
 
-.shop-reports-tab:hover:not(.shop-reports-tab--active) {
+.shop-reports-page .shop-reports-tablist .shop-reports-tab:hover:not(.shop-reports-tab--active),
+.shop-reports-page .shop-reports-tablist .shop-reports-tab:focus-visible:not(.shop-reports-tab--active) {
   background: var(--color-surface);
   border-color: var(--color-polish-14);
   color: var(--color-accent);
 }
 
-.shop-reports-tab--active {
+.shop-reports-page .shop-reports-tablist .shop-reports-tab:active:not(.shop-reports-tab--active) {
+  background: var(--color-accent-light);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.shop-reports-page .shop-reports-tablist .shop-reports-tab--active,
+.shop-reports-page .shop-reports-tablist .shop-reports-tab--active:hover,
+.shop-reports-page .shop-reports-tablist .shop-reports-tab--active:focus-visible,
+.shop-reports-page .shop-reports-tablist .shop-reports-tab--active:active {
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
   background-color: var(--color-polish-19);
   color: var(--color-on-accent);
   border-color: var(--color-polish-19);
-  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-6);
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-21);
 }
 
 .shop-reports-filter-panel {
   display: flex !important;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
   margin-bottom: var(--space-4);
 }
 
@@ -725,19 +740,17 @@
   max-width: min(calc(var(--space-8) * 6), 100%);
 }
 
+.shop-reports-field--period {
+  flex: 1 1 calc(var(--space-8) * 3);
+  max-width: min(calc(var(--space-8) * 4), 100%);
+}
+
 .shop-reports-field__label {
+  display: block;
+  margin: 0;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
   color: var(--color-brand-dark);
-}
-
-.shop-reports-field input[type="date"],
-.shop-reports-field input[type="month"] {
-  height: var(--target-min);
-  min-height: var(--target-min);
-  width: 100%;
-  box-sizing: border-box;
-  padding: var(--space-1) var(--space-2);
 }
 
 .shop-reports-state {
@@ -745,15 +758,26 @@
   font-size: var(--font-size-sm);
 }
 
+.shop-reports-error {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2);
+  border-radius: calc(var(--radius) * 2);
+  border: var(--border-width) solid var(--color-alert-border);
+  background: var(--color-alert-bg);
+  color: var(--color-alert-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+}
+
 .shop-reports-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--space-8) + var(--space-6)), 100%), 1fr));
-  gap: var(--space-1);
+  grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--space-8) * 3 - var(--space-2)), 100%), 1fr));
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
 .shop-reports-kpi-grid--with-targets {
-  grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--space-8) * 2 + var(--space-3)), 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--space-8) * 3 - var(--space-2)), 100%), 1fr));
 }
 
 .shop-reports-kpi-card {
@@ -764,7 +788,7 @@
   background: linear-gradient(180deg, var(--color-polish-29) 0%, var(--color-surface) 100%);
   border: var(--border-width) solid var(--color-polish-22);
   border-radius: calc(var(--radius) * 2.5);
-  padding: var(--space-1) calc(var(--space-1) + var(--space-half));
+  padding: var(--space-2);
   box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-14);
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
@@ -826,7 +850,7 @@
   color: var(--color-brand-dark);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .shop-reports-kpi-card--primary .shop-reports-kpi-badge {
@@ -1000,7 +1024,9 @@
   overflow: hidden;
 }
 
-.shop-reports-table th {
+.reporting-data-table.shop-reports-table th,
+.reporting-data-table.shop-reports-table th:nth-child(1),
+.reporting-data-table.shop-reports-table th:nth-child(2) {
   background: var(--color-polish-29) !important;
   color: var(--color-brand-dark) !important;
   border-bottom: var(--border-width-strong) solid var(--color-polish-14) !important;
@@ -1009,18 +1035,28 @@
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase;
   min-width: auto !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
 }
 
-.shop-reports-table td {
+.reporting-data-table.shop-reports-table td,
+.reporting-data-table.shop-reports-table td:nth-child(1),
+.reporting-data-table.shop-reports-table td:nth-child(2) {
   min-width: auto !important;
   max-width: none !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
   font-variant-numeric: tabular-nums;
 }
 
-.shop-reports-num {
+.reporting-data-table.shop-reports-table th.shop-reports-num,
+.reporting-data-table.shop-reports-table td.shop-reports-num {
   text-align: right !important;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  white-space: nowrap !important;
 }
 
 .shop-reports-code-pill {
@@ -1033,6 +1069,7 @@
   color: var(--color-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
+  white-space: nowrap;
 }
 
 .shop-reports-name-cell {
@@ -1290,4 +1327,92 @@
   stroke-linejoin: round !important;
   flex-shrink: 0 !important;
   margin-left: var(--space-2) !important;
+}
+
+/* Custom Date & Month Pickers (`.cdp`) alignment inside Shop Reports filters */
+.shop-reports-filter-panel .cdp > input.visually-hidden {
+  position: absolute !important;
+  width: var(--border-width) !important;
+  height: var(--border-width) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+}
+
+.shop-reports-filter-panel .cdp__trigger {
+  height: var(--target-min) !important;
+  min-height: var(--target-min) !important;
+  padding: var(--space-1) var(--space-2) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-surface) !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-text) !important;
+}
+
+.shop-reports-filter-panel .cdp--filled .cdp__trigger {
+  font-weight: var(--font-weight-normal) !important;
+}
+
+.shop-reports-filter-panel .cdp__trigger:hover,
+.shop-reports-filter-panel .cdp__trigger:focus-visible,
+.shop-reports-filter-panel .cdp--open .cdp__trigger {
+  border-color: var(--color-accent) !important;
+  background: var(--color-surface) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.shop-reports-filter-panel .cdp__cal-icon {
+  width: var(--space-2);
+  height: var(--space-2);
+  opacity: 1;
+}
+
+.shop-reports-page .shop-reports-filter-panel .cdp__nav {
+  background: transparent;
+  color: var(--color-accent);
+  box-shadow: none;
+}
+
+.shop-reports-page .shop-reports-filter-panel .cdp__nav:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.shop-reports-page .shop-reports-filter-panel .cdp__day {
+  background: transparent;
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.shop-reports-page .shop-reports-filter-panel .cdp__day:hover:not(.cdp__day--selected) {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.shop-reports-page .shop-reports-filter-panel .cdp__day--today {
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-accent);
+}
+
+.shop-reports-page .shop-reports-filter-panel .cdp__day--selected {
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-accent);
+}
+
+.cdp__month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-half);
+}
+
+.cdp__day--month {
+  height: calc(var(--space-3) + var(--space-half));
+  font-weight: var(--font-weight-strong);
 }

@@ -4,6 +4,7 @@ import { IntlProvider } from "react-intl";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { messages } from "../../shell/i18n/messages";
+import { businessToday } from "../../shell/i18n/formats";
 import type { DailyShopReport, Location, MonthlyShopReport } from "./reportingApi";
 import { ShopReportsPage } from "./ShopReportsPage";
 import { ShopReportsDashboardCard } from "./ShopReportsDashboardCard";
@@ -161,7 +162,15 @@ describe("ShopReportsPage", () => {
       expect(screen.getByText("Monthly Shop Report")).toBeDefined();
     });
 
-    fireEvent.click(screen.getByText("Monthly Shop Report"));
+    const dailyTab = screen.getByRole("tab", { name: "Daily Shop Report" });
+    const monthlyTab = screen.getByRole("tab", { name: "Monthly Shop Report" });
+    expect(dailyTab.className).toContain("shop-reports-tab--active");
+    expect(monthlyTab.className).not.toContain("shop-reports-tab--active");
+
+    fireEvent.click(monthlyTab);
+
+    expect(monthlyTab.className).toContain("shop-reports-tab--active");
+    expect(dailyTab.className).not.toContain("shop-reports-tab--active");
 
     await waitFor(() => {
       expect(screen.getByText("Cross-Shop Performance Comparison")).toBeDefined();
@@ -205,6 +214,76 @@ describe("ShopReportsPage", () => {
         expect.objectContaining({ locationId: LOCATION_ID })
       );
     });
+  });
+
+  it("selects a date via custom ShopReportDatePicker (.cdp) calendar and closes on Escape", async () => {
+    const todayStr = businessToday();
+    const [year, month] = todayStr.split("-");
+    const formattedToday = `${todayStr.slice(8, 10)}/${month}/${year}`;
+    const expectedPickedIso = `${year}-${month}-15`;
+    const expectedPickedDisplay = `15/${month}/${year}`;
+
+    renderAt("/reporting/shop-reports");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: formattedToday })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: formattedToday }));
+    const dialog = screen.getByRole("dialog", { name: "Date" });
+    expect(dialog.className).toContain("cdp__popup");
+    fireEvent.click(within(dialog).getByRole("button", { name: "15" }));
+
+    expect(screen.queryByRole("dialog", { name: "Date" })).toBeNull();
+    expect(screen.getByRole("button", { name: expectedPickedDisplay })).toBeDefined();
+    await waitFor(() => {
+      expect(api.dailyShopReport).toHaveBeenCalledWith(
+        expect.objectContaining({ date: expectedPickedIso })
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: expectedPickedDisplay }));
+    expect(screen.getByRole("dialog", { name: "Date" })).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Date" })).toBeNull();
+  });
+
+  it("selects a month via custom ShopReportMonthPicker (.cdp) dialog on the Monthly tab", async () => {
+    const todayStr = businessToday();
+    const [currentYearStr, currentMonthStr] = todayStr.split("-");
+    const prevYearNum = Number(currentYearStr) - 1;
+    const currentMonthLabel = `${messages.en[`reporting.shop_reports.month.${Number(currentMonthStr)}`]} ${currentYearStr}`;
+
+    renderAt("/reporting/shop-reports");
+
+    await waitFor(() => {
+      expect(screen.getByText("Monthly Shop Report")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Monthly Shop Report" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: currentMonthLabel })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: currentMonthLabel }));
+    const dialog = screen.getByRole("dialog", { name: "Month" });
+    expect(dialog.className).toContain("cdp__popup");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous year" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "October" }));
+
+    expect(screen.queryByRole("dialog", { name: "Month" })).toBeNull();
+    expect(screen.getByRole("button", { name: `October ${prevYearNum}` })).toBeDefined();
+    await waitFor(() => {
+      expect(api.monthlyShopReport).toHaveBeenCalledWith(
+        expect.objectContaining({ yearMonth: `${prevYearNum}-10` })
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: `October ${prevYearNum}` }));
+    expect(screen.getByRole("dialog", { name: "Month" })).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Month" })).toBeNull();
   });
 
   it("renders ShopReportsDashboardCard with today's summary metrics", async () => {
