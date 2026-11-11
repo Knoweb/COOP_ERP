@@ -1,0 +1,1 @@
+- feat(hello): redesign Greetings (`hello`) screen with shared PageHeader, styled read-only notice card, responsive registration form card with radiant rose-berry submit action, and elevated greeting list cards with token-only CSS (`hello.css`) while preserving E2E selectors and `make new-module` scaffolding compatibility on branch `feat/hello-greetings-ui`.

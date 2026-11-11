@@ -45,7 +45,7 @@ export function ExpiryListPage() {
 
   const slowQuery = useQuery({
     queryKey: ["inventory", "slow-moving", locationId],
-    queryFn: () => api.slowMovingStock(locationId, 30, 90),
+    queryFn: () => api.slowMovingStock(locationId),
     enabled: locationId !== ""
   });
 
