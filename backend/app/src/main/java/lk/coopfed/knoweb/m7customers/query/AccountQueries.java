@@ -14,6 +14,11 @@ public interface AccountQueries {
 
     Optional<AccountView> account(UUID accountId, ScopeContext scope);
 
+    /** A paginated list of the society's outstanding customer credit accounts. */
+    List<Receivable> receivables(int offset, int limit, ScopeContext scope);
+
+    record Receivable(AccountView account, String displayName, String displayNameSi, String displayNameTa) {}
+
     /**
      * The statement of an account for the business dates {@code from} to {@code to}, both
      * included: the balance brought forward, every posting with its running balance, and the

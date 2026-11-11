@@ -26,6 +26,7 @@ import lk.coopfed.knoweb.m7customers.web.generated.AmendLimitsRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerPayment;
 import lk.coopfed.knoweb.m7customers.web.generated.OpenAccountRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.ReasonRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.Receivable;
 import lk.coopfed.knoweb.m7customers.web.generated.RecordPaymentRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.Statement;
 import org.springframework.http.ResponseEntity;
@@ -92,6 +93,22 @@ class AccountController implements AccountsApi {
                 .map(CustomerResponses::account)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<List<Receivable>> listReceivables(Integer offset, Integer limit) {
+        List<Receivable> result =
+                accounts
+                        .receivables(offset == null ? 0 : offset, limit == null ? 50 : limit, currentScope.get())
+                        .stream()
+                        .map(row -> new Receivable()
+                                .account(CustomerResponses.account(row.account()))
+                                .displayName(row.displayName())
+                                .displayNameSi(row.displayNameSi())
+                                .displayNameTa(row.displayNameTa()))
+                        .toList();
+
+        return ResponseEntity.ok(result);
     }
 
     @Override

@@ -10,6 +10,7 @@ import type { paths as partyPaths, components as partyComponents } from "../../g
 export type CustomerSummary = components["schemas"]["CustomerSummary"];
 export type CustomerCard = components["schemas"]["CustomerCard"];
 export type Account = components["schemas"]["Account"];
+export type Receivable = components["schemas"]["Receivable"];
 export type Statement = components["schemas"]["Statement"];
 export type StatementLine = Statement["lines"][number];
 export type CustomerPayment = components["schemas"]["CustomerPayment"];
@@ -65,6 +66,14 @@ export function useCustomersApi() {
           body: request
         });
         return data!;
+      },
+
+      /** Outstanding accounts and ageing for the caller's society. */
+      async receivables(offset = 0, limit = 50): Promise<Receivable[]> {
+        const { data } = await api.GET("/v1/accounts/receivables", {
+          params: { query: { offset, limit } }
+        });
+        return data ?? [];
       },
 
       async account(accountId: string): Promise<Account | null> {

@@ -149,6 +149,11 @@ export function CustomersPage() {
   return (
     <main className="shell-page">
       <h1>{t("customers.title").text}</h1>
+      <p>
+        <Link to="/customers/receivables">
+          {t("customers.receivables.title").text}
+        </Link>
+      </p>
       {canSeePrivacy && (
         <p>
           <Link to="/customers/privacy">{t("customers.privacy.title").text}</Link>

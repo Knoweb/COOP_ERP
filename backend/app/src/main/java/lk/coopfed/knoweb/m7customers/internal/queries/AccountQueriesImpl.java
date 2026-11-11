@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Allocator;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
@@ -98,6 +99,42 @@ class AccountQueriesImpl implements AccountQueries {
                 open.isEmpty() ? null : open.get(0).businessDate(),
                 ledger.unallocated(accountId),
                 ageing(open, clock.today())));
+    }
+
+    @Override
+    public List<Receivable> receivables(int offset, int limit, ScopeContext scope) {
+        if (scope == null || scope.policyClass() != PolicyClass.OWN || scope.entityId() == null) {
+            return List.of();
+        }
+
+        record Row(UUID accountId, String displayName, String displayNameSi, String displayNameTa) {}
+
+        List<Row> rows = jdbc.query(
+                """
+                select a.account_id, c.display_name, c.display_name_si, c.display_name_ta
+                  from customers.customer_account a
+                  join customers.customer c on c.customer_id = a.customer_id
+                 where a.owner_entity_id = ?
+                   and a.balance > 0
+                 order by a.account_no, a.account_id
+                 limit ? offset ?
+                """,
+                (rs, n) -> new Row(
+                        rs.getObject("account_id", UUID.class),
+                        rs.getString("display_name"),
+                        rs.getString("display_name_si"),
+                        rs.getString("display_name_ta")),
+                scope.entityId(),
+                Math.max(1, Math.min(limit, 100)),
+                Math.max(0, offset));
+
+        List<Receivable> result = new ArrayList<>();
+        for (Row row : rows) {
+            account(row.accountId(), scope)
+                    .ifPresent(view -> result.add(
+                            new Receivable(view, row.displayName(), row.displayNameSi(), row.displayNameTa())));
+        }
+        return List.copyOf(result);
     }
 
     /** 0–30, 31–60, 61–90 and over 90 days since the charge's business date, on what is open of it. */
