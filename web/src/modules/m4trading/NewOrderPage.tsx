@@ -2,13 +2,14 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useIntl } from "react-intl";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { businessToday } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { CustomSelect } from "../../shell/components/CustomSelect";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { EntityOption, inLocale, skuText } from "./labels";
+import { entityText, inLocale, shortId, skuText } from "./labels";
 import { useTradingApi, type Sku } from "./tradingApi";
 import { errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
 
@@ -33,6 +34,14 @@ export function NewOrderPage() {
 
   const sellers = useQuery({ queryKey: ["trading", "sellers"], queryFn: () => api.sellers() });
   const locations = useQuery({ queryKey: ["trading", "own-locations"], queryFn: () => api.locations() });
+  const sellerEntities = useQueries({
+    queries: (sellers.data ?? []).map((row) => ({
+      queryKey: ["trading", "entity", row.sellerEntityId],
+      queryFn: () => api.entity(row.sellerEntityId),
+      staleTime: Infinity,
+      retry: false
+    }))
+  });
   const relationship = sellers.data?.find((row) => row.relationshipId === relationshipId);
   const selectedLocation = locations.data?.find((l) => l.locationId === deliverTo);
 
@@ -79,31 +88,46 @@ export function NewOrderPage() {
       </Link>
       <h1>{t("trading.order.new.title").text}</h1>
       <form onSubmit={send} className="trading-form-row">
-        <label className="trading-form-field">
-          {t("trading.field.seller").text}
-          <select value={relationshipId} onChange={(event) => setRelationshipId(event.target.value)} required>
-            <option value="">{t("trading.field.choose").text}</option>
-            {(sellers.data ?? []).map((row) => (
-              <EntityOption key={row.relationshipId} value={row.relationshipId} entityId={row.sellerEntityId} />
-            ))}
-          </select>
-        </label>
+        <div className="trading-form-field">
+          <span className="trading-form-field__label">{t("trading.field.seller").text}</span>
+          <CustomSelect
+            ariaLabel={t("trading.field.seller").text}
+            value={relationshipId}
+            onChange={setRelationshipId}
+            required
+            options={[
+              { value: "", label: t("trading.field.choose").text },
+              ...(sellers.data ?? []).map((row, index) => {
+                const entity = sellerEntities[index]?.data;
+                return {
+                  value: row.relationshipId,
+                  label: entity ? entityText(entity, locale) : shortId(row.sellerEntityId)
+                };
+              })
+            ]}
+          />
+        </div>
         {sellers.data?.length === 0 && <p>{t("trading.sellers.none").text}</p>}
-        <label className="trading-form-field">
-          {t("trading.field.deliver_to").text}
-          <select value={deliverTo} onChange={(event) => setDeliverTo(event.target.value)} required>
-            <option value="">{t("trading.field.choose").text}</option>
-            {(locations.data ?? []).map((location) => {
-              const label = `${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`;
-              const isManual = location.connectivitySpecMet === false;
-              return (
-                <option key={location.locationId} value={location.locationId}>
-                  {isManual ? `${label} [${t("trading.order.manual_branch").text}]` : label}
-                </option>
-              );
-            })}
-          </select>
-        </label>
+        <div className="trading-form-field">
+          <span className="trading-form-field__label">{t("trading.field.deliver_to").text}</span>
+          <CustomSelect
+            ariaLabel={t("trading.field.deliver_to").text}
+            value={deliverTo}
+            onChange={setDeliverTo}
+            required
+            options={[
+              { value: "", label: t("trading.field.choose").text },
+              ...(locations.data ?? []).map((location) => {
+                const label = `${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`;
+                const isManual = location.connectivitySpecMet === false;
+                return {
+                  value: location.locationId,
+                  label: isManual ? `${label} [${t("trading.order.manual_branch").text}]` : label
+                };
+              })
+            ]}
+          />
+        </div>
         {selectedLocation && selectedLocation.connectivitySpecMet === false && (
           <aside className="trading-on-behalf-notice" role="status">
             <strong>{t("trading.order.on_behalf.badge").text}: </strong>

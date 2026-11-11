@@ -7,6 +7,8 @@ import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { CustomSelect } from "../../shell/components/CustomSelect";
+import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
 import { useTradingApi, type LotBalance } from "./tradingApi";
 import { deliveryRequest, errorText, isSyntheticBatchNo, openQty, type DispatchRow } from "./tradingView";
@@ -113,89 +115,145 @@ export function NewDeliveryNotePage() {
         </svg>
         {t("trading.back_to_order").text}
       </Link>
-      <h1>{t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}</h1>
-      <dl>
-        <dt>{t("trading.column.buyer").text}</dt>
-        <dd>
-          <EntityName entityId={o.buyerEntityId} />
-        </dd>
-        <dt>{t("trading.field.deliver_to").text}</dt>
-        <dd>{o.deliverToLocationId ? <LocationName locationId={o.deliverToLocationId} own={false} known={o.deliverTo} /> : "—"}</dd>
-      </dl>
+      <DocumentHeader
+        code={o.docNumber ?? t("trading.order.draft_number").text}
+        title={t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}
+        state={{ look: "draft", label: t("trading.note.status.DRAFT").text }}
+        facts={[
+          { label: t("trading.column.buyer").text, value: <EntityName entityId={o.buyerEntityId} /> },
+          {
+            label: t("trading.field.deliver_to").text,
+            value: o.deliverToLocationId ? (
+              <LocationName locationId={o.deliverToLocationId} own={false} known={o.deliverTo} />
+            ) : undefined
+          }
+        ]}
+      />
       {!o.deliverToLocationId && <p role="alert">{t("trading.note.no_deliver_to").text}</p>}
 
-      <form onSubmit={send} className="trading-form-row">
-        <label className="trading-form-field">
-          {t("trading.field.from_location").text}
-          <select value={fromLocationId} onChange={(event) => setFromLocationId(event.target.value)} required>
-            <option value="">{t("trading.field.choose").text}</option>
-            {(warehouses.data ?? []).map((location) => (
-              <option key={location.locationId} value={location.locationId}>
-                {`${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="trading-form-field">
-          {t("trading.field.vehicle").text}
-          <input value={vehicleRef} maxLength={40} onChange={(event) => setVehicleRef(event.target.value)} />
-        </label>
-        <label className="trading-form-field">
-          {t("trading.field.driver").text}
-          <input value={driverName} maxLength={120} onChange={(event) => setDriverName(event.target.value)} />
-        </label>
-        <table>
-          <thead>
-            <tr>
-              <th>{t("trading.column.item").text}</th>
-              <th>{t("trading.column.batch").text}</th>
-              <th>{t("trading.column.qty").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.orderLineId}>
-                <td>
-                  <SkuLabel skuId={row.skuId} />
-                </td>
-                <td>
-                  <select
-                    aria-label={t("trading.column.batch").text}
-                    value={row.batchId}
-                    onChange={(event) => setRow(index, { batchId: event.target.value })}
-                  >
-                    <option value="">{t("trading.field.no_batch").text}</option>
-                    {(lots.data ?? [])
-                      .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
-                      .map((lot) => (
-                        <option key={lot.stockLotId} value={lot.batchId}>
-                          {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`}
-                        </option>
-                      ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    aria-label={t("trading.column.qty").text}
-                    value={row.qty}
-                    onChange={(event) => setRow(index, { qty: event.target.value })}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div>
+      <form onSubmit={send} className="trading-dispatch-form">
+        <section className="trading-dispatch-card">
+          <div className="trading-dispatch-card__header">
+            <div className="trading-dispatch-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13" />
+                <polygon points="16 8 20 8 23 11 23 16 16 16 8" />
+                <circle cx="5.5" cy="18.5" r="2.5" />
+                <circle cx="18.5" cy="18.5" r="2.5" />
+              </svg>
+            </div>
+            <div className="trading-dispatch-card__titles">
+              <h2 className="trading-dispatch-card__title">{t("trading.note.dispatch").text}</h2>
+            </div>
+          </div>
+
+          <div className="trading-dispatch-card__grid">
+            <div className="trading-form-field">
+              <span className="trading-form-field__label">{t("trading.field.from_location").text}</span>
+              <CustomSelect
+                ariaLabel={t("trading.field.from_location").text}
+                value={fromLocationId}
+                onChange={setFromLocationId}
+                required
+                options={[
+                  { value: "", label: t("trading.field.choose").text },
+                  ...(warehouses.data ?? []).map((location) => ({
+                    value: location.locationId,
+                    label: `${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`
+                  }))
+                ]}
+              />
+            </div>
+            <label className="trading-form-field">
+              <span className="trading-form-field__label">{t("trading.field.vehicle").text}</span>
+              <input
+                type="text"
+                placeholder={t("trading.field.vehicle").text}
+                value={vehicleRef}
+                maxLength={40}
+                onChange={(event) => setVehicleRef(event.target.value)}
+              />
+            </label>
+            <label className="trading-form-field">
+              <span className="trading-form-field__label">{t("trading.field.driver").text}</span>
+              <input
+                type="text"
+                placeholder={t("trading.field.driver").text}
+                value={driverName}
+                maxLength={120}
+                onChange={(event) => setDriverName(event.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="trading-items-card">
+          <div className="modern-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("trading.column.item").text}</th>
+                    <th scope="col">{t("trading.column.batch").text}</th>
+                    <th scope="col" className="trading-col-qty">{t("trading.column.qty").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, index) => (
+                    <tr key={row.orderLineId}>
+                      <td className="trading-item-cell">
+                        <SkuLabel skuId={row.skuId} />
+                      </td>
+                      <td className="trading-batch-cell">
+                        <CustomSelect
+                          portal
+                          compact
+                          ariaLabel={t("trading.column.batch").text}
+                          value={row.batchId}
+                          onChange={(val) => setRow(index, { batchId: val })}
+                          options={[
+                            { value: "", label: t("trading.field.no_batch").text },
+                            ...(lots.data ?? [])
+                              .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
+                              .map((lot) => ({
+                                key: lot.stockLotId,
+                                value: lot.batchId,
+                                label: `${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`
+                              }))
+                          ]}
+                        />
+                      </td>
+                      <td className="trading-qty-cell">
+                        <input
+                          className="trading-table-input"
+                          type="number"
+                          min="0"
+                          step="any"
+                          aria-label={t("trading.column.qty").text}
+                          value={row.qty}
+                          onChange={(event) => setRow(index, { qty: event.target.value })}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div className="trading-form-footer">
           <button
             type="submit"
+            className="trading-submit-btn"
             disabled={
               create.isPending || !fromLocationId || !lots.isSuccess || !o.deliverToLocationId || !rows.some((row) => Number(row.qty) > 0)
             }
           >
-            {t("trading.note.create").text}
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span>{t("trading.note.create").text}</span>
           </button>
         </div>
         {create.isError && <p role="alert">{errorText(create.error, t("trading.error.generic").text)}</p>}

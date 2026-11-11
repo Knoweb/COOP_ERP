@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { businessToday } from "../../shell/i18n/formats";
+import { CustomDatePicker } from "../../shell/components/CustomDatePicker";
+import { CustomSelect } from "../../shell/components/CustomSelect";
 import { useT } from "../../shell/i18n/useT";
 import { useTradingApi, type PaymentReceipt } from "./tradingApi";
 import { errorText, paymentReady, paymentRequest, type PaymentForm } from "./tradingView";
@@ -60,16 +62,18 @@ export function PaymentEntry({
       <h2>{t("trading.payment.new").text}</h2>
       <p>{t(invoiceId ? "trading.payment.against_invoice" : "trading.payment.oldest_first").text}</p>
       <div className="trading-filter-bar">
-        <label className="trading-form-field">
-          {t("trading.payment.method").text}
-          <select value={form.method} onChange={(event) => set({ method: event.target.value as PaymentForm["method"] })}>
-            {METHODS.map((method) => (
-              <option key={method} value={method}>
-                {t(`trading.payment.method.${method}`).text}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="trading-form-field">
+          <span className="trading-form-field__label">{t("trading.payment.method").text}</span>
+          <CustomSelect
+            ariaLabel={t("trading.payment.method").text}
+            value={form.method}
+            onChange={(val) => set({ method: val as PaymentForm["method"] })}
+            options={METHODS.map((method) => ({
+              value: method,
+              label: t(`trading.payment.method.${method}`).text
+            }))}
+          />
+        </div>
         <label className="trading-form-field">
           {t("trading.payment.amount").text}
           <input type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => set({ amount: event.target.value })} />
@@ -78,10 +82,16 @@ export function PaymentEntry({
           {t("trading.payment.reference").text}
           <input type="text" maxLength={100} value={form.reference} onChange={(event) => set({ reference: event.target.value })} />
         </label>
-        <label className="trading-form-field">
-          {t("trading.payment.received_on").text}
-          <input type="date" max={today} value={form.receivedOn} onChange={(event) => set({ receivedOn: event.target.value })} />
-        </label>
+        <div className="trading-form-field">
+          <span className="trading-form-field__label">{t("trading.payment.received_on").text}</span>
+          <CustomDatePicker
+            value={form.receivedOn}
+            onChange={(val) => set({ receivedOn: val })}
+            max={today}
+            ariaLabel={t("trading.payment.received_on").text}
+            required
+          />
+        </div>
         {form.method === "CHEQUE" && (
           <>
             <label className="trading-form-field">
@@ -92,10 +102,14 @@ export function PaymentEntry({
               {t("trading.payment.cheque_no").text}
               <input type="text" maxLength={20} value={form.chequeNo} onChange={(event) => set({ chequeNo: event.target.value })} />
             </label>
-            <label className="trading-form-field">
-              {t("trading.payment.cheque_dated").text}
-              <input type="date" value={form.chequeDated} onChange={(event) => set({ chequeDated: event.target.value })} />
-            </label>
+            <div className="trading-form-field">
+              <span className="trading-form-field__label">{t("trading.payment.cheque_dated").text}</span>
+              <CustomDatePicker
+                value={form.chequeDated}
+                onChange={(val) => set({ chequeDated: val })}
+                ariaLabel={t("trading.payment.cheque_dated").text}
+              />
+            </div>
           </>
         )}
         <button type="button" disabled={record.isPending || !paymentReady(form)} onClick={() => record.mutate()}>

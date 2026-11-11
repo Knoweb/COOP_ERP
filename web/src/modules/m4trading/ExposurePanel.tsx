@@ -58,8 +58,8 @@ export function ExposurePanel({ exposure, orderValue }: { exposure: Exposure; or
         <div className="document-header__fact">
           <dt>{t("trading.exposure.amount").text}</dt>
           <dd>
-            <MoneyDisplay amount={exposure.amount} size="total" />
-            {percent !== null && <span> {t("trading.exposure.percent", undefined, { percent }).text}</span>}
+            <MoneyDisplay amount={exposure.amount} />
+            {percent !== null && <span className="trading-exposure-percent">{t("trading.exposure.percent", undefined, { percent }).text}</span>}
           </dd>
         </div>
       </dl>

@@ -6750,6 +6750,13 @@ button[type="submit"]:not(:disabled):hover,
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
+.cdp__day:disabled,
+.cdp__day--disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
 
 /* 
    M2 CATALOGUE MODULE STYLES
@@ -9949,7 +9956,7 @@ button[type="submit"]:not(:disabled):hover,
 
 .document-header__facts {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
   gap: 14px 16px !important;
   margin: 20px 0 !important;
   padding: 0 !important;
@@ -9961,7 +9968,7 @@ button[type="submit"]:not(:disabled):hover,
   background: var(--color-surface-subtle) !important;
   border: 1.5px solid var(--color-border) !important;
   border-radius: 12px !important;
-  padding: 14px 18px !important;
+  padding: 12px 16px !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 4px !important;
@@ -9986,12 +9993,13 @@ button[type="submit"]:not(:disabled):hover,
 }
 
 .document-header__fact dd {
-  font-size: 16px !important;
+  font-size: 15px !important;
   font-weight: 600 !important;
   color: var(--color-text) !important;
   margin: 0 !important;
-  word-break: normal !important;
+  line-height: 1.35 !important;
   overflow-wrap: break-word !important;
+  word-break: normal !important;
 }
 
 .document-header__fact dd .money--total,
@@ -10487,7 +10495,7 @@ button[type="submit"]:not(:disabled):hover,
    ==== */
 .shell-page .document-header__facts {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
   gap: 14px 16px !important;
   margin: 20px 0 !important;
   padding: 0 !important;
@@ -10500,7 +10508,7 @@ button[type="submit"]:not(:disabled):hover,
   background: var(--color-polish-29) !important;
   border: 1.5px solid var(--color-polish-22) !important;
   border-radius: 12px !important;
-  padding: 14px 18px !important;
+  padding: 12px 16px !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 5px !important;
@@ -10528,16 +10536,82 @@ button[type="submit"]:not(:disabled):hover,
 
 .shell-page .document-header__fact dd,
 .batch-detail-value {
-  font-size: 15.5px !important;
+  font-size: 15px !important;
   font-weight: 600 !important;
   color: var(--color-text) !important;
   margin: 0 !important;
-  word-break: break-all !important;
+  line-height: 1.35 !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
 }
 
 .shell-page .document-header__fact dd .money-display {
   color: var(--color-accent) !important;
   font-weight: 700 !important;
+}
+
+/* ====
+   Global Table Polish: Prevent Mid-Word Wrapping and Column Squishing
+   ==== */
+.shell-page table,
+.modern-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.shell-page table th,
+.modern-table th {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  font-weight: 700 !important;
+  font-size: 12.5px !important;
+  letter-spacing: 0.3px !important;
+  padding: 12px 14px !important;
+  background: var(--color-surface-subtle) !important;
+  color: var(--color-text) !important;
+  border-bottom: 1.5px solid var(--color-border) !important;
+  text-align: left !important;
+}
+
+.shell-page table td,
+.modern-table td {
+  padding: 12px 14px !important;
+  font-size: 13.5px !important;
+  color: var(--color-text) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  vertical-align: middle !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Numeric, quantity, date, tag, and amount cells should never break across lines */
+.shell-page table td .money,
+.modern-table td .money,
+.shell-page table td .state-chip,
+.modern-table td .state-chip,
+.shell-page table td strong,
+.modern-table td strong {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  display: inline-block !important;
+}
+
+/* Ensure columns with numbers, dates, or badges do not wrap */
+.shell-page table td:not(:first-child),
+.modern-table td:not(:first-child) {
+  white-space: nowrap !important;
+}
+
+/* Allow item name / description column to wrap naturally at word boundaries */
+.shell-page table td:first-child,
+.modern-table td:first-child,
+.shell-page table td.trading-item-cell,
+.modern-table td.trading-item-cell {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  min-width: 180px !important;
 }
 
 /* ====
@@ -11581,4 +11655,257 @@ button[type="submit"]:not(:disabled):hover,
     font-size: 1.1rem !important;
     line-height: 1.2 !important;
   }
+}
+
+/* ==========================================================================
+   Shared CustomSelect (.ui-select) & Native Option Color Polish
+   ========================================================================== */
+
+.ui-select {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ui-select > select.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+.shell-page .ui-select__trigger,
+.ui-select__trigger {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: 10px 14px;
+  border: 1px solid var(--color-accent) !important;
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 1px 2px var(--color-polish-3);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.shell-page .ui-select__trigger:hover:not(:disabled),
+.ui-select__trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29);
+  color: var(--color-text);
+  box-shadow: 0 0 0 3px var(--color-polish-27);
+  transform: none;
+}
+
+.shell-page .ui-select__trigger:focus-visible:not(:disabled),
+.shell-page .ui-select--open .ui-select__trigger:not(:disabled),
+.ui-select__trigger:focus-visible:not(:disabled),
+.ui-select--open .ui-select__trigger:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29);
+  color: var(--color-text);
+  box-shadow: 0 0 0 3.5px var(--color-polish-21);
+  outline: none;
+}
+
+.shell-page .ui-select--compact .ui-select__trigger,
+.ui-select--compact .ui-select__trigger {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.ui-select__trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ui-select__value {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+}
+
+.ui-select__chevron {
+  width: 16px;
+  height: 16px;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.ui-select__chevron--open {
+  transform: rotate(180deg);
+}
+
+.ui-select__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(448px, 90vw);
+  z-index: 1000;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  box-sizing: border-box;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-accent);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px var(--color-polish-21), 0 2px 6px var(--color-polish-3);
+  overflow-y: auto;
+  max-height: 260px;
+  white-space: normal;
+  animation: customDropdownFadeIn 0.15s ease-out;
+}
+
+.ui-select--up .ui-select__menu {
+  top: auto;
+  bottom: calc(100% + 4px);
+  animation: customDropdownFadeInUp 0.15s ease-out;
+}
+
+.ui-select__menu--portal {
+  position: fixed;
+  top: auto;
+  bottom: auto;
+  right: auto;
+  min-width: auto;
+  width: max-content;
+  max-width: min(448px, 90vw);
+  margin-top: 4px;
+  z-index: 10100;
+}
+
+.ui-select__menu--portal.ui-select__menu--up {
+  margin-top: 0;
+  margin-bottom: 4px;
+  animation: customDropdownFadeInUp 0.15s ease-out;
+}
+
+.ui-select__menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ui-select__menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-select__menu::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.ui-select__menu::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+.ui-select__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  list-style: none;
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ui-select__item:not(:last-child) {
+  margin-bottom: 2px;
+}
+
+.ui-select__item:hover,
+.ui-select__item--focused {
+  background: var(--color-polish-29);
+  color: var(--color-accent);
+}
+
+.ui-select__item--selected {
+  background: var(--color-polish-31);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-strong);
+}
+
+.ui-select__item--selected:hover,
+.ui-select__item--selected.ui-select__item--focused {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.ui-select__item-bar {
+  width: 3px;
+  height: 18px;
+  background-color: var(--color-accent);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.ui-select__item-spacer {
+  width: 3px;
+  flex-shrink: 0;
+}
+
+.ui-select__item-label {
+  flex: 1;
+}
+
+.ui-select__check {
+  width: 16px;
+  height: 16px;
+  stroke: var(--color-accent);
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.shell-page select option {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.shell-page select option:checked {
+  background-color: var(--color-polish-31);
+  color: var(--color-accent);
 }
