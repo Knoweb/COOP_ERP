@@ -1,0 +1,1 @@
+- feat(web): modernize the Reporting Dashboard (`DashboardPage`, `ShopReportsDashboardCard`, `ShopTargetsDashboardCard`), Exception Queue table presentation, Report Viewer (`ReportPage`, `ReportingSelect`), and Payment Receipt (`m4trading/PaymentPage`) UI on branch `feat/m8-dashboard-ui`.
