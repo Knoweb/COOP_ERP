@@ -368,3 +368,238 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
+
+/* ---- Payment Receipt Page (PaymentPage) ------------------------------- */
+
+.payment-back-bar {
+  margin-bottom: var(--space-2);
+}
+
+.shell-page.payment-page .document-header .document-header__facts {
+  grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--space-8) * 3 + var(--space-4)), 100%), 1fr)) !important;
+  gap: var(--space-2) !important;
+}
+
+.shell-page.payment-page .payment-cheque-facts {
+  grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--space-8) * 3), 100%), 1fr)) !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.shell-page.payment-page .document-header__fact {
+  background: var(--color-polish-29) !important;
+  border: var(--border-width) solid var(--color-polish-22) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  padding: var(--space-2) !important;
+  min-width: 0 !important;
+  box-shadow: none !important;
+}
+
+.shell-page.payment-page .document-header__fact:hover {
+  background: var(--color-polish-31) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.shell-page.payment-page .document-header__fact dd {
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  line-height: var(--line-height) !important;
+}
+
+.shell-page.payment-page .document-header__fact dd .money-display {
+  font-size: var(--font-size-lg) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-polish-25) !important;
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+  display: inline-block !important;
+}
+
+.payment-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-polish-14);
+}
+
+.payment-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.payment-btn svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.payment-btn--secondary {
+  background: var(--color-surface);
+  background-color: var(--color-surface);
+  color: var(--color-accent);
+  border: var(--border-width) solid var(--color-accent);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.payment-btn--secondary:hover:not(:disabled),
+.payment-btn--secondary:focus-visible:not(:disabled) {
+  background: var(--color-polish-29);
+  color: var(--color-polish-25);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
+  transform: translateY(calc(-1 * var(--border-width)));
+}
+
+.payment-btn--danger {
+  background: var(--color-alert-bg);
+  color: var(--color-alert-text);
+  border: var(--border-width) solid var(--color-alert-text);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.payment-btn--danger:hover:not(:disabled),
+.payment-btn--danger:focus-visible:not(:disabled) {
+  background: var(--color-alert-text);
+  color: var(--color-on-accent);
+}
+
+.payment-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payment-feedback {
+  margin-top: var(--space-2);
+}
+
+.payment-feedback--success {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-issued-bg);
+  border: var(--border-width) solid var(--color-issued-text);
+  color: var(--color-issued-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+}
+
+.payment-section {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: calc(var(--radius) * 3);
+  padding: var(--space-3);
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23);
+}
+
+.payment-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-polish-14);
+}
+
+.payment-section__title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.payment-section__icon {
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-polish-29);
+  border: var(--border-width) solid var(--color-polish-14);
+  color: var(--color-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.payment-section__icon svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.payment-section__header h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+}
+
+.payment-outcome-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-polish-29);
+  border: var(--border-width) solid var(--color-polish-14);
+}
+
+.payment-outcome-field {
+  display: grid;
+  gap: var(--space-half);
+  flex: 1 1 calc(var(--space-8) * 4);
+  min-width: min(calc(var(--space-8) * 3), 100%);
+}
+
+.payment-outcome-field span {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
+  color: var(--color-brand-dark);
+}
+
+.payment-outcome-field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.payment-outcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.payment-allocations-table td:last-child {
+  font-weight: var(--font-weight-strong);
+  color: var(--color-polish-25);
+}
