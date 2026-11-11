@@ -835,23 +835,25 @@
   margin-top: auto;
   padding: var(--space-1) var(--space-2);
   border-radius: calc(var(--radius) * 2);
-  background: var(--color-polish-29);
-  border: var(--border-width) solid var(--color-polish-14);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-accent);
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-1);
-  color: var(--color-accent);
+  color: var(--color-polish-25);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
   text-decoration: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.dashboard-tile .dashboard-tile__link:hover {
+.dashboard-tile .dashboard-tile__link:hover,
+.dashboard-tile .dashboard-tile__link:focus-visible {
   background: var(--color-polish-22);
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-25);
   color: var(--color-polish-25);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
 }
 
 .dashboard-tile__link svg,
@@ -1094,8 +1096,9 @@
 
 .dashboard-report-card__top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
+  min-height: calc(var(--space-4) + var(--space-1));
 }
 
 .dashboard-report-card__icon {
@@ -1148,13 +1151,26 @@
 
 .dashboard-report-card__cta {
   margin-top: auto;
-  padding-top: var(--space-1);
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-accent);
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-1);
-  color: var(--color-accent);
+  color: var(--color-polish-25);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dashboard-report-card:hover .dashboard-report-card__cta,
+.dashboard-report-card:focus-within .dashboard-report-card__cta {
+  border-color: var(--color-polish-25);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
 }
 
 /* Report viewer redesign */
