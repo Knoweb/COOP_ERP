@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
 import { locationText } from "../../shell/i18n/localName";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
@@ -16,11 +17,14 @@ import {
   type UpdateShopTargetRequest
 } from "./reportingApi";
 import { errorText } from "./reportView";
+import { TargetsSelect, type TargetsSelectOption } from "./TargetsSelect";
+import { TargetsDatePicker } from "./TargetsDatePicker";
 import "./reporting.css";
 
 export function ShopTargetsPage() {
   const t = useT();
   const intl = useIntl();
+  const formatDate = useFormatDate();
   const api = useReportingApi();
   const queryClient = useQueryClient();
   const key = useIdempotencyKey();
@@ -59,6 +63,7 @@ export function ShopTargetsPage() {
   });
 
   const items = performanceQuery.data?.items ?? [];
+  const locations = locationsQuery.data ?? [];
 
   // Summary calculations
   let totalTarget = 0;
@@ -119,8 +124,8 @@ export function ShopTargetsPage() {
 
   function handleOpenCreate() {
     resetForm();
-    if (locationsQuery.data && locationsQuery.data.length > 0) {
-      setFormLocationId(locationsQuery.data[0].locationId);
+    if (locations.length > 0) {
+      setFormLocationId(locations[0].locationId);
     }
     setModalOpen(true);
   }
@@ -145,7 +150,7 @@ export function ShopTargetsPage() {
       return;
     }
 
-    if (formPeriodStart > formPeriodEnd) {
+    if (!formPeriodStart || !formPeriodEnd || formPeriodStart > formPeriodEnd) {
       setFormError(t("reporting.error.generic").text);
       return;
     }
@@ -170,230 +175,384 @@ export function ShopTargetsPage() {
     }
   }
 
+  const filterLocationOptions: TargetsSelectOption<string>[] = [
+    { value: "", label: t("reporting.field.location.all").text },
+    ...locations.map((loc) => ({
+      value: loc.locationId,
+      label: locationText(loc, intl.locale)
+    }))
+  ];
+
+  const modalLocationOptions: TargetsSelectOption<string>[] = locations.map((loc) => ({
+    value: loc.locationId,
+    label: locationText(loc, intl.locale)
+  }));
+
+  const varianceTone = totalVariance >= 0 ? "success" : "alert";
+
   return (
     <main className="shell-page">
       <PageHeader
         icon="stock"
         title={t("reporting.targets.title").text}
-        actions={
-          canManage ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleOpenCreate}
-            >
-              {t("reporting.targets.create").text}
-            </button>
-          ) : undefined
-        }
       />
 
-      <p className="shop-targets-card__subtitle">{t("reporting.targets.subtitle").text}</p>
+      <p className="sales-targets-subtitle">{t("reporting.targets.subtitle").text}</p>
 
-      {/* Filter bar */}
-      <div className="reporting-filter-bar">
-        <div>
-          <label className="reporting-filter-label" htmlFor="filter-location">
-            {t("reporting.field.location").text}
-          </label>
-          <select
-            id="filter-location"
-            className="form-control"
-            value={filterLocation}
-            onChange={(e) => setFilterLocation(e.target.value)}
-          >
-            <option value="">{t("reporting.field.location.all").text}</option>
-            {locationsQuery.data?.map((loc) => (
-              <option key={loc.locationId} value={loc.locationId}>
-                {locationText(loc, intl.locale)}
-              </option>
-            ))}
-          </select>
+      {/* Filter & Action Panel */}
+      <section className="modern-filter-panel sales-targets-filter-panel">
+        <div className="sales-targets-filter-controls">
+          <div className="sales-targets-field sales-targets-field--location">
+            <label className="sales-targets-field__label" htmlFor="filter-location">
+              {t("reporting.field.location").text}
+            </label>
+            <TargetsSelect
+              id="filter-location"
+              aria-label={t("reporting.field.location").text}
+              value={filterLocation}
+              options={filterLocationOptions}
+              onChange={setFilterLocation}
+            />
+          </div>
+
+          <div className="sales-targets-field">
+            <label className="sales-targets-field__label" htmlFor="filter-from">
+              {t("reporting.field.from").text}
+            </label>
+            <TargetsDatePicker
+              id="filter-from"
+              label={t("reporting.field.from").text}
+              value={filterFrom}
+              onChange={setFilterFrom}
+            />
+          </div>
+
+          <div className="sales-targets-field">
+            <label className="sales-targets-field__label" htmlFor="filter-to">
+              {t("reporting.field.to").text}
+            </label>
+            <TargetsDatePicker
+              id="filter-to"
+              label={t("reporting.field.to").text}
+              value={filterTo}
+              onChange={setFilterTo}
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="reporting-filter-label" htmlFor="filter-from">
-            {t("reporting.field.from").text}
-          </label>
-          <input
-            id="filter-from"
-            type="date"
-            className="form-control"
-            value={filterFrom}
-            onChange={(e) => setFilterFrom(e.target.value)}
-          />
-        </div>
+        {canManage && (
+          <div className="sales-targets-filter-action">
+            <button
+              type="button"
+              className="btn btn-primary sales-targets-create-btn"
+              onClick={handleOpenCreate}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>{t("reporting.targets.create").text}</span>
+            </button>
+          </div>
+        )}
+      </section>
 
-        <div>
-          <label className="reporting-filter-label" htmlFor="filter-to">
-            {t("reporting.field.to").text}
-          </label>
-          <input
-            id="filter-to"
-            type="date"
-            className="form-control"
-            value={filterTo}
-            onChange={(e) => setFilterTo(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {performanceQuery.isLoading && <p>{t("reporting.loading").text}</p>}
+      {performanceQuery.isLoading && (
+        <p className="sales-targets-state">{t("reporting.loading").text}</p>
+      )}
       {performanceQuery.isError && (
-        <p role="alert">{errorText(performanceQuery.error, t("reporting.error.generic").text)}</p>
+        <p role="alert" className="reporting-error">
+          {errorText(performanceQuery.error, t("reporting.error.generic").text)}
+        </p>
       )}
 
       {/* KPI Cards */}
       {performanceQuery.isSuccess && (
-        <div className="targets-kpi-grid">
-          <div className="targets-kpi-card">
-            <span className="targets-kpi-label">{t("reporting.targets.kpi.total_target").text}</span>
-            <span className="targets-kpi-value"><MoneyDisplay amount={totalTarget.toFixed(2)} /></span>
-          </div>
-          <div className="targets-kpi-card">
-            <span className="targets-kpi-label">{t("reporting.targets.kpi.total_actual").text}</span>
-            <span className="targets-kpi-value"><MoneyDisplay amount={totalActual.toFixed(2)} /></span>
-          </div>
-          <div className="targets-kpi-card">
-            <span className="targets-kpi-label">{t("reporting.targets.kpi.total_variance").text}</span>
-            <span className={`targets-kpi-value ${totalVariance >= 0 ? "targets-kpi-positive" : "targets-kpi-negative"}`}>
-              <MoneyDisplay amount={totalVariance.toFixed(2)} />
-            </span>
-          </div>
-          <div className="targets-kpi-card">
-            <span className="targets-kpi-label">{t("reporting.targets.kpi.overall_achievement").text}</span>
-            <span className="targets-kpi-value">
-              {overallAchievement !== null ? `${overallAchievement}%` : "—"}
-            </span>
-          </div>
-        </div>
-      )}
+        <>
+          <div className="sales-targets-kpi-grid">
+            <div className="sales-targets-kpi-card sales-targets-kpi-card--primary">
+              <div className="sales-targets-kpi-card__top">
+                <span className="sales-targets-kpi-label">
+                  {t("reporting.targets.kpi.total_target").text}
+                </span>
+                <span className="sales-targets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
+                  </svg>
+                </span>
+              </div>
+              <div className="sales-targets-kpi-card__bottom">
+                <span className="sales-targets-kpi-value">
+                  <MoneyDisplay amount={totalTarget.toFixed(2)} />
+                </span>
+              </div>
+            </div>
 
-      {/* Comparison Table */}
-      {performanceQuery.isSuccess && items.length === 0 && (
-        <p>{t("reporting.targets.empty").text}</p>
-      )}
+            <div className="sales-targets-kpi-card sales-targets-kpi-card--navy">
+              <div className="sales-targets-kpi-card__top">
+                <span className="sales-targets-kpi-label">
+                  {t("reporting.targets.kpi.total_actual").text}
+                </span>
+                <span className="sales-targets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
+                  </svg>
+                </span>
+              </div>
+              <div className="sales-targets-kpi-card__bottom">
+                <span className="sales-targets-kpi-value">
+                  <MoneyDisplay amount={totalActual.toFixed(2)} />
+                </span>
+              </div>
+            </div>
 
-      {performanceQuery.isSuccess && items.length > 0 && (
-        <table className="reporting-data-table">
-          <thead>
-            <tr>
-              <th>{t("reporting.targets.col.shop").text}</th>
-              <th>{t("reporting.targets.col.period").text}</th>
-              <th>{t("reporting.targets.col.target").text}</th>
-              <th>{t("reporting.targets.col.actual").text}</th>
-              <th>{t("reporting.targets.col.variance").text}</th>
-              <th>{t("reporting.targets.col.achievement").text}</th>
-              <th>{t("reporting.targets.col.status").text}</th>
-              {canManage && <th>{t("reporting.exceptions.col.action").text}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
-              const targetVal = parseFloat(item.targetAmount) || 0;
-              const actualVal = parseFloat(item.actualAmount) || 0;
-              const varianceVal = parseFloat(item.varianceAmount) || 0;
-              const isMet = targetVal > 0 && actualVal >= targetVal;
-              const stateType = targetVal === 0 ? "draft" : isMet ? "issued" : "alert";
-              const statusLabel =
-                targetVal === 0
-                  ? t("reporting.targets.status.not_set").text
-                  : isMet
-                    ? t("reporting.targets.status.achieved").text
-                    : t("reporting.targets.status.behind").text;
+            <div className={`sales-targets-kpi-card sales-targets-kpi-card--${varianceTone}`}>
+              <div className="sales-targets-kpi-card__top">
+                <span className="sales-targets-kpi-label">
+                  {t("reporting.targets.kpi.total_variance").text}
+                </span>
+                <span className="sales-targets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 2v20" />
+                    <path d="m17 5-5-3-5 3" />
+                    <path d="m17 19-5 3-5-3" />
+                  </svg>
+                </span>
+              </div>
+              <div className="sales-targets-kpi-card__bottom">
+                <span
+                  className={`sales-targets-kpi-value ${
+                    totalVariance >= 0 ? "targets-kpi-positive" : "targets-kpi-negative"
+                  }`}
+                >
+                  <MoneyDisplay amount={totalVariance.toFixed(2)} />
+                </span>
+              </div>
+            </div>
 
-              return (
-                <tr key={item.targetId}>
-                  <td>{item.locationName}</td>
-                  <td>
-                    {item.periodStart} — {item.periodEnd}
-                  </td>
-                  <td>
-                    <MoneyDisplay amount={item.targetAmount} />
-                  </td>
-                  <td>
-                    <MoneyDisplay amount={item.actualAmount} />
-                  </td>
-                  <td className={varianceVal >= 0 ? "targets-kpi-positive" : "targets-kpi-negative"}>
-                    <MoneyDisplay amount={item.varianceAmount} />
-                  </td>
-                  <td>
-                    {item.achievementPercent !== null && item.achievementPercent !== undefined
-                      ? `${item.achievementPercent}%`
-                      : "—"}
-                  </td>
-                  <td>
-                    <StateChip state={stateType} label={statusLabel} />
-                  </td>
-                  {canManage && (
-                    <td className="targets-actions-cell">
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleOpenEdit(item)}
-                      >
-                        {t("reporting.targets.edit").text}
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+            <div className="sales-targets-kpi-card sales-targets-kpi-card--lavender">
+              <div className="sales-targets-kpi-card__top">
+                <span className="sales-targets-kpi-label">
+                  {t("reporting.targets.kpi.overall_achievement").text}
+                </span>
+                <span className="sales-targets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <line x1="19" y1="5" x2="5" y2="19" />
+                    <circle cx="6.5" cy="6.5" r="2.5" />
+                    <circle cx="17.5" cy="17.5" r="2.5" />
+                  </svg>
+                </span>
+              </div>
+              <div className="sales-targets-kpi-card__bottom">
+                <span className="sales-targets-kpi-value">
+                  {overallAchievement !== null ? `${overallAchievement}%` : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Comparison Section */}
+          <section className="sales-targets-section">
+            <div className="sales-targets-section__header">
+              <div className="sales-targets-section__title-group">
+                <span className="sales-targets-section__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
+                  </svg>
+                </span>
+                <h2>{t("reporting.targets.nav").text}</h2>
+              </div>
+              <span className="sales-targets-count-pill">{items.length}</span>
+            </div>
+
+            {items.length === 0 ? (
+              <div className="sales-targets-empty-box">
+                <span className="sales-targets-empty-box__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
+                  </svg>
+                </span>
+                <p>{t("reporting.targets.empty").text}</p>
+              </div>
+            ) : (
+              <div className="modern-table-card sales-targets-table-card">
+                <div className="modern-table-scroll">
+                  <table
+                    className="modern-table reporting-data-table sales-targets-table"
+                    aria-label={t("reporting.targets.nav").text}
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">{t("reporting.targets.col.shop").text}</th>
+                        <th scope="col">{t("reporting.targets.col.period").text}</th>
+                        <th scope="col" className="sales-targets-num">{t("reporting.targets.col.target").text}</th>
+                        <th scope="col" className="sales-targets-num">{t("reporting.targets.col.actual").text}</th>
+                        <th scope="col" className="sales-targets-num">{t("reporting.targets.col.variance").text}</th>
+                        <th scope="col" className="sales-targets-num">{t("reporting.targets.col.achievement").text}</th>
+                        <th scope="col">{t("reporting.targets.col.status").text}</th>
+                        {canManage && <th scope="col">{t("reporting.exceptions.col.action").text}</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item) => {
+                        const targetVal = parseFloat(item.targetAmount) || 0;
+                        const actualVal = parseFloat(item.actualAmount) || 0;
+                        const varianceVal = parseFloat(item.varianceAmount) || 0;
+                        const isMet = targetVal > 0 && actualVal >= targetVal;
+                        const stateType = targetVal === 0 ? "draft" : isMet ? "issued" : "alert";
+                        const statusLabel =
+                          targetVal === 0
+                            ? t("reporting.targets.status.not_set").text
+                            : isMet
+                              ? t("reporting.targets.status.achieved").text
+                              : t("reporting.targets.status.behind").text;
+
+                        return (
+                          <tr key={item.targetId}>
+                            <td className="sales-targets-shop-cell">
+                              <span className="sales-targets-shop-name">{item.locationName}</span>
+                            </td>
+                            <td className="sales-targets-period-cell">
+                              {formatDate(item.periodStart)} — {formatDate(item.periodEnd)}
+                            </td>
+                            <td className="sales-targets-num">
+                              <MoneyDisplay amount={item.targetAmount} />
+                            </td>
+                            <td className="sales-targets-num">
+                              <MoneyDisplay amount={item.actualAmount} />
+                            </td>
+                            <td
+                              className={`sales-targets-num ${
+                                varianceVal >= 0 ? "targets-kpi-positive" : "targets-kpi-negative"
+                              }`}
+                            >
+                              <MoneyDisplay amount={item.varianceAmount} />
+                            </td>
+                            <td className="sales-targets-num">
+                              {item.achievementPercent !== null && item.achievementPercent !== undefined
+                                ? `${item.achievementPercent}%`
+                                : "—"}
+                            </td>
+                            <td>
+                              <StateChip state={stateType} label={statusLabel} />
+                            </td>
+                            {canManage && (
+                              <td className="targets-actions-cell">
+                                <button
+                                  type="button"
+                                  className="sales-targets-edit-btn"
+                                  onClick={() => handleOpenEdit(item)}
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 20h9" />
+                                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                  </svg>
+                                  <span>{t("reporting.targets.edit").text}</span>
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+        </>
       )}
 
       {/* Create / Edit Modal */}
       {modalOpen && (
-        <div className="targets-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="targets-modal">
-            <h2>{editingItem ? t("reporting.targets.edit").text : t("reporting.targets.create").text}</h2>
-            {formError && <p role="alert" className="form-error">{formError}</p>}
-            <form onSubmit={handleSubmit}>
+        <div
+          className="sales-targets-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sales-targets-modal-title"
+        >
+          <div className="sales-targets-modal">
+            <div className="sales-targets-modal__header">
+              <div className="sales-targets-modal__title-group">
+                <span className="sales-targets-section__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
+                  </svg>
+                </span>
+                <h2 id="sales-targets-modal-title">
+                  {editingItem ? t("reporting.targets.edit").text : t("reporting.targets.create").text}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="sales-targets-modal__close"
+                aria-label={t("reporting.targets.form.cancel").text}
+                onClick={() => {
+                  setModalOpen(false);
+                  resetForm();
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {formError && (
+              <p role="alert" className="sales-targets-form-error">
+                {formError}
+              </p>
+            )}
+
+            <form onSubmit={handleSubmit} className="sales-targets-modal__form">
               {!editingItem && (
-                <div className="targets-form-group">
+                <div className="sales-targets-form-group">
                   <label htmlFor="target-location">{t("reporting.targets.form.shop").text}</label>
-                  <select
+                  <TargetsSelect
                     id="target-location"
-                    className="form-control"
+                    aria-label={t("reporting.targets.form.shop").text}
                     value={formLocationId}
-                    onChange={(e) => setFormLocationId(e.target.value)}
+                    options={modalLocationOptions}
+                    onChange={setFormLocationId}
+                    portal
                     required
-                  >
-                    {locationsQuery.data?.map((loc) => (
-                      <option key={loc.locationId} value={loc.locationId}>
-                        {locationText(loc, intl.locale)}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               )}
 
-              <div className="targets-form-group">
-                <label htmlFor="target-start">{t("reporting.targets.form.period_start").text}</label>
-                <input
-                  id="target-start"
-                  type="date"
-                  className="form-control"
-                  value={formPeriodStart}
-                  onChange={(e) => setFormPeriodStart(e.target.value)}
-                  required
-                />
+              <div className="sales-targets-form-row">
+                <div className="sales-targets-form-group">
+                  <label htmlFor="target-start">{t("reporting.targets.form.period_start").text}</label>
+                  <TargetsDatePicker
+                    id="target-start"
+                    label={t("reporting.targets.form.period_start").text}
+                    value={formPeriodStart}
+                    onChange={setFormPeriodStart}
+                    portal
+                  />
+                </div>
+
+                <div className="sales-targets-form-group">
+                  <label htmlFor="target-end">{t("reporting.targets.form.period_end").text}</label>
+                  <TargetsDatePicker
+                    id="target-end"
+                    label={t("reporting.targets.form.period_end").text}
+                    value={formPeriodEnd}
+                    onChange={setFormPeriodEnd}
+                    portal
+                  />
+                </div>
               </div>
 
-              <div className="targets-form-group">
-                <label htmlFor="target-end">{t("reporting.targets.form.period_end").text}</label>
-                <input
-                  id="target-end"
-                  type="date"
-                  className="form-control"
-                  value={formPeriodEnd}
-                  onChange={(e) => setFormPeriodEnd(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="targets-form-group">
+              <div className="sales-targets-form-group">
                 <label htmlFor="target-amount">{t("reporting.targets.form.target_amount").text}</label>
                 <input
                   id="target-amount"
@@ -407,7 +566,7 @@ export function ShopTargetsPage() {
                 />
               </div>
 
-              <div className="targets-form-actions">
+              <div className="sales-targets-form-actions">
                 <button
                   type="button"
                   className="btn btn-secondary"
