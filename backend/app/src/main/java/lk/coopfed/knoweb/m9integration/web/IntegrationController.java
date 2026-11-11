@@ -10,6 +10,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m9integration.api.AcknowledgeJournalExport;
 import lk.coopfed.knoweb.m9integration.api.ApproveOvertime;
 import lk.coopfed.knoweb.m9integration.api.AttendanceImportResult;
 import lk.coopfed.knoweb.m9integration.api.CompleteDeliveryTrip;
@@ -109,6 +110,7 @@ class IntegrationController implements IntegrationApi {
     private final Clock clock;
     private final CurrentScope currentScope;
     private final Handles<RequestJournalExport, UUID> requestExport;
+    private final Handles<AcknowledgeJournalExport, UUID> acknowledgeExport;
     private final Handles<SetNotificationRuleStatus, UUID> setRuleStatus;
     private final Handles<RegisterEmployee, UUID> registerEmployee;
     private final Handles<ImportAttendanceRecords, AttendanceImportResult> importAttendance;
@@ -134,6 +136,7 @@ class IntegrationController implements IntegrationApi {
             Clock clock,
             CurrentScope currentScope,
             Handles<RequestJournalExport, UUID> requestExport,
+            Handles<AcknowledgeJournalExport, UUID> acknowledgeExport,
             Handles<SetNotificationRuleStatus, UUID> setRuleStatus,
             Handles<RegisterEmployee, UUID> registerEmployee,
             Handles<ImportAttendanceRecords, AttendanceImportResult> importAttendance,
@@ -157,6 +160,7 @@ class IntegrationController implements IntegrationApi {
         this.clock = clock;
         this.currentScope = currentScope;
         this.requestExport = requestExport;
+        this.acknowledgeExport = acknowledgeExport;
         this.setRuleStatus = setRuleStatus;
         this.registerEmployee = registerEmployee;
         this.importAttendance = importAttendance;
@@ -192,6 +196,14 @@ class IntegrationController implements IntegrationApi {
         JournalExportView export = queries.export(exportId, scope).orElseThrow();
         return ResponseEntity.created(URI.create(IntegrationApi.PATH_LIST_JOURNAL_EXPORTS + "/" + exportId))
                 .body(toResponse(export));
+    }
+
+    @Override
+    public ResponseEntity<JournalExportResponse> acknowledgeJournalExport(UUID exportId, String idempotencyKey) {
+        ScopeContext scope = currentScope.get();
+        UUID acknowledgedId = acknowledgeExport.handle(new AcknowledgeJournalExport(exportId), scope);
+        JournalExportView export = queries.export(acknowledgedId, scope).orElseThrow();
+        return ResponseEntity.ok(toResponse(export));
     }
 
     @Override

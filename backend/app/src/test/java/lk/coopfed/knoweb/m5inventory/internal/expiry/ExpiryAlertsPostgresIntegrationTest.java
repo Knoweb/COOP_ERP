@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
@@ -249,7 +250,9 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         kernel.reset();
 
         // First scan: emits 1 near-expiry alert and 1 slow-moving alert
+        var scanStartedAt = clock.instant();
         ExpiryAlertScanResult firstResult = evaluateAlertsHandler.handle(new EvaluateExpiryAlerts(shop1), scope);
+        var scanFinishedAt = clock.instant();
         assertThat(firstResult.nearExpiryAlertsEmitted()).isEqualTo(1);
         assertThat(firstResult.slowMovingAlertsEmitted()).isEqualTo(1);
 
@@ -259,13 +262,57 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(events(SlowMovingDetected.class)).hasSize(1);
 
         NearExpiryDetected nearEvent = events(NearExpiryDetected.class).get(0);
+        assertThat(nearEvent.alertId()).isNotNull();
+        assertThat(nearEvent.ownerEntityId()).isEqualTo(MPCS);
+        assertThat(nearEvent.locationId()).isEqualTo(shop1);
         assertThat(nearEvent.batchId()).isEqualTo(batch);
+        assertThat(nearEvent.batchNo()).startsWith("B-SCAN");
+        assertThat(nearEvent.skuId()).isEqualTo(sku);
+        assertThat(nearEvent.expiryDate()).isEqualTo(today.plusDays(5));
         assertThat(nearEvent.urgencyTier()).isEqualTo("CRITICAL");
         assertThat(nearEvent.daysToExpiry()).isEqualTo(5);
+        assertThat(nearEvent.qtyOnHand()).isEqualByComparingTo("30.000");
+        assertThat(nearEvent.detectedAt()).isBetween(scanStartedAt, scanFinishedAt);
+
+        KernelRecorder.AuditRecord nearAudit =
+                audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY).get(0);
+        assertThat(nearAudit.subject().type()).isEqualTo("location");
+        assertThat(nearAudit.subject().id()).isEqualTo(shop1);
+        assertThat(nearAudit.before()).isNull();
+        Map<?, ?> nearAfter = (Map<?, ?>) nearAudit.after();
+        assertThat(nearAfter.get("skuId")).isEqualTo(sku.toString());
+        assertThat(nearAfter.get("batchId")).isEqualTo(batch.toString());
+        assertThat(nearAfter.get("tier")).isEqualTo("CRITICAL");
+        assertThat(nearAfter.get("daysToExpiry")).isEqualTo("5");
+        assertThat(nearAfter.get("qtyOnHand")).isEqualTo("30.000");
+        assertThat(nearAudit.scope()).isEqualTo(scope);
 
         SlowMovingDetected slowEvent = events(SlowMovingDetected.class).get(0);
+        assertThat(slowEvent.alertId()).isNotNull();
+        assertThat(slowEvent.ownerEntityId()).isEqualTo(MPCS);
+        assertThat(slowEvent.locationId()).isEqualTo(shop1);
         assertThat(slowEvent.skuId()).isEqualTo(skuStag);
+        assertThat(slowEvent.qtyOnHand()).isEqualByComparingTo("40.000");
+        assertThat(slowEvent.daysWithoutSale()).isEqualTo(30);
+        assertThat(slowEvent.lastSaleDate()).isNull();
+        assertThat(slowEvent.salesInWindow()).isEqualByComparingTo("0.000");
+        assertThat(slowEvent.averageDailySales()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(slowEvent.daysOfSupply()).isEqualByComparingTo("999.0");
         assertThat(slowEvent.classification()).isEqualTo("STAGNANT");
+        assertThat(slowEvent.detectedAt()).isBetween(scanStartedAt, scanFinishedAt);
+
+        KernelRecorder.AuditRecord slowAudit =
+                audits(EvaluateExpiryAlertsHandler.AUDIT_SLOW_MOVING).get(0);
+        assertThat(slowAudit.subject().type()).isEqualTo("location");
+        assertThat(slowAudit.subject().id()).isEqualTo(shop1);
+        assertThat(slowAudit.before()).isNull();
+        Map<?, ?> slowAfter = (Map<?, ?>) slowAudit.after();
+        assertThat(slowAfter.get("skuId")).isEqualTo(skuStag.toString());
+        assertThat(slowAfter.get("classification")).isEqualTo("STAGNANT");
+        assertThat(slowAfter.get("daysWithoutSale")).isEqualTo("30");
+        assertThat(slowAfter.get("daysOfSupply")).isEqualTo("999.0");
+        assertThat(slowAfter.get("qtyOnHand")).isEqualTo("40.000");
+        assertThat(slowAudit.scope()).isEqualTo(scope);
 
         kernel.reset();
 
@@ -276,6 +323,113 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(events(NearExpiryDetected.class)).isEmpty();
         assertThat(events(SlowMovingDetected.class)).isEmpty();
+    }
+
+    @Test
+    void nearExpiryEvaluationUsesOnlyGoodStockAndSkipsExpiredStock() {
+        ScopeContext scope = own(MPCS);
+
+        UUID goodSku = fixture.sku(MPCS, "ELIGIBLE_GOOD");
+        UUID goodBatch = fixture.batch(goodSku, MPCS, "B-GOOD", today.plusDays(5));
+        postGood(shop1, goodBatch, "20.000", "100.00", MPCS);
+        postSale(shop1, goodBatch, "10.000", MPCS);
+
+        UUID damagedSku = fixture.sku(MPCS, "DAMAGED_ONLY");
+        UUID damagedBatch = fixture.batch(damagedSku, MPCS, "B-DAMAGED", today.plusDays(5));
+        postMovement(shop1, damagedBatch, LotCondition.DAMAGED, MovementType.RECEIPT, "20.000", "100.00", MPCS);
+
+        UUID mixedSku = fixture.sku(MPCS, "MIXED_CONDITION");
+        UUID mixedBatch = fixture.batch(mixedSku, MPCS, "B-MIXED", today.plusDays(5));
+        postGood(shop1, mixedBatch, "20.000", "100.00", MPCS);
+        postSale(shop1, mixedBatch, "10.000", MPCS);
+        postMovement(shop1, mixedBatch, LotCondition.DAMAGED, MovementType.RECEIPT, "5.000", "100.00", MPCS);
+
+        UUID expiredSku = fixture.sku(MPCS, "EXPIRED_GOOD");
+        UUID expiredBatch = fixture.batch(expiredSku, MPCS, "B-EXPIRED", today.minusDays(1));
+        postGood(shop1, expiredBatch, "20.000", "100.00", MPCS);
+        postSale(shop1, expiredBatch, "10.000", MPCS);
+
+        List<NearExpiryLotView> visible = inventoryQueries.nearExpiryLots(shop1, 30, null, scope);
+        assertThat(visible)
+                .extracting(NearExpiryLotView::batchId)
+                .containsExactlyInAnyOrder(goodBatch, mixedBatch, expiredBatch);
+        assertThat(visible).extracting(NearExpiryLotView::batchId).doesNotContain(damagedBatch);
+        assertThat(visible.stream().filter(lot -> lot.batchId().equals(mixedBatch)))
+                .hasSize(1);
+        assertThat(visible.stream().filter(lot -> lot.batchId().equals(expiredBatch)))
+                .singleElement()
+                .satisfies(lot -> assertThat(lot.urgencyTier()).isEqualTo("EXPIRED"));
+
+        kernel.reset();
+        ExpiryAlertScanResult result = evaluateAlertsHandler.handle(new EvaluateExpiryAlerts(shop1), scope);
+
+        assertThat(result.nearExpiryAlertsEmitted()).isEqualTo(2);
+        assertThat(events(NearExpiryDetected.class))
+                .extracting(NearExpiryDetected::batchId)
+                .containsExactlyInAnyOrder(goodBatch, mixedBatch)
+                .doesNotContain(damagedBatch, expiredBatch);
+        assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY)).hasSize(2);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_alert_state where alert_type = 'NEAR_EXPIRY'",
+                                Integer.class))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void nearExpiryAlertResolvesWhenGoodStockDisappearsButDamagedStockRemains() {
+        ScopeContext scope = own(MPCS);
+        UUID sku = fixture.sku(MPCS, "RESOLVE_GOOD_ONLY");
+        UUID batch = fixture.batch(sku, MPCS, "B-RESOLVE", today.plusDays(5));
+        postGood(shop1, batch, "20.000", "100.00", MPCS);
+        postMovement(shop1, batch, LotCondition.DAMAGED, MovementType.RECEIPT, "5.000", "100.00", MPCS);
+
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isEqualTo(1);
+
+        postMovement(shop1, batch, LotCondition.GOOD, MovementType.WRITE_OFF, "-20.000", "100.00", MPCS);
+        kernel.reset();
+
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isZero();
+        assertThat(events(NearExpiryDetected.class)).isEmpty();
+        assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY)).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select status from inventory.stock_alert_state where location_id = ? and batch_id = ? and alert_type = 'NEAR_EXPIRY'",
+                                String.class,
+                                shop1,
+                                batch))
+                .isEqualTo("RESOLVED");
+    }
+
+    @Test
+    void slowMovingExcludesExactThresholdNonPositiveAndDamagedStock() {
+        ScopeContext scope = own(MPCS);
+
+        UUID exactSku = fixture.sku(MPCS, "DOS_EXACT_90");
+        UUID exactBatch = fixture.batch(exactSku, MPCS, "B-DOS-90", today.plusDays(180));
+        postGood(shop1, exactBatch, "40.000", "100.00", MPCS);
+        postSale(shop1, exactBatch, "10.000", MPCS);
+
+        UUID zeroSku = fixture.sku(MPCS, "ZERO_STOCK");
+        UUID zeroBatch = fixture.batch(zeroSku, MPCS, "B-ZERO", today.plusDays(180));
+        postGood(shop1, zeroBatch, "10.000", "100.00", MPCS);
+        postSale(shop1, zeroBatch, "10.000", MPCS);
+
+        UUID negativeSku = fixture.sku(MPCS, "NEGATIVE_STOCK");
+        UUID negativeBatch = fixture.batch(negativeSku, MPCS, "B-NEGATIVE", today.plusDays(180));
+        postMovement(shop1, negativeBatch, LotCondition.GOOD, MovementType.SALE, "-5.000", "100.00", MPCS);
+
+        UUID damagedSku = fixture.sku(MPCS, "DAMAGED_STOCK");
+        UUID damagedBatch = fixture.batch(damagedSku, MPCS, "B-DAMAGED-SLOW", today.plusDays(180));
+        postMovement(shop1, damagedBatch, LotCondition.DAMAGED, MovementType.RECEIPT, "50.000", "100.00", MPCS);
+
+        assertThat(inventoryQueries.slowMovingStock(shop1, 30, 90, scope)).isEmpty();
     }
 
     @Test
@@ -295,6 +449,7 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID activeMpcsShop = fixture.location(MPCS, "SHOP", "ACTIVE");
         UUID activeOtherWarehouse = fixture.location(OTHER_ENTITY, "WAREHOUSE", "ACTIVE");
         UUID dormantMpcsShop = fixture.location(MPCS, "SHOP", "DORMANT");
+        UUID activeOffice = fixture.location(MPCS, "OFFICE", "ACTIVE");
 
         UUID mpcsSku = fixture.sku(MPCS, "JOB_MPCS");
         UUID mpcsBatch = fixture.batch(mpcsSku, MPCS, "B-JOB-MPCS", today.plusDays(5));
@@ -311,6 +466,11 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         postGood(dormantMpcsShop, dormantBatch, "20.000", "100.00", MPCS);
         postSale(dormantMpcsShop, dormantBatch, "10.000", MPCS);
 
+        UUID officeSku = fixture.sku(MPCS, "JOB_OFFICE");
+        UUID officeBatch = fixture.batch(officeSku, MPCS, "B-JOB-OFFICE", today.plusDays(5));
+        postGood(activeOffice, officeBatch, "20.000", "100.00", MPCS);
+        postSale(activeOffice, officeBatch, "10.000", MPCS);
+
         assertThat(superuserJdbc().queryForObject("select count(*) from inventory.expiry_task", Integer.class))
                 .isZero();
         kernel.reset();
@@ -319,7 +479,7 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(events(NearExpiryDetected.class)).hasSize(2);
         assertThat(events(NearExpiryDetected.class).stream().map(NearExpiryDetected::locationId))
                 .containsExactlyInAnyOrder(activeMpcsShop, activeOtherWarehouse)
-                .doesNotContain(dormantMpcsShop);
+                .doesNotContain(dormantMpcsShop, activeOffice);
         assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY).stream()
                         .map(a -> a.scope().entityId()))
                 .containsExactlyInAnyOrder(MPCS, OTHER_ENTITY);
@@ -332,9 +492,10 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(2);
         assertThat(superuserJdbc()
                         .queryForObject(
-                                "select count(*) from inventory.stock_alert_state where location_id = ?",
+                                "select count(*) from inventory.stock_alert_state where location_id in (?, ?)",
                                 Integer.class,
-                                dormantMpcsShop))
+                                dormantMpcsShop,
+                                activeOffice))
                 .isZero();
 
         kernel.reset();
@@ -352,6 +513,17 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void postGood(UUID location, UUID batch, String qty, String cost, UUID entity) {
+        postMovement(location, batch, LotCondition.GOOD, MovementType.RECEIPT, qty, cost, entity);
+    }
+
+    private void postMovement(
+            UUID location,
+            UUID batch,
+            LotCondition condition,
+            MovementType movementType,
+            String qty,
+            String cost,
+            UUID entity) {
         ScopeContext scope = own(entity);
         outer.run(
                 scope,
@@ -363,8 +535,8 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 List.of(new Movement(
                                         location,
                                         batch,
-                                        LotCondition.GOOD,
-                                        MovementType.RECEIPT,
+                                        condition,
+                                        movementType,
                                         new BigDecimal(qty),
                                         new BigDecimal(cost),
                                         null))),
