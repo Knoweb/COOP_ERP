@@ -207,6 +207,26 @@ describe("ShopReportsPage", () => {
     });
   });
 
+  it("filters daily report via custom COOPFED ShopReportDatePicker calendar", async () => {
+    renderAt("/reporting/shop-reports");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^Date:/i })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Date:/i }));
+    expect(screen.getByRole("dialog", { name: "Date" })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /^15\// }));
+
+    await waitFor(() => {
+      expect(api.dailyShopReport).toHaveBeenCalledWith(
+        expect.objectContaining({ date: expect.stringMatching(/-15$/) })
+      );
+    });
+  });
+
   it("renders ShopReportsDashboardCard with today's summary metrics", async () => {
     renderAt("/reporting/dashboard-card");
 

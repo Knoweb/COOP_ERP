@@ -731,13 +731,319 @@
   color: var(--color-brand-dark);
 }
 
-.shop-reports-field input[type="date"],
-.shop-reports-field input[type="month"] {
-  height: var(--target-min);
-  min-height: var(--target-min);
+.shop-reports-calendar {
+  position: relative;
   width: 100%;
-  box-sizing: border-box;
+}
+
+.shop-reports-calendar > input.visually-hidden {
+  position: absolute !important;
+  width: var(--border-width) !important;
+  height: var(--border-width) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+}
+
+.shell-page .shop-reports-calendar .shop-reports-calendar__trigger {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: var(--target-min) !important;
+  height: auto !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-text) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-1) !important;
+  cursor: pointer !important;
+  outline: none !important;
+  text-align: left !important;
+  transform: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.shell-page .shop-reports-calendar .shop-reports-calendar__trigger:hover,
+.shell-page .shop-reports-calendar .shop-reports-calendar__trigger:focus-visible,
+.shell-page .shop-reports-calendar--open .shop-reports-calendar__trigger {
+  border-color: var(--color-accent) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  transform: none !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.shop-reports-calendar__value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.shop-reports-calendar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.shop-reports-calendar__icon svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shop-reports-calendar-popover {
+  position: absolute;
+  top: calc(100% + var(--space-half));
+  left: 0;
+  z-index: 120;
+  width: calc(var(--space-8) * 3 + var(--space-4));
+  max-width: min(calc(var(--space-8) * 4 + var(--space-2)), 90vw);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-polish-22);
+  border-radius: calc(var(--radius) * 3);
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-21), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3);
+  overflow: hidden;
+  animation: customDropdownFadeIn 0.15s ease-out;
+}
+
+.shop-reports-calendar-popover--days {
+  width: calc(var(--space-8) * 4 + var(--space-2));
+}
+
+.shop-reports-calendar-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: var(--space-1) var(--space-2);
+  background: var(--color-polish-29);
+  border-bottom: var(--border-width) solid var(--color-polish-14);
+}
+
+.shop-reports-calendar-popover__title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-calendar-popover__nav {
+  width: var(--space-4) !important;
+  height: var(--space-4) !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  border: var(--border-width) solid var(--color-polish-22) !important;
+  background: var(--color-surface) !important;
+  color: var(--color-accent) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-calendar-popover__nav:hover {
+  background: var(--color-polish-31) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+  transform: none !important;
+}
+
+.shop-reports-calendar-popover__nav svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shop-reports-date-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: calc(var(--space-half) / 2);
+  padding: var(--space-1) var(--space-1) 0;
+}
+
+.shop-reports-date-weekdays__cell {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-accent);
+  padding: calc(var(--space-half) / 2) 0;
+}
+
+.shop-reports-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: calc(var(--space-half) / 2);
+  padding: var(--space-half) var(--space-1) var(--space-1);
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-date-grid__btn {
+  min-height: var(--space-4) !important;
+  padding: 0 !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  border: var(--border-width) solid transparent !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer !important;
+  transform: none !important;
+  box-shadow: none !important;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-date-grid__btn--outside {
+  color: var(--color-text-muted) !important;
+  font-weight: var(--font-weight-normal) !important;
+  opacity: 0.6;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-date-grid__btn:hover:not(.shop-reports-date-grid__btn--selected) {
+  background: var(--color-polish-29) !important;
+  border-color: var(--color-polish-22) !important;
+  color: var(--color-accent) !important;
+  opacity: 1;
+  transform: none !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-date-grid__btn--today {
+  border-color: var(--color-polish-22) !important;
+  color: var(--color-brand-dark) !important;
+  background: var(--color-polish-29) !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-date-grid__btn--selected,
+.shell-page .shop-reports-calendar-popover .shop-reports-date-grid__btn--selected:hover {
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
+  color: var(--color-on-accent) !important;
+  opacity: 1;
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-6) !important;
+  transform: none !important;
+}
+
+.shop-reports-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-half);
+  padding: var(--space-2);
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-month-grid__btn {
+  min-height: var(--space-4) !important;
+  padding: var(--space-half) var(--space-1) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  border: var(--border-width) solid transparent !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  cursor: pointer !important;
+  transform: none !important;
+  box-shadow: none !important;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-month-grid__btn:hover:not(.shop-reports-month-grid__btn--selected) {
+  background: var(--color-polish-29) !important;
+  border-color: var(--color-polish-22) !important;
+  color: var(--color-accent) !important;
+  transform: none !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-month-grid__btn--current {
+  border-color: var(--color-polish-22) !important;
+  color: var(--color-brand-dark) !important;
+  background: var(--color-polish-29) !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-month-grid__btn--selected,
+.shell-page .shop-reports-calendar-popover .shop-reports-month-grid__btn--selected:hover {
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-6) !important;
+  transform: none !important;
+}
+
+.shop-reports-calendar-popover__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-2);
+  border-top: var(--border-width) solid var(--color-polish-14);
+  background: var(--color-polish-29);
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-calendar-popover__clear {
+  min-height: var(--space-4) !important;
+  padding: var(--space-half) var(--space-1) !important;
+  border-radius: calc(var(--radius) * 1.5) !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text-muted) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  cursor: pointer !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-calendar-popover__clear:hover {
+  background: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  transform: none !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-calendar-popover__today {
+  min-height: var(--space-4) !important;
+  padding: var(--space-half) var(--space-1) !important;
+  border-radius: var(--radius-pill) !important;
+  border: var(--border-width) solid var(--color-polish-22) !important;
+  background: var(--color-polish-31) !important;
+  color: var(--color-accent) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  cursor: pointer !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.shell-page .shop-reports-calendar-popover .shop-reports-calendar-popover__today:hover {
+  background: var(--color-polish-19) !important;
+  border-color: var(--color-polish-19) !important;
+  color: var(--color-on-accent) !important;
+  transform: none !important;
 }
 
 .shop-reports-state {

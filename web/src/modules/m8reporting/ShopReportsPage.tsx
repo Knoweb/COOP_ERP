@@ -16,6 +16,7 @@ import {
 } from "./reportingApi";
 import { errorText } from "./reportView";
 import { ShopReportSelect } from "./ShopReportSelect";
+import { ShopReportDatePicker, ShopReportMonthPicker } from "./ShopReportCalendarPicker";
 import "./reporting.css";
 
 type KpiSummary = DailyShopReportSummary | MonthlyShopReportSummary;
@@ -126,8 +127,10 @@ export function ShopReportsPage() {
       </div>
 
       <section className="modern-filter-panel shop-reports-filter-panel">
-        <label htmlFor="shop-report-location" className="shop-reports-field shop-reports-field--shop">
-          <span className="shop-reports-field__label">{t("reporting.shop_reports.shop").text}</span>
+        <div className="shop-reports-field shop-reports-field--shop">
+          <label htmlFor="shop-report-location" className="shop-reports-field__label">
+            {t("reporting.shop_reports.shop").text}
+          </label>
           <ShopReportSelect
             id="shop-report-location"
             ariaLabel={t("reporting.shop_reports.shop").text}
@@ -135,30 +138,34 @@ export function ShopReportsPage() {
             onChange={setFilterLocation}
             options={shopOptions}
           />
-        </label>
+        </div>
 
         {activeTab === "daily" && (
-          <label htmlFor="shop-report-date" className="shop-reports-field">
-            <span className="shop-reports-field__label">{t("reporting.shop_reports.date").text}</span>
-            <input
+          <div className="shop-reports-field">
+            <label htmlFor="shop-report-date" className="shop-reports-field__label">
+              {t("reporting.shop_reports.date").text}
+            </label>
+            <ShopReportDatePicker
               id="shop-report-date"
-              type="date"
+              label={t("reporting.shop_reports.date").text}
               value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
+              onChange={setFilterDate}
             />
-          </label>
+          </div>
         )}
 
         {activeTab === "monthly" && (
-          <label htmlFor="shop-report-month" className="shop-reports-field">
-            <span className="shop-reports-field__label">{t("reporting.shop_reports.month").text}</span>
-            <input
+          <div className="shop-reports-field">
+            <label htmlFor="shop-report-month" className="shop-reports-field__label">
+              {t("reporting.shop_reports.month").text}
+            </label>
+            <ShopReportMonthPicker
               id="shop-report-month"
-              type="month"
+              label={t("reporting.shop_reports.month").text}
               value={filterYearMonth}
-              onChange={(e) => setFilterYearMonth(e.target.value)}
+              onChange={setFilterYearMonth}
             />
-          </label>
+          </div>
         )}
       </section>
 
