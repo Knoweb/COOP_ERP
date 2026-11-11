@@ -290,6 +290,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
                         where l.location_id = a.location_id
                           and l.batch_id = a.batch_id
                           and l.qty_on_hand > 0
+                          and l.condition = 'GOOD'
                    )
                 """;
         return jdbc.update(sql, now, locationId);
