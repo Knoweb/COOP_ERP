@@ -44,6 +44,22 @@ export function useIntegrationApi() {
         return data!;
       },
 
+      async acknowledgeExport(
+        exportId: string,
+        idempotencyKey: string
+      ): Promise<JournalExport> {
+        const { data } = await api.POST(
+          "/v1/integration/journal-exports/{exportId}/acknowledge",
+          {
+            params: {
+              path: { exportId },
+              header: { "Idempotency-Key": idempotencyKey }
+            }
+          }
+        );
+        return data!;
+      },
+
       async pending(from: string, to: string): Promise<PendingPostings> {
         const { data } = await api.GET("/v1/integration/journal-postings/pending", {
           params: { query: { from, to } }

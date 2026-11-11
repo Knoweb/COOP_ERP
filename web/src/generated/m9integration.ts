@@ -42,6 +42,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/integration/journal-exports/{exportId}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge receipt of a generated journal export
+         * @description Changes GENERATED to ACKNOWLEDGED, recording the actor and time. A repeated acknowledgement returns the existing acknowledged export without generating another audit event. Rule errors: m9.journal.entity_required, m9.journal.not_found, m9.journal.not_generated.
+         */
+        post: operations["acknowledgeJournalExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/integration/journal-exports/{exportId}/lines": {
         parameters: {
             query?: never;
@@ -1344,6 +1364,33 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    acknowledgeJournalExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                exportId: components["parameters"]["ExportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Acknowledged journal export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalExportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
     listJournalLines: {
