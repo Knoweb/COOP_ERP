@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -126,6 +126,25 @@ describe("AssetRegisterPage", () => {
       expect(api.listAssets).toHaveBeenCalledWith({
         locationId: "0190f8bb-0000-7000-8000-000000000001",
         assetType: undefined,
+        status: undefined
+      });
+    });
+  });
+
+  it("filters assets via custom AssetSelect listbox options", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "All Asset Types" })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "All Asset Types" }));
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Vehicle" }));
+
+    await waitFor(() => {
+      expect(api.listAssets).toHaveBeenCalledWith({
+        locationId: undefined,
+        assetType: "VEHICLE",
         status: undefined
       });
     });
