@@ -5,7 +5,9 @@ import { businessToday } from "../i18n/formats";
 
 export type DatePickerProps = {
   id?: string;
+  className?: string;
   label?: string;
+  prefixLabel?: string;
   value: string; // YYYY-MM-DD
   onChange: (value: string) => void;
   placeholder?: string;
@@ -41,7 +43,9 @@ function formatIso(year: number, monthIndex: number, day: number): string {
 
 export function DatePicker({
   id,
+  className,
   label,
+  prefixLabel,
   value,
   onChange,
   disabled,
@@ -155,7 +159,7 @@ export function DatePicker({
   const firstDayOfWeek = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay(); // 0 = Sunday
 
   return (
-    <div className="catalogue-datepicker-wrap" ref={containerRef}>
+    <div className={`catalogue-datepicker-wrap ${className || ""}`.trim()} ref={containerRef}>
       {label && (
         <label className="catalogue-datepicker-label" htmlFor={inputId}>
           <span>{label}</span>
@@ -184,6 +188,11 @@ export function DatePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
       >
+        {prefixLabel && (
+          <span className="catalogue-datepicker-trigger__prefix">
+            {prefixLabel}
+          </span>
+        )}
         <span className={value ? "catalogue-datepicker-trigger__value" : "catalogue-datepicker-trigger__placeholder"}>
           {value || placeholder}
         </span>
