@@ -26,6 +26,7 @@ import lk.coopfed.knoweb.m7customers.api.BulkImportMembers;
 import lk.coopfed.knoweb.m7customers.api.BulkMemberReport;
 import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.ConsentRecorded;
+import lk.coopfed.knoweb.m7customers.api.ConsentWithdrawn;
 import lk.coopfed.knoweb.m7customers.api.CustomerDeactivated;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentRecorded;
 import lk.coopfed.knoweb.m7customers.api.CustomerReactivated;
@@ -35,8 +36,10 @@ import lk.coopfed.knoweb.m7customers.api.MembersBulkImported;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.ReactivateCustomer;
+import lk.coopfed.knoweb.m7customers.api.RecordConsent;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
+import lk.coopfed.knoweb.m7customers.api.WithdrawConsent;
 import lk.coopfed.knoweb.m7customers.query.AccountQueries;
 import lk.coopfed.knoweb.m7customers.query.AccountView;
 import lk.coopfed.knoweb.m7customers.query.CustomerCard;
@@ -67,6 +70,12 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Handles<ChangePhone, UUID> changePhone;
+
+    @Autowired
+    Handles<RecordConsent, UUID> recordConsent;
+
+    @Autowired
+    Handles<WithdrawConsent, UUID> withdrawConsent;
 
     @Autowired
     Handles<DeactivateCustomer, UUID> deactivate;
@@ -633,6 +642,103 @@ class CustomerHandlersIntegrationTest extends PostgresIntegrationTest {
         assertThat(seen.registeredHere()).isFalse();
         assertThat(seen.account().balance()).isEqualByComparingTo("0");
         assertThat(accounts.account(accountId, other())).isEmpty();
+    }
+
+    // ---- CUS-04: consent lifecycle ---------------------------------------------------------------
+
+    @Test
+    void consentCanBeWithdrawnAndGrantedAgain() {
+        UUID id = registerMember("Consent Member", "0700000181", false);
+        kernel.reset();
+
+        recordConsent.handle(new RecordConsent(id, "STATEMENTS_NOTIFICATIONS", "PAPER"), office());
+
+        assertThat(customers.card(id, office()).orElseThrow().consents())
+                .filteredOn(c -> c.purpose().equals("STATEMENTS_NOTIFICATIONS"))
+                .hasSize(1)
+                .allSatisfy(c -> {
+                    assertThat(c.grantedVia()).isEqualTo("PAPER");
+                    assertThat(c.withdrawnAt()).isNull();
+                });
+
+        assertThat(single("CUSTOMER_CONSENT_RECORDED").subject().id()).isEqualTo(id);
+        assertThat(kernel.committedEvents())
+                .containsExactly(new ConsentRecorded(id, SOCIETY, "STATEMENTS_NOTIFICATIONS"));
+
+        kernel.reset();
+
+        withdrawConsent.handle(new WithdrawConsent(id, "STATEMENTS_NOTIFICATIONS"), office());
+
+        assertThat(customers.card(id, office()).orElseThrow().consents())
+                .filteredOn(c -> c.purpose().equals("STATEMENTS_NOTIFICATIONS"))
+                .hasSize(1)
+                .allSatisfy(c -> assertThat(c.withdrawnAt()).isNotNull());
+
+        assertThat(single("CUSTOMER_CONSENT_WITHDRAWN").subject().id()).isEqualTo(id);
+        assertThat(kernel.committedEvents())
+                .containsExactly(new ConsentWithdrawn(id, SOCIETY, "STATEMENTS_NOTIFICATIONS"));
+
+        kernel.reset();
+
+        recordConsent.handle(new RecordConsent(id, "STATEMENTS_NOTIFICATIONS", "WEB"), office());
+
+        List<CustomerCard.Consent> history = customers.card(id, office()).orElseThrow().consents().stream()
+                .filter(c -> c.purpose().equals("STATEMENTS_NOTIFICATIONS"))
+                .toList();
+
+        assertThat(history).hasSize(2);
+        assertThat(history.stream().filter(c -> c.withdrawnAt() == null).toList())
+                .hasSize(1)
+                .allSatisfy(c -> assertThat(c.grantedVia()).isEqualTo("WEB"));
+        assertThat(history.stream().filter(c -> c.withdrawnAt() != null).toList())
+                .hasSize(1);
+    }
+
+    @Test
+    void duplicateAndMissingActiveConsentAreRejected() {
+        UUID id = registerMember("Consent Rules", "0700000182", false);
+        kernel.reset();
+
+        assertThatThrownBy(() -> recordConsent.handle(new RecordConsent(id, "CREDIT_ACCOUNT", "WEB"), office()))
+                .isInstanceOfSatisfying(ProblemException.class, p -> assertThat(p.getMessage())
+                        .contains("m7.customer.consent_already_active"));
+
+        assertThatThrownBy(() -> withdrawConsent.handle(new WithdrawConsent(id, "STATEMENTS_NOTIFICATIONS"), office()))
+                .isInstanceOfSatisfying(ProblemException.class, p -> assertThat(p.getMessage())
+                        .contains("m7.customer.consent_not_active"));
+
+        assertThatThrownBy(() -> recordConsent.handle(new RecordConsent(id, "UNKNOWN_PURPOSE", "WEB"), office()))
+                .isInstanceOfSatisfying(ProblemException.class, p -> assertThat(p.getMessage())
+                        .contains("m7.customer.consent_invalid"));
+
+        assertThatThrownBy(() ->
+                        recordConsent.handle(new RecordConsent(id, "STATEMENTS_NOTIFICATIONS", "INVALID"), office()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, p -> assertThat(p.getMessage()).contains("m7.customer.via_invalid"));
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void anotherSocietyCannotChangeCustomerConsent() {
+        UUID id = registerMember("Private Consent", "0700000183", false);
+        kernel.reset();
+
+        assertThatThrownBy(
+                        () -> recordConsent.handle(new RecordConsent(id, "STATEMENTS_NOTIFICATIONS", "PAPER"), other()))
+                .isInstanceOf(ProblemException.class);
+
+        assertThatThrownBy(() -> withdrawConsent.handle(new WithdrawConsent(id, "CREDIT_ACCOUNT"), other()))
+                .isInstanceOf(ProblemException.class);
+
+        assertThat(customers.card(id, office()).orElseThrow().consents())
+                .filteredOn(c -> c.purpose().equals("CREDIT_ACCOUNT"))
+                .hasSize(1)
+                .allSatisfy(c -> assertThat(c.withdrawnAt()).isNull());
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     // ---- helpers ---------------------------------------------------------------------------------

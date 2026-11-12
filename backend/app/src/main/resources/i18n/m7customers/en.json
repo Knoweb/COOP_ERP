@@ -15,6 +15,8 @@
   "m7.customer.phone_held_elsewhere": "A customer of another society has this number now",
   "m7.customer.phone_reuse_confirm": "Someone else had this number recently. Confirm this is a different person to continue",
   "m7.customer.consent_invalid": "This consent is not known",
+  "m7.customer.consent_already_active": "This consent is already active",
+  "m7.customer.consent_not_active": "There is no active consent to withdraw",
   "m7.customer.consent_required": "The customer must agree to a credit account",
   "m7.customer.phone_unchanged": "This is already the customerâ€™s number",
   "m7.customer.open_balance": "The customerâ€™s account still has a balance; settle it first",

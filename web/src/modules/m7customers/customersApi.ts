@@ -14,6 +14,7 @@ export type Statement = components["schemas"]["Statement"];
 export type StatementLine = Statement["lines"][number];
 export type CustomerPayment = components["schemas"]["CustomerPayment"];
 export type RegisterCustomerRequest = components["schemas"]["RegisterCustomerRequest"];
+export type RecordConsentRequest = components["schemas"]["RecordConsentRequest"];
 export type OpenAccountRequest = components["schemas"]["OpenAccountRequest"];
 export type RecordPaymentRequest = components["schemas"]["RecordPaymentRequest"];
 export type AmendLimitsRequest = components["schemas"]["AmendLimitsRequest"];
@@ -48,6 +49,38 @@ export function useCustomersApi() {
       async customer(customerId: string): Promise<CustomerCard | null> {
         const { data } = await api.GET("/v1/customers/{customerId}", { params: { path: { customerId } } });
         return data ?? null;
+      },
+
+      /** Record consent after registration, preserving existing consent history. */
+      async recordConsent(
+        customerId: string,
+        request: RecordConsentRequest,
+        idempotencyKey: string
+      ): Promise<CustomerCard> {
+        const { data } = await api.POST("/v1/customers/{customerId}/consents", {
+          params: {
+            path: { customerId },
+            header: { "Idempotency-Key": idempotencyKey }
+          },
+          body: request
+        });
+        return data!;
+      },
+
+      /** Withdraw active consent; the server retains the historical record. */
+      async withdrawConsent(
+        customerId: string,
+        purpose: RecordConsentRequest["purpose"],
+        idempotencyKey: string
+      ): Promise<CustomerCard> {
+        const { data } = await api.DELETE("/v1/customers/{customerId}/consents", {
+          params: {
+            path: { customerId },
+            query: { purpose },
+            header: { "Idempotency-Key": idempotencyKey }
+          }
+        });
+        return data!;
       },
 
       /** `idempotencyKey` comes from useIdempotencyKey(): one key per user action, reused on a retry. */

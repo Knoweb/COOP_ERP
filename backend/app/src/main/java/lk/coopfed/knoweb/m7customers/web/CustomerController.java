@@ -19,12 +19,14 @@ import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.ConfigureLoyaltyPolicy;
 import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.RecaptureNic;
+import lk.coopfed.knoweb.m7customers.api.RecordConsent;
 import lk.coopfed.knoweb.m7customers.api.RecordLoyaltySpend;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
 import lk.coopfed.knoweb.m7customers.api.RegisterLoyaltyCustomer;
 import lk.coopfed.knoweb.m7customers.api.SubmitInsuranceClaim;
 import lk.coopfed.knoweb.m7customers.api.UpdateInsuranceClaimStatus;
 import lk.coopfed.knoweb.m7customers.api.UpdateRegionalRegistration;
+import lk.coopfed.knoweb.m7customers.api.WithdrawConsent;
 import lk.coopfed.knoweb.m7customers.query.CustomerQueries;
 import lk.coopfed.knoweb.m7customers.query.LoyaltyCustomerQueries;
 import lk.coopfed.knoweb.m7customers.query.LoyaltyCustomerView;
@@ -50,6 +52,7 @@ import lk.coopfed.knoweb.m7customers.web.generated.LoyaltyMonthlyRewardResponse;
 import lk.coopfed.knoweb.m7customers.web.generated.LoyaltyRewardPolicyResponse;
 import lk.coopfed.knoweb.m7customers.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.RecaptureNicRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.RecordConsentRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.RecordLoyaltySpendRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.RecordLoyaltySpendResponse;
 import lk.coopfed.knoweb.m7customers.web.generated.RegisterCustomerRequest;
@@ -71,6 +74,8 @@ class CustomerController implements CustomersApi {
     private final Handles<BulkImportMembers, BulkMemberReport> bulkImporter;
     private final Handles<AmendCustomer, UUID> amend;
     private final Handles<ChangePhone, UUID> changePhone;
+    private final Handles<RecordConsent, UUID> recordConsent;
+    private final Handles<WithdrawConsent, UUID> withdrawConsent;
     private final Handles<DeactivateCustomer, UUID> deactivate;
     private final Handles<RecaptureNic, UUID> recapture;
     private final Handles<RegisterLoyaltyCustomer, UUID> registerLoyalty;
@@ -90,6 +95,8 @@ class CustomerController implements CustomersApi {
             Handles<BulkImportMembers, BulkMemberReport> bulkImporter,
             Handles<AmendCustomer, UUID> amend,
             Handles<ChangePhone, UUID> changePhone,
+            Handles<RecordConsent, UUID> recordConsent,
+            Handles<WithdrawConsent, UUID> withdrawConsent,
             Handles<DeactivateCustomer, UUID> deactivate,
             Handles<RecaptureNic, UUID> recapture,
             Handles<RegisterLoyaltyCustomer, UUID> registerLoyalty,
@@ -107,6 +114,8 @@ class CustomerController implements CustomersApi {
         this.bulkImporter = bulkImporter;
         this.amend = amend;
         this.changePhone = changePhone;
+        this.recordConsent = recordConsent;
+        this.withdrawConsent = withdrawConsent;
         this.deactivate = deactivate;
         this.recapture = recapture;
         this.registerLoyalty = registerLoyalty;
@@ -213,6 +222,26 @@ class CustomerController implements CustomersApi {
                         request.getAttributes(),
                         request.getTags()),
                 scope);
+        return ResponseEntity.ok(card(customerId, scope));
+    }
+
+    @Override
+    public ResponseEntity<CustomerCard> recordConsent(
+            String idempotencyKey, UUID customerId, RecordConsentRequest request) {
+        ScopeContext scope = currentScope.get();
+        recordConsent.handle(
+                new RecordConsent(
+                        customerId,
+                        request.getPurpose().getValue(),
+                        request.getVia().getValue()),
+                scope);
+        return ResponseEntity.ok(card(customerId, scope));
+    }
+
+    @Override
+    public ResponseEntity<CustomerCard> withdrawConsent(String idempotencyKey, String purpose, UUID customerId) {
+        ScopeContext scope = currentScope.get();
+        withdrawConsent.handle(new WithdrawConsent(customerId, purpose), scope);
         return ResponseEntity.ok(card(customerId, scope));
     }
 
