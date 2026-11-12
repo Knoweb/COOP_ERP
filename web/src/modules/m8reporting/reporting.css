@@ -947,9 +947,7 @@
   padding: var(--space-2) calc(var(--space-1) + var(--space-half));
 }
 
-.finance-kpi-grid--goods .finance-kpi-label {
-  letter-spacing: 0.02em;
-}
+
 
 .finance-final-accounts-card {
   align-self: flex-start;
@@ -1010,7 +1008,6 @@
   word-break: normal;
   overflow-wrap: break-word;
   line-height: var(--line-height);
-  letter-spacing: 0.02em;
   font-size: var(--font-size-xs);
 }
 
@@ -1159,7 +1156,6 @@
   font-weight: var(--font-weight-strong);
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
   line-height: var(--line-height);
   white-space: normal;
   word-break: normal;
@@ -1433,7 +1429,6 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
   color: var(--color-brand-dark);
-  letter-spacing: 0.02em;
 }
 
 .finance-voucher-search-input {

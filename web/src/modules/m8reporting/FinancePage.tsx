@@ -699,7 +699,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
                 id="goods-from-date"
                 value={goodsFrom}
                 onChange={setGoodsFrom}
-                placeholder="YYYY-MM-DD"
+                placeholder={businessToday()}
                 className="finance-compact-datepicker"
               />
             </div>
@@ -712,7 +712,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
                 id="goods-to-date"
                 value={goodsTo}
                 onChange={setGoodsTo}
-                placeholder="YYYY-MM-DD"
+                placeholder={businessToday()}
                 className="finance-compact-datepicker"
               />
             </div>
@@ -1066,7 +1066,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
                     setFinalAccountsPeriod(val.substring(0, 7));
                   }
                 }}
-                placeholder="YYYY-MM-DD"
+                placeholder={businessToday()}
                 className="finance-compact-datepicker"
               />
             </div>
@@ -1341,7 +1341,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
                               <td className="finance-code-cell">{item.employeeNo}</td>
                               <td><strong>{item.employeeName}</strong></td>
                               <td><span className="finance-badge-role">{item.contributionType}</span></td>
-                              <td className="finance-td-right">{item.approvedOtMinutes} min</td>
+                              <td className="finance-td-right">{item.approvedOtMinutes}</td>
                               <td className="finance-td-right"><strong><MoneyDisplay amount={item.approvedAmount} /></strong></td>
                               <td>{item.approvedAt ? formatDate(item.approvedAt.substring(0, 10)) : "—"}</td>
                               <td><StateChip state="issued" /></td>
