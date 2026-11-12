@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -286,6 +286,56 @@ describe("RevenueEstimatorPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Unable to resolve active price for SKU SKU-NOPRICE/i)).toBeDefined();
+    });
+  });
+
+  it("supports custom COOPFED dropdowns and calendar picker interactions", async () => {
+    renderPage();
+
+    // Wait for initial queries
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Select Shop / Location" })).toBeDefined();
+    });
+
+    // Select Location via custom COOPFED dropdown listbox
+    fireEvent.click(screen.getByRole("button", { name: "Select Shop / Location" }));
+    await waitFor(() => {
+      expect(within(screen.getByRole("listbox")).getByRole("option", { name: /Polgolla Main Shop/ })).toBeDefined();
+    });
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Polgolla Main Shop/ }));
+
+    // Select Pricing Basis via custom COOPFED dropdown listbox
+    fireEvent.click(screen.getByRole("button", { name: "Retail Price" }));
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Commercial Price" }));
+
+    // Open Effective Date calendar popover and pick Today
+    fireEvent.click(screen.getByRole("button", { name: /^Effective Date:/ }));
+    const dialog = screen.getByRole("dialog", { name: "Effective Date" });
+    expect(dialog).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+
+    // Add SKU via custom COOPFED SKU dropdown listbox
+    fireEvent.click(screen.getByRole("button", { name: "Select Item / SKU" }));
+    await waitFor(() => {
+      expect(within(screen.getByRole("listbox")).getByRole("option", { name: /Samba Rice 5kg/ })).toBeDefined();
+    });
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /Samba Rice 5kg/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add SKU" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Total Mix: 100.00%")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Calculate Required Quantities" }));
+
+    await waitFor(() => {
+      expect(api.estimateRevenue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          locationId: "0190f8bb-0000-7000-8000-000000000001",
+          priceType: "COMMERCIAL"
+        }),
+        expect.any(String)
+      );
     });
   });
 });
