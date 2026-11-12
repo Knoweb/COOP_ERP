@@ -151,6 +151,16 @@ describe("ExpiryListPage", () => {
     }
   );
 
+  it.each(["en", "si", "ta"] as const)(
+    "describes the %s approaching filter using the implemented 60-day boundary",
+    (locale) => {
+      const label = localizedText(locale, "inventory.expiry.filter_approaching");
+      expect(label).toContain("31");
+      expect(label).toContain("60");
+      expect(label).not.toContain("90");
+    }
+  );
+
   it.each(["CRITICAL", "WARNING", "APPROACHING", "EXPIRED"] as const)(
     "passes the %s tier filter to the expiry API",
     async (tier) => {

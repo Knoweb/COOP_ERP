@@ -173,8 +173,9 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
             }
         }
 
-        // Clean up any near-expiry alerts for batches that have since been depleted
-        resolveObsoleteNearExpiryAlerts(locationId, nowTs);
+        // Clean up alerts for batches that have been depleted or have passed their expiry date.
+        // Expired stock remains visible in the expiry feed and leaves inventory through write-off.
+        resolveObsoleteNearExpiryAlerts(locationId, today, nowTs);
 
         // 2. Evaluate slow-moving stock
         List<SlowMovingStockView> slowMovingItems =
@@ -275,7 +276,7 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
         jdbc.update(sql, newTier, qtyOnHand, now, alertId);
     }
 
-    private int resolveObsoleteNearExpiryAlerts(UUID locationId, Timestamp now) {
+    private int resolveObsoleteNearExpiryAlerts(UUID locationId, LocalDate today, Timestamp now) {
         String sql =
                 """
                 update inventory.stock_alert_state a
@@ -291,9 +292,10 @@ public class EvaluateExpiryAlertsHandler implements Handles<EvaluateExpiryAlerts
                           and l.batch_id = a.batch_id
                           and l.qty_on_hand > 0
                           and l.condition = 'GOOD'
+                          and l.expiry_date >= ?
                    )
                 """;
-        return jdbc.update(sql, now, locationId);
+        return jdbc.update(sql, now, locationId, today);
     }
 
     private int resolveObsoleteSlowMovingAlerts(

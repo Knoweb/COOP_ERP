@@ -9,6 +9,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useIntegrationApi, type JournalExport } from "./integrationApi";
 import { defaultExportPeriod, errorText, journalFileName, periodIsOpen } from "./integrationView";
+import { IntegrationDatePicker } from "./IntegrationDatePicker";
 import "./integration.css";
 
 /**
@@ -124,95 +125,184 @@ export function JournalExportsPage() {
   }
 
   return (
-    <main className="shell-page">
+    <main className="shell-page journal-exports-page">
       <PageHeader icon="journal" title={t("integration.journal.title").text} />
-      <p>{t("integration.journal.intro").text}</p>
+      <p className="journal-exports-subtitle">{t("integration.journal.intro").text}</p>
 
       <form
-        className="modern-filter-panel integration-bar"
+        className="modern-filter-panel integration-bar journal-controls"
         onSubmit={(event) => {
           event.preventDefault();
           void generate();
         }}
       >
-        <label className="modern-field">
-          <span className="modern-field__label integration-label">{t("integration.field.from").text}</span>
-          <input
-            type="date"
-            value={period.from}
-            required
-            onChange={(event) => setPeriod({ ...period, from: event.target.value })}
-          />
-        </label>
-        <label className="modern-field">
-          <span className="modern-field__label integration-label">{t("integration.field.to").text}</span>
-          <input
-            type="date"
-            value={period.to}
-            required
-            onChange={(event) => setPeriod({ ...period, to: event.target.value })}
-          />
-        </label>
-        <label className="modern-field integration-check">
-          <input
-            type="checkbox"
-            checked={provisional}
-            required={periodOpen}
-            aria-describedby="integration-provisional-hint"
-            onChange={(event) => setProvisional(event.target.checked)}
-          />
-          <span className="modern-field__label integration-label">{t("integration.journal.provisional").text}</span>
-        </label>
-        {canExport && (
-          <button
-            type="submit"
-            className="modern-btn modern-btn--primary"
-            disabled={busy || !periodValid || pending.data?.postings === 0}
-          >
-            {busy ? t("integration.journal.generating").text : t("integration.journal.generate").text}
-          </button>
-        )}
+        <div className="journal-controls__row">
+          <div className="modern-field integration-period-field">
+            <label htmlFor="integration-period-from" className="modern-field__label integration-label">
+              {t("integration.field.from").text}
+            </label>
+            <IntegrationDatePicker
+              id="integration-period-from"
+              ariaLabel={t("integration.field.from").text}
+              value={period.from}
+              required
+              onChange={(from) => setPeriod({ ...period, from })}
+            />
+          </div>
+          <div className="modern-field integration-period-field">
+            <label htmlFor="integration-period-to" className="modern-field__label integration-label">
+              {t("integration.field.to").text}
+            </label>
+            <IntegrationDatePicker
+              id="integration-period-to"
+              ariaLabel={t("integration.field.to").text}
+              value={period.to}
+              required
+              onChange={(to) => setPeriod({ ...period, to })}
+            />
+          </div>
+          <label className={`modern-field integration-check${provisional ? " integration-check--checked" : ""}`}>
+            <input
+              type="checkbox"
+              checked={provisional}
+              required={periodOpen}
+              aria-describedby="integration-provisional-hint"
+              onChange={(event) => setProvisional(event.target.checked)}
+            />
+            <span className="modern-field__label integration-label journal-check-label">
+              {t("integration.journal.provisional").text}
+            </span>
+          </label>
+          {canExport && (
+            <div className="journal-controls__submit">
+              <button
+                type="submit"
+                className="modern-btn modern-btn--primary journal-generate-btn"
+                disabled={busy || !periodValid || pending.data?.postings === 0}
+              >
+                <svg className="journal-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>{busy ? t("integration.journal.generating").text : t("integration.journal.generate").text}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <p id="integration-provisional-hint" className="integration-hint journal-controls__hint">
+          <svg className="journal-callout__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+          </svg>
+          <span>
+            {periodOpen
+              ? t("integration.journal.provisional.open", undefined, { to: formatDate(period.to) }).text
+              : t("integration.journal.provisional.hint").text}
+          </span>
+        </p>
       </form>
 
-      <p id="integration-provisional-hint" className="integration-hint">
-        {periodOpen
-          ? t("integration.journal.provisional.open", undefined, { to: formatDate(period.to) }).text
-          : t("integration.journal.provisional.hint").text}
-      </p>
-      {supplementDue.data && supplementDue.data.postings > 0 && supplementDue.data.upTo && (
-        <p role="status" className="integration-banner">
-          {
-            t("integration.journal.supplement_due", undefined, {
-              count: String(supplementDue.data.postings),
-              upTo: formatDate(supplementDue.data.upTo)
-            }).text
-          }{" "}
-          <MoneyDisplay amount={String(supplementDue.data.amount)} />
-        </p>
-      )}
-      {pending.data && (
-        <p role="status" aria-live="polite">
-          {pending.data.postings === 0 ? (
-            t("integration.journal.pending.none").text
-          ) : (
-            <>
-              {t("integration.journal.pending", undefined, { count: String(pending.data.postings) }).text}{" "}
-              <MoneyDisplay amount={String(pending.data.amount)} />
-            </>
-          )}
-        </p>
-      )}
-      {message && <p role={message.kind}>{message.text}</p>}
+      <div className="journal-callouts">
+        {supplementDue.data && supplementDue.data.postings > 0 && supplementDue.data.upTo && (
+          <p role="status" className="integration-banner journal-callout journal-callout--warning">
+            <svg className="journal-callout__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span className="journal-callout__text">
+              {
+                t("integration.journal.supplement_due", undefined, {
+                  count: String(supplementDue.data.postings),
+                  upTo: formatDate(supplementDue.data.upTo)
+                }).text
+              }
+            </span>
+            <span className="journal-callout__amount">
+              <MoneyDisplay amount={String(supplementDue.data.amount)} />
+            </span>
+          </p>
+        )}
+        {pending.data && (
+          <p
+            role="status"
+            aria-live="polite"
+            className={`journal-callout ${pending.data.postings === 0 ? "journal-callout--muted" : "journal-callout--pending"}`}
+          >
+            <svg className="journal-callout__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            {pending.data.postings === 0 ? (
+              <span className="journal-callout__text">{t("integration.journal.pending.none").text}</span>
+            ) : (
+              <>
+                <span className="journal-callout__text">
+                  {t("integration.journal.pending", undefined, { count: String(pending.data.postings) }).text}
+                </span>
+                <span className="journal-callout__amount">
+                  <MoneyDisplay amount={String(pending.data.amount)} />
+                </span>
+              </>
+            )}
+          </p>
+        )}
+        {message && (
+          <p
+            role={message.kind}
+            className={`journal-callout ${message.kind === "alert" ? "journal-callout--alert" : "journal-callout--success"}`}
+          >
+            <svg className="journal-callout__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              {message.kind === "alert" ? (
+                <>
+                  <circle cx="12" cy="12" r="9" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </>
+              ) : (
+                <>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m9 12 2 2 4-4" />
+                </>
+              )}
+            </svg>
+            <span className="journal-callout__text">{message.text}</span>
+          </p>
+        )}
+      </div>
 
-      <section>
-        <h2>{t("integration.journal.history").text}</h2>
-        {exports.isLoading && <p>{t("integration.loading").text}</p>}
-        {exports.isError && <p role="alert">{errorText(exports.error, t("integration.error.generic").text)}</p>}
-        {exports.data && exports.data.length === 0 && <p>{t("integration.journal.history.empty").text}</p>}
+      <section className="journal-section">
+        <div className="journal-section__header">
+          <div className="journal-section__title-group">
+            <span className="journal-section__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+            </span>
+            <h2>{t("integration.journal.history").text}</h2>
+          </div>
+          {exports.data && <span className="journal-count-pill">{exports.data.length}</span>}
+        </div>
+        {exports.isLoading && <p className="journal-state-text">{t("integration.loading").text}</p>}
+        {exports.isError && (
+          <p role="alert" className="journal-callout journal-callout--alert">
+            {errorText(exports.error, t("integration.error.generic").text)}
+          </p>
+        )}
+        {exports.data && exports.data.length === 0 && (
+          <div className="integration-empty-card journal-empty-card">
+            <p>{t("integration.journal.history.empty").text}</p>
+          </div>
+        )}
         {exports.data && exports.data.length > 0 && (
-          <div className="modern-table-card">
+          <div className="modern-table-card journal-table-card">
             <div className="modern-table-scroll">
-              <table className="modern-table">
+              <table className="modern-table journal-exports-table">
                 <thead>
                   <tr>
                     <th scope="col">{t("integration.journal.col.period").text}</th>
@@ -227,60 +317,61 @@ export function JournalExportsPage() {
                 <tbody>
                   {exports.data.map((journal) => (
                     <tr key={journal.exportId}>
-                      <td>
+                      <td className="journal-period-cell">
                         {formatDate(journal.periodFrom)} – {formatDate(journal.periodTo)}
                       </td>
-                      <td>{formatInstant(journal.generatedAt)}</td>
+                      <td className="journal-instant-cell">{formatInstant(journal.generatedAt)}</td>
                       <td>
-                        <StateChip state="issued" label={t(`integration.journal.status.${journal.status}`).text} />
-                        {journal.provisional && (
-                          <>
-                            {" "}
+                        <div className="journal-status-group">
+                          <StateChip state="issued" label={t(`integration.journal.status.${journal.status}`).text} />
+                          {journal.provisional && (
                             <StateChip state="alert" label={t("integration.journal.mark.PROVISIONAL").text} />
-                          </>
-                        )}
+                          )}
+                        </div>
                       </td>
-                      <td className="integration-number">{journal.lineCount}</td>
-                      <td className="integration-number">
+                      <td className="integration-number journal-num-cell">{journal.lineCount}</td>
+                      <td className="integration-number journal-num-cell">
                         <MoneyDisplay amount={String(journal.totalDebit)} />
                       </td>
-                      <td className="integration-number">
+                      <td className="integration-number journal-num-cell">
                         <MoneyDisplay amount={String(journal.totalCredit)} />
                       </td>
-                      <td className="integration-actions">
-                        {canExport && (
+                      <td className="journal-actions-cell">
+                        <div className="integration-actions">
+                          {canExport && (
+                            <button
+                              type="button"
+                              className="journal-row-btn journal-row-btn--secondary"
+                              aria-label={t("integration.journal.download.label", undefined, {
+                                from: formatDate(journal.periodFrom),
+                                to: formatDate(journal.periodTo)
+                              }).text}
+                              onClick={() => void download(journal)}
+                            >
+                              {t("integration.journal.download").text}
+                            </button>
+                          )}
+                          {canAcknowledge && journal.status === "GENERATED" && (
+                            <button
+                              type="button"
+                              className="journal-row-btn journal-row-btn--primary"
+                              disabled={acknowledgingId !== null}
+                              onClick={() => void acknowledge(journal)}
+                            >
+                              {acknowledgingId === journal.exportId
+                                ? t("integration.journal.acknowledging").text
+                                : t("integration.journal.acknowledge").text}
+                            </button>
+                          )}
                           <button
                             type="button"
-                            className="modern-btn"
-                            aria-label={t("integration.journal.download.label", undefined, {
-                              from: formatDate(journal.periodFrom),
-                              to: formatDate(journal.periodTo)
-                            }).text}
-                            onClick={() => void download(journal)}
+                            className={`journal-row-btn journal-row-btn--secondary${open === journal.exportId ? " journal-row-btn--active" : ""}`}
+                            aria-expanded={open === journal.exportId}
+                            onClick={() => setOpen(open === journal.exportId ? null : journal.exportId)}
                           >
-                            {t("integration.journal.download").text}
+                            {t("integration.journal.reconcile").text}
                           </button>
-                        )}
-                        {canAcknowledge && journal.status === "GENERATED" && (
-                          <button
-                            type="button"
-                            className="modern-btn modern-btn--primary"
-                            disabled={acknowledgingId !== null}
-                            onClick={() => void acknowledge(journal)}
-                          >
-                            {acknowledgingId === journal.exportId
-                              ? t("integration.journal.acknowledging").text
-                              : t("integration.journal.acknowledge").text}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="modern-btn"
-                          aria-expanded={open === journal.exportId}
-                          onClick={() => setOpen(open === journal.exportId ? null : journal.exportId)}
-                        >
-                          {t("integration.journal.reconcile").text}
-                        </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -306,28 +397,47 @@ function ReconciliationPanel({ exportId }: { exportId: string }) {
   });
 
   if (reconciliation.isLoading) {
-    return <p>{t("integration.loading").text}</p>;
+    return <p className="journal-state-text">{t("integration.loading").text}</p>;
   }
   if (reconciliation.isError || !reconciliation.data) {
-    return <p role="alert">{errorText(reconciliation.error, t("integration.error.generic").text)}</p>;
+    return (
+      <p role="alert" className="journal-callout journal-callout--alert">
+        {errorText(reconciliation.error, t("integration.error.generic").text)}
+      </p>
+    );
   }
   const r = reconciliation.data;
   const sound = r.balanced && r.matchesRecordedTotals && r.matchesRecordedHash;
   return (
-    <section aria-labelledby="integration-reconciliation">
-      <h2 id="integration-reconciliation">{t("integration.reconciliation.title").text}</h2>
-      <p role="status">
+    <section className="journal-section journal-reconciliation-panel" aria-labelledby="integration-reconciliation">
+      <div className="journal-section__header">
+        <div className="journal-section__title-group">
+          <span className="journal-section__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <polyline points="9 12 11 14 15 10" />
+            </svg>
+          </span>
+          <h2 id="integration-reconciliation">{t("integration.reconciliation.title").text}</h2>
+        </div>
+      </div>
+      <p
+        role="status"
+        className={`journal-reconciliation-status ${sound ? "journal-reconciliation-status--ok" : "journal-reconciliation-status--warn"}`}
+      >
         <StateChip
           state={sound ? "issued" : "alert"}
           label={sound ? t("integration.reconciliation.balanced").text : t("integration.reconciliation.unbalanced").text}
-        />{" "}
-        {r.matchesRecordedHash
-          ? t("integration.reconciliation.hash.ok").text
-          : t("integration.reconciliation.hash.changed").text}
+        />
+        <span>
+          {r.matchesRecordedHash
+            ? t("integration.reconciliation.hash.ok").text
+            : t("integration.reconciliation.hash.changed").text}
+        </span>
       </p>
-      <div className="modern-table-card">
+      <div className="modern-table-card journal-reconciliation-table-card">
         <div className="modern-table-scroll">
-          <table className="modern-table">
+          <table className="modern-table journal-reconciliation-table">
             <thead>
               <tr>
                 <th scope="col">{t("integration.reconciliation.col.role").text}</th>
@@ -339,10 +449,10 @@ function ReconciliationPanel({ exportId }: { exportId: string }) {
               {r.accounts.map((account) => (
                 <tr key={account.role}>
                   <td title={account.role}>{t(`integration.account_role.${account.role}`, account.role).text}</td>
-                  <td className="integration-number">
+                  <td className="integration-number journal-num-cell">
                     <MoneyDisplay amount={String(account.debit)} />
                   </td>
-                  <td className="integration-number">
+                  <td className="integration-number journal-num-cell">
                     <MoneyDisplay amount={String(account.credit)} />
                   </td>
                 </tr>
@@ -351,10 +461,10 @@ function ReconciliationPanel({ exportId }: { exportId: string }) {
             <tfoot>
               <tr>
                 <th scope="row">{t("integration.reconciliation.total").text}</th>
-                <th className="integration-number">
+                <th className="integration-number journal-num-cell">
                   <MoneyDisplay amount={String(r.totalDebit)} />
                 </th>
-                <th className="integration-number">
+                <th className="integration-number journal-num-cell">
                   <MoneyDisplay amount={String(r.totalCredit)} />
                 </th>
               </tr>
