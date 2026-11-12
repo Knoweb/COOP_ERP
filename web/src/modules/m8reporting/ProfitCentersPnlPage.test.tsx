@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -204,6 +204,26 @@ describe("ProfitCentersPnlPage", () => {
 
     // Pending chips present
     expect(screen.getAllByText("Pending").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("filters P&L report via custom PnlSelect listbox option", async () => {
+    api.monthlyProfitCenterPnl.mockResolvedValue(mockPnlReportSettled);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("AG-01 — Polgolla Agency A")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "All Profit Centers" }));
+    fireEvent.click(
+      within(screen.getByRole("listbox")).getByRole("option", { name: "AG-01 — Polgolla Agency A" })
+    );
+
+    await waitFor(() => {
+      expect(api.monthlyProfitCenterPnl).toHaveBeenCalledWith(
+        expect.objectContaining({ profitCenterId: "0190f8dd-0000-7000-8000-000000000001" })
+      );
+    });
   });
 
   it("opens create profit center modal and triggers mutation", async () => {

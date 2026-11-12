@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { IntlProvider } from "react-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { messages } from "../../shell/i18n/messages";
@@ -124,6 +124,18 @@ describe("StockRepriceModal", () => {
     // (4 * 70 + 6 * 100) / 10 = 88.00
     expect(screen.getByText(/Projected Blended Cost/)).toBeTruthy();
     expect(screen.getByText(/Rs 88.00/)).toBeTruthy();
+  });
+
+  it("offers both target conditions and changes a GOOD lot to DAMAGED", () => {
+    renderModal();
+
+    const trigger = screen.getByRole("button", { name: "Good" });
+    fireEvent.click(trigger);
+    const listbox = screen.getByRole("listbox", { name: "Target Condition" });
+    expect(within(listbox).getByRole("option", { name: "Good" })).toBeTruthy();
+    fireEvent.click(within(listbox).getByRole("option", { name: "Damaged" }));
+
+    expect(screen.getByRole("button", { name: "Damaged" })).toBeTruthy();
   });
 
   it("validates empty reason and prevents submission", async () => {

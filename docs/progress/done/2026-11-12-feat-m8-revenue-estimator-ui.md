@@ -1,0 +1,2 @@
+- Redesign the M8 Revenue Estimator & Sales Mix Planner (`RevenueEstimatorPage.tsx`) to match the unified COOPFED design language with shared `.shell-page` header, blush `.modern-filter-panel`, custom `EstimatorSelect` dropdown listboxes, custom `EstimatorDatePicker` calendar popover, KPI summary cards, modernized mix and breakdown tables, trilingual `en`/`si`/`ta` picker labels, and unit tests (`feat/m8-revenue-estimator-ui`).
+

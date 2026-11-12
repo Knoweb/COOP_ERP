@@ -10,6 +10,9 @@ import { StockPage } from "./StockPage";
 const LOCATION_ID = "0190f0de-0000-7000-8000-000000000101";
 const SKU_1 = "0190f0de-0000-7000-8000-000000000102";
 const SKU_2 = "0190f0de-0000-7000-8000-000000000103";
+const permissionState = vi.hoisted(() => ({
+  permissions: new Set<string>(["inv.stock.view", "inv.stock.reprice", "inv.reorder.configure"])
+}));
 
 const mockSummaries: StockSummary[] = [
   {
@@ -105,7 +108,7 @@ vi.mock("./inventoryApi", async () => {
 });
 
 vi.mock("../../shell/auth/permissions", () => ({
-  useHasPermission: () => true
+  useHasPermission: (code: string) => permissionState.permissions.has(code)
 }));
 
 // Mock LocationPicker to directly trigger location selection
@@ -132,6 +135,7 @@ describe("StockPage", () => {
       defaultOptions: { queries: { retry: false, gcTime: 0 } }
     });
     vi.clearAllMocks();
+    permissionState.permissions = new Set(["inv.stock.view", "inv.stock.reprice", "inv.reorder.configure"]);
   });
 
   afterEach(() => {
@@ -232,6 +236,18 @@ describe("StockPage", () => {
       expect(screen.getByText("BAT-RICE-01")).toBeTruthy();
       expect(screen.getByText("Reprice")).toBeTruthy();
     });
+  });
+
+  it("does not offer stock repricing without inv.stock.reprice", async () => {
+    permissionState.permissions = new Set(["inv.stock.view"]);
+    renderPage();
+
+    fireEvent.click(screen.getByTestId("select-location-btn"));
+    await waitFor(() => expect(screen.getByText("SKU-RICE-5KG")).toBeTruthy());
+    fireEvent.click(screen.getAllByRole("button", { name: /Show Lots/i })[0]);
+
+    await waitFor(() => expect(screen.getByText("BAT-RICE-01")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Reprice" })).toBeNull();
   });
 
   it("opens explanation modal when clicking Explain button", async () => {
