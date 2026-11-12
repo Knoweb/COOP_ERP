@@ -617,10 +617,10 @@
 .inventory-dropdown-select .custom-dropdown__menu,
 .inventory-dropdown-menu {
   position: absolute !important;
-  top: calc(100% + var(--space-half)) !important;
-  left: 0 !important;
+  top: calc(100% + var(--space-half));
+  left: 0;
   right: auto !important;
-  min-width: 100% !important;
+  min-width: 100%;
   width: max-content !important;
   max-width: min(calc(var(--space-8) * 7), 90vw) !important;
   z-index: 100 !important;

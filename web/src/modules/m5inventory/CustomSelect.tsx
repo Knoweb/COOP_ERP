@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -45,20 +45,36 @@ export function CustomSelect<T extends string>({
 }: CustomSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [portalCoords, setPortalCoords] = useState<PortalCoords | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const portalRef = useRef<HTMLUListElement>(null);
+  const optionRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const generatedId = useId().replace(/:/g, "");
+  const listboxId = `${id ?? `custom-select-${generatedId}`}-listbox`;
   const effectiveAriaLabel = ariaLabelProp ?? ariaLabel;
+  const visibleOptions = options.filter((opt) => !(String(opt.value) === "" && opt.label.trim() === ""));
+  const hasPlaceholderRow = Boolean(placeholder) && !visibleOptions.some((o) => String(o.value) === "");
+  const selectableOptions = hasPlaceholderRow
+    ? [{ value: "" as T, label: placeholder! }, ...visibleOptions]
+    : visibleOptions;
 
   const updatePlacement = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const shouldOpenUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+    const menuHeight = portalRef.current?.getBoundingClientRect().height ?? 200;
+    const shouldOpenUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
     setOpenUp(shouldOpenUp);
     if (portal) {
-      const safeLeft = Math.max(0, rect.left);
+      const viewportGap = 8;
+      const menuWidth = portalRef.current?.getBoundingClientRect().width ?? rect.width;
+      const safeLeft = Math.min(
+        Math.max(viewportGap, rect.left),
+        Math.max(viewportGap, window.innerWidth - menuWidth - viewportGap)
+      );
       if (shouldOpenUp) {
         setPortalCoords({
           bottom: window.innerHeight - rect.top,
@@ -75,17 +91,44 @@ export function CustomSelect<T extends string>({
     }
   }, [portal]);
 
+  const matchingIndex = selectableOptions.findIndex((option) => option.value === value);
+  const selectedIndex = matchingIndex >= 0 ? matchingIndex : selectableOptions.length > 0 ? 0 : -1;
+
+  const openMenu = () => {
+    updatePlacement();
+    setActiveIndex(selectedIndex);
+    setOpen(true);
+  };
+
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) {
+      triggerRef.current?.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) setActiveIndex(selectedIndex);
+  }, [open, selectedIndex]);
+
   const toggleOpen = (e?: ReactMouseEvent<HTMLButtonElement>) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     if (disabled) return;
-    if (!open) {
-      updatePlacement();
+    if (open) {
+      closeMenu();
+    } else {
+      openMenu();
     }
-    setOpen((prev) => !prev);
   };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (portal) updatePlacement();
+    optionRefs.current[activeIndex]?.focus({ preventScroll: true });
+  }, [activeIndex, open, portal, updatePlacement]);
 
   useEffect(() => {
     if (!open) return;
@@ -102,7 +145,7 @@ export function CustomSelect<T extends string>({
     };
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeMenu(true);
       }
     };
     const handleScrollOrResize = (event: Event) => {
@@ -129,10 +172,8 @@ export function CustomSelect<T extends string>({
         window.removeEventListener("scroll", handleScrollOrResize, true);
       }
     };
-  }, [open, portal, updatePlacement]);
+  }, [closeMenu, open, portal, updatePlacement]);
 
-  const visibleOptions = options.filter((opt) => !(String(opt.value) === "" && opt.label.trim() === ""));
-  const hasPlaceholderRow = Boolean(placeholder) && !visibleOptions.some((o) => String(o.value) === "");
   const selectedOption = options.find((opt) => opt.value === value);
   const fallbackLabel = placeholder ?? (visibleOptions[0]?.label || "");
   const triggerLabel =
@@ -144,28 +185,57 @@ export function CustomSelect<T extends string>({
     if (disabled) return;
     if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      if (!open) {
-        updatePlacement();
-        setOpen(true);
-      } else if (e.key === "Enter" || e.key === " ") {
-        setOpen(false);
-      }
+      openMenu();
     }
+  };
+
+  const selectOption = (nextValue: T) => {
+    onChange(nextValue);
+    closeMenu(true);
   };
 
   const handleSelectOption = (e: ReactMouseEvent<HTMLLIElement>, nextValue: T) => {
     e.preventDefault();
     e.stopPropagation();
-    onChange(nextValue);
-    setOpen(false);
+    selectOption(nextValue);
+  };
+
+  const handleListboxKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeMenu(true);
+      return;
+    }
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const activeOption = selectableOptions[activeIndex];
+      if (activeOption) selectOption(activeOption.value);
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      if (selectableOptions.length === 0) return;
+      if (e.key === "Home") {
+        setActiveIndex(0);
+      } else if (e.key === "End") {
+        setActiveIndex(selectableOptions.length - 1);
+      } else {
+        const direction = e.key === "ArrowDown" ? 1 : -1;
+        setActiveIndex((current) => (current + direction + selectableOptions.length) % selectableOptions.length);
+      }
+    }
   };
 
   const menuNode = open && (
     <ul
+      id={listboxId}
       ref={portal ? portalRef : undefined}
       className={`custom-dropdown__menu inventory-dropdown-menu ${portal ? "inventory-dropdown-portal" : ""} ${openUp ? "custom-dropdown__menu--up" : ""}`.trim()}
       role="listbox"
+      aria-label={effectiveAriaLabel}
       style={portal && portalCoords ? portalCoords : undefined}
+      onKeyDown={handleListboxKeyDown}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -173,10 +243,15 @@ export function CustomSelect<T extends string>({
     >
       {hasPlaceholderRow && placeholder && (
         <li
+          ref={(element) => {
+            optionRefs.current[0] = element;
+          }}
           role="option"
           aria-selected={String(value) === ""}
+          tabIndex={activeIndex === 0 ? 0 : -1}
           className={`custom-dropdown__item ${String(value) === "" ? "custom-dropdown__item--selected" : ""}`}
           onClick={(e) => handleSelectOption(e, "" as T)}
+          onMouseEnter={() => setActiveIndex(0)}
         >
           {String(value) === "" ? (
             <span className="custom-dropdown__item-bar" aria-hidden="true" />
@@ -191,15 +266,21 @@ export function CustomSelect<T extends string>({
           )}
         </li>
       )}
-      {visibleOptions.map((opt) => {
+      {visibleOptions.map((opt, optionIndex) => {
         const isSelected = opt.value === value;
+        const selectableIndex = optionIndex + (hasPlaceholderRow ? 1 : 0);
         return (
           <li
             key={opt.value}
+            ref={(element) => {
+              optionRefs.current[selectableIndex] = element;
+            }}
             role="option"
             aria-selected={isSelected}
+            tabIndex={activeIndex === selectableIndex ? 0 : -1}
             className={`custom-dropdown__item ${isSelected ? "custom-dropdown__item--selected" : ""}`}
             onClick={(e) => handleSelectOption(e, opt.value)}
+            onMouseEnter={() => setActiveIndex(selectableIndex)}
           >
             {isSelected ? (
               <span className="custom-dropdown__item-bar" aria-hidden="true" />
@@ -244,6 +325,7 @@ export function CustomSelect<T extends string>({
       </select>
 
       <button
+        ref={triggerRef}
         type="button"
         className="custom-dropdown__trigger"
         onClick={toggleOpen}
@@ -251,6 +333,7 @@ export function CustomSelect<T extends string>({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
       >
         <span className="custom-dropdown__value">{triggerLabel}</span>
         <svg

@@ -66,6 +66,66 @@ describe("CustomSelect", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
   });
 
+  it("selects a portalled option with the mouse and restores focus to the trigger", () => {
+    const onChange = vi.fn();
+    render(
+      <CustomSelect
+        portal
+        ariaLabel="Target Condition"
+        value="GOOD"
+        onChange={onChange}
+        options={[
+          { value: "GOOD", label: "Good" },
+          { value: "DAMAGED", label: "Damaged" }
+        ]}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: "Good" });
+    fireEvent.click(trigger);
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Damaged" }));
+
+    expect(onChange).toHaveBeenCalledWith("DAMAGED");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("navigates options with arrow keys, selects with Enter, and closes with Escape", () => {
+    const onChange = vi.fn();
+    render(
+      <CustomSelect
+        ariaLabel="Target Condition"
+        value="GOOD"
+        onChange={onChange}
+        options={[
+          { value: "GOOD", label: "Good" },
+          { value: "DAMAGED", label: "Damaged" }
+        ]}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: "Good" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    let listbox = screen.getByRole("listbox");
+    const good = within(listbox).getByRole("option", { name: "Good" });
+    expect(document.activeElement).toBe(good);
+
+    fireEvent.keyDown(good, { key: "ArrowDown" });
+    const damaged = within(listbox).getByRole("option", { name: "Damaged" });
+    expect(document.activeElement).toBe(damaged);
+    fireEvent.keyDown(damaged, { key: "Enter" });
+
+    expect(onChange).toHaveBeenCalledWith("DAMAGED");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+
+    fireEvent.keyDown(trigger, { key: " " });
+    listbox = screen.getByRole("listbox");
+    fireEvent.keyDown(within(listbox).getByRole("option", { name: "Good" }), { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("preserves empty index-0 option in native combobox while omitting blank row from listbox", () => {
     const onChange = vi.fn();
     render(
@@ -87,5 +147,29 @@ describe("CustomSelect", () => {
     const listbox = screen.getByRole("listbox");
     expect(within(listbox).getAllByRole("option")).toHaveLength(1);
     expect(within(listbox).getByRole("option", { name: "Repack 50kg to 1kg" })).toBeTruthy();
+  });
+
+  it("does not open or change a disabled select", () => {
+    const onChange = vi.fn();
+    render(
+      <CustomSelect
+        disabled
+        ariaLabel="Condition"
+        value="GOOD"
+        onChange={onChange}
+        options={[
+          { value: "GOOD", label: "Good" },
+          { value: "DAMAGED", label: "Damaged" }
+        ]}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: "Good" });
+    expect((trigger as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(trigger);
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
