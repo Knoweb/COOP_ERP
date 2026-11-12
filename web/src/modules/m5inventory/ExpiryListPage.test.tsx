@@ -69,11 +69,18 @@ vi.mock("../../shell/auth/permissions", () => ({
 vi.mock("./inventoryApi", () => ({ useInventoryApi: () => api }));
 vi.mock("./SkuLabel", () => ({ SkuLabel: ({ skuId }: { skuId: string }) => <span>{skuId}</span> }));
 
-function renderPage() {
+type TestLocale = "en" | "si" | "ta";
+const tierTranslationCases = (["en", "si", "ta"] as const).flatMap((locale) =>
+  (["EXPIRED", "CRITICAL", "WARNING", "APPROACHING", "HEALTHY"] as const).map(
+    (tier) => [locale, tier] as const
+  )
+);
+
+function renderPage(locale: TestLocale = "en") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <IntlProvider locale="en" messages={messages.en}>
+      <IntlProvider locale={locale} messages={messages[locale]}>
         <MemoryRouter>
           <ExpiryListPage />
         </MemoryRouter>
@@ -83,10 +90,19 @@ function renderPage() {
 }
 
 const text = (id: string) => (messages.en as Record<string, string>)[id];
+const localizedText = (locale: TestLocale, id: string) =>
+  (messages[locale] as Record<string, string>)[id];
 
 describe("ExpiryListPage", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    api.locations.mockReset().mockResolvedValue([location(SHOP, "SHOP 1")]);
+    api.expiryFeed.mockReset().mockResolvedValue([mockExpiryItem]);
+    api.slowMovingStock.mockReset().mockResolvedValue([mockSlowMovingItem]);
+    api.scanExpiryAlerts.mockReset().mockResolvedValue({
+      nearExpiryAlertsEmitted: 1,
+      slowMovingAlertsEmitted: 1,
+      totalEvaluated: 2
+    });
     state.permissions = new Set<string>(["inv.expiry.scan", "inv.stock.view"]);
   });
   afterEach(cleanup);
@@ -115,17 +131,111 @@ describe("ExpiryListPage", () => {
     expect(await screen.findByText("Critical")).toBeDefined();
   });
 
-  it("renders the translated healthy expiry tier instead of its message id", async () => {
-    api.expiryFeed.mockResolvedValueOnce([{ ...mockExpiryItem, urgencyTier: "HEALTHY" }]);
+  it.each(tierTranslationCases)(
+    "renders the translated %s %s expiry tier instead of its message id",
+    async (locale, tier) => {
+      api.expiryFeed.mockResolvedValueOnce([{ ...mockExpiryItem, urgencyTier: tier }]);
+      renderPage(locale);
+
+      const select = (await screen.findByRole("combobox", {
+        name: localizedText(locale, "inventory.field.location")
+      })) as HTMLSelectElement;
+      fireEvent.change(select, { target: { value: SHOP } });
+
+      expect(
+        await screen.findByText(localizedText(locale, `inventory.expiry.tier.${tier}`), {
+          selector: ".state-chip"
+        })
+      ).toBeDefined();
+      expect(screen.queryByText(`inventory.expiry.tier.${tier}`)).toBeNull();
+    }
+  );
+
+  it.each(["CRITICAL", "WARNING", "APPROACHING", "EXPIRED"] as const)(
+    "passes the %s tier filter to the expiry API",
+    async (tier) => {
+      renderPage();
+      const locationSelect = (await screen.findByRole("combobox", {
+        name: text("inventory.field.location")
+      })) as HTMLSelectElement;
+      fireEvent.change(locationSelect, { target: { value: SHOP } });
+      await waitFor(() => expect(api.expiryFeed).toHaveBeenCalled());
+      api.expiryFeed.mockClear();
+
+      fireEvent.change(
+        screen.getByRole("combobox", { name: text("inventory.expiry.filter_tier") }),
+        { target: { value: tier } }
+      );
+
+      await waitFor(() => {
+        expect(api.expiryFeed).toHaveBeenCalledWith(SHOP, undefined, tier);
+      });
+    }
+  );
+
+  it("shows expiry loading, error, and empty states", async () => {
+    api.expiryFeed.mockImplementation(() => new Promise<ExpiryAlertItem[]>(() => {}));
+    const loadingView = renderPage();
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: text("inventory.field.location") }),
+      { target: { value: SHOP } }
+    );
+    expect(await screen.findByText(text("inventory.loading"))).toBeDefined();
+    loadingView.unmount();
+
+    api.expiryFeed.mockReset().mockRejectedValue(new Error("expiry unavailable"));
+    const errorView = renderPage();
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: text("inventory.field.location") }),
+      { target: { value: SHOP } }
+    );
+    expect((await screen.findAllByRole("alert")).length).toBeGreaterThan(0);
+    errorView.unmount();
+
+    api.expiryFeed.mockReset().mockResolvedValue([]);
     renderPage();
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: text("inventory.field.location") }),
+      { target: { value: SHOP } }
+    );
+    expect(await screen.findByText(text("inventory.expiry.none"))).toBeDefined();
+  });
 
-    const select = (await screen.findByRole("combobox", {
-      name: text("inventory.field.location")
-    })) as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: SHOP } });
+  it("shows slow-moving loading, error, and empty states", async () => {
+    api.slowMovingStock.mockImplementation(() => new Promise<SlowMovingStock[]>(() => {}));
+    const loadingView = renderPage();
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: text("inventory.field.location") }),
+      { target: { value: SHOP } }
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: text("inventory.expiry.tab_slow_moving") })
+    );
+    expect(await screen.findByText(text("inventory.loading"))).toBeDefined();
+    loadingView.unmount();
 
-    expect(await screen.findByText(text("inventory.expiry.tier.HEALTHY"))).toBeDefined();
-    expect(screen.queryByText("inventory.expiry.tier.HEALTHY")).toBeNull();
+    api.slowMovingStock.mockReset().mockRejectedValue(new Error("slow-moving unavailable"));
+    const errorView = renderPage();
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: text("inventory.field.location") }),
+      { target: { value: SHOP } }
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: text("inventory.expiry.tab_slow_moving") })
+    );
+    expect(await screen.findByRole("alert")).toBeDefined();
+    errorView.unmount();
+
+    api.slowMovingStock.mockReset().mockResolvedValue([]);
+    renderPage();
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: text("inventory.field.location") }),
+      { target: { value: SHOP } }
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: text("inventory.expiry.tab_slow_moving") })
+    );
+    expect(await screen.findByText(text("inventory.slow.none"))).toBeDefined();
   });
 
   it("switches to slow-moving stock tab and renders stagnant items", async () => {

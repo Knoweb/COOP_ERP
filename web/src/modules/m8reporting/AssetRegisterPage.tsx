@@ -8,14 +8,18 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
-import { StateChip } from "../../shell/components/StateChip";
+import { StateChip, type ChipState } from "../../shell/components/StateChip";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import {
   useReportingApi,
   type Asset,
   type RegisterAssetRequest
 } from "./reportingApi";
+import { AssetSelect, type AssetSelectOption } from "./AssetSelect";
+import { AssetDatePicker } from "./AssetDatePicker";
 import "./reporting.css";
+
+type AssetType = "LAND" | "BUILDING" | "VEHICLE" | "EQUIPMENT" | "FURNITURE" | "OTHER";
 
 export function AssetRegisterPage() {
   const t = useT();
@@ -36,7 +40,7 @@ export function AssetRegisterPage() {
   const [formCode, setFormCode] = useState("");
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formType, setFormType] = useState<"LAND" | "BUILDING" | "VEHICLE" | "EQUIPMENT" | "FURNITURE" | "OTHER">("EQUIPMENT");
+  const [formType, setFormType] = useState<AssetType>("EQUIPMENT");
   const [formLocationId, setFormLocationId] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formCost, setFormCost] = useState("");
@@ -118,6 +122,78 @@ export function AssetRegisterPage() {
     .reduce((sum, a) => sum + parseFloat(a.acquisitionCost!), 0);
   const locationCount = new Set(assets.map((a) => a.locationId).filter(Boolean)).size;
 
+  const filterLocationOptions: AssetSelectOption<string>[] = [
+    { value: "", label: t("reporting.assets.filter.all_locations").text },
+    ...locations.map((loc) => ({
+      value: loc.locationId,
+      label: locationText(loc, intl.locale)
+    }))
+  ];
+
+  const assetTypeChoices: AssetSelectOption<AssetType>[] = [
+    { value: "LAND", label: t("reporting.assets.type.land").text },
+    { value: "BUILDING", label: t("reporting.assets.type.building").text },
+    { value: "VEHICLE", label: t("reporting.assets.type.vehicle").text },
+    { value: "EQUIPMENT", label: t("reporting.assets.type.equipment").text },
+    { value: "FURNITURE", label: t("reporting.assets.type.furniture").text },
+    { value: "OTHER", label: t("reporting.assets.type.other").text }
+  ];
+
+  const filterTypeOptions: AssetSelectOption<string>[] = [
+    { value: "", label: t("reporting.assets.filter.all_types").text },
+    ...assetTypeChoices
+  ];
+
+  const filterStatusOptions: AssetSelectOption<string>[] = [
+    { value: "", label: t("reporting.assets.filter.all_statuses").text },
+    { value: "ACTIVE", label: t("reporting.assets.status.active").text },
+    { value: "MAINTENANCE", label: t("reporting.assets.status.maintenance").text },
+    { value: "DISPOSED", label: t("reporting.assets.status.disposed").text },
+    { value: "INACTIVE", label: t("reporting.assets.status.inactive").text }
+  ];
+
+  const modalLocationOptions: AssetSelectOption<string>[] = [
+    { value: "", label: t("reporting.assets.modal.location.none").text },
+    ...locations.map((loc) => ({
+      value: loc.locationId,
+      label: locationText(loc, intl.locale)
+    }))
+  ];
+
+  function resolveAssetTypeLabel(type: string): string {
+    switch (type) {
+      case "LAND":
+        return t("reporting.assets.type.land").text;
+      case "BUILDING":
+        return t("reporting.assets.type.building").text;
+      case "VEHICLE":
+        return t("reporting.assets.type.vehicle").text;
+      case "EQUIPMENT":
+        return t("reporting.assets.type.equipment").text;
+      case "FURNITURE":
+        return t("reporting.assets.type.furniture").text;
+      case "OTHER":
+        return t("reporting.assets.type.other").text;
+      default:
+        return type;
+    }
+  }
+
+  function resolveAssetStatus(status: string): { chip: ChipState; label: string } {
+    switch (status) {
+      case "ACTIVE":
+        return { chip: "issued", label: t("reporting.assets.status.active").text };
+      case "MAINTENANCE":
+        return { chip: "disputed", label: t("reporting.assets.status.maintenance").text };
+      case "DISPOSED":
+        return { chip: "void", label: t("reporting.assets.status.disposed").text };
+      case "INACTIVE":
+        return { chip: "alert", label: t("reporting.assets.status.inactive").text };
+      default:
+        return { chip: "alert", label: status };
+    }
+  }
+
   function exportCsv() {
     if (assets.length === 0) return;
     const headers = [
@@ -154,214 +230,295 @@ export function AssetRegisterPage() {
         icon="society"
         title={t("reporting.assets.title").text}
       />
-      <p className="shop-targets-card__subtitle">{t("reporting.assets.subtitle").text}</p>
+      <p className="assets-subtitle">{t("reporting.assets.subtitle").text}</p>
 
       {/* Filter and Action Bar */}
-      <div className="reporting-filter-bar" style={{ justifyContent: "space-between" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "flex-end" }}>
-          <div>
-            <label className="reporting-filter-label" htmlFor="filter-location">
+      <section className="modern-filter-panel assets-filter-panel">
+        <div className="assets-filter-controls">
+          <div className="assets-field assets-field--location">
+            <label className="assets-field__label" htmlFor="filter-location">
               {t("reporting.field.location").text}
             </label>
-            <select
+            <AssetSelect
               id="filter-location"
-              className="input"
+              aria-label={t("reporting.field.location").text}
               value={filterLocationId}
-              onChange={(e) => setFilterLocationId(e.target.value)}
-            >
-              <option value="">{t("reporting.assets.filter.all_locations").text}</option>
-              {locations.map((loc) => (
-                <option key={loc.locationId} value={loc.locationId}>
-                  {locationText(loc, intl.locale)}
-                </option>
-              ))}
-            </select>
+              options={filterLocationOptions}
+              onChange={setFilterLocationId}
+            />
           </div>
 
-          <div>
-            <label className="reporting-filter-label" htmlFor="filter-type">
+          <div className="assets-field">
+            <label className="assets-field__label" htmlFor="filter-type">
               {t("reporting.assets.col.type").text}
             </label>
-            <select
+            <AssetSelect
               id="filter-type"
-              className="input"
+              aria-label={t("reporting.assets.col.type").text}
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="">{t("reporting.assets.filter.all_types").text}</option>
-              <option value="LAND">{t("reporting.assets.type.land").text}</option>
-              <option value="BUILDING">{t("reporting.assets.type.building").text}</option>
-              <option value="VEHICLE">{t("reporting.assets.type.vehicle").text}</option>
-              <option value="EQUIPMENT">{t("reporting.assets.type.equipment").text}</option>
-              <option value="FURNITURE">{t("reporting.assets.type.furniture").text}</option>
-              <option value="OTHER">{t("reporting.assets.type.other").text}</option>
-            </select>
+              options={filterTypeOptions}
+              onChange={setFilterType}
+            />
           </div>
 
-          <div>
-            <label className="reporting-filter-label" htmlFor="filter-status">
+          <div className="assets-field">
+            <label className="assets-field__label" htmlFor="filter-status">
               {t("reporting.assets.col.status").text}
             </label>
-            <select
+            <AssetSelect
               id="filter-status"
-              className="input"
+              aria-label={t("reporting.assets.col.status").text}
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="">{t("reporting.assets.filter.all_statuses").text}</option>
-              <option value="ACTIVE">{t("reporting.assets.status.active").text}</option>
-              <option value="MAINTENANCE">{t("reporting.assets.status.maintenance").text}</option>
-              <option value="DISPOSED">{t("reporting.assets.status.disposed").text}</option>
-              <option value="INACTIVE">{t("reporting.assets.status.inactive").text}</option>
-            </select>
+              options={filterStatusOptions}
+              onChange={setFilterStatus}
+            />
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+        <div className="assets-filter-actions">
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-secondary assets-export-btn"
             onClick={exportCsv}
             disabled={assets.length === 0}
           >
-            {t("reporting.assets.btn.export").text}
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>{t("reporting.assets.btn.export").text}</span>
           </button>
+
           {canManage && (
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary assets-register-btn"
               onClick={() => {
                 resetForm();
                 setModalOpen(true);
               }}
             >
-              {t("reporting.assets.btn.register").text}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>{t("reporting.assets.btn.register").text}</span>
             </button>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Loading & Error States */}
-      {assetsQuery.isLoading && <p className="reporting-loading">{t("reporting.loading").text}</p>}
-      {assetsQuery.isError && <p className="reporting-error">{t("reporting.error.generic").text}</p>}
+      {assetsQuery.isLoading && <p className="assets-state">{t("reporting.loading").text}</p>}
+      {assetsQuery.isError && (
+        <p role="alert" className="reporting-error">
+          {t("reporting.error.generic").text}
+        </p>
+      )}
 
       {/* Content */}
       {!assetsQuery.isLoading && !assetsQuery.isError && (
-        <div className="shop-targets-card">
+        <>
           {/* Summary KPIs */}
-          <div className="targets-kpi-grid">
-            <div className="targets-kpi-card">
-              <span className="targets-kpi-label">{t("reporting.assets.kpi.total").text}</span>
-              <span className="targets-kpi-value">{totalAssets}</span>
+          <div className="assets-kpi-grid">
+            <div className="assets-kpi-card assets-kpi-card--primary">
+              <div className="assets-kpi-card__top">
+                <span className="assets-kpi-label">{t("reporting.assets.kpi.total").text}</span>
+                <span className="assets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                  </svg>
+                </span>
+              </div>
+              <div className="assets-kpi-card__bottom">
+                <span className="assets-kpi-value">{totalAssets}</span>
+              </div>
             </div>
 
-            <div className="targets-kpi-card">
-              <span className="targets-kpi-label">{t("reporting.assets.kpi.cost").text}</span>
-              <span className="targets-kpi-value">
-                <MoneyDisplay amount={totalAcquisitionCost.toFixed(2)} />
-              </span>
+            <div className="assets-kpi-card assets-kpi-card--navy">
+              <div className="assets-kpi-card__top">
+                <span className="assets-kpi-label">{t("reporting.assets.kpi.cost").text}</span>
+                <span className="assets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <line x1="2" y1="10" x2="22" y2="10" />
+                  </svg>
+                </span>
+              </div>
+              <div className="assets-kpi-card__bottom">
+                <span className="assets-kpi-value">
+                  <MoneyDisplay amount={totalAcquisitionCost.toFixed(2)} />
+                </span>
+              </div>
             </div>
 
-            <div className="targets-kpi-card">
-              <span className="targets-kpi-label">{t("reporting.assets.kpi.active").text}</span>
-              <span className="targets-kpi-value">{activeAssets}</span>
+            <div className="assets-kpi-card assets-kpi-card--success">
+              <div className="assets-kpi-card__top">
+                <span className="assets-kpi-label">{t("reporting.assets.kpi.active").text}</span>
+                <span className="assets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="16 9 10.5 15 8 12.5" />
+                  </svg>
+                </span>
+              </div>
+              <div className="assets-kpi-card__bottom">
+                <span className="assets-kpi-value">{activeAssets}</span>
+              </div>
             </div>
 
-            <div className="targets-kpi-card">
-              <span className="targets-kpi-label">{t("reporting.assets.kpi.branches").text}</span>
-              <span className="targets-kpi-value">{locationCount}</span>
+            <div className="assets-kpi-card assets-kpi-card--lavender">
+              <div className="assets-kpi-card__top">
+                <span className="assets-kpi-label">{t("reporting.assets.kpi.branches").text}</span>
+                <span className="assets-kpi-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                </span>
+              </div>
+              <div className="assets-kpi-card__bottom">
+                <span className="assets-kpi-value">{locationCount}</span>
+              </div>
             </div>
           </div>
 
-          {/* Table */}
-          {assets.length === 0 ? (
-            <p className="reporting-empty">{t("reporting.assets.empty").text}</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="table reporting-data-table">
-                <thead>
-                  <tr>
-                    <th>{t("reporting.assets.col.code").text}</th>
-                    <th>{t("reporting.assets.col.name").text}</th>
-                    <th>{t("reporting.assets.col.type").text}</th>
-                    <th>{t("reporting.assets.col.location").text}</th>
-                    <th>{t("reporting.assets.col.date").text}</th>
-                    <th style={{ textAlign: "right" }}>{t("reporting.assets.col.cost").text}</th>
-                    <th>{t("reporting.assets.col.status").text}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {assets.map((asset) => (
-                    <tr key={asset.assetId}>
-                      <td style={{ fontWeight: "var(--font-weight-strong)" }}>{asset.assetCode}</td>
-                      <td>
-                        <div>{asset.name}</div>
-                        {asset.description && (
-                          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
-                            {asset.description}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <span className="badge">{asset.assetType}</span>
-                      </td>
-                      <td>
-                        {asset.locationName ? (
-                          asset.locationName
-                        ) : (
-                          <span style={{ color: "var(--color-text-muted)" }}>
-                            {t("reporting.assets.location.entity_wide").text}
-                          </span>
-                        )}
-                      </td>
-                      <td>{asset.acquisitionDate ? formatDate(asset.acquisitionDate) : "—"}</td>
-                      <td style={{ textAlign: "right" }}>
-                        {asset.acquisitionCost ? (
-                          <MoneyDisplay amount={asset.acquisitionCost} />
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td>
-                        <StateChip
-                          state={asset.status === "ACTIVE" ? "issued" : "alert"}
-                          label={asset.status}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Section + Table / Empty State */}
+          <section className="assets-section">
+            <div className="assets-section__header">
+              <div className="assets-section__title-group">
+                <span className="assets-section__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M3 21h18" />
+                    <path d="M5 21V7l8-4v18" />
+                    <path d="M19 21V11l-6-4" />
+                  </svg>
+                </span>
+                <h2>{t("reporting.assets.nav").text}</h2>
+              </div>
+              <span className="assets-count-pill">{totalAssets}</span>
             </div>
-          )}
-        </div>
+
+            {assets.length === 0 ? (
+              <div className="assets-empty-box">
+                <span className="assets-empty-box__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                  </svg>
+                </span>
+                <p>{t("reporting.assets.empty").text}</p>
+              </div>
+            ) : (
+              <div className="modern-table-card assets-table-card">
+                <div className="modern-table-scroll">
+                  <table
+                    className="modern-table reporting-data-table assets-table"
+                    aria-label={t("reporting.assets.nav").text}
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">{t("reporting.assets.col.code").text}</th>
+                        <th scope="col">{t("reporting.assets.col.name").text}</th>
+                        <th scope="col">{t("reporting.assets.col.type").text}</th>
+                        <th scope="col">{t("reporting.assets.col.location").text}</th>
+                        <th scope="col">{t("reporting.assets.col.date").text}</th>
+                        <th scope="col" className="assets-num">{t("reporting.assets.col.cost").text}</th>
+                        <th scope="col">{t("reporting.assets.col.status").text}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assets.map((asset) => {
+                        const { chip, label } = resolveAssetStatus(asset.status);
+                        return (
+                          <tr key={asset.assetId}>
+                            <td>
+                              <span className="assets-code-pill">{asset.assetCode}</span>
+                            </td>
+                            <td>
+                              <div className="assets-name-cell">{asset.name}</div>
+                              {asset.description && (
+                                <div className="assets-desc-sub">{asset.description}</div>
+                              )}
+                            </td>
+                            <td>
+                              <span className="assets-type-pill">{resolveAssetTypeLabel(asset.assetType)}</span>
+                            </td>
+                            <td>
+                              {asset.locationName ? (
+                                asset.locationName
+                              ) : (
+                                <span className="assets-muted-cell">
+                                  {t("reporting.assets.location.entity_wide").text}
+                                </span>
+                              )}
+                            </td>
+                            <td className="assets-date-cell">
+                              {asset.acquisitionDate ? formatDate(asset.acquisitionDate) : "—"}
+                            </td>
+                            <td className="assets-num">
+                              {asset.acquisitionCost ? (
+                                <MoneyDisplay amount={asset.acquisitionCost} />
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td>
+                              <StateChip state={chip} label={label} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+        </>
       )}
 
       {/* Modal Dialog for Registration */}
       {modalOpen && (
-        <div className="targets-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="targets-modal">
-            <h2 style={{ marginTop: 0, marginBottom: "var(--space-3)" }}>
-              {t("reporting.assets.modal.title").text}
-            </h2>
+        <div
+          className="assets-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assets-modal-title"
+        >
+          <div className="assets-modal">
+            <div className="assets-modal__header">
+              <div className="assets-modal__title-group">
+                <span className="assets-section__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </span>
+                <h2 id="assets-modal-title">{t("reporting.assets.modal.title").text}</h2>
+              </div>
+              <button
+                type="button"
+                className="assets-modal__close"
+                aria-label={t("reporting.assets.modal.cancel").text}
+                onClick={() => setModalOpen(false)}
+                disabled={registerMutation.isPending}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
             {formError && (
-              <div
-                style={{
-                  color: "var(--color-alert-text)",
-                  backgroundColor: "var(--color-surface-subtle)",
-                  padding: "var(--space-2)",
-                  borderRadius: "var(--radius)",
-                  marginBottom: "var(--space-2)"
-                }}
-              >
+              <div role="alert" className="assets-form-error">
                 {formError}
               </div>
             )}
 
-            <form onSubmit={handleRegister}>
-              <div className="targets-form-group">
-                <label htmlFor="form-asset-code">{t("reporting.assets.modal.code").text} *</label>
+            <form onSubmit={handleRegister} className="assets-modal__form">
+              <div className="assets-form-group">
+                <label htmlFor="form-asset-code">{t("reporting.assets.modal.code").text}</label>
                 <input
                   id="form-asset-code"
                   type="text"
@@ -374,8 +531,8 @@ export function AssetRegisterPage() {
                 />
               </div>
 
-              <div className="targets-form-group">
-                <label htmlFor="form-asset-name">{t("reporting.assets.modal.name").text} *</label>
+              <div className="assets-form-group">
+                <label htmlFor="form-asset-name">{t("reporting.assets.modal.name").text}</label>
                 <input
                   id="form-asset-name"
                   type="text"
@@ -387,7 +544,7 @@ export function AssetRegisterPage() {
                 />
               </div>
 
-              <div className="targets-form-group">
+              <div className="assets-form-group">
                 <label htmlFor="form-asset-desc">{t("reporting.assets.modal.description").text}</label>
                 <textarea
                   id="form-asset-desc"
@@ -398,57 +555,43 @@ export function AssetRegisterPage() {
                 />
               </div>
 
-              <div className="targets-form-group">
-                <label htmlFor="form-asset-type">{t("reporting.assets.modal.type").text} *</label>
-                <select
+              <div className="assets-form-group">
+                <label htmlFor="form-asset-type">{t("reporting.assets.modal.type").text}</label>
+                <AssetSelect
                   id="form-asset-type"
-                  className="input"
+                  aria-label={t("reporting.assets.modal.type").text}
                   value={formType}
-                  onChange={(e) =>
-                    setFormType(
-                      e.target.value as "LAND" | "BUILDING" | "VEHICLE" | "EQUIPMENT" | "FURNITURE" | "OTHER"
-                    )
-                  }
-                >
-                  <option value="LAND">{t("reporting.assets.type.land").text}</option>
-                  <option value="BUILDING">{t("reporting.assets.type.building").text}</option>
-                  <option value="VEHICLE">{t("reporting.assets.type.vehicle").text}</option>
-                  <option value="EQUIPMENT">{t("reporting.assets.type.equipment").text}</option>
-                  <option value="FURNITURE">{t("reporting.assets.type.furniture").text}</option>
-                  <option value="OTHER">{t("reporting.assets.type.other").text}</option>
-                </select>
+                  options={assetTypeChoices}
+                  onChange={setFormType}
+                  portal
+                />
               </div>
 
-              <div className="targets-form-group">
+              <div className="assets-form-group">
                 <label htmlFor="form-asset-location">{t("reporting.assets.modal.location").text}</label>
-                <select
+                <AssetSelect
                   id="form-asset-location"
-                  className="input"
+                  aria-label={t("reporting.assets.modal.location").text}
                   value={formLocationId}
-                  onChange={(e) => setFormLocationId(e.target.value)}
-                >
-                  <option value="">{t("reporting.assets.modal.location.none").text}</option>
-                  {locations.map((loc) => (
-                    <option key={loc.locationId} value={loc.locationId}>
-                      {locationText(loc, intl.locale)}
-                    </option>
-                  ))}
-                </select>
+                  options={modalLocationOptions}
+                  onChange={setFormLocationId}
+                  portal
+                />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
-                <div className="targets-form-group">
+              <div className="assets-form-row">
+                <div className="assets-form-group">
                   <label htmlFor="form-asset-date">{t("reporting.assets.modal.date").text}</label>
-                  <input
+                  <AssetDatePicker
                     id="form-asset-date"
-                    type="date"
-                    className="input"
+                    label={t("reporting.assets.modal.date").text}
                     value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
+                    onChange={setFormDate}
+                    portal
                   />
                 </div>
 
-                <div className="targets-form-group">
+                <div className="assets-form-group">
                   <label htmlFor="form-asset-cost">{t("reporting.assets.modal.cost").text}</label>
                   <input
                     id="form-asset-cost"
@@ -463,7 +606,7 @@ export function AssetRegisterPage() {
                 </div>
               </div>
 
-              <div className="targets-form-actions">
+              <div className="assets-form-actions">
                 <button
                   type="button"
                   className="btn btn-secondary"

@@ -36,24 +36,36 @@ export function ShopTargetsDashboardCard() {
   const overallAchievement = totalTarget > 0 ? ((totalActual / totalTarget) * 100).toFixed(1) : null;
 
   return (
-    <div className="shop-targets-card">
+    <section className="shop-targets-card">
       <div className="shop-targets-card__header">
-        <div>
-          <h3>{t("reporting.targets.card.title").text}</h3>
-          <p className="shop-targets-card__subtitle">{t("reporting.targets.subtitle").text}</p>
+        <div className="shop-targets-card__title-group">
+          <span className="shop-targets-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="6" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+          </span>
+          <div>
+            <h3>{t("reporting.targets.card.title").text}</h3>
+            <p className="shop-targets-card__subtitle">{t("reporting.targets.subtitle").text}</p>
+          </div>
         </div>
-        <Link className="modern-dashboard-tile__link" to="/reporting/targets">
-          {t("reporting.targets.card.view_all").text}
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+        <Link className="modern-dashboard-tile__link dashboard-section__link" to="/reporting/targets">
+          <span>{t("reporting.targets.card.view_all").text}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </svg>
         </Link>
       </div>
 
       <div className="targets-kpi-grid">
-        <div className="targets-kpi-card">
+        <div className="targets-kpi-card targets-kpi-card--money">
           <span className="targets-kpi-label">{t("reporting.targets.kpi.total_target").text}</span>
           <span className="targets-kpi-value"><MoneyDisplay amount={totalTarget.toFixed(2)} /></span>
         </div>
-        <div className="targets-kpi-card">
+        <div className="targets-kpi-card targets-kpi-card--money">
           <span className="targets-kpi-label">{t("reporting.targets.kpi.total_actual").text}</span>
           <span className="targets-kpi-value"><MoneyDisplay amount={totalActual.toFixed(2)} /></span>
         </div>
@@ -70,6 +82,6 @@ export function ShopTargetsDashboardCard() {
           </span>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

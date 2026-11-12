@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -153,5 +153,28 @@ describe("ShopTargetsPage", () => {
     expect(await screen.findByText("Shop sales targets")).toBeDefined();
     expect(screen.getByText("View target performance")).toBeDefined();
     expect(screen.getByText("125.0%")).toBeDefined();
+  });
+
+  it("filters targets via custom TargetsSelect listbox option", async () => {
+    renderAt("/reporting/targets");
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("button", { name: "All locations" })).toBeDefined();
+        expect(screen.getByText("S101 Colombo Main Branch")).toBeDefined();
+      },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "All locations" }));
+    fireEvent.click(
+      within(screen.getByRole("listbox")).getByRole("option", { name: "S101 Colombo Main Branch" })
+    );
+
+    await waitFor(() => {
+      expect(api.getShopTargetPerformance).toHaveBeenCalledWith(
+        expect.objectContaining({ locationId: LOCATION_ID })
+      );
+    });
   });
 });

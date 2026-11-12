@@ -97,6 +97,7 @@ public class ExpiryAlertStore {
                         and a.status = 'TRIGGERED'
                  where l.location_id = ?
                    and l.qty_on_hand > 0
+                   and l.condition = 'GOOD'
                    and l.expiry_date is not null
                  order by l.expiry_date asc, l.sku_id asc
                 """;
