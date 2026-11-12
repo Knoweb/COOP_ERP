@@ -5,13 +5,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry.ConfigScope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
@@ -40,16 +45,22 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Integration tests for near-expiry view, alert feed, and deterministic slow-moving stock detection (PGL-M2-07).
  */
+@Import(ExpiryAlertsPostgresIntegrationTest.AdjustableClockConfiguration.class)
 class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e67e-0000-7000-8000-000000000002");
     private static final UUID OTHER_ENTITY = UUID.fromString("0190e67e-0000-7000-8000-000000000003");
     private static final String SLOW_MOVING_DAYS = "inventory.slow_moving_days";
     private static final String SLOW_MOVING_THRESHOLD_DOS = "inventory.slow_moving_threshold_dos";
+    private static final Instant TEST_INSTANT = Instant.parse("2026-11-11T06:30:00Z");
 
     @Autowired
     Handles<EvaluateExpiryAlerts, ExpiryAlertScanResult> evaluateAlertsHandler;
@@ -64,7 +75,7 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
     OuterCommand outer;
 
     @Autowired
-    Clock clock;
+    AdjustableClock clock;
 
     @Autowired
     ExpiryAlertReviewJob reviewJob;
@@ -80,6 +91,7 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        clock.set(TEST_INSTANT);
         fixture = new InventoryFixture(superuserJdbc());
         fixture.clean();
         fixture.entity(MPCS, "M5AL", "MPCS");
@@ -408,6 +420,141 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void nearExpiryAlertResolvesWhenGoodStockExpiresAndRemainsVisible() {
+        ScopeContext scope = own(MPCS);
+        UUID sku = fixture.sku(MPCS, "EXPIRES_AFTER_ALERT");
+        UUID batch = fixture.batch(sku, MPCS, "B-EXPIRES-AFTER-ALERT", today);
+        postGood(shop1, batch, "2.000", "100.00", MPCS);
+        postMovement(shop1, batch, LotCondition.DAMAGED, MovementType.RECEIPT, "3.000", "100.00", MPCS);
+
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isEqualTo(1);
+        UUID alertId = events(NearExpiryDetected.class).get(0).alertId();
+        assertThat(events(NearExpiryDetected.class).get(0).urgencyTier()).isEqualTo("CRITICAL");
+        assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY)).hasSize(1);
+
+        ScopeContext otherScope = own(OTHER_ENTITY);
+        UUID otherSku = fixture.sku(OTHER_ENTITY, "OTHER_ENTITY_EXPIRES");
+        UUID otherBatch = fixture.batch(otherSku, OTHER_ENTITY, "B-OTHER-EXPIRES", today);
+        postGood(otherShop, otherBatch, "5.000", "100.00", OTHER_ENTITY);
+        kernel.reset();
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(otherShop), otherScope)
+                        .nearExpiryAlertsEmitted())
+                .isEqualTo(1);
+        UUID otherAlertId = events(NearExpiryDetected.class).get(0).alertId();
+
+        clock.advance(Duration.ofDays(1));
+        kernel.reset();
+
+        assertThat(inventoryQueries.nearExpiryLots(shop1, 30, null, scope).stream()
+                        .filter(lot -> lot.batchId().equals(batch)))
+                .singleElement()
+                .satisfies(lot -> {
+                    assertThat(lot.urgencyTier()).isEqualTo("EXPIRED");
+                    assertThat(lot.alertActive()).isTrue();
+                });
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isZero();
+        assertThat(events(NearExpiryDetected.class)).isEmpty();
+        assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY)).isEmpty();
+
+        Map<String, Object> resolved = superuserJdbc()
+                .queryForMap("select status, resolved_at from inventory.stock_alert_state where alert_id = ?", alertId);
+        assertThat(resolved.get("status")).isEqualTo("RESOLVED");
+        assertThat(resolved.get("resolved_at")).isNotNull();
+        Timestamp resolvedAt = (Timestamp) resolved.get("resolved_at");
+        assertThat(resolvedAt.toInstant()).isEqualTo(clock.instant());
+        assertThat(alertStatus(otherAlertId)).isEqualTo("TRIGGERED");
+
+        assertThat(inventoryQueries.nearExpiryLots(shop1, 30, null, scope).stream()
+                        .filter(lot -> lot.batchId().equals(batch)))
+                .singleElement()
+                .satisfies(lot -> {
+                    assertThat(lot.urgencyTier()).isEqualTo("EXPIRED");
+                    assertThat(lot.alertActive()).isFalse();
+                });
+
+        kernel.reset();
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isZero();
+        assertThat(events(NearExpiryDetected.class)).isEmpty();
+        assertThat(audits(EvaluateExpiryAlertsHandler.AUDIT_NEAR_EXPIRY)).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select resolved_at from inventory.stock_alert_state where alert_id = ?",
+                                Object.class,
+                                alertId))
+                .isEqualTo(resolvedAt);
+        assertThat(alertStatus(otherAlertId)).isEqualTo("TRIGGERED");
+
+        UUID alreadyExpiredSku = fixture.sku(MPCS, "EXPIRED_WITHOUT_ALERT");
+        UUID alreadyExpiredBatch = fixture.batch(alreadyExpiredSku, MPCS, "B-EXPIRED-WITHOUT-ALERT", today);
+        postGood(shop1, alreadyExpiredBatch, "4.000", "100.00", MPCS);
+        kernel.reset();
+
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_alert_state where location_id = ? and batch_id = ?",
+                                Integer.class,
+                                shop1,
+                                alreadyExpiredBatch))
+                .isZero();
+    }
+
+    @Test
+    void warningBoundaryAndWarningToCriticalEscalationRemainIntact() {
+        ScopeContext scope = own(MPCS);
+        UUID escalationSku = fixture.sku(MPCS, "WARNING_TO_CRITICAL");
+        UUID escalationBatch = fixture.batch(escalationSku, MPCS, "B-WARNING-TO-CRITICAL", today.plusDays(8));
+        postGood(shop1, escalationBatch, "10.000", "100.00", MPCS);
+
+        UUID boundarySku = fixture.sku(MPCS, "WARNING_BOUNDARY");
+        UUID boundaryBatch = fixture.batch(boundarySku, MPCS, "B-WARNING-BOUNDARY", today.plusDays(30));
+        postGood(shop1, boundaryBatch, "10.000", "100.00", MPCS);
+        kernel.reset();
+
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isEqualTo(2);
+        assertThat(events(NearExpiryDetected.class))
+                .extracting(NearExpiryDetected::batchId, NearExpiryDetected::urgencyTier)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(escalationBatch, "WARNING"),
+                        org.assertj.core.groups.Tuple.tuple(boundaryBatch, "WARNING"));
+
+        UUID escalationAlertId = events(NearExpiryDetected.class).stream()
+                .filter(event -> event.batchId().equals(escalationBatch))
+                .findFirst()
+                .orElseThrow()
+                .alertId();
+        clock.advance(Duration.ofDays(1));
+        kernel.reset();
+
+        assertThat(evaluateAlertsHandler
+                        .handle(new EvaluateExpiryAlerts(shop1), scope)
+                        .nearExpiryAlertsEmitted())
+                .isEqualTo(1);
+        assertThat(events(NearExpiryDetected.class)).singleElement().satisfies(event -> {
+            assertThat(event.alertId()).isEqualTo(escalationAlertId);
+            assertThat(event.batchId()).isEqualTo(escalationBatch);
+            assertThat(event.urgencyTier()).isEqualTo("CRITICAL");
+            assertThat(event.daysToExpiry()).isEqualTo(7);
+        });
+    }
+
+    @Test
     void slowMovingExcludesExactThresholdNonPositiveAndDamagedStock() {
         ScopeContext scope = own(MPCS);
 
@@ -576,6 +723,12 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .toList();
     }
 
+    private String alertStatus(UUID alertId) {
+        return superuserJdbc()
+                .queryForObject(
+                        "select status from inventory.stock_alert_state where alert_id = ?", String.class, alertId);
+    }
+
     private static JobExecution execution() {
         return new JobExecution() {
             @Override
@@ -591,5 +744,53 @@ class ExpiryAlertsPostgresIntegrationTest extends PostgresIntegrationTest {
                 return Optional.empty();
             }
         };
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class AdjustableClockConfiguration {
+
+        @Bean
+        @Primary
+        AdjustableClock adjustableClock() {
+            return new AdjustableClock(TEST_INSTANT, ZoneOffset.UTC);
+        }
+    }
+
+    static final class AdjustableClock extends Clock {
+
+        private final AtomicReference<Instant> instant;
+        private final ZoneId zone;
+
+        AdjustableClock(Instant instant, ZoneId zone) {
+            this(new AtomicReference<>(instant), zone);
+        }
+
+        private AdjustableClock(AtomicReference<Instant> instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        void set(Instant value) {
+            instant.set(value);
+        }
+
+        void advance(Duration duration) {
+            instant.updateAndGet(value -> value.plus(duration));
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId newZone) {
+            return zone.equals(newZone) ? this : new AdjustableClock(instant, newZone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant.get();
+        }
     }
 }

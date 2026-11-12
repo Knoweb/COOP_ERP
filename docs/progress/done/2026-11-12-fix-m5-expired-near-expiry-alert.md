@@ -1,0 +1,1 @@
+- PGL-M2-07 follow-up: resolved active near-expiry alerts when eligible GOOD stock passes its expiry date while retaining expired stock in the expiry feed and immutable detection history; added clock-driven PostgreSQL regressions for expiry transition, idempotent resolution, DAMAGED-stock coexistence, warning-boundary detection, and WARNING-to-CRITICAL escalation (M5-15).
