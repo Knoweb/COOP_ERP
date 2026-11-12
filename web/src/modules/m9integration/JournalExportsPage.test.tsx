@@ -1,9 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { businessToday } from "../../shell/i18n/formats";
 import { messages } from "../../shell/i18n/messages";
+import { defaultExportPeriod } from "./integrationView";
 import { JournalExportsPage } from "./JournalExportsPage";
 import type { JournalExport } from "./integrationApi";
 
@@ -144,5 +146,84 @@ describe("JournalExportsPage acknowledgement (ACC-03)", () => {
     expect(first[0]).toBe(EXPORT_ID);
     expect(second[0]).toBe(EXPORT_ID);
     expect(second[1]).toBe(first[1]);
+  });
+});
+
+function formatDmy(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+describe("JournalExportsPage date pickers (.cdp)", () => {
+  beforeEach(() => {
+    state.permissions.clear();
+    state.status = "GENERATED";
+    vi.clearAllMocks();
+  });
+
+  afterEach(cleanup);
+
+  it("picks From and To dates using custom .cdp calendar dialogs and closes on Escape", async () => {
+    const initial = defaultExportPeriod(businessToday());
+    const fromPrefix = initial.from.slice(0, 7);
+    const toPrefix = initial.to.slice(0, 7);
+    const expectedFromDisplay = formatDmy(initial.from);
+    const expectedToDisplay = formatDmy(initial.to);
+    const expectedPickedFromIso = `${fromPrefix}-15`;
+    const expectedPickedToIso = `${toPrefix}-10`;
+
+    renderPage();
+
+    const fromBtn = await screen.findByRole("button", { name: `From: ${expectedFromDisplay}` });
+    const toBtn = screen.getByRole("button", { name: `To: ${expectedToDisplay}` });
+
+    fireEvent.click(fromBtn);
+    const fromDialog = screen.getByRole("dialog", { name: "From" });
+    expect(fromDialog.className).toContain("cdp__popup");
+    fireEvent.click(within(fromDialog).getByRole("button", { name: "15" }));
+
+    expect(screen.queryByRole("dialog", { name: "From" })).toBeNull();
+    expect(screen.getByRole("button", { name: `From: ${formatDmy(expectedPickedFromIso)}` })).toBeDefined();
+    await waitFor(() => {
+      expect(mockApi.pending).toHaveBeenCalledWith(expectedPickedFromIso, initial.to);
+    });
+
+    fireEvent.click(toBtn);
+    const toDialog = screen.getByRole("dialog", { name: "To" });
+    expect(toDialog.className).toContain("cdp__popup");
+    fireEvent.click(within(toDialog).getByRole("button", { name: "10" }));
+
+    expect(screen.queryByRole("dialog", { name: "To" })).toBeNull();
+    expect(screen.getByRole("button", { name: `To: ${formatDmy(expectedPickedToIso)}` })).toBeDefined();
+    await waitFor(() => {
+      expect(mockApi.pending).toHaveBeenCalledWith(expectedPickedFromIso, expectedPickedToIso);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: `From: ${formatDmy(expectedPickedFromIso)}` }));
+    expect(screen.getByRole("dialog", { name: "From" })).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "From" })).toBeNull();
+  });
+
+  it("toggles the Provisional pill checked state class when clicked", async () => {
+    renderPage();
+
+    await screen.findByRole("button", { name: "Reconciliation" });
+    const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
+    const pill = checkbox.closest("label");
+
+    expect(checkbox.checked).toBe(false);
+    expect(pill?.className).toContain("integration-check");
+    expect(pill?.className).not.toContain("integration-check--checked");
+
+    fireEvent.click(checkbox);
+
+    expect(checkbox.checked).toBe(true);
+    expect(pill?.className).toContain("integration-check--checked");
+
+    fireEvent.click(checkbox);
+
+    expect(checkbox.checked).toBe(false);
+    expect(pill?.className).not.toContain("integration-check--checked");
   });
 });
