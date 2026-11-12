@@ -17,6 +17,7 @@ import {
   type Sku
 } from "./reportingApi";
 import "./reporting.css";
+import "./revenue-estimator.css";
 
 interface MixItem {
   skuId: string;
