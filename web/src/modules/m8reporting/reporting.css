@@ -701,7 +701,6 @@
   font-weight: var(--font-weight-strong);
   color: var(--color-brand-dark);
   white-space: nowrap;
-  letter-spacing: 0.02em;
 }
 
 .finance-filter-action-spacer {
