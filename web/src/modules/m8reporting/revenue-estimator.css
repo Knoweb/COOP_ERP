@@ -49,8 +49,8 @@
   min-height: var(--target-min) !important;
   height: auto !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-color: var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -59,21 +59,29 @@
   font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
-  box-shadow: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
 .sales-estimator-input--numeric {
   font-variant-numeric: tabular-nums;
 }
 
-.shell-page .sales-estimator-field input.sales-estimator-input:hover,
+.shell-page .sales-estimator-field input.sales-estimator-input:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
 .shell-page .sales-estimator-field input.sales-estimator-input:focus,
 .shell-page .sales-estimator-field input.sales-estimator-input:focus-visible {
   border-color: var(--color-accent) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .sales-estimator-section {
@@ -220,8 +228,8 @@
   min-height: var(--target-min) !important;
   height: auto !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) calc(var(--space-1) + var(--space-half)) calc(var(--space-4) + var(--space-half)) !important;
-  border: var(--border-width) solid var(--color-polish-22) !important;
-  border-color: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-color: var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -230,17 +238,25 @@
   font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
-  box-shadow: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.shell-page .sales-estimator-search-wrap input.sales-estimator-search-input:hover,
+.shell-page .sales-estimator-search-wrap input.sales-estimator-search-input:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
 .shell-page .sales-estimator-search-wrap input.sales-estimator-search-input:focus,
 .shell-page .sales-estimator-search-wrap input.sales-estimator-search-input:focus-visible {
   border-color: var(--color-accent) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .sales-estimator-sku-select-wrap {
@@ -333,33 +349,65 @@
 
 .sales-estimator-mix-table-card,
 .sales-estimator-results-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border-radius: calc(var(--radius) * 3);
-  border: var(--border-width) solid var(--color-border);
-  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23);
+  border: var(--border-width) solid var(--color-polish-21);
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-13), 0 var(--space-half) var(--space-2) var(--color-polish-14);
   overflow: hidden;
   margin-bottom: 0;
 }
 
+.sales-estimator-mix-table,
+.sales-estimator-results-table {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
 .sales-estimator-mix-table th,
 .sales-estimator-results-table th {
-  background: var(--color-polish-29) !important;
+  background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-14) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase;
-  min-width: auto !important;
-  padding: calc(var(--space-1) + var(--space-half) / 2) var(--space-2) !important;
+  text-align: center;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height);
+  min-width: 0 !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
 }
 
 .sales-estimator-mix-table td,
 .sales-estimator-results-table td {
-  min-width: auto !important;
+  min-width: 0 !important;
   max-width: none !important;
-  padding: calc(var(--space-1) + var(--space-half) / 2) var(--space-2) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
   vertical-align: middle;
+}
+
+.sales-estimator-mix-table th:last-child,
+.sales-estimator-mix-table td:last-child,
+.sales-estimator-results-table th:last-child,
+.sales-estimator-results-table td:last-child {
+  border-right: none !important;
+}
+
+.sales-estimator-mix-table tbody tr:last-child td,
+.sales-estimator-results-table tbody tr:last-child td {
+  border-bottom: none !important;
 }
 
 .sales-estimator-sku-cell {
@@ -788,7 +836,7 @@
   min-height: var(--target-min) !important;
   height: auto !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -797,7 +845,7 @@
   font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
-  box-shadow: none !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -805,11 +853,18 @@
   cursor: pointer !important;
   outline: none !important;
   text-align: left !important;
-  transform: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.sales-estimator-dropdown-select .custom-dropdown__trigger:hover,
+.sales-estimator-dropdown-select .custom-dropdown__trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-text) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
 .sales-estimator-dropdown-select .custom-dropdown__trigger:focus-visible,
 .sales-estimator-dropdown-select .custom-dropdown__trigger:active,
 .sales-estimator-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
@@ -817,8 +872,8 @@
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
-  transform: none !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .sales-estimator-dropdown-select .custom-dropdown__value {
@@ -1008,7 +1063,7 @@
   min-height: var(--target-min) !important;
   height: auto !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -1017,7 +1072,7 @@
   font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
-  box-shadow: none !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -1025,19 +1080,26 @@
   cursor: pointer !important;
   outline: none !important;
   text-align: left !important;
-  transform: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.shell-page .sales-estimator-calendar .sales-estimator-calendar__trigger:hover,
+.shell-page .sales-estimator-calendar .sales-estimator-calendar__trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-text) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
 .shell-page .sales-estimator-calendar .sales-estimator-calendar__trigger:focus-visible,
 .shell-page .sales-estimator-calendar--open .sales-estimator-calendar__trigger {
   border-color: var(--color-accent) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
-  transform: none !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .sales-estimator-calendar__value {

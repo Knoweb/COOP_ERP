@@ -7,6 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useT } from "../../shell/i18n/useT";
@@ -148,7 +149,7 @@ export function CustomersPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("customers.title").text}</h1>
+      <PageHeader icon="relationships" title={t("customers.title").text} />
       {canSeePrivacy && (
         <p>
           <Link to="/customers/privacy">{t("customers.privacy.title").text}</Link>

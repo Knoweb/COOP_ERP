@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -124,7 +125,7 @@ export function OpeningBalancePage() {
           {t("inventory.back").text}
         </Link>
       </div>
-      <h1>{t("inventory.opening.title").text}</h1>
+      <PageHeader icon="stock" title={t("inventory.opening.title").text} />
       <p>
         <StateChip state={chipOf(ob.status)} label={t(`inventory.opening.status.${ob.status}`).text} />
       </p>

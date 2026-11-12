@@ -82,7 +82,7 @@ export function DuplicateSuspectsPage() {
       </div>
 
       <PageHeader
-        icon="catalogue"
+        icon="suspects"
         title={t("catalogue.suspects.title").text}
       />
       <p className="catalogue-import-subtitle">{t("catalogue.suspects.description").text}</p>

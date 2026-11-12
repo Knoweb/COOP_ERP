@@ -35,7 +35,7 @@ export function UsersPage() {
   return (
     <main className="shell-page">
       <PageHeader
-        icon="society"
+        icon="users"
         title={t("party.users.title").text}
         actions={
           canManage ? (

@@ -89,7 +89,7 @@ export function GrantsPage() {
 
   return (
     <main className="shell-page party-grants-page">
-      <PageHeader icon="society" title={t("party.grants.title").text} />
+      <PageHeader icon="grants" title={t("party.grants.title").text} />
       {grants.isLoading && <p>{t("party.list.loading").text}</p>}
       {grants.isError && <p role="alert">{refusalOf(grants.error, t("party.error.generic").text).text}</p>}
       {grants.isSuccess && rows.length === 0 && (

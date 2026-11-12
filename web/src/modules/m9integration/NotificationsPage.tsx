@@ -6,6 +6,7 @@ import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip, type ChipState } from "../../shell/components/StateChip";
 import { useScope } from "../../shell/scope/useScope";
 import { useIntegrationApi, type LogStatus, type NotificationLogEntry, type NotificationRule } from "./integrationApi";
@@ -118,7 +119,7 @@ export function NotificationsPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("integration.notify.title").text}</h1>
+      <PageHeader icon="notifications" title={t("integration.notify.title").text} />
       {message && <p role="alert">{message}</p>}
 
       <section className="notifications-section">

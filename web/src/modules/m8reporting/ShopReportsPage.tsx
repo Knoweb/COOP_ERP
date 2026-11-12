@@ -91,7 +91,7 @@ export function ShopReportsPage() {
 
   return (
     <main className="shell-page shop-reports-page">
-      <PageHeader icon="society" title={t("reporting.shop_reports.title").text} />
+      <PageHeader icon="shop-reports" title={t("reporting.shop_reports.title").text} />
       <p className="shop-reports-subtitle">{t("reporting.shop_reports.subtitle").text}</p>
 
       <div className="shop-reports-tablist" role="tablist">

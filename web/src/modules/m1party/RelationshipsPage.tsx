@@ -27,7 +27,7 @@ export function RelationshipsPage() {
   return (
     <main className="shell-page">
       <PageHeader
-        icon="relationships"
+        icon="partner-network"
         title={t("party.relationships.title").text}
       />
 

@@ -161,7 +161,7 @@ export function PickListPage() {
           {t("inventory.back").text}
         </Link>
       </div>
-      <PageHeader icon="stock" title={t("inventory.pick.title").text} />
+      <PageHeader icon="transfers" title={t("inventory.pick.title").text} />
       <p className="modern-intro-text">{t("inventory.pick.intro").text}</p>
       <form className="modern-filter-panel inventory-form-row" onSubmit={submit}>
         <label className="inventory-form-field">

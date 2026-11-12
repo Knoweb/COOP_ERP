@@ -6,6 +6,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { useCustomersApi } from "./customersApi";
@@ -43,7 +44,7 @@ export function StatementPage() {
         </svg>
         {t("customers.statement.back").text}
       </Link>
-      <h1>{t("customers.statement.title").text}</h1>
+      <PageHeader icon="statement" title={t("customers.statement.title").text} />
       <div className="customers-filter-bar">
         <label className="customers-field">
           {t("customers.statement.from").text}

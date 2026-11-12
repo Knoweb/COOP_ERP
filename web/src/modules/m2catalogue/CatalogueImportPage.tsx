@@ -138,7 +138,7 @@ export function CatalogueImportPage() {
       </div>
 
       <PageHeader
-        icon="catalogue"
+        icon="import"
         title={t("catalogue.import.title").text}
       />
       <p className="catalogue-import-subtitle">{t("catalogue.import.description").text}</p>

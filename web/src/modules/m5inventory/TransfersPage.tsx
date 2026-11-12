@@ -175,7 +175,7 @@ export function TransfersPage() {
         </Link>
       </div>
       <PageHeader
-        icon="stock"
+        icon="transfers"
         title={t("inventory.transfer.title").text}
       />
       <section className="modern-filter-panel modern-filter-panel--stock">

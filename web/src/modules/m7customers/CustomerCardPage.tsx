@@ -7,6 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
@@ -66,10 +67,15 @@ export function CustomerCardPage() {
   return (
     <main className="shell-page">
       <BackLink />
-      <h1>
-        {name.text}
-        {name.isFallback && <LangFallbackTag />}
-      </h1>
+      <PageHeader
+        icon="relationships"
+        title={
+          <>
+            {name.text}
+            {name.isFallback && <LangFallbackTag />}
+          </>
+        }
+      />
       <dl className="customers-facts">
         <dt>{t("customers.column.phone").text}</dt>
         <dd>{customer.phone}</dd>

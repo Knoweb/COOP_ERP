@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import "./trading.css";
 import { SkuLabel } from "./labels";
 import { useTradingApi, type ClaimKind } from "./tradingApi";
@@ -56,7 +57,7 @@ export function NewClaimPage() {
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
-      <h1>{t("trading.claim.new").text}</h1>
+      <PageHeader icon="exceptions" title={t("trading.claim.new").text} />
       {grn.isLoading && <p>{t("trading.loading").text}</p>}
       {grn.isError && <p role="alert">{errorText(grn.error, t("trading.error.not_found").text)}</p>}
       {grn.data && (

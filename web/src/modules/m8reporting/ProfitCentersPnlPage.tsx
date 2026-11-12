@@ -147,7 +147,7 @@ export function ProfitCentersPnlPage() {
   return (
     <main className="shell-page">
       <PageHeader
-        icon="society"
+        icon="profit-centers"
         title={t("reporting.profit_centers.title").text}
       />
       <p className="pnl-subtitle">{t("reporting.profit_centers.subtitle").text}</p>

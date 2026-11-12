@@ -34,7 +34,7 @@ export function InventoryPoliciesPage() {
           {t("inventory.back").text}
         </Link>
       </div>
-      <PageHeader icon="stock" title={t("inventory.policy.title").text} />
+      <PageHeader icon="rules" title={t("inventory.policy.title").text} />
       <p className="modern-intro-text">{t("inventory.policy.intro").text}</p>
       <p className="inventory-policy-notice" role="status">{t("inventory.policy.read_unavailable").text}</p>
       <section className="inventory-policy-grid">

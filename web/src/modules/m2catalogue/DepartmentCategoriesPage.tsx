@@ -156,7 +156,7 @@ export function DepartmentCategoriesPage() {
     <div className="catalogue-departments-page app-page-shell">
       <PageHeader
         title={t("catalogue.departments.title").text}
-        icon="catalogue"
+        icon="departments"
         actions={
           canManage && !showDefineForm && !editingDepartment ? (
             <button

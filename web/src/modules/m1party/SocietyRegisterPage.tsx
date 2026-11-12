@@ -7,6 +7,7 @@ import { useT } from "../../shell/i18n/useT";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { ApiProblem } from "../../shell/api/client";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
@@ -309,20 +310,18 @@ export function SocietyRegisterPage() {
 
   return (
     <main className="shell-page">
-      <div className="page-heading">
-        <div className="page-heading__icon">
-          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        </div>
-        <div className="page-heading__copy">
-          <h1>{t("party.register.title").text}</h1>
-        </div>
-        {canRegister && (
-          <div className="page-heading__actions" aria-label={t("party.register.actions").text}>
-            <Link className="modern-btn" to="/party/societies/new">{t("party.register.new").text}</Link>
-            <Link className="modern-btn" to="/party/societies/bulk">{t("party.register.bulk").text}</Link>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        icon="society"
+        title={t("party.register.title").text}
+        actions={
+          canRegister ? (
+            <div aria-label={t("party.register.actions").text} style={{ display: "contents" }}>
+              <Link className="modern-btn" to="/party/societies/new">{t("party.register.new").text}</Link>
+              <Link className="modern-btn" to="/party/societies/bulk">{t("party.register.bulk").text}</Link>
+            </div>
+          ) : undefined
+        }
+      />
 
       <div className="society-filters-wrap">
         <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">

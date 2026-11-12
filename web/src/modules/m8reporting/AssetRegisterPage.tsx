@@ -227,7 +227,7 @@ export function AssetRegisterPage() {
   return (
     <main className="shell-page">
       <PageHeader
-        icon="society"
+        icon="assets"
         title={t("reporting.assets.title").text}
       />
       <p className="assets-subtitle">{t("reporting.assets.subtitle").text}</p>

@@ -6,6 +6,7 @@ import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { usePartyApi } from "./partyApi";
 import type { BulkNetworkReport, BulkRegisterNetworkRequest, BulkShopItem, BulkUserItem, BulkDeviceItem } from "./partyApi";
 import { errorText } from "./SocietyRegisterPage";
@@ -66,7 +67,7 @@ export function BulkNetworkRegisterPage() {
   if (!canRegister) {
     return (
       <main className="shell-page">
-        <h1>{t("party.bulk_network.title").text}</h1>
+        <PageHeader icon="import" title={t("party.bulk_network.title").text} />
         <p role="note">{t("party.bulk_network.not_allowed").text}</p>
       </main>
     );
@@ -93,7 +94,7 @@ export function BulkNetworkRegisterPage() {
           {t("party.back_to_register").text}
         </Link>
       </div>
-      <h1>{t("party.bulk_network.title").text}</h1>
+      <PageHeader icon="import" title={t("party.bulk_network.title").text} />
       <p>{t("party.bulk_network.intro").text}</p>
 
       <form onSubmit={submit} className="party-form-row-margin">

@@ -8,6 +8,7 @@ import { inLocale, skuText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import {
   useInventoryApi,
   type BulkStockReport,
@@ -262,7 +263,7 @@ export function NewOpeningBalancePage() {
           {t("inventory.back").text}
         </Link>
       </div>
-      <h1>{t("inventory.opening.new.title").text}</h1>
+      <PageHeader icon="stock" title={t("inventory.opening.new.title").text} />
 
       <div className="opening-tabs" role="tablist">
         <button

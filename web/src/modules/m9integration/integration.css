@@ -120,8 +120,8 @@
   width: 100%;
   min-height: calc(var(--space-4) + var(--space-half));
   padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half));
-  border: var(--border-width) solid var(--color-accent);
-  border-radius: calc(var(--radius) * 2);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 2.5);
   background-color: var(--color-surface);
   color: var(--color-text);
   font-family: inherit;
@@ -131,15 +131,26 @@
   cursor: pointer;
   text-align: left;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.integration-dropdown-trigger:hover,
+.integration-dropdown-trigger:hover {
+  border-color: var(--color-polish-19);
+  background-color: var(--color-polish-29);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
+}
+
 .integration-dropdown-trigger:focus,
 .integration-dropdown-trigger--open {
   border-color: var(--color-accent);
   background-color: var(--color-surface);
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
 }
 
 .integration-dropdown-arrow {
@@ -345,11 +356,13 @@
 }
 
 .notifications-section .modern-table-card {
-  border: var(--border-width-strong) solid var(--color-polish-21);
+  border: var(--border-width) solid var(--color-polish-21);
 }
 
 .notifications-section .modern-table th {
-  border-bottom: var(--border-width) solid var(--color-polish-21);
+  background: var(--color-polish-22);
+  color: var(--color-brand-dark);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
 }
 
 .notifications-section .modern-table td {
@@ -382,18 +395,22 @@
 .shell-page .notification-rules-table,
 .notification-rules-table {
   width: 100%;
-  min-width: calc(var(--space-8) * 8);
+  max-width: 100%;
+  min-width: 0;
   table-layout: auto;
   border-collapse: collapse !important;
 }
 
 .shell-page .notification-rules-table th,
 .notification-rules-table th {
-  padding: var(--space-2) var(--space-2) !important;
+  padding: var(--space-1) var(--space-2) !important;
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
   vertical-align: middle;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
   line-height: var(--line-height);
   box-sizing: border-box;
   min-width: 0 !important;
@@ -401,7 +418,7 @@
 
 .shell-page .notification-rules-table td,
 .notification-rules-table td {
-  padding: var(--space-2) var(--space-2) !important;
+  padding: var(--space-1) var(--space-2) !important;
   font-size: var(--font-size-sm) !important;
   vertical-align: middle;
   line-height: var(--line-height);
@@ -414,17 +431,21 @@
 .notification-rules-table th:first-child,
 .notification-rules-table td:first-child {
   min-width: 0 !important;
-  padding-left: var(--space-3) !important;
+  padding-left: var(--space-2) !important;
 }
 
 .shell-page .notification-rules-table th:last-child,
 .shell-page .notification-rules-table td:last-child,
 .notification-rules-table th:last-child,
 .notification-rules-table td:last-child {
-  padding-right: var(--space-3) !important;
+  padding-right: var(--space-2) !important;
   text-align: right;
-  white-space: nowrap !important;
   width: 1%;
+}
+
+.shell-page .notification-rules-table td:last-child,
+.notification-rules-table td:last-child {
+  white-space: nowrap !important;
 }
 
 /* Col 1: Name */
@@ -463,19 +484,25 @@
 .shell-page .notification-rules-table th:nth-child(4),
 .shell-page .notification-rules-table td:nth-child(4),
 .notification-rules-table td:nth-child(4) {
-  white-space: nowrap !important;
   width: 1%;
   min-width: 0 !important;
+}
+.shell-page .notification-rules-table td:nth-child(4),
+.notification-rules-table td:nth-child(4) {
+  white-space: nowrap !important;
 }
 
 /* Col 5: Status */
 .shell-page .notification-rules-table th:nth-child(5),
 .shell-page .notification-rules-table td:nth-child(5),
 .notification-rules-table td:nth-child(5) {
-  white-space: nowrap !important;
   width: 1%;
   min-width: 0 !important;
   text-align: center;
+}
+.shell-page .notification-rules-table td:nth-child(5),
+.notification-rules-table td:nth-child(5) {
+  white-space: nowrap !important;
 }
 
 .notification-rule-btn {
@@ -581,18 +608,22 @@
 .shell-page .notification-log-table,
 .notification-log-table {
   width: 100%;
-  min-width: calc(var(--space-8) * 13 + var(--space-2));
+  max-width: 100%;
+  min-width: 0;
   table-layout: auto;
   border-collapse: collapse !important;
 }
 
 .shell-page .notification-log-table th,
 .notification-log-table th {
-  padding: var(--space-2) var(--space-1) !important;
+  padding: var(--space-1) var(--space-1) !important;
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
   vertical-align: middle;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
   line-height: var(--line-height);
   box-sizing: border-box;
   min-width: 0 !important;
@@ -600,7 +631,7 @@
 
 .shell-page .notification-log-table td,
 .notification-log-table td {
-  padding: var(--space-2) var(--space-1) !important;
+  padding: var(--space-1) var(--space-1) !important;
   font-size: var(--font-size-sm) !important;
   vertical-align: middle;
   line-height: var(--line-height);
@@ -630,19 +661,23 @@
 .shell-page .notification-log-table th:nth-child(1),
 .shell-page .notification-log-table td:nth-child(1) {
   width: 1%;
-  white-space: nowrap !important;
   min-width: 0 !important;
-  padding-right: var(--space-half) !important;
+  padding-right: var(--space-1) !important;
   text-align: left !important;
 }
+.notification-log-table td.log-col-when,
+.shell-page .notification-log-table td:nth-child(1) {
+  white-space: nowrap !important;
+}
 
-/* Col 2: Template - natural balanced width */
+/* Col 2: Template - flexible balanced width */
 .notification-log-table col.log-col-template,
 .notification-log-table th.log-col-template,
 .notification-log-table td.log-col-template,
 .shell-page .notification-log-table th:nth-child(2),
 .shell-page .notification-log-table td:nth-child(2) {
-  width: calc(var(--space-8) * 2 + var(--space-4));
+  width: auto !important;
+  min-width: 0 !important;
   white-space: normal !important;
   word-break: normal;
   overflow-wrap: break-word;
@@ -655,18 +690,22 @@
 .shell-page .notification-log-table th:nth-child(3),
 .shell-page .notification-log-table td:nth-child(3) {
   width: 1%;
-  white-space: nowrap !important;
   min-width: 0 !important;
   text-align: left;
 }
+.notification-log-table td.log-col-channel,
+.shell-page .notification-log-table td:nth-child(3) {
+  white-space: nowrap !important;
+}
 
-/* Col 4: Recipient - balanced comfortable width */
+/* Col 4: Recipient - flexible balanced width */
 .notification-log-table col.log-col-recipient,
 .notification-log-table th.log-col-recipient,
 .notification-log-table td.log-col-recipient,
 .shell-page .notification-log-table th:nth-child(4),
 .shell-page .notification-log-table td:nth-child(4) {
-  width: calc(var(--space-8) * 3);
+  width: auto !important;
+  min-width: 0 !important;
   white-space: normal !important;
   word-break: normal;
   overflow-wrap: break-word;
@@ -679,9 +718,12 @@
 .shell-page .notification-log-table th:nth-child(5),
 .shell-page .notification-log-table td:nth-child(5) {
   width: 1%;
-  white-space: nowrap !important;
   min-width: 0 !important;
   text-align: left;
+}
+.notification-log-table td.log-col-language,
+.shell-page .notification-log-table td:nth-child(5) {
+  white-space: nowrap !important;
 }
 
 /* Col 6: Status - shrink-to-fit chip */
@@ -691,9 +733,12 @@
 .shell-page .notification-log-table th:nth-child(6),
 .shell-page .notification-log-table td:nth-child(6) {
   width: 1%;
-  white-space: nowrap !important;
   min-width: 0 !important;
   text-align: center;
+}
+.notification-log-table td.log-col-status,
+.shell-page .notification-log-table td:nth-child(6) {
+  white-space: nowrap !important;
 }
 
 /* Col 7: Attempts - shrink-to-fit count */
@@ -703,20 +748,24 @@
 .shell-page .notification-log-table th:nth-child(7),
 .shell-page .notification-log-table td:nth-child(7) {
   width: 1%;
-  white-space: nowrap !important;
   min-width: 0 !important;
   text-align: center;
   padding-left: var(--space-half) !important;
   padding-right: var(--space-half) !important;
 }
+.notification-log-table td.log-col-attempts,
+.shell-page .notification-log-table td:nth-child(7) {
+  white-space: nowrap !important;
+}
 
-/* Col 8: Note - balanced readable space */
+/* Col 8: Note - flexible readable space */
 .notification-log-table col.log-col-note,
 .notification-log-table th.log-col-note,
 .notification-log-table td.log-col-note,
 .shell-page .notification-log-table th:nth-child(8),
 .shell-page .notification-log-table td:nth-child(8) {
-  width: calc(var(--space-8) * 4);
+  width: auto !important;
+  min-width: 0 !important;
   white-space: normal !important;
   word-break: normal;
   overflow-wrap: break-word;

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
@@ -37,7 +38,7 @@ export function PrivacyRequestsPage() {
         </svg>
         {t("customers.back").text}
       </Link>
-      <h1>{t("customers.privacy.title").text}</h1>
+      <PageHeader icon="privacy" title={t("customers.privacy.title").text} />
       <p>{t("customers.privacy.explain").text}</p>
       {requests.isLoading && <p>{t("customers.loading").text}</p>}
       {requests.isError && <p role="alert">{errorText(requests.error, t("customers.error.generic").text)}</p>}

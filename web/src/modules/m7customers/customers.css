@@ -1,15 +1,106 @@
 /* The customer screens (M7). Tokens only (design/tokens.css): no colour and no length of their own. */
 
+.shell-page:has(> .customers-filter-bar) {
+  padding: var(--space-4);
+}
+
+.shell-page:has(> .customers-filter-bar) > .page-heading:first-child {
+  margin-top: 0;
+}
+
+.page-heading + .customers-filter-bar {
+  margin-top: 0;
+}
+
 .customers-filter-bar {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: flex-end;
+  width: 100%;
   margin-top: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 4);
+  box-shadow: 0 var(--space-1) calc(var(--space-4) - var(--space-half)) var(--color-polish-23);
+  box-sizing: border-box;
+}
+
+.customers-form > .customers-filter-bar {
+  margin-top: var(--space-1);
+  margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.customers-filter-bar .customers-field {
+  flex: 1 1 calc(var(--space-8) * 2 + var(--space-4));
+  min-width: min(calc(var(--space-8) * 2 + var(--space-4)), 100%);
+  gap: var(--space-1);
+}
+
+.customers-filter-bar .customers-field input:not([type="checkbox"]):not([type="radio"]),
+.customers-filter-bar .customers-field select {
+  width: 100%;
+  max-width: none;
+  height: var(--target-min);
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-2);
+  border-radius: calc(var(--radius) * 2.5);
+}
+
+.customers-filter-bar > button {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: var(--target-min);
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  border-radius: calc(var(--radius) * 2.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.customers-filter-bar > button[type="submit"]:not(:disabled):hover,
+.customers-filter-bar > button:not(:disabled):hover,
+.customers-filter-bar > button:not(:disabled):focus-visible {
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
 }
 
 .customers-section {
   margin-top: var(--space-4);
+}
+
+.customers-section > h2:first-child {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-lg);
+  color: var(--color-brand-dark);
+}
+
+.customers-section > p {
+  margin: 0 0 var(--space-1);
+  line-height: var(--line-height);
+}
+
+.shell-page:has(> .customers-filter-bar) > p[role="note"] {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height);
 }
 
 .customers-subsection {
@@ -23,7 +114,71 @@
 
 .customers-field {
   display: grid;
-  gap: var(--space-half);
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+  min-width: 0;
+}
+
+.customers-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]),
+.customers-field select,
+.customers-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 2.5);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  outline: none;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.customers-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):hover:not(:disabled),
+.customers-field select:hover:not(:disabled),
+.customers-field textarea:hover:not(:disabled) {
+  border-color: var(--color-polish-19);
+  background: var(--color-polish-29);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
+}
+
+.customers-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus,
+.customers-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus-visible,
+.customers-field select:focus,
+.customers-field select:focus-visible,
+.customers-field textarea:focus,
+.customers-field textarea:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customers-filter-bar > button:hover,
+  .customers-filter-bar > button:focus-visible,
+  .customers-field input:hover:not(:disabled),
+  .customers-field input:focus,
+  .customers-field input:focus-visible,
+  .customers-field select:hover:not(:disabled),
+  .customers-field select:focus,
+  .customers-field select:focus-visible,
+  .customers-field textarea:hover:not(:disabled),
+  .customers-field textarea:focus,
+  .customers-field textarea:focus-visible {
+    transform: none;
+  }
 }
 
 .customers-check {

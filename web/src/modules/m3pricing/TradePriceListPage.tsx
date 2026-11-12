@@ -8,6 +8,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { SetLinesResponse, Sku } from "./pricingApi";
@@ -240,7 +241,7 @@ export function TradePriceListPage() {
       )}
 
       <div className="pricing-header-card">
-        <h1>{list.name}</h1>
+        <PageHeader icon="pricing" title={list.name} />
         <div className="pricing-header-row">
           <span className="pricing-meta-badge">{t("pricing.version", undefined, { version: list.version }).text}</span>
           <StateChip state={chipOf(list.status)} label={t(`pricing.status.${list.status.toLowerCase()}`).text} />
