@@ -5,6 +5,7 @@ import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useIntegrationApi, type JournalExport } from "./integrationApi";
 import { defaultExportPeriod, errorText, journalFileName, periodIsOpen } from "./integrationView";
@@ -124,7 +125,7 @@ export function JournalExportsPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("integration.journal.title").text}</h1>
+      <PageHeader icon="journal" title={t("integration.journal.title").text} />
       <p>{t("integration.journal.intro").text}</p>
 
       <form

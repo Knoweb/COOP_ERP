@@ -106,7 +106,7 @@ export function WriteOffsPage() {
         </Link>
       </div>
       <PageHeader
-        icon="stock"
+        icon="writeoffs"
         title={t("inventory.title").text}
       />
 

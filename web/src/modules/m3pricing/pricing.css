@@ -356,6 +356,22 @@
   margin-bottom: 0;
 }
 
+.pricing-filter-bar:not(.pricing-create-card > .pricing-filter-bar) {
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 4);
+  box-shadow: 0 var(--space-1) calc(var(--space-4) - var(--space-half)) var(--color-polish-23);
+  box-sizing: border-box;
+}
+
+.pricing-filter-bar > button,
+.pricing-filter-bar > .modern-btn {
+  min-height: var(--target-min);
+  box-sizing: border-box;
+}
+
 .pricing-create-field {
   flex: 1 1 calc(var(--space-8) * 4);
   min-width: calc(var(--space-8) * 2);
@@ -374,17 +390,27 @@
   width: 100%;
   min-height: var(--target-min);
   padding: var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--color-border-control);
+  border: var(--border-width) solid var(--color-polish-21);
   border-radius: var(--radius);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-md);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease;
+}
+
+.pricing-input:hover:not(:disabled) {
+  border-color: var(--color-polish-19);
+  background: var(--color-polish-29);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27);
 }
 
 .pricing-input:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
+  background: var(--color-surface);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13);
   outline: none;
 }
 
@@ -393,17 +419,28 @@
   width: 100%;
   min-height: var(--target-min);
   padding: var(--space-1) var(--space-4) var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--color-border-control);
+  border: var(--border-width) solid var(--color-polish-21);
   border-radius: var(--radius);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-md);
   appearance: none;
-  transition: border-color 0.2s ease;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease;
+}
+
+.pricing-select:hover:not(:disabled) {
+  border-color: var(--color-polish-19);
+  background: var(--color-polish-29);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27);
 }
 
 .pricing-select:focus {
   border-color: var(--color-accent);
+  background: var(--color-surface);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13);
   outline: none;
 }
 
@@ -506,7 +543,7 @@
   box-sizing: border-box !important;
   vertical-align: middle !important;
   line-height: var(--line-height);
-  padding: var(--space-2) calc(var(--space-2) + var(--space-half)) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
   text-align: left;
 }
 
@@ -525,8 +562,11 @@
   text-align: center !important;
   border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
-  white-space: nowrap !important;
-  min-width: calc(var(--space-8) + var(--space-4));
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table td,
@@ -535,8 +575,10 @@
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   font-size: var(--font-size-sm) !important;
   color: var(--color-text) !important;
-  white-space: nowrap !important;
-  min-width: calc(var(--space-8) + var(--space-4));
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table th:last-child,
@@ -551,18 +593,13 @@
   border-bottom: none !important;
 }
 
-.shell-page .modern-table tbody tr:nth-child(even) td,
-.modern-table tbody tr:nth-child(even) td {
-  background-color: var(--color-polish-29) !important;
-}
-
-.shell-page .modern-table tbody tr:nth-child(odd) td,
-.modern-table tbody tr:nth-child(odd) td {
+.shell-page .modern-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded):not(.pnl-total-row):not(.pnl-unallocated-row) > td:not(.stock-nested-cell),
+.modern-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded):not(.pnl-total-row):not(.pnl-unallocated-row) > td:not(.stock-nested-cell) {
   background-color: var(--color-surface) !important;
 }
 
-.shell-page .modern-table tbody tr:hover td,
-.modern-table tbody tr:hover td {
+.shell-page .modern-table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover > td:not(.stock-nested-cell),
+.modern-table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover > td:not(.stock-nested-cell) {
   background-color: var(--color-polish-31) !important;
 }
 
@@ -572,7 +609,7 @@
   color: var(--color-brand-dark) !important;
   font-weight: var(--font-weight-strong) !important;
   text-align: center !important;
-  min-width: calc(var(--space-8) * 5 + var(--space-4));
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table td:first-child,
@@ -580,7 +617,7 @@
 .pricing-cell-item {
   font-weight: var(--font-weight-strong) !important;
   color: var(--color-text) !important;
-  min-width: calc(var(--space-8) * 5 + var(--space-4));
+  min-width: 0 !important;
   white-space: normal !important;
   word-break: normal !important;
   overflow-wrap: break-word !important;
@@ -591,7 +628,7 @@
 .shell-page .modern-table th.pricing-cell-numeric,
 .shell-page .modern-table th.pricing-th-qty {
   text-align: center !important;
-  min-width: calc(var(--space-8) + var(--space-6));
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table td.pricing-cell-numeric,
@@ -599,7 +636,8 @@
 .pricing-cell-numeric {
   text-align: right !important;
   font-variant-numeric: tabular-nums;
-  min-width: calc(var(--space-8) + var(--space-6));
+  white-space: nowrap !important;
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table td.pricing-cell-numeric .pricing-table-input,
@@ -622,7 +660,7 @@
 .shell-page .modern-table td.pricing-cell-expiry,
 .pricing-cell-center {
   text-align: center !important;
-  min-width: calc(var(--space-8) + var(--space-2));
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table td.pricing-cell-center > *,
@@ -636,9 +674,9 @@
 
 /* Date cells */
 .shell-page .modern-table th.pricing-cell-date {
-  white-space: nowrap !important;
+  white-space: normal !important;
   text-align: center !important;
-  min-width: calc(var(--space-8) * 2 + var(--space-2));
+  min-width: 0 !important;
 }
 
 .shell-page .modern-table td.pricing-cell-date,
@@ -646,7 +684,7 @@
   white-space: nowrap !important;
   color: var(--color-text-muted) !important;
   font-variant-numeric: tabular-nums;
-  min-width: calc(var(--space-8) * 2 + var(--space-2));
+  min-width: 0 !important;
   text-align: left !important;
 }
 
@@ -688,7 +726,7 @@ td.pricing-version-text,
   font-weight: var(--font-weight-strong) !important;
   font-variant-numeric: tabular-nums !important;
   color: var(--color-draft-text) !important;
-  min-width: calc(var(--space-8) + var(--space-2));
+  min-width: 0;
 }
 
 /* Span/Badge pricing-version-text (when used inside an element, not td directly) */
@@ -715,7 +753,7 @@ span.pricing-version-text {
   max-width: calc(var(--space-8) * 2);
   min-height: calc(var(--target-min) * 0.75);
   padding: var(--space-half) var(--space-2);
-  border: var(--border-width-strong) solid var(--color-polish-18);
+  border: var(--border-width) solid var(--color-polish-21);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-brand-dark);
@@ -723,19 +761,23 @@ span.pricing-version-text {
   font-weight: var(--font-weight-strong);
   text-align: right;
   font-variant-numeric: tabular-nums;
-  transition: all 0.15s ease;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease;
 }
 
-.pricing-table-input:hover {
-  background: var(--color-surface);
-  border-color: var(--color-polish-21);
+.pricing-table-input:hover:not(:disabled) {
+  background: var(--color-polish-29);
+  border-color: var(--color-polish-19);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27);
 }
 
 .pricing-table-input:focus {
   background: var(--color-surface);
   border-color: var(--color-accent);
   outline: none;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-18);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13);
 }
 
 .pricing-outcome-cell {
@@ -743,7 +785,7 @@ span.pricing-version-text {
   flex-direction: column;
   gap: var(--space-half);
   align-items: flex-start;
-  min-width: calc(var(--space-8) * 2 + var(--space-2));
+  min-width: 0;
 }
 
 /* Action buttons inside tables with rich vibrant theme colors */
@@ -1204,8 +1246,8 @@ select.pricing-select:not(.visually-hidden) {
   min-height: calc(var(--space-4) + var(--space-1));
   padding: var(--space-1) var(--space-4) var(--space-1) var(--space-2);
   border-radius: var(--radius-pill);
-  border: var(--border-width) solid var(--color-polish-18);
-  background-color: var(--color-polish-29);
+  border: var(--border-width) solid var(--color-polish-21);
+  background-color: var(--color-surface);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232E3192' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--space-2) center;
@@ -1218,27 +1260,28 @@ select.pricing-select:not(.visually-hidden) {
   -moz-appearance: none;
   cursor: pointer;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease;
   accent-color: var(--color-polish-25);
 }
 
-.pricing-filter-bar select:not(.visually-hidden):hover,
-.pricing-form-field select:not(.visually-hidden):hover,
-select.pricing-select:not(.visually-hidden):hover {
-  background-color: var(--color-polish-31);
-  border-color: var(--color-polish-21);
+.pricing-filter-bar select:not(.visually-hidden):hover:not(:disabled),
+.pricing-form-field select:not(.visually-hidden):hover:not(:disabled),
+select.pricing-select:not(.visually-hidden):hover:not(:disabled) {
+  background-color: var(--color-polish-29);
+  border-color: var(--color-polish-19);
   color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
-  transform: translateY(calc(var(--border-width) * -1));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
 }
 
 .pricing-filter-bar select:not(.visually-hidden):focus,
 .pricing-form-field select:not(.visually-hidden):focus,
 select.pricing-select:not(.visually-hidden):focus {
   background-color: var(--color-surface);
-  border: var(--border-width-strong) solid var(--color-polish-25);
+  border-color: var(--color-accent);
   color: var(--color-brand-dark);
-  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-13);
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13);
+  transform: translateY(calc(var(--border-width) * -1.5));
   outline: none;
 }
 
@@ -1464,7 +1507,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-height: calc(var(--space-4) + var(--space-half)) !important;
   height: auto !important;
   padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -1476,8 +1519,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
   cursor: pointer !important;
   text-align: left !important;
   outline: none !important;
-  box-shadow: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
 .pricing-dropdown-select--compact {
@@ -1490,7 +1533,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-height: calc(var(--target-min) * 0.75) !important;
   padding: var(--space-half) var(--space-1) !important;
   border-width: var(--border-width) !important;
-  border-color: var(--color-accent) !important;
+  border-color: var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -1499,7 +1542,15 @@ select.pricing-select:not(.visually-hidden) option:focus {
   font-weight: var(--font-weight-normal) !important;
 }
 
-.pricing-dropdown-select .custom-dropdown__trigger:hover,
+.pricing-dropdown-select .custom-dropdown__trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-text) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
 .pricing-dropdown-select .custom-dropdown__trigger:focus-visible,
 .pricing-dropdown-select .custom-dropdown__trigger:active,
 .pricing-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
@@ -1507,8 +1558,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
-  transform: none !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-dropdown-select .custom-dropdown__trigger:disabled {
@@ -1743,17 +1794,21 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-markdown-filter-card .dropdown-select__trigger,
 .pricing-markdown-filter-card .pricing-markdown-search-input {
   background: var(--color-surface) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
   min-height: calc(var(--space-4) + var(--space-1)) !important;
   box-sizing: border-box !important;
   width: 100% !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.pricing-markdown-filter-card .dropdown-select__trigger:hover,
-.pricing-markdown-filter-card .pricing-markdown-search-input:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.pricing-markdown-filter-card .dropdown-select__trigger:hover:not(:disabled),
+.pricing-markdown-filter-card .pricing-markdown-search-input:hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .pricing-markdown-filter-card .dropdown-select__trigger:focus,
@@ -1761,7 +1816,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-markdown-filter-card .pricing-markdown-search-input:focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-markdown-filter-card .pricing-filter-label {
@@ -1812,13 +1868,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
   padding-top: var(--space-1) !important;
   padding-bottom: var(--space-1) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
 .pricing-markdown-search-input::-webkit-search-cancel-button,
@@ -1851,11 +1908,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
   opacity: 1;
 }
 
-.shell-page input.pricing-markdown-search-input:hover,
-.shell-page .pricing-markdown-search-input:hover,
-.pricing-markdown-search-input:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.shell-page input.pricing-markdown-search-input:hover:not(:disabled),
+.shell-page .pricing-markdown-search-input:hover:not(:disabled),
+.pricing-markdown-search-input:hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .shell-page input.pricing-markdown-search-input:focus,
@@ -1863,7 +1922,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-markdown-search-input:focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-markdown-search-clear {
@@ -2016,13 +2076,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
   padding-top: var(--space-1) !important;
   padding-bottom: var(--space-1) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
-  background-color: var(--color-polish-24) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
 .pricing-tradelist-search-input::-webkit-search-cancel-button,
@@ -2055,11 +2116,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
   opacity: 1;
 }
 
-.shell-page input.pricing-tradelist-search-input:hover,
-.shell-page .pricing-tradelist-search-input:hover,
-.pricing-tradelist-search-input:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.shell-page input.pricing-tradelist-search-input:hover:not(:disabled),
+.shell-page .pricing-tradelist-search-input:hover:not(:disabled),
+.pricing-tradelist-search-input:hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .shell-page input.pricing-tradelist-search-input:focus,
@@ -2067,7 +2130,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-tradelist-search-input:focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-tradelist-search-clear {
@@ -2150,13 +2214,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
   padding-top: var(--space-1) !important;
   padding-bottom: var(--space-1) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
-  background-color: var(--color-polish-24) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
 .pricing-gazette-search-input::-webkit-search-cancel-button,
@@ -2189,11 +2254,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
   opacity: 1;
 }
 
-.shell-page input.pricing-gazette-search-input:hover,
-.shell-page .pricing-gazette-search-input:hover,
-.pricing-gazette-search-input:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.shell-page input.pricing-gazette-search-input:hover:not(:disabled),
+.shell-page .pricing-gazette-search-input:hover:not(:disabled),
+.pricing-gazette-search-input:hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .shell-page input.pricing-gazette-search-input:focus,
@@ -2201,7 +2268,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-gazette-search-input:focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .pricing-gazette-search-clear {
@@ -2278,7 +2346,9 @@ select.pricing-select:not(.visually-hidden) option:focus {
 
 .pricing-markdown-table {
   width: 100% !important;
-  min-width: calc(var(--space-8) * 23) !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  table-layout: auto !important;
   border-collapse: collapse !important;
   border-spacing: 0 !important;
   box-sizing: border-box !important;
@@ -2294,8 +2364,12 @@ select.pricing-select:not(.visually-hidden) option:focus {
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
-  padding: var(--space-2) var(--space-2) !important;
-  white-space: nowrap !important;
+  padding: var(--space-1) var(--space-1) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
+  min-width: 0 !important;
   border-bottom: var(--border-width) solid var(--color-border) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   vertical-align: middle !important;
@@ -2310,12 +2384,15 @@ select.pricing-select:not(.visually-hidden) option:focus {
 
 .shell-page .pricing-markdown-table td,
 .pricing-markdown-table td {
-  padding: var(--space-2) var(--space-2) !important;
+  padding: var(--space-1) var(--space-1) !important;
   font-size: var(--font-size-sm) !important;
   border-bottom: var(--border-width) solid var(--color-polish-18) !important;
   border-right: var(--border-width) solid var(--color-polish-18) !important;
   vertical-align: middle !important;
-  white-space: nowrap !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  min-width: 0 !important;
   text-align: center !important;
   box-sizing: border-box !important;
 }
@@ -2335,7 +2412,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-markdown-table td:first-child,
 .pricing-markdown-table td.pricing-cell-item,
 .pricing-col-item {
-  min-width: calc(var(--space-8) * 3.5) !important;
+  width: auto !important;
+  min-width: 0 !important;
   text-align: left !important;
   white-space: normal !important;
 }
@@ -2346,9 +2424,10 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .shell-page .pricing-markdown-table td.pricing-cell-reason,
 .pricing-markdown-table td.pricing-cell-reason,
 .pricing-col-reason {
-  min-width: calc(var(--space-8) * 2.2) !important;
+  width: auto !important;
+  min-width: 0 !important;
   text-align: center !important;
-  white-space: nowrap !important;
+  white-space: normal !important;
 }
 
 /* 3. Classification / Tier */
@@ -2357,9 +2436,10 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .shell-page .pricing-markdown-table td.pricing-cell-classification,
 .pricing-markdown-table td.pricing-cell-classification,
 .pricing-col-classification {
-  min-width: calc(var(--space-8) * 2.8) !important;
+  width: auto !important;
+  min-width: 0 !important;
   text-align: center !important;
-  white-space: nowrap !important;
+  white-space: normal !important;
 }
 
 /* 4. Batch */
@@ -2368,8 +2448,12 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .shell-page .pricing-markdown-table td.pricing-cell-batch,
 .pricing-markdown-table td.pricing-cell-batch,
 .pricing-col-batch {
-  min-width: calc(var(--space-8) * 2.2) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-batch,
+.pricing-markdown-table td.pricing-cell-batch {
   white-space: nowrap !important;
 }
 
@@ -2379,8 +2463,12 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-col-expiry,
 .pricing-th-expiry,
 .pricing-cell-expiry {
-  min-width: calc(var(--space-8) * 1.9) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-expiry,
+.pricing-markdown-table .pricing-cell-expiry {
   white-space: nowrap !important;
 }
 
@@ -2390,8 +2478,12 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-col-days,
 .pricing-th-days,
 .pricing-cell-days {
-  min-width: calc(var(--space-8) * 2.2) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-days,
+.pricing-markdown-table .pricing-cell-days {
   white-space: nowrap !important;
 }
 
@@ -2401,9 +2493,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-col-qty,
 .pricing-th-qty,
 .pricing-markdown-table .pricing-cell-qty {
-  min-width: calc(var(--space-8) * 1.8) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: center !important;
   font-variant-numeric: tabular-nums !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-qty,
+.pricing-markdown-table td.pricing-cell-qty {
+  white-space: nowrap !important;
 }
 
 /* 8. Condition */
@@ -2412,8 +2509,12 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-col-condition,
 .pricing-th-condition,
 .pricing-markdown-table .pricing-cell-condition {
-  min-width: calc(var(--space-8) * 1.6) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-condition,
+.pricing-markdown-table td.pricing-cell-condition {
   white-space: nowrap !important;
 }
 
@@ -2423,7 +2524,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-th-rule,
 .shell-page .pricing-markdown-table td.pricing-cell-rule,
 .pricing-cell-rule {
-  min-width: calc(var(--space-8) * 3.4) !important;
+  width: auto !important;
+  min-width: 0 !important;
   text-align: center !important;
 }
 
@@ -2433,9 +2535,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-th-price,
 .shell-page .pricing-markdown-table td.pricing-cell-price,
 .pricing-cell-price {
-  min-width: calc(var(--space-8) * 1.8) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-price,
+.pricing-markdown-table td.pricing-cell-price {
+  white-space: nowrap !important;
 }
 
 /* 11. Status */
@@ -2444,8 +2551,12 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-th-status,
 .shell-page .pricing-markdown-table td.pricing-cell-status,
 .pricing-cell-status {
-  min-width: calc(var(--space-8) * 1.5) !important;
+  width: 1% !important;
+  min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-markdown-table td.pricing-cell-status,
+.pricing-markdown-table td.pricing-cell-status {
   white-space: nowrap !important;
 }
 
@@ -2465,8 +2576,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: var(--space-2) !important;
-  flex-wrap: nowrap !important;
+  gap: var(--space-1) !important;
+  flex-wrap: wrap !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -2474,7 +2585,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-cell-rule .pricing-header-row span,
 .pricing-cell-rule .pricing-header-row a,
 .pricing-cell-rule .pricing-markdown-rule-badge span {
-  white-space: nowrap !important;
+  white-space: normal !important;
 }
 
 /* Cell Elements - Markdown Queue plain text columns */
@@ -2602,15 +2713,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
   max-width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
-  overflow: hidden !important;
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
   overflow-y: hidden !important;
   touch-action: pan-y !important;
   user-select: auto;
 }
 
 .pricing-gazette-table {
-  table-layout: fixed !important;
+  table-layout: auto !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -2629,7 +2739,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   word-break: normal !important;
   overflow-wrap: break-word !important;
   line-height: var(--line-height) !important;
-  padding: var(--space-2) var(--space-2) !important;
+  padding: var(--space-1) var(--space-1) !important;
   box-sizing: border-box !important;
   text-align: center !important;
   vertical-align: middle !important;
@@ -2638,14 +2748,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .shell-page .pricing-gazette-table td,
 .pricing-gazette-table td {
   min-width: 0 !important;
-  padding: var(--space-2) var(--space-2) !important;
+  padding: var(--space-1) var(--space-1) !important;
   box-sizing: border-box !important;
   vertical-align: middle !important;
 }
 
-/* Explicit percentage widths and alignments for Gazette columns */
+/* Balanced dynamic column widths (adapts cleanly whether 7 or 8 columns) */
 
-/* 1. Item (First Column - 20% with actions, 24% without) */
+/* 1. Item */
 .shell-page .pricing-gazette-table thead th:first-child,
 .shell-page .pricing-gazette-table th:first-child,
 .shell-page .pricing-gazette-table th.pricing-gazette-th-item,
@@ -2654,9 +2764,9 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-gazette-table th.pricing-gazette-th-item,
 .pricing-gazette-col-item,
 .pricing-gazette-th-item {
-  width: 20% !important;
+  width: auto !important;
   min-width: 0 !important;
-  max-width: 24% !important;
+  max-width: none !important;
   text-align: center !important;
   vertical-align: middle !important;
 }
@@ -2665,107 +2775,119 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-item,
 .pricing-gazette-table td:first-child,
 .pricing-gazette-table td.pricing-gazette-cell-item {
-  width: 20% !important;
+  width: auto !important;
   min-width: 0 !important;
-  max-width: 24% !important;
+  max-width: none !important;
   text-align: left !important;
   white-space: normal !important;
   word-break: normal !important;
   overflow-wrap: break-word !important;
 }
 
-/* 2. Ceiling Price (18%) */
+/* 2. Ceiling Price */
 .shell-page .pricing-gazette-table thead th.pricing-gazette-th-price,
 .shell-page .pricing-gazette-table th.pricing-gazette-th-price,
 .pricing-gazette-table thead th.pricing-gazette-th-price,
 .pricing-gazette-table th.pricing-gazette-th-price,
 .pricing-gazette-col-price,
 .pricing-gazette-th-price {
-  width: 18% !important;
+  width: 1% !important;
   min-width: 0 !important;
-  max-width: 20% !important;
+  max-width: none !important;
   text-align: center !important;
   vertical-align: middle !important;
-  white-space: nowrap !important;
-  padding-left: var(--space-2) !important;
-  padding-right: var(--space-2) !important;
+  padding-left: var(--space-1) !important;
+  padding-right: var(--space-1) !important;
 }
 
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-price,
 .pricing-gazette-table td.pricing-gazette-cell-price,
 .pricing-gazette-cell-price {
-  width: 18% !important;
+  width: 1% !important;
   min-width: 0 !important;
-  max-width: 20% !important;
+  max-width: none !important;
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
   white-space: nowrap !important;
-  padding-left: var(--space-2) !important;
-  padding-right: var(--space-2) !important;
+  padding-left: var(--space-1) !important;
+  padding-right: var(--space-1) !important;
 }
 
-/* 3. Unit (8%) */
+/* 3. Unit */
 .shell-page .pricing-gazette-table th.pricing-gazette-th-unit,
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-unit,
 .pricing-gazette-col-unit,
 .pricing-gazette-th-unit,
 .pricing-gazette-cell-unit {
-  width: 8% !important;
+  width: 1% !important;
   min-width: 0 !important;
   text-align: center !important;
+  padding-left: var(--space-1) !important;
+  padding-right: var(--space-1) !important;
+}
+.shell-page .pricing-gazette-table td.pricing-gazette-cell-unit,
+.pricing-gazette-table td.pricing-gazette-cell-unit {
   white-space: nowrap !important;
-  padding-left: var(--space-2) !important;
-  padding-right: var(--space-2) !important;
 }
 
-/* 4. From Date (11%) */
+/* 4. From Date */
 .shell-page .pricing-gazette-table th.pricing-gazette-th-from,
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-from,
 .pricing-gazette-col-from,
 .pricing-gazette-th-from,
 .pricing-gazette-cell-from {
-  width: 11% !important;
+  width: 1% !important;
   min-width: 0 !important;
   text-align: center !important;
   font-variant-numeric: tabular-nums !important;
+}
+.shell-page .pricing-gazette-table td.pricing-gazette-cell-from,
+.pricing-gazette-table td.pricing-gazette-cell-from {
   white-space: nowrap !important;
 }
 
-/* 5. To Date (11%) */
+/* 5. To Date */
 .shell-page .pricing-gazette-table th.pricing-gazette-th-to,
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-to,
 .pricing-gazette-col-to,
 .pricing-gazette-th-to,
 .pricing-gazette-cell-to {
-  width: 11% !important;
+  width: 1% !important;
   min-width: 0 !important;
   text-align: center !important;
   font-variant-numeric: tabular-nums !important;
+}
+.shell-page .pricing-gazette-table td.pricing-gazette-cell-to,
+.pricing-gazette-table td.pricing-gazette-cell-to {
   white-space: nowrap !important;
 }
 
-/* 6. Gazette Reference (11%) */
+/* 6. Gazette Reference */
 .shell-page .pricing-gazette-table th.pricing-gazette-th-ref,
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-ref,
 .pricing-gazette-col-ref,
 .pricing-gazette-th-ref,
 .pricing-gazette-cell-ref {
-  width: 11% !important;
+  width: auto !important;
   min-width: 0 !important;
   text-align: center !important;
-  word-break: break-word !important;
+  white-space: normal !important;
+  word-break: normal !important;
   overflow-wrap: break-word !important;
 }
 
-/* 7. Status (11%) */
+/* 7. Status */
 .shell-page .pricing-gazette-table th.pricing-gazette-th-status,
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-status,
 .pricing-gazette-col-status,
 .pricing-gazette-th-status,
 .pricing-gazette-cell-status {
-  width: 11% !important;
+  width: 1% !important;
   min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-gazette-table td.pricing-gazette-cell-status,
+.pricing-gazette-table td.pricing-gazette-cell-status {
   white-space: nowrap !important;
 }
 
@@ -2774,15 +2896,19 @@ select.pricing-select:not(.visually-hidden) option:focus {
   margin-right: auto !important;
 }
 
-/* 8. Actions (10%) */
+/* 8. Actions */
 .shell-page .pricing-gazette-table th.pricing-gazette-th-actions,
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-actions,
 .pricing-gazette-col-actions,
 .pricing-gazette-th-actions,
 .pricing-gazette-cell-actions {
-  width: 10% !important;
+  width: 1% !important;
   min-width: 0 !important;
   text-align: center !important;
+}
+.shell-page .pricing-gazette-table td.pricing-gazette-cell-actions,
+.pricing-gazette-table td.pricing-gazette-cell-actions {
+  white-space: nowrap !important;
 }
 
 .pricing-gazette-cell-actions button {
@@ -2817,7 +2943,10 @@ select.pricing-select:not(.visually-hidden) option:focus {
 
 /* ---- Customer Price Lookup Portal (M3-08) ----------------------------------- */
 .customer-price-portal {
-  max-width: var(--page-max-width);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 0 auto;
 }
 
@@ -2863,7 +2992,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   margin-bottom: 0 !important;
 }
 
-/* Select matching user screenshot: pure white background, magenta border, radius 10px */
+/* Select matching clean white surface, rose border, hover/focus lift */
 .customer-shop-select select:not(.visually-hidden),
 .customer-shop-select select.pricing-select:not(.visually-hidden) {
   box-sizing: border-box !important;
@@ -2873,7 +3002,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   height: calc(var(--space-4) + var(--space-1)) !important;
   padding: var(--space-1) var(--space-4) var(--space-1) var(--space-3) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   background-color: var(--color-surface) !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E0E5B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
@@ -2887,18 +3016,21 @@ select.pricing-select:not(.visually-hidden) option:focus {
   -moz-appearance: none !important;
   cursor: pointer !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.customer-shop-select select:not(.visually-hidden):hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.customer-shop-select select:not(.visually-hidden):hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .customer-shop-select select:not(.visually-hidden):focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
   outline: none !important;
 }
 
@@ -2938,19 +3070,22 @@ select.pricing-select:not(.visually-hidden) option:focus {
   padding-top: var(--space-1) !important;
   padding-bottom: var(--space-1) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.customer-price-search-input:hover,
-.customer-query-input input[type="search"]:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.customer-price-search-input:hover:not(:disabled),
+.customer-query-input input[type="search"]:hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .customer-price-search-input:focus,
@@ -2958,7 +3093,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
   outline: none !important;
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .customer-price-search-input::placeholder,

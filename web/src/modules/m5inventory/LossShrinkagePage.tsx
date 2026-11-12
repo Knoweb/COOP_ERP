@@ -41,7 +41,7 @@ export function LossShrinkagePage() {
           {t("inventory.back").text}
         </Link>
       </div>
-      <PageHeader icon="stock" title={t("inventory.loss.title").text} />
+      <PageHeader icon="writeoffs" title={t("inventory.loss.title").text} />
       <p className="modern-intro-text">{t("inventory.loss.intro").text}</p>
       <section className="modern-filter-panel modern-filter-panel--stock"><LocationPicker value={locationId} onChange={setLocationId} /></section>
       {(writeOffs.isLoading || negatives.isLoading) && <p>{t("inventory.loading").text}</p>}

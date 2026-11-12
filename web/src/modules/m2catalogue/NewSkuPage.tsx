@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { useCatalogueApi } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
 
@@ -61,7 +62,7 @@ export function NewSkuPage() {
       </div>
 
       <div className="sku-header-card">
-        <h1>{t("catalogue.new.title").text}</h1>
+        <PageHeader icon="catalogue" title={t("catalogue.new.title").text} />
       </div>
 
       <div className="sku-editor-card">

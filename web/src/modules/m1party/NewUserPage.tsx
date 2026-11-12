@@ -78,7 +78,7 @@ export function NewUserPage() {
           {t("party.users.back").text}
         </Link>
       </div>
-      <PageHeader icon="society" title={t("party.users.new.title").text} />
+      <PageHeader icon="users" title={t("party.users.new.title").text} />
       <p className="new-user-hint">{t("party.users.new.hint").text}</p>
 
       <form onSubmit={submit} className="party-form-row new-user-form">

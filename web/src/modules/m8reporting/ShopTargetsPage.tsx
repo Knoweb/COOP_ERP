@@ -193,7 +193,7 @@ export function ShopTargetsPage() {
   return (
     <main className="shell-page">
       <PageHeader
-        icon="stock"
+        icon="targets"
         title={t("reporting.targets.title").text}
       />
 

@@ -8,6 +8,7 @@ import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { EntityOption, inLocale, skuText } from "./labels";
 import { useTradingApi, type Sku } from "./tradingApi";
 import { errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
@@ -77,7 +78,7 @@ export function NewOrderPage() {
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
-      <h1>{t("trading.order.new.title").text}</h1>
+      <PageHeader icon="trading" title={t("trading.order.new.title").text} />
       <form onSubmit={send} className="trading-form-row">
         <label className="trading-form-field">
           {t("trading.field.seller").text}

@@ -9,6 +9,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { useSession } from "../../shell/auth/session";
 import { ApprovalBar, type ApprovalAction } from "../../shell/components/ApprovalBar";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Count } from "./inventoryApi";
@@ -135,7 +136,7 @@ export function CountPage() {
           {t("inventory.count.back").text}
         </Link>
       </div>
-      <h1>{t("inventory.count.sheet_title").text}</h1>
+      <PageHeader icon="counts" title={t("inventory.count.sheet_title").text} />
       <p>
         <StateChip state={countChip(task.status)} label={t(`inventory.count.status.${task.status}`).text} />
         {task.outcome && ` ${t(`inventory.count.outcome.${task.outcome}`).text}`}

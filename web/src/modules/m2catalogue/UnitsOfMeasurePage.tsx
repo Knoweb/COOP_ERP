@@ -157,7 +157,7 @@ export function UnitsOfMeasurePage() {
     <div className="catalogue-uoms-page app-page-shell">
       <PageHeader
         title={t("catalogue.uom.title").text}
-        icon="catalogue"
+        icon="uom"
         actions={
           canManage && !showDefineForm && !editingUom ? (
             <button

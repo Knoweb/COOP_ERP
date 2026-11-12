@@ -317,7 +317,7 @@ export function MobileStockTakePage() {
       </Link>
 
       <PageHeader
-        icon="stock"
+        icon="counts"
         title={t("inventory.stock_take.title").text}
         actions={
           <div className="mobile-stock-take-status-bar">

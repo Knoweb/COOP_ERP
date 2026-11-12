@@ -177,7 +177,7 @@ export function RevenueEstimatorPage() {
 
   return (
     <main className="shell-page">
-      <PageHeader icon="pricing" title={t("reporting.estimator.title").text} />
+      <PageHeader icon="estimator" title={t("reporting.estimator.title").text} />
 
       <p className="sales-estimator-subtitle">{t("reporting.estimator.subtitle").text}</p>
 

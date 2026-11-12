@@ -149,7 +149,7 @@ export function TaxRatesPage() {
       </div>
 
       <PageHeader
-        icon="catalogue"
+        icon="tax-rates"
         title={t("catalogue.tax.title").text}
       />
 

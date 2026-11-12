@@ -187,7 +187,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
   return (
     <div className="reporting-page finance-page">
       <PageHeader
-        icon="report"
+        icon="finance"
         title={t("reporting.finance.title").text}
       />
       <p className="finance-subtitle">

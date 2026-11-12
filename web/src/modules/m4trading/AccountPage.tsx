@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
@@ -44,9 +45,14 @@ export function AccountPage() {
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
-      <h1>
-        {t("trading.account.title").text}: <EntityName entityId={counterpartyId} />
-      </h1>
+      <PageHeader
+        icon="finance"
+        title={
+          <>
+            {t("trading.account.title").text}: <EntityName entityId={counterpartyId} />
+          </>
+        }
+      />
       {error && <p role="alert">{errorText(error, t("trading.error.generic").text)}</p>}
       {exposures.isLoading ? <p>{t("trading.loading").text}</p> : exposure && <ExposurePanel exposure={exposure} />}
       {role === "SELLER" && canChangeLimit && exposure && (

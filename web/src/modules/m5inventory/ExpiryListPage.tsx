@@ -113,7 +113,7 @@ export function ExpiryListPage() {
           {t("inventory.back").text}
         </Link>
       </div>
-      <PageHeader icon="stock" title={t("inventory.expiry.title").text} />
+      <PageHeader icon="expiry" title={t("inventory.expiry.title").text} />
       <p className="modern-intro-text">{t("inventory.expiry.intro").text}</p>
 
       <section className="modern-filter-panel modern-filter-panel--stock">

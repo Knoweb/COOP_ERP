@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { useInventoryApi } from "./inventoryApi";
 import { SkuLabel } from "./SkuLabel";
 import { errorText } from "./stockView";
@@ -48,7 +49,7 @@ export function StockCardPage() {
       </div>
 
       <header className="stock-card-header">
-        <h1>{t("inventory.card.title").text}</h1>
+        <PageHeader icon="statement" title={t("inventory.card.title").text} />
         <div className="stock-card-sku">
           <svg
             className="stock-card-sku__icon"

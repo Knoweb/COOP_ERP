@@ -6,6 +6,7 @@ import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { usePartyApi } from "./partyApi";
 import type { BulkValidationReport } from "./partyApi";
 import { errorText } from "./SocietyRegisterPage";
@@ -113,7 +114,7 @@ export function BulkRegisterPage() {
       <main className="shell-page">
         <div className="bulk-upload-container">
           <div className="bulk-upload-card">
-            <h1 className="bulk-title">{t("party.bulk.title").text}</h1>
+            <PageHeader icon="import" title={t("party.bulk.title").text} />
             <p role="note">{t("party.new.not_allowed").text}</p>
           </div>
         </div>
@@ -145,7 +146,7 @@ export function BulkRegisterPage() {
             </Link>
           </div>
 
-          <h1 className="bulk-title">{t("party.bulk.title").text}</h1>
+          <PageHeader icon="import" title={t("party.bulk.title").text} />
           <p className="bulk-intro">{t("party.bulk.intro").text}</p>
 
           <div className="bulk-excel-card">

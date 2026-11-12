@@ -10,6 +10,7 @@ import { useSession } from "../../shell/auth/session";
 import { ApprovalBar, type ApprovalAction } from "../../shell/components/ApprovalBar";
 import { AttachmentCapture } from "../../shell/components/AttachmentCapture";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi } from "./inventoryApi";
@@ -151,7 +152,7 @@ export function WriteOffPage() {
           {t("inventory.writeoff.back").text}
         </Link>
       </div>
-      <h1>{t("inventory.writeoff.doc_title").text}</h1>
+      <PageHeader icon="writeoffs" title={t("inventory.writeoff.doc_title").text} />
       <p>
         <StateChip state={writeOffChip(w.status)} label={t(`inventory.writeoff.status.${w.status}`).text} />
         {w.documentNo && ` ${t("inventory.writeoff.document").text}: ${w.documentNo}`}

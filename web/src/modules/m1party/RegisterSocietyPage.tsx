@@ -7,6 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import "./m1party.css";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { usePartyApi } from "./partyApi";
 import type { RegisterSocietyRequest } from "./partyApi";
 import { errorText } from "./SocietyRegisterPage";
@@ -71,7 +72,7 @@ export function RegisterSocietyPage() {
   if (!canRegister) {
     return (
       <main className="shell-page">
-        <h1>{t("party.new.title").text}</h1>
+        <PageHeader icon="society" title={t("party.new.title").text} />
         <p role="note">{t("party.new.not_allowed").text}</p>
       </main>
     );
@@ -100,19 +101,7 @@ export function RegisterSocietyPage() {
           </Link>
         </div>
 
-        <div className="page-heading">
-          <div className="page-heading__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </div>
-          <div className="page-heading__copy">
-            <h1>{t("party.new.title").text}</h1>
-          </div>
-        </div>
+        <PageHeader icon="society" title={t("party.new.title").text} />
 
         <div className="register-society-card">
           <form onSubmit={submit} noValidate>

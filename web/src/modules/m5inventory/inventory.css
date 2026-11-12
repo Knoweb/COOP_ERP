@@ -201,9 +201,9 @@
   border: var(--border-width) solid var(--color-polish-21) !important;
 }
 
-.shell-page tbody tr:hover td,
-.shell-page .stock-table tbody tr:hover td,
-.stock-table tbody tr:hover td {
+.shell-page tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover > td:not(.stock-nested-cell),
+.shell-page .stock-table tbody tr:not(.stock-nested-row):hover > td:not(.stock-nested-cell),
+.stock-table tbody tr:not(.stock-nested-row):hover > td:not(.stock-nested-cell) {
   background-color: var(--color-polish-31) !important;
 }
 
@@ -278,21 +278,24 @@
   padding-bottom: var(--space-1) !important;
   padding-left: calc(var(--space-3) + var(--space-half)) !important;
   padding-right: calc(var(--space-1) + var(--space-half)) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  background-color: var(--color-polish-24) !important;
+  background-color: var(--color-surface) !important;
   font-size: var(--font-size-sm) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.shell-page input.stock-search-input:hover,
-.shell-page .stock-search-input:hover,
-.stock-search-input:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.shell-page input.stock-search-input:hover:not(:disabled),
+.shell-page .stock-search-input:hover:not(:disabled),
+.stock-search-input:hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .shell-page input.stock-search-input:focus,
@@ -300,7 +303,8 @@
 .stock-search-input:focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .stock-search-clear {
@@ -458,13 +462,14 @@
   flex-direction: column !important;
   width: fit-content !important;
   max-width: 100% !important;
-  gap: calc(var(--space-half) / 2) !important;
-  background: var(--color-surface) !important;
-  padding: var(--space-2) var(--space-3) !important;
-  border-radius: calc(var(--radius) * 3) !important;
-  border: var(--border-width) solid var(--color-border) !important;
-  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-3) !important;
+  gap: var(--space-1) !important;
+  background: var(--color-polish-22) !important;
+  padding: var(--space-3) !important;
+  border-radius: calc(var(--radius) * 4) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  box-shadow: 0 var(--space-1) calc(var(--space-4) - var(--space-half)) var(--color-polish-23) !important;
   margin-bottom: var(--space-3) !important;
+  box-sizing: border-box !important;
 }
 
 .modern-location-picker {
@@ -531,7 +536,7 @@
   min-height: calc(var(--space-4) + var(--space-half)) !important;
   height: auto !important;
   padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -540,7 +545,7 @@
   font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
-  box-shadow: none !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -548,7 +553,7 @@
   cursor: pointer !important;
   outline: none !important;
   text-align: left !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
 .inventory-dropdown-select--compact {
@@ -561,7 +566,7 @@
   min-height: calc(var(--target-min) * 0.75) !important;
   padding: var(--space-half) var(--space-1) !important;
   border-width: var(--border-width) !important;
-  border-color: var(--color-accent) !important;
+  border-color: var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
@@ -570,7 +575,15 @@
   font-weight: var(--font-weight-normal) !important;
 }
 
-.inventory-dropdown-select .custom-dropdown__trigger:hover,
+.inventory-dropdown-select .custom-dropdown__trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-text) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
 .inventory-dropdown-select .custom-dropdown__trigger:focus-visible,
 .inventory-dropdown-select .custom-dropdown__trigger:active,
 .inventory-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
@@ -578,8 +591,8 @@
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
   color: var(--color-text) !important;
-  transform: none !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .inventory-dropdown-select .custom-dropdown__trigger:disabled {
@@ -757,7 +770,7 @@
   padding-bottom: var(--space-half) !important;
   padding-left: var(--space-2) !important;
   padding-right: calc(var(--space-4) + var(--space-half)) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
   background-color: var(--color-surface) !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E0E5B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
@@ -775,19 +788,23 @@
   min-width: calc(var(--space-8) * 3 + var(--space-4)) !important;
   outline: none !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.modern-filter-panel--stock select:not(.visually-hidden):hover,
-.modern-location-picker select:not(.visually-hidden):hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+.modern-filter-panel--stock select:not(.visually-hidden):hover:not(:disabled),
+.modern-location-picker select:not(.visually-hidden):hover:not(:disabled) {
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .modern-filter-panel--stock select:not(.visually-hidden):focus,
 .modern-location-picker select:not(.visually-hidden):focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .modern-filter-panel--stock .inventory-control-links,
@@ -879,41 +896,46 @@
 /* ---------- Common Table Styling (Main & Item Details) --------------------- */
 
 .stock-table {
-  border: var(--border-width) solid var(--color-polish-6);
+  border: none;
 }
 
 .stock-table th {
-  border-bottom: var(--border-width-strong) solid var(--color-polish-6);
-  background: var(--color-polish-27);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  background: var(--color-polish-22);
+  color: var(--color-brand-dark);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
   white-space: normal !important;
-  word-break: keep-all !important;
-  overflow-wrap: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
   hyphens: none !important;
   vertical-align: middle !important;
   text-align: center !important;
-  line-height: var(--line-height-normal, 1.3);
-  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-1);
+  line-height: var(--line-height);
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
 }
 
 .stock-table td {
-  border-bottom: var(--border-width) solid var(--color-polish-18);
+  border-bottom: var(--border-width) solid var(--color-polish-21);
   vertical-align: middle !important;
   text-align: center !important;
-  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-1);
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
   word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .stock-table th:not(:last-child),
 .stock-table td:not(:last-child) {
-  border-right: var(--border-width) solid var(--color-polish-18);
+  border-right: var(--border-width) solid var(--color-polish-21);
 }
 
 .stock-table th.numeric-cell {
   text-align: center !important;
   vertical-align: middle !important;
   white-space: normal !important;
-  word-break: keep-all !important;
-  overflow-wrap: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
   hyphens: none !important;
 }
 
@@ -1007,7 +1029,7 @@
 .shell-page table.modern-table.stock-positions-table,
 .stock-table.stock-positions-table {
   width: 100% !important;
-  min-width: calc(var(--space-8) * 12) !important;
+  min-width: 0 !important;
   max-width: 100% !important;
   table-layout: auto !important;
   border-collapse: separate !important;
@@ -1031,8 +1053,11 @@
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   border-left: none !important;
-  padding: var(--space-1) var(--space-2) !important;
-  white-space: nowrap !important;
+  padding: var(--space-1) var(--space-1) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
   vertical-align: middle !important;
 }
 
@@ -1045,7 +1070,7 @@
   font-size: var(--font-size-sm) !important;
   color: var(--color-text) !important;
   vertical-align: middle !important;
-  padding: calc(var(--space-1) + var(--border-width)) var(--space-2) !important;
+  padding: calc(var(--space-1) + var(--border-width)) var(--space-1) !important;
 }
 
 .shell-page .stock-positions-table th:last-child,
@@ -1055,23 +1080,18 @@
   border-right: none !important;
 }
 
-.shell-page .stock-positions-table tbody tr:nth-child(even) td,
-.stock-positions-table tbody tr:nth-child(even) td {
-  background-color: var(--color-polish-29) !important;
-}
-
-.shell-page .stock-positions-table tbody tr:nth-child(odd) td,
-.stock-positions-table tbody tr:nth-child(odd) td {
+.shell-page .stock-positions-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded) > td:not(.stock-nested-cell),
+.stock-positions-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded) > td:not(.stock-nested-cell) {
   background-color: var(--color-surface) !important;
 }
 
-.shell-page .stock-positions-table tbody tr:hover td,
-.stock-positions-table tbody tr:hover td {
+.shell-page .stock-positions-table tbody tr:not(.stock-nested-row):hover > td:not(.stock-nested-cell),
+.stock-positions-table tbody tr:not(.stock-nested-row):hover > td:not(.stock-nested-cell) {
   background-color: var(--color-polish-31) !important;
 }
 
-.shell-page .stock-positions-table tbody tr.stock-sku-row--expanded td,
-.stock-positions-table tbody tr.stock-sku-row--expanded td {
+.shell-page .stock-positions-table tbody tr.stock-sku-row--expanded > td,
+.stock-positions-table tbody tr.stock-sku-row--expanded > td {
   background-color: var(--color-polish-31) !important;
 }
 
@@ -1082,8 +1102,8 @@
 .shell-page .stock-positions-table td:first-child,
 .stock-positions-table .col-expand,
 .stock-positions-table col.col-expand {
-  width: calc(var(--space-4) + var(--space-1)) !important;
-  min-width: calc(var(--space-4) + var(--space-1)) !important;
+  width: 1% !important;
+  min-width: var(--space-4) !important;
   max-width: calc(var(--space-4) + var(--space-1)) !important;
   padding: var(--space-1) var(--space-half) !important;
   text-align: center !important;
@@ -1093,102 +1113,132 @@
 .stock-positions-table .col-item,
 .stock-positions-table col.col-item {
   width: auto !important;
-  min-width: calc(var(--space-8) * 3) !important;
+  min-width: 0 !important;
 }
-.shell-page .stock-positions-table th.col-item,
+.shell-page .stock-positions-table th.col-item {
+  text-align: left !important;
+  white-space: normal !important;
+}
 .shell-page .stock-positions-table td.col-item {
   text-align: left !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
 
 /* 3. Col Dept */
 .stock-positions-table .col-dept,
 .stock-positions-table col.col-dept {
-  width: calc(var(--space-8) + var(--space-4)) !important;
-  min-width: calc(var(--space-8) + var(--space-4)) !important;
+  width: auto !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-dept,
 .shell-page .stock-positions-table td.col-dept {
   text-align: left !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
 
 /* 4. Col UOM */
 .stock-positions-table .col-uom,
 .stock-positions-table col.col-uom {
-  width: calc(var(--space-6) + var(--space-2)) !important;
-  min-width: calc(var(--space-6) + var(--space-2)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-uom,
 .shell-page .stock-positions-table td.col-uom {
   text-align: center !important;
 }
+.shell-page .stock-positions-table td.col-uom {
+  white-space: nowrap !important;
+}
 
 /* 5. Col On Hand */
 .stock-positions-table .col-on-hand,
 .stock-positions-table col.col-on-hand {
-  width: calc(var(--space-8) + var(--space-2)) !important;
-  min-width: calc(var(--space-8) + var(--space-2)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-on-hand,
 .shell-page .stock-positions-table td.col-on-hand {
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
 }
+.shell-page .stock-positions-table td.col-on-hand {
+  white-space: nowrap !important;
+}
 
 /* 6. Col Reserved */
 .stock-positions-table .col-reserved,
 .stock-positions-table col.col-reserved {
-  width: calc(var(--space-8) + var(--space-2)) !important;
-  min-width: calc(var(--space-8) + var(--space-2)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-reserved,
 .shell-page .stock-positions-table td.col-reserved {
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
 }
+.shell-page .stock-positions-table td.col-reserved {
+  white-space: nowrap !important;
+}
 
 /* 7. Col Available */
 .stock-positions-table .col-available,
 .stock-positions-table col.col-available {
-  width: calc(var(--space-8) + var(--space-2)) !important;
-  min-width: calc(var(--space-8) + var(--space-2)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-available,
 .shell-page .stock-positions-table td.col-available {
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
 }
+.shell-page .stock-positions-table td.col-available {
+  white-space: nowrap !important;
+}
 
 /* 8. Col In-Transit */
 .stock-positions-table .col-in-transit,
 .stock-positions-table col.col-in-transit {
-  width: calc(var(--space-8) + var(--space-4)) !important;
-  min-width: calc(var(--space-8) + var(--space-4)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-in-transit,
 .shell-page .stock-positions-table td.col-in-transit {
   text-align: center !important;
 }
+.shell-page .stock-positions-table td.col-in-transit {
+  white-space: nowrap !important;
+}
 
 /* 9. Col Variance */
 .stock-positions-table .col-variance,
 .stock-positions-table col.col-variance {
-  width: calc(var(--space-8) + var(--space-4)) !important;
-  min-width: calc(var(--space-8) + var(--space-4)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-variance,
 .shell-page .stock-positions-table td.col-variance {
   text-align: center !important;
 }
+.shell-page .stock-positions-table td.col-variance {
+  white-space: nowrap !important;
+}
 
 /* 10. Col Actions */
 .stock-positions-table .col-actions,
 .stock-positions-table col.col-actions {
-  width: calc(var(--space-8) + var(--space-3)) !important;
-  min-width: calc(var(--space-8) + var(--space-3)) !important;
+  width: 1% !important;
+  min-width: 0 !important;
 }
 .shell-page .stock-positions-table th.col-actions,
 .shell-page .stock-positions-table td.col-actions {
   text-align: right !important;
+}
+.shell-page .stock-positions-table td.col-actions {
+  white-space: nowrap !important;
 }
 
 /* Expand Button */
@@ -1312,46 +1362,48 @@
 
 .stock-table.stock-card-table {
   width: 100%;
-  min-width: calc(var(--space-8) * 9.2);
+  min-width: 0;
   max-width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
   border-collapse: collapse;
 }
 
 .stock-card-table col.col-when {
   width: 22%;
-  min-width: calc(var(--space-8) * 2);
+  min-width: 0;
 }
 
 .stock-card-table col.col-movement {
   width: 18%;
-  min-width: calc(var(--space-8) * 1.7);
+  min-width: 0;
 }
 
 .stock-card-table col.col-condition {
   width: 14%;
-  min-width: calc(var(--space-8) * 1.4);
+  min-width: 0;
 }
 
 .stock-card-table col.col-qty {
   width: 15%;
-  min-width: calc(var(--space-8) * 1.3);
+  min-width: 0;
 }
 
 .stock-card-table col.col-balance {
   width: 15%;
-  min-width: calc(var(--space-8) * 1.3);
+  min-width: 0;
 }
 
 .stock-card-table col.col-unit-cost {
   width: 16%;
-  min-width: calc(var(--space-8) * 1.4);
+  min-width: 0;
 }
 
 .stock-card-table th,
 .stock-card-table td {
   text-align: center !important;
   vertical-align: middle !important;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .stock-card-table td.cell-when {
@@ -1366,38 +1418,40 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
   border-collapse: collapse;
 }
 
 .stock-table.opening-balance-table--view {
-  min-width: calc(var(--space-8) * 7);
+  min-width: 0;
 }
 
 .opening-balance-table--view col.col-item {
   width: 40%;
-  min-width: calc(var(--space-8) * 2.5);
+  min-width: 0;
 }
 
 .opening-balance-table--view col.col-condition {
   width: 20%;
-  min-width: calc(var(--space-8) * 1.5);
+  min-width: 0;
 }
 
 .opening-balance-table--view col.col-qty {
   width: 20%;
-  min-width: calc(var(--space-8) * 1.3);
+  min-width: 0;
 }
 
 .opening-balance-table--view col.col-unit-cost {
   width: 20%;
-  min-width: calc(var(--space-8) * 1.5);
+  min-width: 0;
 }
 
 .opening-balance-table th,
 .opening-balance-table td {
   text-align: center !important;
   vertical-align: middle !important;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .stock-table td.empty-table-cell {
@@ -2433,8 +2487,11 @@
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
-  padding: var(--space-1) var(--space-2) !important;
-  white-space: nowrap !important;
+  padding: var(--space-1) var(--space-1) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
   vertical-align: middle !important;
   text-align: center !important;
 }
@@ -2447,8 +2504,10 @@
   border-left: none !important;
   font-size: var(--font-size-sm) !important;
   color: var(--color-text) !important;
-  padding: calc(var(--space-1) + var(--border-width)) var(--space-2) !important;
-  white-space: nowrap !important;
+  padding: calc(var(--space-1) + var(--border-width)) var(--space-1) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
   vertical-align: middle !important;
 }
 
@@ -2464,13 +2523,8 @@
   border-bottom: none !important;
 }
 
-.shell-page .stock-nested-table tbody tr:nth-child(even) td,
-.stock-nested-table tbody tr:nth-child(even) td {
-  background-color: var(--color-polish-29) !important;
-}
-
-.shell-page .stock-nested-table tbody tr:nth-child(odd) td,
-.stock-nested-table tbody tr:nth-child(odd) td {
+.shell-page .stock-nested-table tbody tr td,
+.stock-nested-table tbody tr td {
   background-color: var(--color-surface) !important;
 }
 
@@ -2485,9 +2539,10 @@
 .stock-nested-table th:first-child,
 .stock-nested-table td:first-child {
   text-align: left !important;
-  white-space: nowrap !important;
-  word-break: keep-all !important;
-  min-width: calc(var(--space-8) * 2.5) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  min-width: 0 !important;
   font-weight: var(--font-weight-strong) !important;
   color: var(--color-polish-25) !important;
 }
@@ -2497,7 +2552,7 @@
 .stock-nested-table th:nth-child(2),
 .stock-nested-table td:nth-child(2) {
   text-align: center !important;
-  min-width: calc(var(--space-8) + var(--space-4)) !important;
+  min-width: 0 !important;
 }
 
 .shell-page .stock-nested-table th:nth-child(3),
@@ -2505,7 +2560,7 @@
 .stock-nested-table th:nth-child(3),
 .stock-nested-table td:nth-child(3) {
   text-align: center !important;
-  min-width: calc(var(--space-8) + var(--space-2)) !important;
+  min-width: 0 !important;
 }
 
 .shell-page .stock-nested-table th:nth-child(4),
@@ -2513,7 +2568,7 @@
 .stock-nested-table th:nth-child(4),
 .stock-nested-table td:nth-child(4) {
   text-align: center !important;
-  min-width: calc(var(--space-8) + var(--space-2)) !important;
+  min-width: 0 !important;
 }
 
 .shell-page .stock-nested-table th.numeric-cell,
@@ -2522,7 +2577,11 @@
 .stock-nested-table td.numeric-cell {
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
-  min-width: calc(var(--space-8) + var(--space-2)) !important;
+  min-width: 0 !important;
+}
+.shell-page .stock-nested-table td.numeric-cell,
+.stock-nested-table td.numeric-cell {
+  white-space: nowrap !important;
 }
 
 .shell-page .stock-nested-table th.col-actions,
@@ -2530,7 +2589,11 @@
 .stock-nested-table th.col-actions,
 .stock-nested-table td.col-actions {
   text-align: right !important;
-  min-width: calc(var(--space-8) + var(--space-4)) !important;
+  min-width: 0 !important;
+}
+.shell-page .stock-nested-table td.col-actions,
+.stock-nested-table td.col-actions {
+  white-space: nowrap !important;
 }
 
 .stock-nested-empty {
@@ -2885,12 +2948,15 @@
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
-  padding: var(--space-1) var(--space-2) !important;
+  padding: var(--space-1) var(--space-1) !important;
   border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   border-left: none !important;
-  white-space: nowrap !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
   text-align: center !important;
 }
 
@@ -2922,13 +2988,8 @@
   vertical-align: middle !important;
 }
 
-.shell-page .stock-modal-table tbody tr:nth-child(even) td,
-.stock-modal-table tbody tr:nth-child(even) td {
-  background-color: var(--color-polish-29) !important;
-}
-
-.shell-page .stock-modal-table tbody tr:nth-child(odd) td,
-.stock-modal-table tbody tr:nth-child(odd) td {
+.shell-page .stock-modal-table tbody tr td,
+.stock-modal-table tbody tr td {
   background-color: var(--color-surface) !important;
 }
 
@@ -3035,7 +3096,10 @@
 /* ---- Mobile Stock-Taking (M3-09) ---------------------------------------- */
 
 .mobile-stock-take-page {
-  max-width: var(--page-max-width);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .mobile-stock-take-status-bar {

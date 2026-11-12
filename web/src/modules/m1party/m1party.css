@@ -34,6 +34,9 @@
 
 .party-table-full {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: auto;
   border-collapse: collapse;
 }
 
@@ -89,28 +92,34 @@
   width: 100% !important;
   min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
   padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
-  border-radius: calc(var(--radius) * 2) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
   background-color: var(--color-surface) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
   color: var(--color-text) !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 .roles-filter-bar input.party-filter-input:hover,
 .roles-filter-bar .party-filter-input:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-27) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
 }
 
 .roles-filter-bar input.party-filter-input:focus,
 .roles-filter-bar .party-filter-input:focus {
   background-color: var(--color-surface) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
 }
 
 .roles-filter-bar .custom-dropdown {
@@ -123,8 +132,8 @@
   width: 100% !important;
   min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
   padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
-  border-radius: calc(var(--radius) * 2) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
   background-color: var(--color-surface) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
@@ -136,19 +145,25 @@
   gap: var(--space-1) !important;
   cursor: pointer !important;
   outline: none !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 .roles-filter-bar .custom-dropdown__trigger:hover {
-  background-color: var(--color-polish-4) !important;
-  border-color: var(--color-accent) !important;
+  background-color: var(--color-polish-29) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-27) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
 }
 
 .roles-filter-bar .custom-dropdown--open .custom-dropdown__trigger,
 .roles-filter-bar .custom-dropdown__trigger:focus-visible {
   border-color: var(--color-accent) !important;
   background-color: var(--color-surface) !important;
-  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
 }
 
 .roles-filter-bar .custom-dropdown__arrow {
@@ -558,25 +573,32 @@
   width: 100%;
   min-height: calc(var(--space-4) + var(--space-half));
   padding: var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: calc(var(--radius) * 2);
-  background-color: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 2.5);
+  background-color: var(--color-surface);
   font-size: var(--font-size-sm);
   font-family: inherit;
   color: var(--color-text);
   outline: none;
-  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .relationship-field__input:hover {
-  border-color: var(--color-accent);
-  background-color: var(--color-surface);
+  border-color: var(--color-polish-19);
+  background-color: var(--color-polish-29);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
 }
 
 .relationship-field__input:focus {
   border-color: var(--color-accent);
   background-color: var(--color-surface);
-  box-shadow: 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-13);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
 }
 
 .relationship-amend-note {
@@ -634,7 +656,7 @@
   min-width: 0;
   box-sizing: border-box;
   background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
+  border: var(--border-width) solid var(--color-polish-21);
   border-radius: calc(var(--radius) * 3);
   box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-13), 0 var(--space-half) var(--space-2) var(--color-polish-14);
   overflow: hidden;
@@ -654,27 +676,42 @@
 
 table.modern-table {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: auto;
   border-collapse: collapse;
 }
 
 table.modern-table th {
-  background: var(--color-surface-subtle);
-  color: var(--color-text-muted);
+  background: var(--color-polish-22);
+  color: var(--color-brand-dark);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
   text-transform: uppercase;
-  padding: var(--space-2) var(--space-2);
-  border-bottom: var(--border-width-strong) solid var(--color-border);
-  white-space: nowrap;
+  text-align: center;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-right: var(--border-width) solid var(--color-polish-21);
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 table.modern-table td {
-  padding: var(--space-2) var(--space-2);
-  border-bottom: var(--border-width) solid var(--color-border);
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-polish-21);
+  border-right: var(--border-width) solid var(--color-polish-21);
   font-size: var(--font-size-sm);
   color: var(--color-text);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
   vertical-align: middle;
+}
+
+table.modern-table th:last-child,
+table.modern-table td:last-child {
+  border-right: none;
 }
 
 table.modern-table tbody tr:last-child td {
@@ -682,7 +719,7 @@ table.modern-table tbody tr:last-child td {
 }
 
 table.modern-table tbody tr:hover td {
-  background-color: var(--color-surface-subtle);
+  background-color: var(--color-polish-31);
 }
 
 .table-numeric-head {

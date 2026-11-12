@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { LocationName, SkuLabel } from "./labels";
 import { useTradingApi, type DeliveryNote } from "./tradingApi";
 import { countReady, errorText, grnRequest, isShort, type CountRow } from "./tradingView";
@@ -163,7 +164,10 @@ export function NewGrnPage() {
         </svg>
         {t("trading.back_to_note").text}
       </Link>
-      <h1>{t("trading.grn.new.title", undefined, { number: note.data?.docNumber ?? "" }).text}</h1>
+      <PageHeader
+        icon="stock"
+        title={t("trading.grn.new.title", undefined, { number: note.data?.docNumber ?? "" }).text}
+      />
       <p>
         {t("trading.field.receive_at").text}: <LocationName locationId={drop.shipToLocationId} />
       </p>

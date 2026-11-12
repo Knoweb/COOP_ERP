@@ -10,6 +10,26 @@
   margin-top: var(--space-3);
 }
 
+.trading-filter-bar:has(input, select) {
+  width: 100%;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 4);
+  box-shadow: 0 var(--space-1) calc(var(--space-4) - var(--space-half)) var(--color-polish-23);
+  box-sizing: border-box;
+}
+
+.trading-filter-bar:has(input, select) .trading-form-field {
+  flex: 1 1 calc(var(--space-8) * 2 + var(--space-4));
+  min-width: min(calc(var(--space-8) * 2 + var(--space-4)), 100%);
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+}
+
 .trading-form-row {
   display: grid;
   gap: var(--space-2);
@@ -18,6 +38,83 @@
 .trading-form-field {
   display: grid;
   gap: var(--space-half);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+  min-width: 0;
+}
+
+.trading-form-field input:not([type="checkbox"]):not([type="radio"]),
+.trading-form-field select,
+.trading-form-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 2.5);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  outline: none;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.trading-form-field input:not([type="checkbox"]):not([type="radio"]):hover:not(:disabled),
+.trading-form-field select:hover:not(:disabled),
+.trading-form-field textarea:hover:not(:disabled) {
+  border-color: var(--color-polish-19);
+  background: var(--color-polish-29);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
+}
+
+.trading-form-field input:not([type="checkbox"]):not([type="radio"]):focus,
+.trading-form-field input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+.trading-form-field select:focus,
+.trading-form-field select:focus-visible,
+.trading-form-field textarea:focus,
+.trading-form-field textarea:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27);
+  transform: translateY(calc(var(--border-width) * -1.5));
+  outline: none;
+}
+
+.trading-filter-bar:has(input, select) > button {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: var(--target-min);
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  border-radius: calc(var(--radius) * 2.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trading-form-field input:hover:not(:disabled),
+  .trading-form-field input:focus,
+  .trading-form-field input:focus-visible,
+  .trading-form-field select:hover:not(:disabled),
+  .trading-form-field select:focus,
+  .trading-form-field select:focus-visible,
+  .trading-form-field textarea:hover:not(:disabled),
+  .trading-form-field textarea:focus,
+  .trading-form-field textarea:focus-visible {
+    transform: none;
+  }
 }
 
 .trading-search-form {
@@ -320,18 +417,39 @@
 .trading-table-card {
   margin-bottom: 0 !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
-  border-radius: calc(var(--radius) * 2) !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-3) !important;
+  border-radius: calc(var(--radius) * 3) !important;
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-13), 0 var(--space-half) var(--space-2) var(--color-polish-14) !important;
 }
 
 .trading-table th {
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  text-align: center !important;
   border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+}
+
+.trading-table th:last-child,
+.trading-table td:last-child {
+  border-right: none !important;
+}
+
+.trading-table td {
+  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+}
+
+.trading-table tbody tr:last-child td {
+  border-bottom: none !important;
 }
 
 .trading-table tbody tr:hover td {
-  background: var(--color-polish-29) !important;
+  background: var(--color-polish-31) !important;
 }
 
 .trading-doc-link {

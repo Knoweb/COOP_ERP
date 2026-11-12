@@ -94,7 +94,7 @@ export function RolesPage() {
 
   return (
     <main className="shell-page">
-      <PageHeader icon="society" title={t("party.roles.title").text} />
+      <PageHeader icon="roles" title={t("party.roles.title").text} />
       {roles.isLoading && <p>{t("party.list.loading").text}</p>}
       {roles.isError && <p role="alert">{refusalOf(roles.error, t("party.error.generic").text).text}</p>}
       {roles.isSuccess && roles.data.length === 0 && <p>{t("party.roles.empty").text}</p>}

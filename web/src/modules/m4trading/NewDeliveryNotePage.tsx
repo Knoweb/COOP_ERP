@@ -7,6 +7,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
 import { useTradingApi, type LotBalance } from "./tradingApi";
 import { deliveryRequest, errorText, isSyntheticBatchNo, openQty, type DispatchRow } from "./tradingView";
@@ -113,7 +114,10 @@ export function NewDeliveryNotePage() {
         </svg>
         {t("trading.back_to_order").text}
       </Link>
-      <h1>{t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}</h1>
+      <PageHeader
+        icon="suppliers"
+        title={t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}
+      />
       <dl>
         <dt>{t("trading.column.buyer").text}</dt>
         <dd>

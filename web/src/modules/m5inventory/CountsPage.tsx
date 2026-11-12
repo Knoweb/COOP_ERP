@@ -120,7 +120,7 @@ export function CountsPage() {
         </Link>
       </div>
       <PageHeader
-        icon="stock"
+        icon="counts"
         title={t("inventory.title").text}
       />
 

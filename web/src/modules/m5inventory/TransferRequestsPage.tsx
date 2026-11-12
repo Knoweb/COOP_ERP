@@ -126,7 +126,7 @@ export function TransferRequestsPage() {
         </Link>
       </div>
       <PageHeader
-        icon="stock"
+        icon="transfers"
         title={t("inventory.title").text}
       />
 

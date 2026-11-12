@@ -10,6 +10,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { CatalogueReasonCapture as ReasonCapture } from "./CatalogueReasonCapture";
 
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
@@ -147,7 +148,7 @@ export function SkuPage() {
         </Link>
 
         <div className="sku-header-card">
-          <h1>{nameIn(item, language)}</h1>
+          <PageHeader icon="catalogue" title={nameIn(item, language)} />
           <p className="catalogue-header-row">
             <span className="sku-code-badge">{item.skuCode}</span>
             <StateChip state={chipOf(item.status)} label={t(`catalogue.status.${item.status}`).text} />

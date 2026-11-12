@@ -10,6 +10,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { RetailPrice, SetLinesResponse } from "./pricingApi";
@@ -205,7 +206,7 @@ export function ShelfListPage() {
       </div>
 
       <div className="pricing-header-card">
-        <h1>{list.name}</h1>
+        <PageHeader icon="shelf" title={list.name} />
         <div className="pricing-header-row">
           <span className="pricing-meta-badge">{t(`pricing.kind.${list.kind.toLowerCase()}`).text}</span>
           <span className="pricing-meta-badge">{t("pricing.version", undefined, { version: list.version }).text}</span>

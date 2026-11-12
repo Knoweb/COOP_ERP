@@ -167,7 +167,7 @@ export function SuppliersPage() {
       </div>
 
       <PageHeader
-        icon="catalogue"
+        icon="suppliers"
         title={t("catalogue.suppliers.title").text}
       />
       <p className="catalogue-import-subtitle">{t("catalogue.suppliers.description").text}</p>
