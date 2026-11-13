@@ -9375,8 +9375,15 @@ button[type="submit"]:not(:disabled):hover,
   box-sizing: border-box !important;
 }
 
-.catalogue-datepicker-label {
+.catalogue-datepicker-label-wrap {
   display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 0 !important;
+}
+
+.catalogue-datepicker-label {
+  display: inline-flex !important;
   align-items: center !important;
   gap: 4px !important;
   font-size: 13.5px !important;
@@ -9401,7 +9408,7 @@ button[type="submit"]:not(:disabled):hover,
   padding: 0 !important;
   margin: 0 !important;
   border: 0 !important;
-  opacity: 0 !important;
+  opacity: 0.001 !important;
   pointer-events: none !important;
   box-sizing: border-box !important;
 }

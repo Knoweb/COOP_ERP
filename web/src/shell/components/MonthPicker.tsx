@@ -98,10 +98,10 @@ export function MonthPicker({
 
   const formattedMonth = selectedParsed
     ? intl.formatDate(new Date(Date.UTC(selectedParsed.year, selectedParsed.month - 1, 1)), {
-        month: "long",
-        year: "numeric",
-        timeZone: "UTC"
-      })
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC"
+    })
     : "";
   const effectivePlaceholder = placeholder ?? t("shell.datepicker.placeholder_month").text;
   const dialogLabel = label ?? ariaLabel ?? effectivePlaceholder;
@@ -216,10 +216,12 @@ export function MonthPicker({
       ref={containerRef}
     >
       {label && (
-        <label className="catalogue-datepicker-label" htmlFor={inputId}>
-          <span>{label}</span>
+        <div className="catalogue-datepicker-label-wrap">
+          <label className="catalogue-datepicker-label" htmlFor={inputId}>
+            {label}
+          </label>
           {required && <span className="register-field-required" aria-hidden="true">*</span>}
-        </label>
+        </div>
       )}
 
       <div className="catalogue-datepicker-control">

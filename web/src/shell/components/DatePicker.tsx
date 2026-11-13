@@ -238,9 +238,9 @@ export function DatePicker({
           const isOutOfRange = Boolean((min && iso < min) || (max && iso > max));
           const isSelected = Boolean(
             parsedDate &&
-              parsedDate.year === viewYear &&
-              parsedDate.month === viewMonth &&
-              parsedDate.day === day
+            parsedDate.year === viewYear &&
+            parsedDate.month === viewMonth &&
+            parsedDate.day === day
           );
           const isToday = iso === todayStr;
           const cellClass = [
@@ -285,10 +285,12 @@ export function DatePicker({
       ref={containerRef}
     >
       {label && (
-        <label className="catalogue-datepicker-label" htmlFor={inputId}>
-          <span>{label}</span>
+        <div className="catalogue-datepicker-label-wrap">
+          <label className="catalogue-datepicker-label" htmlFor={inputId}>
+            {label}
+          </label>
           {required && <span className="register-field-required" aria-hidden="true">*</span>}
-        </label>
+        </div>
       )}
 
       <div className="catalogue-datepicker-control">
