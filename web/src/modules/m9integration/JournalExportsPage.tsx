@@ -145,6 +145,7 @@ export function JournalExportsPage() {
               id="integration-period-from"
               ariaLabel={t("integration.field.from").text}
               value={period.from}
+              max={period.to || undefined}
               required
               onChange={(from) => setPeriod({ ...period, from })}
             />
@@ -157,6 +158,7 @@ export function JournalExportsPage() {
               id="integration-period-to"
               ariaLabel={t("integration.field.to").text}
               value={period.to}
+              min={period.from || undefined}
               required
               onChange={(to) => setPeriod({ ...period, to })}
             />

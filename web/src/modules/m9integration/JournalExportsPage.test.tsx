@@ -147,6 +147,38 @@ describe("JournalExportsPage acknowledgement (ACC-03)", () => {
     expect(second[0]).toBe(EXPORT_ID);
     expect(second[1]).toBe(first[1]);
   });
+
+  it("uses custom DatePicker popups for From and To period filters", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".catalogue-datepicker-trigger").length).toBeGreaterThanOrEqual(2);
+    });
+
+    const inputs = document.querySelectorAll<HTMLInputElement>(".catalogue-datepicker-input");
+    const triggers = document.querySelectorAll<HTMLButtonElement>(".catalogue-datepicker-trigger");
+    const fromInput = inputs[0]!;
+    const beforeValue = fromInput.value;
+
+    fireEvent.click(triggers[0]!);
+
+    const popup = document.querySelector(".catalogue-calendar-popup");
+    expect(popup).not.toBeNull();
+
+    const enabledDays = Array.from(
+      popup!.querySelectorAll<HTMLButtonElement>(".catalogue-calendar-day:not(:disabled)")
+    ).filter((btn) => {
+      const dayNum = btn.textContent?.trim() ?? "";
+      return !beforeValue.endsWith(`-${dayNum.padStart(2, "0")}`);
+    });
+    expect(enabledDays.length).toBeGreaterThan(0);
+
+    const pickedDay = enabledDays[0]!.textContent!.trim().padStart(2, "0");
+    fireEvent.click(enabledDays[0]!);
+
+    expect(document.querySelector(".catalogue-calendar-popup")).toBeNull();
+    expect(fromInput.value).toMatch(new RegExp(`^\\d{4}-\\d{2}-${pickedDay}$`));
+  });
 });
 
 function formatDmy(iso: string): string {
@@ -154,7 +186,7 @@ function formatDmy(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-describe("JournalExportsPage date pickers (.cdp)", () => {
+describe("JournalExportsPage date pickers", () => {
   beforeEach(() => {
     state.permissions.clear();
     state.status = "GENERATED";
@@ -163,13 +195,13 @@ describe("JournalExportsPage date pickers (.cdp)", () => {
 
   afterEach(cleanup);
 
-  it("picks From and To dates using custom .cdp calendar dialogs and closes on Escape", async () => {
+  it("picks From and To dates using custom COOPFED calendar dialogs and closes on Escape", async () => {
     const initial = defaultExportPeriod(businessToday());
     const fromPrefix = initial.from.slice(0, 7);
     const toPrefix = initial.to.slice(0, 7);
     const expectedFromDisplay = formatDmy(initial.from);
     const expectedToDisplay = formatDmy(initial.to);
-    const expectedPickedFromIso = `${fromPrefix}-15`;
+    const expectedPickedFromIso = `${fromPrefix}-05`;
     const expectedPickedToIso = `${toPrefix}-10`;
 
     renderPage();
@@ -179,8 +211,8 @@ describe("JournalExportsPage date pickers (.cdp)", () => {
 
     fireEvent.click(fromBtn);
     const fromDialog = screen.getByRole("dialog", { name: "From" });
-    expect(fromDialog.className).toContain("cdp__popup");
-    fireEvent.click(within(fromDialog).getByRole("button", { name: "15" }));
+    expect(fromDialog.className).toContain("catalogue-calendar-popup");
+    fireEvent.click(within(fromDialog).getByRole("gridcell", { name: formatDmy(expectedPickedFromIso) }));
 
     expect(screen.queryByRole("dialog", { name: "From" })).toBeNull();
     expect(screen.getByRole("button", { name: `From: ${formatDmy(expectedPickedFromIso)}` })).toBeDefined();
@@ -190,8 +222,8 @@ describe("JournalExportsPage date pickers (.cdp)", () => {
 
     fireEvent.click(toBtn);
     const toDialog = screen.getByRole("dialog", { name: "To" });
-    expect(toDialog.className).toContain("cdp__popup");
-    fireEvent.click(within(toDialog).getByRole("button", { name: "10" }));
+    expect(toDialog.className).toContain("catalogue-calendar-popup");
+    fireEvent.click(within(toDialog).getByRole("gridcell", { name: formatDmy(expectedPickedToIso) }));
 
     expect(screen.queryByRole("dialog", { name: "To" })).toBeNull();
     expect(screen.getByRole("button", { name: `To: ${formatDmy(expectedPickedToIso)}` })).toBeDefined();

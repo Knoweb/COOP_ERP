@@ -17,6 +17,7 @@ function SkuStatusDropdown(props: {
   value: SkuStatus | "";
   onChange: (value: SkuStatus | "") => void;
   anyLabel: string;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,6 +60,7 @@ function SkuStatusDropdown(props: {
       <button
         type="button"
         className="custom-status-dropdown__trigger"
+        aria-label={props.ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
@@ -123,14 +125,14 @@ function SkuStatusDropdown(props: {
 function SkuThumbnail({ skuId }: { skuId: string }) {
   const t = useT();
   const api = useCatalogueApi();
-  const images = useQuery({ 
-    queryKey: ["catalogue", "images", skuId], 
+  const images = useQuery({
+    queryKey: ["catalogue", "images", skuId],
     queryFn: () => api.images(skuId),
     staleTime: 60000 // Cache for a minute to reduce network calls
   });
-  
+
   const activeImage = images.data?.find(img => img.status === "ACTIVE" || img.status === "PENDING");
-  
+
   // Read local preview if available, but clear it if backend image is ready
   let localPreviewUrl = null;
   try {
@@ -267,6 +269,7 @@ export function CataloguePage() {
             value={status}
             onChange={(val) => setStatus(val)}
             anyLabel={t("catalogue.filter.status.all").text}
+            ariaLabel={t("catalogue.filter.status").text}
           />
         </div>
       </section>

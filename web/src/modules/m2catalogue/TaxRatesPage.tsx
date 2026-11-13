@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip, type ChipState } from "../../shell/components/StateChip";
 import { ApiProblem } from "../../shell/api/client";
@@ -266,17 +267,16 @@ export function TaxRatesPage() {
                 />
               </label>
 
-              <label className="catalogue-form-field">
-                <span className="tax-field-required">{t("catalogue.tax.field.apply_from").text} *</span>
-                <input
+              <div className="catalogue-form-field">
+                <DatePicker
                   id="publish-rate-apply-from-input"
-                  type="date"
+                  label={t("catalogue.tax.field.apply_from").text}
                   required
                   min={todayIso}
                   value={applyFrom}
-                  onChange={(e) => setApplyFrom(e.target.value)}
+                  onChange={setApplyFrom}
                 />
-              </label>
+              </div>
 
               <div className="tax-button-container">
                 <button

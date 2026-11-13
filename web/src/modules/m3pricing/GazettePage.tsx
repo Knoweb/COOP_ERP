@@ -6,6 +6,7 @@ import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
@@ -284,14 +285,12 @@ function EnterForm({ onEntered }: { onEntered: () => void }) {
           {t("pricing.column.ceiling_price").text}
           <input type="number" min="0.01" step="0.01" required value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
         </label>
-        <label className="pricing-form-field">
-          {t("pricing.column.from").text}
-          <input type="date" required value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label className="pricing-form-field">
-          {t("pricing.gazette.field.to").text}
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
+        <div className="pricing-form-field">
+          <DatePicker label={t("pricing.column.from").text} required value={from} onChange={setFrom} />
+        </div>
+        <div className="pricing-form-field">
+          <DatePicker label={t("pricing.gazette.field.to").text} value={to} onChange={setTo} />
+        </div>
         <label className="pricing-form-field">
           {t("pricing.column.gazette").text}
           <input type="text" required maxLength={80} value={gazette} onChange={(e) => setGazette(e.target.value)} />
@@ -344,10 +343,9 @@ function RescindForm({ row, onRescinded }: { row: ControlPrice; onRescinded: () 
   };
   return (
     <form onSubmit={submit} className="pricing-form-grid">
-      <label className="pricing-form-field">
-        {t("pricing.gazette.field.last_day").text}
-        <input type="date" required value={lastDay} onChange={(e) => setLastDay(e.target.value)} />
-      </label>
+      <div className="pricing-form-field">
+        <DatePicker label={t("pricing.gazette.field.last_day").text} required value={lastDay} onChange={setLastDay} />
+      </div>
       <label className="pricing-form-field">
         {t("pricing.gazette.field.reason").text}
         <input type="text" required maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} />

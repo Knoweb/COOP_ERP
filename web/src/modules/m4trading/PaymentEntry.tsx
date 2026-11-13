@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { businessToday } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { useTradingApi, type PaymentReceipt } from "./tradingApi";
@@ -78,10 +79,14 @@ export function PaymentEntry({
           {t("trading.payment.reference").text}
           <input type="text" maxLength={100} value={form.reference} onChange={(event) => set({ reference: event.target.value })} />
         </label>
-        <label className="trading-form-field">
-          {t("trading.payment.received_on").text}
-          <input type="date" max={today} value={form.receivedOn} onChange={(event) => set({ receivedOn: event.target.value })} />
-        </label>
+        <div className="trading-form-field">
+          <DatePicker
+            label={t("trading.payment.received_on").text}
+            max={today}
+            value={form.receivedOn}
+            onChange={(val) => set({ receivedOn: val })}
+          />
+        </div>
         {form.method === "CHEQUE" && (
           <>
             <label className="trading-form-field">
@@ -92,10 +97,13 @@ export function PaymentEntry({
               {t("trading.payment.cheque_no").text}
               <input type="text" maxLength={20} value={form.chequeNo} onChange={(event) => set({ chequeNo: event.target.value })} />
             </label>
-            <label className="trading-form-field">
-              {t("trading.payment.cheque_dated").text}
-              <input type="date" value={form.chequeDated} onChange={(event) => set({ chequeDated: event.target.value })} />
-            </label>
+            <div className="trading-form-field">
+              <DatePicker
+                label={t("trading.payment.cheque_dated").text}
+                value={form.chequeDated}
+                onChange={(val) => set({ chequeDated: val })}
+              />
+            </div>
           </>
         )}
         <button type="button" disabled={record.isPending || !paymentReady(form)} onClick={() => record.mutate()}>

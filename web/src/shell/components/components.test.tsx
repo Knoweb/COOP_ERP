@@ -1,15 +1,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { IntlProvider } from "react-intl";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import shellCss from "../shell.css?raw";
 import { messages } from "../i18n/messages";
 import type { Locale } from "../i18n/messages";
 import { ApprovalBar } from "./ApprovalBar";
+import { DatePicker } from "./DatePicker";
 import { DocumentHeader } from "./DocumentHeader";
 import { ExceptionQueue } from "./ExceptionQueue";
 import { MemoryRouter } from "react-router-dom";
 import { MoneyDisplay } from "./MoneyDisplay";
+import { MonthPicker } from "./MonthPicker";
 import { ReasonCapture } from "./ReasonCapture";
 import { CHIP_STATES, StateChip } from "./StateChip";
 import { TrainingBadge } from "./TrainingBadge";
@@ -325,5 +327,79 @@ describe("ExceptionQueue", () => {
     renderIn("en", <ExceptionQueue caption="c" headers={headers} emptyText="Nothing needs attention." items={[]} />);
     expect(screen.getByText("Nothing needs attention.")).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+describe("DatePicker", () => {
+  it("opens the custom calendar grid with weekday headers, enforces min/max, and selects or clears a date", () => {
+    const onChange = vi.fn();
+    renderIn(
+      "en",
+      <DatePicker
+        id="dp-test"
+        label="Effective date"
+        value="2026-11-12"
+        min="2026-11-05"
+        max="2026-11-25"
+        onChange={onChange}
+      />
+    );
+
+    const input = screen.getByLabelText("Effective date") as HTMLInputElement;
+    expect(input.value).toBe("2026-11-12");
+
+    fireEvent.click(screen.getByRole("button", { name: "2026-11-12" }));
+    expect(screen.getByRole("dialog", { name: "Effective date" })).toBeTruthy();
+    expect(screen.getByText("November 2026")).toBeTruthy();
+    expect(screen.getByText("SU")).toBeTruthy();
+    expect(screen.getByText("SA")).toBeTruthy();
+
+    const beforeMin = screen.getByRole("gridcell", { name: "04/11/2026" }) as HTMLButtonElement;
+    const afterMax = screen.getByRole("gridcell", { name: "26/11/2026" }) as HTMLButtonElement;
+    expect(beforeMin.disabled).toBe(true);
+    expect(afterMax.disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("gridcell", { name: "18/11/2026" }));
+    expect(onChange).toHaveBeenCalledWith("2026-11-18");
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "2026-11-12" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("supports direct labeled input changes and closes on Escape", () => {
+    const onChange = vi.fn();
+    renderIn("en", <DatePicker id="dp-direct" label="Apply from" value="" onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText("Apply from"), { target: { value: "2026-12-01" } });
+    expect(onChange).toHaveBeenCalledWith("2026-12-01");
+
+    fireEvent.click(screen.getByRole("button", { name: "Select date" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("MonthPicker", () => {
+  it("navigates years and selects or clears a month", () => {
+    const onChange = vi.fn();
+    renderIn("en", <MonthPicker id="mp-test" label="Period" value="2026-11" onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "November 2026" }));
+    expect(screen.getByRole("dialog", { name: "Period" })).toBeTruthy();
+    expect(screen.getByText("2026")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous year" }));
+    expect(screen.getByText("2025")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("gridcell", { name: "Oct" }));
+    expect(onChange).toHaveBeenCalledWith("2025-10");
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "November 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(onChange).toHaveBeenCalledWith("");
   });
 });

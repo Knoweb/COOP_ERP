@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
@@ -46,14 +47,12 @@ export function StatementPage() {
       </Link>
       <PageHeader icon="statement" title={t("customers.statement.title").text} />
       <div className="customers-filter-bar">
-        <label className="customers-field">
-          {t("customers.statement.from").text}
-          <input type="date" max={to} value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label className="customers-field">
-          {t("customers.statement.to").text}
-          <input type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
+        <div className="customers-field">
+          <DatePicker label={t("customers.statement.from").text} max={to} value={from} onChange={setFrom} />
+        </div>
+        <div className="customers-field">
+          <DatePicker label={t("customers.statement.to").text} min={from} value={to} onChange={setTo} />
+        </div>
       </div>
       {reversing && <ReverseForm documentId={reversing} accountId={accountId} onDone={() => setReversing(null)} />}
       {statement.isLoading && <p>{t("customers.loading").text}</p>}

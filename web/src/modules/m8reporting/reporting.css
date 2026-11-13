@@ -882,6 +882,28 @@
   stroke: var(--color-accent);
 }
 
+.finance-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.finance-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.finance-field label {
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+}
+
+.finance-field--inline .catalogue-datepicker-wrap {
+  width: auto !important;
+  min-width: calc(var(--space-8) * 3);
+}
+
 .finance-section-card {
   padding: var(--space-3);
   background: var(--color-surface);
@@ -1711,6 +1733,7 @@
   background: var(--color-surface-subtle);
   border-radius: var(--radius);
 }
+
 .finance-section-card.blocked {
   border-style: dashed;
 }
@@ -2094,7 +2117,7 @@
   border-color: var(--color-accent);
 }
 
-.dashboard-section > p:not([role="alert"]) {
+.dashboard-section>p:not([role="alert"]) {
   margin: 0;
   padding: var(--space-3);
   border-radius: calc(var(--radius) * 3);
@@ -2318,7 +2341,7 @@
   width: 100%;
 }
 
-.report-viewer-controls__query + .report-viewer-controls__actions {
+.report-viewer-controls__query+.report-viewer-controls__actions {
   padding-top: var(--space-2);
   border-top: var(--border-width) solid var(--color-polish-14);
 }
@@ -2439,7 +2462,7 @@
   text-transform: none !important;
 }
 
-.reporting-dropdown-select > select.visually-hidden {
+.reporting-dropdown-select>select.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -2691,40 +2714,78 @@
 }
 
 .sales-targets-filter-panel {
-  display: flex !important;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-4);
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: var(--space-2) !important;
+  align-items: flex-end !important;
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-polish-14);
+  border-radius: calc(var(--radius) * 2.5);
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-23);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sales-targets-filter-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-2);
-  flex: 1 1 auto;
-}
-
-.sales-targets-field {
   display: grid;
-  gap: var(--space-half);
-  flex: 0 1 calc(var(--space-8) * 3);
-  min-width: min(calc(var(--space-8) * 2 + var(--space-4)), 100%);
-  max-width: min(calc(var(--space-8) * 3), 100%);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: flex-end;
+  min-width: 0;
+  width: 100%;
 }
 
+.sales-targets-field,
 .sales-targets-field--location {
-  flex: 1 1 calc(var(--space-8) * 3);
-  min-width: min(calc(var(--space-8) * 3), 100%);
-  max-width: min(calc(var(--space-8) * 4 + var(--space-4)), 100%);
+  display: grid;
+  gap: calc(var(--space-half) / 2);
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 .sales-targets-field__label {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
-  color: var(--color-brand-dark);
+  text-transform: uppercase;
+  letter-spacing: calc(var(--border-width) / 2);
+  line-height: 1.2;
+  color: var(--color-text-muted);
+  margin: 0 0 calc(var(--space-half) / 2) 0;
+}
+
+.sales-targets-filter-panel .targets-dropdown-select .custom-dropdown__trigger,
+.shell-page .sales-targets-filter-panel .catalogue-datepicker-trigger {
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  height: auto !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-2) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-polish-24) !important;
+  background-color: var(--color-polish-24) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  box-shadow: none !important;
+}
+
+.shell-page .sales-targets-filter-panel .catalogue-datepicker-trigger:hover:not(:disabled),
+.shell-page .sales-targets-filter-panel .catalogue-datepicker-trigger:focus-visible,
+.shell-page .sales-targets-filter-panel .catalogue-datepicker-trigger--open,
+.sales-targets-filter-panel .targets-dropdown-select .custom-dropdown__trigger:hover,
+.sales-targets-filter-panel .targets-dropdown-select .custom-dropdown__trigger:focus-visible,
+.sales-targets-filter-panel .targets-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
+  background: var(--color-polish-4) !important;
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.sales-targets-filter-panel .targets-dropdown-select .custom-dropdown__arrow {
+  width: calc(var(--space-2) - var(--space-half) / 2) !important;
+  height: calc(var(--space-2) - var(--space-half) / 2) !important;
 }
 
 .sales-targets-filter-action {
@@ -2738,13 +2799,14 @@
   align-items: center !important;
   justify-content: center !important;
   gap: var(--space-1) !important;
-  min-height: var(--target-min) !important;
-  padding: var(--space-1) var(--space-3) !important;
-  border-radius: calc(var(--radius) * 2.5) !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: 0 var(--space-2) !important;
+  border-radius: var(--radius-pill) !important;
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
   background-color: var(--color-polish-19) !important;
   border: var(--border-width) solid var(--color-polish-19) !important;
   color: var(--color-on-accent) !important;
+  font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-6) !important;
   white-space: nowrap;
@@ -3242,7 +3304,7 @@
   text-transform: none !important;
 }
 
-.targets-dropdown-select > select.visually-hidden {
+.targets-dropdown-select>select.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -3263,8 +3325,8 @@
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-24) !important;
+  background-color: var(--color-polish-24) !important;
   font-family: inherit !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
@@ -3294,8 +3356,8 @@
 .targets-dropdown-select .custom-dropdown__trigger:active,
 .targets-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
   border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-4) !important;
+  background-color: var(--color-polish-4) !important;
   color: var(--color-text) !important;
   transform: translateY(calc(var(--border-width) * -1.5)) !important;
   box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
@@ -3314,7 +3376,7 @@
 .targets-dropdown-select .custom-dropdown__arrow {
   width: var(--space-2) !important;
   height: var(--space-2) !important;
-  stroke: var(--color-accent) !important;
+  stroke: var(--color-polish-25) !important;
   stroke-width: var(--border-width-strong) !important;
   stroke-linecap: round !important;
   stroke-linejoin: round !important;
@@ -3389,9 +3451,9 @@
   border-radius: 0 !important;
   font-family: inherit !important;
   font-size: var(--font-size-sm) !important;
-  font-weight: var(--font-weight-strong) !important;
+  font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
-  color: var(--color-polish-25) !important;
+  color: var(--color-text) !important;
   text-align: left !important;
   text-transform: none !important;
   white-space: normal !important;
@@ -3418,14 +3480,14 @@
 .targets-dropdown-select .custom-dropdown__item--selected:hover,
 .targets-dropdown-menu .custom-dropdown__item--selected,
 .targets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
+  background-color: var(--color-polish-31) !important;
   color: var(--color-polish-25) !important;
   font-weight: var(--font-weight-strong) !important;
 }
 
 .targets-dropdown-select .custom-dropdown__item--selected:hover,
 .targets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-29) !important;
+  background-color: var(--color-polish-31) !important;
 }
 
 .targets-dropdown-select .custom-dropdown__item-bar,
@@ -3469,7 +3531,7 @@
   width: 100%;
 }
 
-.targets-calendar > input.visually-hidden {
+.targets-calendar>input.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -3846,7 +3908,7 @@
   width: 100%;
 }
 
-.shop-reports-calendar > input.visually-hidden {
+.shop-reports-calendar>input.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -4497,7 +4559,7 @@
   text-transform: none !important;
 }
 
-.shop-reports-dropdown-select > select.visually-hidden {
+.shop-reports-dropdown-select>select.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -4750,40 +4812,58 @@
 }
 
 .assets-filter-panel {
-  display: flex !important;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-4);
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: var(--space-2) !important;
+  align-items: flex-end !important;
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-polish-14);
+  border-radius: calc(var(--radius) * 2.5);
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-23);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .assets-filter-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-2);
-  flex: 1 1 auto;
-}
-
-.assets-field {
   display: grid;
-  gap: var(--space-half);
-  flex: 0 1 calc(var(--space-8) * 3);
-  min-width: min(calc(var(--space-8) * 2 + var(--space-4)), 100%);
-  max-width: min(calc(var(--space-8) * 3), 100%);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: flex-end;
+  min-width: 0;
+  width: 100%;
 }
 
+.assets-field,
 .assets-field--location {
-  flex: 1 1 calc(var(--space-8) * 3);
-  min-width: min(calc(var(--space-8) * 3), 100%);
-  max-width: min(calc(var(--space-8) * 4 + var(--space-4)), 100%);
+  display: grid;
+  gap: calc(var(--space-half) / 2);
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 .assets-field__label {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
-  color: var(--color-brand-dark);
+  text-transform: uppercase;
+  letter-spacing: calc(var(--border-width) / 2);
+  line-height: 1.2;
+  color: var(--color-text-muted);
+  margin: 0 0 calc(var(--space-half) / 2) 0;
+}
+
+.assets-filter-panel .assets-dropdown-select .custom-dropdown__trigger {
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-2) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+}
+
+.assets-filter-panel .assets-dropdown-select .custom-dropdown__arrow {
+  width: calc(var(--space-2) - var(--space-half) / 2) !important;
+  height: calc(var(--space-2) - var(--space-half) / 2) !important;
 }
 
 .assets-filter-actions {
@@ -4799,12 +4879,13 @@
   align-items: center !important;
   justify-content: center !important;
   gap: var(--space-1) !important;
-  min-height: var(--target-min) !important;
-  padding: var(--space-1) var(--space-2) !important;
-  border-radius: calc(var(--radius) * 2.5) !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: 0 var(--space-2) !important;
+  border-radius: var(--radius-pill) !important;
   border: var(--border-width) solid var(--color-polish-22) !important;
   background: var(--color-surface) !important;
   color: var(--color-accent) !important;
+  font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   white-space: nowrap;
   cursor: pointer;
@@ -4827,13 +4908,14 @@
   align-items: center !important;
   justify-content: center !important;
   gap: var(--space-1) !important;
-  min-height: var(--target-min) !important;
-  padding: var(--space-1) var(--space-3) !important;
-  border-radius: calc(var(--radius) * 2.5) !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: 0 var(--space-2) !important;
+  border-radius: var(--radius-pill) !important;
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
   background-color: var(--color-polish-19) !important;
   border: var(--border-width) solid var(--color-polish-19) !important;
   color: var(--color-on-accent) !important;
+  font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-6) !important;
   white-space: nowrap;
@@ -5325,7 +5407,7 @@
   text-transform: none !important;
 }
 
-.assets-dropdown-select > select.visually-hidden {
+.assets-dropdown-select>select.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -5346,8 +5428,8 @@
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-24) !important;
+  background-color: var(--color-polish-24) !important;
   font-family: inherit !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
@@ -5377,8 +5459,8 @@
 .assets-dropdown-select .custom-dropdown__trigger:active,
 .assets-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
   border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-4) !important;
+  background-color: var(--color-polish-4) !important;
   color: var(--color-text) !important;
   transform: translateY(calc(var(--border-width) * -1.5)) !important;
   box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
@@ -5427,9 +5509,9 @@
   box-sizing: border-box !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
-  border: var(--border-width) solid var(--color-border) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
   border-radius: calc(var(--radius) * 2) !important;
-  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-21), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
   overflow-y: auto !important;
   max-height: calc(var(--space-8) * 4) !important;
   animation: customDropdownFadeIn 0.15s ease-out !important;
@@ -5472,9 +5554,9 @@
   border-radius: 0 !important;
   font-family: inherit !important;
   font-size: var(--font-size-sm) !important;
-  font-weight: var(--font-weight-strong) !important;
+  font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
-  color: var(--color-polish-25) !important;
+  color: var(--color-text) !important;
   text-align: left !important;
   text-transform: none !important;
   white-space: normal !important;
@@ -5501,14 +5583,14 @@
 .assets-dropdown-select .custom-dropdown__item--selected:hover,
 .assets-dropdown-menu .custom-dropdown__item--selected,
 .assets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
+  background-color: var(--color-polish-31) !important;
   color: var(--color-polish-25) !important;
   font-weight: var(--font-weight-strong) !important;
 }
 
 .assets-dropdown-select .custom-dropdown__item--selected:hover,
 .assets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-29) !important;
+  background-color: var(--color-polish-31) !important;
 }
 
 .assets-dropdown-select .custom-dropdown__item-bar,
@@ -5552,7 +5634,7 @@
   width: 100%;
 }
 
-.assets-calendar > input.visually-hidden {
+.assets-calendar>input.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -5885,7 +5967,7 @@
   width: 100%;
 }
 
-.pnl-month-picker > input.visually-hidden {
+.pnl-month-picker>input.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -6619,7 +6701,7 @@
   text-transform: none !important;
 }
 
-.pnl-dropdown-select > select.visually-hidden {
+.pnl-dropdown-select>select.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;

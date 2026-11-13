@@ -52,13 +52,13 @@
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto !important;
   gap: var(--space-2) !important;
   align-items: flex-end !important;
-  margin-top: var(--space-2) !important;
+  margin-top: 0 !important;
   margin-bottom: var(--space-3) !important;
   background: var(--color-polish-22) !important;
   padding: var(--space-2) var(--space-3) !important;
-  border: var(--border-width) solid var(--color-polish-21) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-23) !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -81,7 +81,8 @@
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
-  color: var(--color-brand-dark) !important;
+  letter-spacing: calc(var(--border-width) / 2) !important;
+  color: var(--color-text-muted) !important;
   line-height: 1.2 !important;
   margin-bottom: calc(var(--space-half) / 2) !important;
 }
@@ -132,13 +133,13 @@
   width: 100% !important;
   min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
   padding: calc(var(--space-half) + var(--space-half) / 2) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-polish-21) !important;
-  border-radius: calc(var(--radius) * 2.5) !important;
-  background-color: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background-color: var(--color-polish-24) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
   color: var(--color-text) !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  box-shadow: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -161,15 +162,14 @@
 .roles-filter-bar .custom-dropdown--open .custom-dropdown__trigger,
 .roles-filter-bar .custom-dropdown__trigger:focus-visible {
   border-color: var(--color-accent) !important;
-  background-color: var(--color-surface) !important;
-  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27) !important;
-  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  background-color: var(--color-polish-4) !important;
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
 }
 
 .roles-filter-bar .custom-dropdown__arrow {
   width: calc(var(--space-2) - var(--space-half) / 2) !important;
   height: calc(var(--space-2) - var(--space-half) / 2) !important;
-  stroke: var(--color-accent) !important;
+  stroke: var(--color-polish-25) !important;
   stroke-width: var(--border-width-strong) !important;
   fill: none !important;
   flex-shrink: 0 !important;

@@ -1,41 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { MouseEvent } from "react";
+import { createPortal } from "react-dom";
+import { useIntl } from "react-intl";
+import { businessToday, useFormatDate } from "../i18n/formats";
 import { useT } from "../i18n/useT";
-import { businessToday } from "../i18n/formats";
+import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  isValidIsoDate,
+  pad2,
+  useCalendarPopup
+} from "./calendarShared";
 
 export type DatePickerProps = {
   id?: string;
-  className?: string;
   label?: string;
   prefixLabel?: string;
+  ariaLabel?: string;
+  triggerAriaLabel?: string;
   value: string; // YYYY-MM-DD
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
   min?: string; // YYYY-MM-DD
+  max?: string; // YYYY-MM-DD
+  portal?: boolean;
+  portalClassName?: string;
+  className?: string;
+  compact?: boolean;
+  displayValueMode?: "iso" | "formatted";
 };
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-];
-
-const WEEKDAY_NAMES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
 
 function formatIso(year: number, monthIndex: number, day: number): string {
   return `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`;
@@ -43,23 +39,39 @@ function formatIso(year: number, monthIndex: number, day: number): string {
 
 export function DatePicker({
   id,
-  className,
   label,
   prefixLabel,
+  ariaLabel,
+  triggerAriaLabel,
   value,
   onChange,
-  disabled,
-  required,
   placeholder,
-  min
+  disabled = false,
+  required = false,
+  min,
+  max,
+  portal = true,
+  portalClassName,
+  className,
+  compact = false,
+  displayValueMode = "iso"
 }: DatePickerProps) {
-  const generatedId = useRef(`datepicker-${Math.random().toString(36).substring(2, 9)}`);
-  const inputId = id || generatedId.current;
+  const autoId = useId();
+  const inputId = id || `datepicker-${autoId}`;
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const intl = useIntl();
+  const formatDate = useFormatDate();
 
-  // Parse current value or fallback to today
+  const {
+    open,
+    setOpen,
+    openUpward,
+    popupStyle,
+    containerRef,
+    triggerRef,
+    popupRef
+  } = useCalendarPopup(portal);
+
   const parsedDate = (() => {
     if (!value) return null;
     const parts = value.split("-").map(Number);
@@ -74,7 +86,6 @@ export function DatePicker({
   const [viewYear, setViewYear] = useState<number>(parsedDate ? parsedDate.year : todayParts[0]);
   const [viewMonth, setViewMonth] = useState<number>(parsedDate ? parsedDate.month : todayParts[1] - 1);
 
-  // Update view when value changes from outside
   useEffect(() => {
     if (!value) return;
     const parts = value.split("-").map(Number);
@@ -84,30 +95,20 @@ export function DatePicker({
     }
   }, [value]);
 
-  // Click outside and escape key handling
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (event: globalThis.MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!open) {
+      if (parsedDate) {
+        setViewYear(parsedDate.year);
+        setViewMonth(parsedDate.month);
+      } else {
+        setViewYear(todayParts[0]);
+        setViewMonth(todayParts[1] - 1);
       }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
+    }
+    setOpen((prev) => !prev);
+  };
 
-  // Navigation handlers
   const handlePrevMonth = (e: MouseEvent) => {
     e.stopPropagation();
     if (viewMonth === 0) {
@@ -128,177 +129,206 @@ export function DatePicker({
     }
   };
 
-  // Select day
   const handleSelectDay = (day: number) => {
     const iso = formatIso(viewYear, viewMonth, day);
     if (min && iso < min) return;
+    if (max && iso > max) return;
     onChange(iso);
     setOpen(false);
   };
 
-  // Clear date
   const handleClear = (e: MouseEvent) => {
     e.stopPropagation();
     onChange("");
     setOpen(false);
   };
 
-  // Today
   const handleToday = (e: MouseEvent) => {
     e.stopPropagation();
-    if (min && todayStr < min) {
-      onChange(min);
-    } else {
-      onChange(todayStr);
+    let target = todayStr;
+    if (min && target < min) {
+      target = min;
+    } else if (max && target > max) {
+      target = max;
     }
+    onChange(target);
     setOpen(false);
   };
 
-  // Calendar math using UTC so local timezone cannot shift dates
   const daysInMonth = new Date(Date.UTC(viewYear, viewMonth + 1, 0)).getUTCDate();
-  const firstDayOfWeek = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay(); // 0 = Sunday
+  const firstDayOfWeek = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay();
+
+  const headerTitle = intl.formatDate(new Date(Date.UTC(viewYear, viewMonth, 1)), {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  });
+
+  const weekdayHeaders = Array.from({ length: 7 }, (_, idx) => {
+    const date = new Date(Date.UTC(2023, 0, 1 + idx));
+    if (intl.locale.startsWith("en")) {
+      return intl.formatDate(date, { weekday: "short", timeZone: "UTC" }).slice(0, 2).toUpperCase();
+    }
+    return intl.formatDate(date, { weekday: "narrow", timeZone: "UTC" });
+  });
+
+  const displayText =
+    value && displayValueMode === "formatted" && isValidIsoDate(value)
+      ? formatDate(value)
+      : value;
+  const effectivePlaceholder = placeholder ?? t("shell.datepicker.placeholder").text;
+  const dialogLabel = label ?? ariaLabel ?? effectivePlaceholder;
+
+  const popupClasses = [
+    "catalogue-calendar-popup",
+    portal ? "catalogue-calendar-popup--portal" : "",
+    openUpward ? "catalogue-calendar-popup--up" : "",
+    portalClassName ?? ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const popupNode = open ? (
+    <div
+      ref={popupRef}
+      className={popupClasses}
+      style={portal ? popupStyle : undefined}
+      role="dialog"
+      aria-modal={portal ? undefined : true}
+      aria-label={dialogLabel}
+    >
+      <div className="catalogue-calendar-header">
+        <button
+          type="button"
+          className="catalogue-calendar-nav-btn"
+          onClick={handlePrevMonth}
+          aria-label={t("shell.datepicker.prev_month").text}
+        >
+          <ChevronLeftIcon />
+        </button>
+
+        <span className="catalogue-calendar-title">{headerTitle}</span>
+
+        <button
+          type="button"
+          className="catalogue-calendar-nav-btn"
+          onClick={handleNextMonth}
+          aria-label={t("shell.datepicker.next_month").text}
+        >
+          <ChevronRightIcon />
+        </button>
+      </div>
+
+      <div className="catalogue-calendar-weekdays" aria-hidden="true">
+        {weekdayHeaders.map((day, idx) => (
+          <span key={idx} className="catalogue-calendar-weekday">
+            {day}
+          </span>
+        ))}
+      </div>
+
+      <div className="catalogue-calendar-grid" role="grid" aria-label={headerTitle}>
+        {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
+          <div key={`empty-${idx}`} className="catalogue-calendar-empty-slot" />
+        ))}
+
+        {Array.from({ length: daysInMonth }).map((_, idx) => {
+          const day = idx + 1;
+          const iso = formatIso(viewYear, viewMonth, day);
+          const isOutOfRange = Boolean((min && iso < min) || (max && iso > max));
+          const isSelected = Boolean(
+            parsedDate &&
+            parsedDate.year === viewYear &&
+            parsedDate.month === viewMonth &&
+            parsedDate.day === day
+          );
+          const isToday = iso === todayStr;
+          const cellClass = [
+            "catalogue-calendar-day",
+            isSelected ? "catalogue-calendar-day--selected" : "",
+            !isSelected && isToday ? "catalogue-calendar-day--today" : ""
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          return (
+            <button
+              key={day}
+              type="button"
+              role="gridcell"
+              disabled={isOutOfRange}
+              aria-selected={isSelected}
+              aria-label={formatDate(iso)}
+              className={cellClass}
+              onClick={() => handleSelectDay(day)}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="catalogue-calendar-footer">
+        <button type="button" className="catalogue-calendar-action" onClick={handleClear}>
+          {t("shell.datepicker.clear").text}
+        </button>
+        <button type="button" className="catalogue-calendar-action" onClick={handleToday}>
+          {t("shell.datepicker.today").text}
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <div className={`catalogue-datepicker-wrap ${className || ""}`.trim()} ref={containerRef}>
+    <div
+      className={`catalogue-datepicker-wrap ${compact ? "catalogue-datepicker-wrap--compact" : ""} ${className ?? ""}`.trim()}
+      ref={containerRef}
+    >
       {label && (
-        <label className="catalogue-datepicker-label" htmlFor={inputId}>
-          <span>{label}</span>
-          {required && <span className="register-field-required">*</span>}
-        </label>
-      )}
-
-      {/* Accessible input associated with label for testing and form semantics */}
-      <input
-        id={inputId}
-        type="text"
-        className="visually-hidden"
-        value={value}
-        disabled={disabled}
-        required={required}
-        onChange={(e) => onChange(e.target.value)}
-        tabIndex={-1}
-      />
-
-      {/* Trigger Button */}
-      <button
-        type="button"
-        className={`catalogue-datepicker-trigger ${open ? "catalogue-datepicker-trigger--open" : ""}`}
-        disabled={disabled}
-        onClick={() => setOpen(!open)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        {prefixLabel && (
-          <span className="catalogue-datepicker-trigger__prefix">
-            {prefixLabel}
-          </span>
-        )}
-        <span className={value ? "catalogue-datepicker-trigger__value" : "catalogue-datepicker-trigger__placeholder"}>
-          {value || placeholder}
-        </span>
-        <span className="catalogue-datepicker-trigger__icon" aria-hidden="true">
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-        </span>
-      </button>
-
-      {/* Calendar Dialog Popup */}
-      {open && (
-        <div className="catalogue-calendar-popup" role="dialog" aria-modal="true">
-          {/* Header */}
-          <div className="catalogue-calendar-header">
-            <button
-              type="button"
-              className="catalogue-calendar-nav-btn"
-              onClick={handlePrevMonth}
-              aria-label={t("catalogue.datepicker.prev_month", "Previous month").text}
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-
-            <span className="catalogue-calendar-title">
-              {MONTH_NAMES[viewMonth]} {viewYear}
-            </span>
-
-            <button
-              type="button"
-              className="catalogue-calendar-nav-btn"
-              onClick={handleNextMonth}
-              aria-label={t("catalogue.datepicker.next_month", "Next month").text}
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Weekday Names */}
-          <div className="catalogue-calendar-weekdays">
-            {WEEKDAY_NAMES.map((day) => (
-              <span key={day} className="catalogue-calendar-weekday">
-                {day}
-              </span>
-            ))}
-          </div>
-
-          {/* Days Grid */}
-          <div className="catalogue-calendar-grid">
-            {/* Empty offset slots */}
-            {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
-              <div key={`empty-${idx}`} className="catalogue-calendar-empty-slot" />
-            ))}
-
-            {/* Days of Month */}
-            {Array.from({ length: daysInMonth }).map((_, idx) => {
-              const day = idx + 1;
-              const iso = formatIso(viewYear, viewMonth, day);
-              const isPastMin = Boolean(min && iso < min);
-              const isSelected =
-                parsedDate &&
-                parsedDate.year === viewYear &&
-                parsedDate.month === viewMonth &&
-                parsedDate.day === day;
-
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  disabled={isPastMin}
-                  className={`catalogue-calendar-day ${isSelected ? "catalogue-calendar-day--selected" : ""}`}
-                  onClick={() => handleSelectDay(day)}
-                >
-                  {day}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Footer (Clear and Today) */}
-          <div className="catalogue-calendar-footer">
-            <button type="button" className="catalogue-calendar-action" onClick={handleClear}>
-              {t("catalogue.datepicker.clear", "Clear").text}
-            </button>
-            <button type="button" className="catalogue-calendar-action" onClick={handleToday}>
-              {t("catalogue.datepicker.today", "Today").text}
-            </button>
-          </div>
+        <div className="catalogue-datepicker-label-wrap">
+          <label className="catalogue-datepicker-label" htmlFor={inputId}>
+            {label}
+          </label>
+          {required && <span className="register-field-required" aria-hidden="true">*</span>}
         </div>
       )}
+
+      <div className="catalogue-datepicker-control">
+        <input
+          id={inputId}
+          type="text"
+          className="catalogue-datepicker-input"
+          aria-label={!label ? ariaLabel : undefined}
+          value={value}
+          disabled={disabled}
+          required={required}
+          onChange={(e) => onChange(e.target.value)}
+          tabIndex={-1}
+        />
+
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`catalogue-datepicker-trigger ${open ? "catalogue-datepicker-trigger--open" : ""} ${compact ? "catalogue-datepicker-trigger--compact" : ""}`.trim()}
+          disabled={disabled}
+          onClick={handleToggle}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={triggerAriaLabel}
+        >
+          {prefixLabel && (
+            <span className="catalogue-datepicker-trigger__prefix">
+              {prefixLabel}
+            </span>
+          )}
+          <span className={displayText ? "catalogue-datepicker-trigger__value" : "catalogue-datepicker-trigger__placeholder"}>
+            {displayText || effectivePlaceholder}
+          </span>
+          <CalendarIcon />
+        </button>
+      </div>
+
+      {popupNode && (portal && typeof document !== "undefined" ? createPortal(popupNode, document.body) : popupNode)}
     </div>
   );
 }
