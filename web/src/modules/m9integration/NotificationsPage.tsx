@@ -53,9 +53,18 @@ export function NotificationsPage() {
         setDropdownOpen(false);
       }
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDropdownOpen(false);
+      }
+    }
     if (dropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleKeyDown);
+      };
     }
   }, [dropdownOpen]);
 
@@ -245,7 +254,7 @@ export function NotificationsPage() {
                   viewBox="0 0 24 24"
                   aria-hidden="true"
                 >
-                  <path d="m7 9 5 5 5-5" />
+                  <path d="m6 9 6 6 6-6" />
                 </svg>
               </button>
 
@@ -262,15 +271,10 @@ export function NotificationsPage() {
                         setDropdownOpen(false);
                       }}
                     >
-                      {status === "" ? (
-                        <span className="integration-dropdown-item__bar" aria-hidden="true" />
-                      ) : (
-                        <span className="integration-dropdown-item__spacer" aria-hidden="true" />
-                      )}
                       <span className="integration-dropdown-item__label">{t("integration.log.filter.all").text}</span>
                       {status === "" && (
                         <svg className="integration-dropdown-item__check" viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M20 6L9 17l-5-5" />
+                          <polyline points="20 6 9 17 4 12" />
                         </svg>
                       )}
                     </button>
@@ -289,15 +293,10 @@ export function NotificationsPage() {
                             setDropdownOpen(false);
                           }}
                         >
-                          {isSelected ? (
-                            <span className="integration-dropdown-item__bar" aria-hidden="true" />
-                          ) : (
-                            <span className="integration-dropdown-item__spacer" aria-hidden="true" />
-                          )}
                           <span className="integration-dropdown-item__label">{t(`integration.log.status.${s}`).text}</span>
                           {isSelected && (
                             <svg className="integration-dropdown-item__check" viewBox="0 0 24 24" aria-hidden="true">
-                              <path d="M20 6L9 17l-5-5" />
+                              <polyline points="20 6 9 17 4 12" />
                             </svg>
                           )}
                         </button>

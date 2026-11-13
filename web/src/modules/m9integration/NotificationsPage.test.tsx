@@ -195,4 +195,33 @@ describe("NotificationsPage (PGL-M3-02)", () => {
     const retryButtons = screen.queryAllByRole("button", { name: /retry delivery/i });
     expect(retryButtons).toHaveLength(0);
   });
+
+  it("filters delivery log via the Delivery status dropdown and closes on Escape", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockApi.log).toHaveBeenCalledWith(undefined);
+    });
+
+    const trigger = screen.getByRole("button", { name: "Delivery status" });
+    fireEvent.click(trigger);
+
+    const listbox = screen.getByRole("listbox", { name: "Delivery status" });
+    expect(listbox.className).toContain("integration-dropdown-menu");
+
+    const failedOption = Array.from(listbox.querySelectorAll('[role="option"]')).find((el) =>
+      el.textContent?.includes("Failed")
+    );
+    expect(failedOption).toBeTruthy();
+    fireEvent.click(failedOption!);
+
+    await waitFor(() => {
+      expect(mockApi.log).toHaveBeenCalledWith("FAILED");
+    });
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("listbox", { name: "Delivery status" })).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("listbox", { name: "Delivery status" })).toBeNull();
+  });
 });

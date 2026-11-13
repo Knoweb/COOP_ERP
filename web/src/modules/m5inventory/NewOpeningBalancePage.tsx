@@ -7,6 +7,7 @@ import { useT } from "../../shell/i18n/useT";
 import { inLocale, skuText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import {
@@ -442,10 +443,12 @@ export function NewOpeningBalancePage() {
                               />
                             </td>
                             <td>
-                              <input
-                                type="date"
+                              <DatePicker
+                                compact
+                                portal
+                                ariaLabel={t("inventory.column.expiry").text}
                                 value={row.expiryDate ?? ""}
-                                onChange={(e) => updatePreviewRow(idx, { expiryDate: e.target.value })}
+                                onChange={(val) => updatePreviewRow(idx, { expiryDate: val })}
                               />
                             </td>
                             <td className="numeric-cell">

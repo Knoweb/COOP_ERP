@@ -372,6 +372,30 @@
   box-sizing: border-box;
 }
 
+.pricing-rules-filter-panel {
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  gap: var(--space-2);
+  background: var(--color-polish-22);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-polish-14);
+  border-radius: calc(var(--radius) * 2.5);
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-23);
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+}
+
+.pricing-rules-filter-panel .pricing-filter-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: calc(var(--border-width) / 2);
+  line-height: 1.2;
+  color: var(--color-text-muted);
+  margin-bottom: 0;
+}
+
 .pricing-create-field {
   flex: 1 1 calc(var(--space-8) * 4);
   min-width: calc(var(--space-8) * 2);
@@ -1509,8 +1533,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
   padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-24) !important;
+  background-color: var(--color-polish-24) !important;
   color: var(--color-text) !important;
   font-family: inherit !important;
   font-size: var(--font-size-sm) !important;
@@ -1535,8 +1559,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
   border-width: var(--border-width) !important;
   border-color: var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-24) !important;
+  background-color: var(--color-polish-24) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-normal) !important;
@@ -1555,8 +1579,8 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-dropdown-select .custom-dropdown__trigger:active,
 .pricing-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
   border-color: var(--color-accent) !important;
-  background: var(--color-surface) !important;
-  background-color: var(--color-surface) !important;
+  background: var(--color-polish-4) !important;
+  background-color: var(--color-polish-4) !important;
   color: var(--color-text) !important;
   transform: translateY(calc(var(--border-width) * -1.5)) !important;
   box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
@@ -1579,7 +1603,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-dropdown-select .custom-dropdown__arrow {
   width: var(--space-2) !important;
   height: var(--space-2) !important;
-  stroke: var(--color-accent) !important;
+  stroke: var(--color-polish-25) !important;
   fill: none !important;
   stroke-width: var(--border-width-strong) !important;
   stroke-linecap: round !important;
@@ -1608,9 +1632,9 @@ select.pricing-select:not(.visually-hidden) option:focus {
   list-style: none !important;
   background: var(--color-surface) !important;
   background-color: var(--color-surface) !important;
-  border: var(--border-width) solid var(--color-border) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
   border-radius: calc(var(--radius) * 2) !important;
-  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-21), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
   z-index: 100 !important;
   max-height: calc(var(--space-8) * 4) !important;
   overflow-y: auto !important;
@@ -1651,9 +1675,9 @@ select.pricing-select:not(.visually-hidden) option:focus {
   border-radius: 0 !important;
   font-family: inherit !important;
   font-size: var(--font-size-sm) !important;
-  font-weight: var(--font-weight-strong) !important;
+  font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
-  color: var(--color-polish-25) !important;
+  color: var(--color-text) !important;
   cursor: pointer !important;
   text-align: left !important;
   text-transform: none !important;
@@ -1680,14 +1704,14 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-dropdown-select .custom-dropdown__item--selected:hover,
 .pricing-dropdown-menu .custom-dropdown__item--selected,
 .pricing-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
+  background-color: var(--color-polish-31) !important;
   color: var(--color-polish-25) !important;
   font-weight: var(--font-weight-strong) !important;
 }
 
 .pricing-dropdown-select .custom-dropdown__item--selected:hover,
 .pricing-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-29) !important;
+  background-color: var(--color-polish-31) !important;
 }
 
 .pricing-dropdown-select .custom-dropdown__item-bar,
@@ -1728,12 +1752,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
 /* ---- Markdown Queue Filter Panel & Search (PGL-M1-07) ------------------ */
 
 .pricing-markdown-filter-card {
-  background: var(--color-accent-light) !important;
-  border: var(--border-width) solid var(--color-border) !important;
-  border-radius: calc(var(--radius) * 4) !important;
-  padding: var(--space-3) var(--space-4) !important;
+  background: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  padding: var(--space-2) var(--space-3) !important;
+  margin-top: 0 !important;
   margin-bottom: var(--space-3) !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-13) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-23) !important;
   box-sizing: border-box !important;
   width: 100% !important;
 }
@@ -1741,16 +1766,16 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-markdown-filter-container {
   display: flex !important;
   flex-direction: column !important;
-  gap: var(--space-3) !important;
+  gap: var(--space-2) !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
 
-/* Row 1: Location (1.4fr), Reason (1fr), Status (1fr) */
+/* Row 1: Location, Reason, Status in equal 3 columns like Roles filter bar */
 .pricing-markdown-row-top {
   display: grid !important;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) !important;
-  gap: var(--space-3) !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: var(--space-2) !important;
   align-items: flex-end !important;
   width: 100% !important;
   box-sizing: border-box !important;
@@ -1760,7 +1785,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-markdown-row-bottom {
   display: flex !important;
   flex-wrap: wrap !important;
-  gap: var(--space-3) !important;
+  gap: var(--space-2) !important;
   align-items: flex-end !important;
   width: 100% !important;
   box-sizing: border-box !important;
@@ -1772,7 +1797,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: var(--space-half) !important;
+  gap: calc(var(--space-half) / 2) !important;
 }
 
 /* Search Box: Snug width strictly for "Search Markdown Queue..." text (~240px) without excess empty space */
@@ -1782,7 +1807,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   max-width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: var(--space-half) !important;
+  gap: calc(var(--space-half) / 2) !important;
 }
 
 .pricing-markdown-cell--action {
@@ -1791,30 +1816,35 @@ select.pricing-select:not(.visually-hidden) option:focus {
   flex: 0 0 auto !important;
 }
 
+.pricing-markdown-filter-card .pricing-dropdown-select .custom-dropdown__trigger,
 .pricing-markdown-filter-card .dropdown-select__trigger,
 .pricing-markdown-filter-card .pricing-markdown-search-input {
-  background: var(--color-surface) !important;
-  border: var(--border-width) solid var(--color-polish-21) !important;
-  border-radius: calc(var(--radius) * 2.5) !important;
-  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  background: var(--color-polish-24) !important;
+  background-color: var(--color-polish-24) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding-top: calc(var(--space-half) + var(--space-half) / 2) !important;
+  padding-bottom: calc(var(--space-half) + var(--space-half) / 2) !important;
   box-sizing: border-box !important;
   width: 100% !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
   transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
 }
 
-.pricing-markdown-filter-card .dropdown-select__trigger:hover:not(:disabled),
-.pricing-markdown-filter-card .pricing-markdown-search-input:hover:not(:disabled) {
-  background-color: var(--color-polish-29) !important;
-  border-color: var(--color-polish-19) !important;
-  transform: translateY(calc(var(--border-width) * -1.5)) !important;
-  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+.pricing-markdown-filter-card .pricing-dropdown-select .custom-dropdown__trigger:hover,
+.pricing-markdown-filter-card .dropdown-select__trigger:hover,
+.pricing-markdown-filter-card .pricing-markdown-search-input:hover {
+  background-color: var(--color-polish-4) !important;
+  border-color: var(--color-accent) !important;
 }
 
+.pricing-markdown-filter-card .pricing-dropdown-select.custom-dropdown--open .custom-dropdown__trigger,
+.pricing-markdown-filter-card .pricing-dropdown-select .custom-dropdown__trigger:focus-visible,
 .pricing-markdown-filter-card .dropdown-select__trigger:focus,
 .pricing-markdown-filter-card .dropdown-select__trigger--active,
 .pricing-markdown-filter-card .pricing-markdown-search-input:focus {
-  background-color: var(--color-surface) !important;
+  background-color: var(--color-polish-4) !important;
   border-color: var(--color-accent) !important;
   transform: translateY(calc(var(--border-width) * -1.5)) !important;
   box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
@@ -1824,9 +1854,11 @@ select.pricing-select:not(.visually-hidden) option:focus {
   display: block !important;
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
-  color: var(--color-brand-dark) !important;
+  color: var(--color-text-muted) !important;
+  letter-spacing: calc(var(--border-width) / 2) !important;
+  line-height: 1.2 !important;
   text-transform: uppercase !important;
-  margin-bottom: var(--space-1) !important;
+  margin-bottom: calc(var(--space-half) / 2) !important;
 }
 
 .pricing-markdown-search-wrapper {

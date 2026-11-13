@@ -3,6 +3,7 @@ import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useT } from "../../shell/i18n/useT";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { businessToday } from "../../shell/i18n/formats";
 import { locationText } from "../../shell/i18n/localName";
 import "./pos.css";
@@ -93,9 +94,8 @@ export function ShopPicker({ value, onChange }: { value: string; onChange: (loca
 export function DayPicker({ value, onChange }: { value: string; onChange: (day: string) => void }) {
   const t = useT();
   return (
-    <label className="pos-field">
-      {t("pos.field.business_date").text}
-      <input type="date" value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
+    <div className="pos-field">
+      <DatePicker label={t("pos.field.business_date").text} value={value} onChange={onChange} />
+    </div>
   );
 }

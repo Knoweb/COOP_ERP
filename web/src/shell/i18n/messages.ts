@@ -89,7 +89,16 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.design.col.contrast": "Contrast",
     "shell.design.col.required": "Needs at least",
     "shell.design.col.input": "What the server sent",
-    "shell.design.col.shown": "What the screen shows"
+    "shell.design.col.shown": "What the screen shows",
+    "shell.datepicker.prev_month": "Previous month",
+    "shell.datepicker.next_month": "Next month",
+    "shell.datepicker.prev_year": "Previous year",
+    "shell.datepicker.next_year": "Next year",
+    "shell.datepicker.clear": "Clear",
+    "shell.datepicker.today": "Today",
+    "shell.datepicker.this_month": "This month",
+    "shell.datepicker.placeholder": "Select date",
+    "shell.datepicker.placeholder_month": "Select month"
   },
   si: {
     "shell.lang_fallback": "තවම පරිවර්තනය කර නැත; ඉංග්‍රීසියෙන් පෙන්වයි",
@@ -158,7 +167,16 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.design.col.contrast": "ප්‍රතිවිරෝධය",
     "shell.design.col.required": "අවම අවශ්‍යතාව",
     "shell.design.col.input": "සේවාදායකය එවූ දේ",
-    "shell.design.col.shown": "තිරයේ පෙන්වන දේ"
+    "shell.design.col.shown": "තිරයේ පෙන්වන දේ",
+    "shell.datepicker.prev_month": "පෙර මාසය",
+    "shell.datepicker.next_month": "ඊළඟ මාසය",
+    "shell.datepicker.prev_year": "පෙර වසර",
+    "shell.datepicker.next_year": "ඊළඟ වසර",
+    "shell.datepicker.clear": "පිරිසිදු කරන්න",
+    "shell.datepicker.today": "අද",
+    "shell.datepicker.this_month": "මෙම මාසය",
+    "shell.datepicker.placeholder": "දිනය තෝරන්න",
+    "shell.datepicker.placeholder_month": "මාසය තෝරන්න"
   },
   ta: {
     "shell.lang_fallback": "இன்னும் மொழிபெயர்க்கப்படவில்லை; ஆங்கிலத்தில் காட்டப்படுகிறது",
@@ -227,7 +245,16 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.design.col.contrast": "மாறுபாடு",
     "shell.design.col.required": "குறைந்தபட்சத் தேவை",
     "shell.design.col.input": "சேவையகம் அனுப்பியது",
-    "shell.design.col.shown": "திரை காட்டுவது"
+    "shell.design.col.shown": "திரை காட்டுவது",
+    "shell.datepicker.prev_month": "முந்தைய மாதம்",
+    "shell.datepicker.next_month": "அடுத்த மாதம்",
+    "shell.datepicker.prev_year": "முந்தைய ஆண்டு",
+    "shell.datepicker.next_year": "அடுத்த ஆண்டு",
+    "shell.datepicker.clear": "அழி",
+    "shell.datepicker.today": "இன்று",
+    "shell.datepicker.this_month": "இந்த மாதம்",
+    "shell.datepicker.placeholder": "தேதியைத் தேர்ந்தெடுக்கவும்",
+    "shell.datepicker.placeholder_month": "மாதத்தைத் தேர்ந்தெடுக்கவும்"
   }
 };
 

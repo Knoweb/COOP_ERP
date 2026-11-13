@@ -7,6 +7,7 @@ import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
@@ -425,16 +426,14 @@ export function TradePriceListPage() {
 
             {canPublish && (
               <form onSubmit={submitPublish} className="pricing-publish-form">
-                <label className="modern-field">
-                  <span className="modern-field__label pricing-filter-label">{t("pricing.field.apply_from").text}</span>
-                  <input
-                    type="date"
+                <div className="modern-field">
+                  <DatePicker
+                    label={t("pricing.field.apply_from").text}
                     required
-                    className="pricing-input"
                     value={applyFrom}
-                    onChange={(event) => setApplyFrom(event.target.value)}
+                    onChange={setApplyFrom}
                   />
-                </label>
+                </div>
                 <button
                   type="submit"
                   className="modern-btn modern-btn--primary"
