@@ -14,6 +14,7 @@ import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { inLocale } from "../../shell/i18n/localName";
 import { useT } from "../../shell/i18n/useT";
 import { AccountManagement } from "./AccountManagement";
+import { ConsentManagement } from "./ConsentManagement";
 import {
   useCustomersApi,
   type Account,
@@ -112,6 +113,11 @@ export function CustomerCardPage() {
           </ul>
         </section>
       )}
+
+      <ConsentManagement
+        customer={customer}
+        canManage={canManageCustomer}
+      />
 
       <MembershipLoyaltySection
         customer={customer}

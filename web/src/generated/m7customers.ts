@@ -286,6 +286,26 @@ export interface paths {
         patch: operations["amendCustomer"];
         trace?: never;
     };
+    "/v1/customers/{customerId}/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record customer consent after registration */
+        post: operations["recordConsent"];
+        /** Withdraw active customer consent while preserving history */
+        delete: operations["withdrawConsent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customers/{customerId}/phone": {
         parameters: {
             query?: never;
@@ -749,6 +769,12 @@ export interface components {
                 [key: string]: string;
             };
             tags?: string[];
+        };
+        RecordConsentRequest: {
+            /** @enum {string} */
+            purpose: "CREDIT_ACCOUNT" | "STATEMENTS_NOTIFICATIONS";
+            /** @enum {string} */
+            via: "WEB" | "PAPER";
         };
         ChangePhoneRequest: {
             newPhone: string;
@@ -1806,6 +1832,66 @@ export interface operations {
         };
         responses: {
             /** @description Amended; the card */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCard"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    recordConsent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordConsentRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent recorded; updated customer card */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCard"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    withdrawConsent: {
+        parameters: {
+            query: {
+                purpose: "CREDIT_ACCOUNT" | "STATEMENTS_NOTIFICATIONS";
+            };
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consent withdrawn; updated customer card */
             200: {
                 headers: {
                     [name: string]: unknown;

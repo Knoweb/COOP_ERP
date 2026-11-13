@@ -380,6 +380,50 @@ paths:
               schema: { $ref: '#/components/schemas/CustomerCard' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/{customerId}/consents:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Customers]
+      operationId: recordConsent
+      summary: Record customer consent after registration
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordConsentRequest' }
+      responses:
+        '200':
+          description: Consent recorded; updated customer card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+    delete:
+      tags: [Customers]
+      operationId: withdrawConsent
+      summary: Withdraw active customer consent while preserving history
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: purpose
+          required: true
+          schema:
+            type: string
+            enum: [CREDIT_ACCOUNT, STATEMENTS_NOTIFICATIONS]
+      responses:
+        '200':
+          description: Consent withdrawn; updated customer card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/customers/{customerId}/phone:
     parameters:
       - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
@@ -937,6 +981,16 @@ components:
           type: array
           maxItems: 20
           items: { type: string, maxLength: 40 }
+    RecordConsentRequest:
+      type: object
+      required: [purpose, via]
+      properties:
+        purpose:
+          type: string
+          enum: [CREDIT_ACCOUNT, STATEMENTS_NOTIFICATIONS]
+        via:
+          type: string
+          enum: [WEB, PAPER]
     ChangePhoneRequest:
       type: object
       required: [newPhone, reason]

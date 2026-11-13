@@ -15,6 +15,8 @@
   "m7.customer.phone_held_elsewhere": "වෙනත් සමිතියක පාරිභෝගිකයෙකුට දැන් මෙම අංකය ඇත",
   "m7.customer.phone_reuse_confirm": "මෑතකදී වෙනත් අයෙකුට මෙම අංකය තිබුණි. ඉදිරියට යාමට මෙය වෙනත් පුද්ගලයෙකු බව තහවුරු කරන්න",
   "m7.customer.consent_invalid": "මෙම එකඟතාවය නොදනී",
+  "m7.customer.consent_already_active": "මෙම එකඟතාව දැනටමත් සක්‍රීයයි",
+  "m7.customer.consent_not_active": "ඉවත් කිරීමට සක්‍රීය එකඟතාවක් නොමැත",
   "m7.customer.consent_required": "පාරිභෝගිකයා ණය ගිණුමකට එකඟ විය යුතුය",
   "m7.customer.phone_unchanged": "මෙය දැනටමත් පාරිභෝගිකයාගේ අංකයයි",
   "m7.customer.open_balance": "පාරිභෝගිකයාගේ ගිණුමේ තවමත් ශේෂයක් ඇත; පළමුව එය පියවන්න",
