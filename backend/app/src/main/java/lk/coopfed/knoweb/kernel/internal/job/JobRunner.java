@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.kernel.internal.job;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -28,6 +29,7 @@ import net.javacrumbs.shedlock.core.SimpleLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -114,8 +116,7 @@ public class JobRunner {
             return Outcome.SKIPPED_DISABLED;
         }
 
-        Optional<SimpleLock> lock = locks.lock(
-                new LockConfiguration(clock.instant(), "job:" + name, job.lockTimeout(), lockAtLeastFor(job)));
+        Optional<SimpleLock> lock = acquireLock(name, job);
 
         if (lock.isEmpty()) {
             log.debug("Scheduled job {} is running on another instance", name);
@@ -143,7 +144,14 @@ public class JobRunner {
             return outcome;
         } finally {
             if (release) {
-                lock.get().unlock();
+                try {
+                    lock.get().unlock();
+                } catch (Exception e) {
+                    log.warn(
+                            "Releasing lock for scheduled job {} threw an exception (lock will expire at lockTimeout): {}",
+                            name,
+                            e.getMessage());
+                }
             } else {
                 log.warn(
                         "Scheduled job {} keeps its lock until it expires ({}) after the timeout",
@@ -151,6 +159,72 @@ public class JobRunner {
                         job.lockTimeout());
             }
         }
+    }
+
+    /**
+     * Tries to claim the lock for a scheduled job, retrying transient serialization or concurrency
+     * failures when multiple worker instances fire the schedule at the same instant and contend
+     * for the same row in {@code kernel.shedlock}.
+     */
+    private Optional<SimpleLock> acquireLock(String name, JobDefinition job) {
+        LockConfiguration configuration =
+                new LockConfiguration(clock.instant(), "job:" + name, job.lockTimeout(), lockAtLeastFor(job));
+        int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return locks.lock(configuration);
+            } catch (TransientDataAccessException e) {
+                if (attempt == maxAttempts) {
+                    log.debug(
+                            "Transient concurrency contention acquiring lock for scheduled job {} after {} attempts; treating as locked by peer: {}",
+                            name,
+                            attempt,
+                            e.getMessage());
+                    return Optional.empty();
+                }
+                pauseBriefly(attempt);
+            } catch (Exception e) {
+                if (isSerializationFailure(e)) {
+                    if (attempt == maxAttempts) {
+                        log.debug(
+                                "Serialization failure acquiring lock for scheduled job {} after {} attempts; treating as locked by peer: {}",
+                                name,
+                                attempt,
+                                e.getMessage());
+                        return Optional.empty();
+                    }
+                    pauseBriefly(attempt);
+                } else {
+                    throw e;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private void pauseBriefly(int attempt) {
+        try {
+            Thread.sleep(25L * attempt);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static boolean isSerializationFailure(Throwable t) {
+        Throwable cause = t;
+        while (cause != null) {
+            if (cause instanceof SQLException sqlEx) {
+                String state = sqlEx.getSQLState();
+                if ("40001".equals(state) || "40P01".equals(state)) {
+                    return true;
+                }
+            }
+            if (cause.getMessage() != null && cause.getMessage().contains("could not serialize access")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     /**
