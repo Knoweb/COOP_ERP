@@ -672,7 +672,7 @@ textarea {
   font-weight: var(--font-weight-strong);
   text-transform: uppercase;
   text-align: center;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
 }
 
 .shell-page tbody tr {
@@ -1326,7 +1326,7 @@ textarea {
   font-weight: var(--font-weight-strong);
   text-transform: uppercase;
   text-align: center;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
 }
 
 .shell-page tbody tr:hover td {
@@ -1684,7 +1684,7 @@ button[type="submit"]:not(:disabled):hover,
 }
 
 .data-table-wrap .data-table th {
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
   border-right: var(--border-width) solid var(--color-polish-21);
   background: var(--color-polish-22);
   color: var(--color-brand-dark);
@@ -2649,7 +2649,7 @@ button[type="submit"]:not(:disabled):hover,
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-align: center;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
   vertical-align: middle;
   white-space: normal;
   word-break: normal;
@@ -7726,7 +7726,7 @@ button[type="submit"]:not(:disabled):hover,
   font-weight: var(--font-weight-strong);
   text-transform: uppercase;
   color: var(--color-brand-dark);
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
   border-right: var(--border-width) solid var(--color-polish-21);
 }
 
@@ -9786,9 +9786,39 @@ button[type="submit"]:not(:disabled):hover,
 .catalogue-section table {
   width: 100% !important;
   max-width: 100% !important;
-  min-width: 0 !important;
+  min-width: 100% !important;
   table-layout: auto !important;
-  border-collapse: collapse !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+/* Outer frame for table scroll containers and tables inside padded cards, forms or sections */
+.inventory-form-card .modern-table-scroll,
+.modern-table-card.inventory-form-card .modern-table-scroll,
+.count-start-card .modern-table-scroll,
+.inventory-form-row .modern-table-scroll,
+.opening-excel-card .modern-table-scroll,
+.writeoff-lines-card .modern-table-scroll,
+.shell-page form .modern-table-scroll,
+.modern-table-card:has(> .inventory-card-header) .modern-table-scroll,
+.modern-table-card:has(> :not(.modern-table-scroll):first-child) .modern-table-scroll,
+.shell-page .modern-table-scroll:not(:only-child),
+.shell-page > .modern-table-scroll {
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  overflow: hidden !important;
+  background: var(--color-surface) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  margin-top: var(--space-2) !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+/* Standalone tables not inside modern-table-scroll or modern-table-card */
+.shell-page > table.modern-table,
+.shell-page form > table.modern-table {
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  overflow: hidden !important;
 }
 
 .shell-page table:not(.modern-table):not(.data-table):not(.import-table):not(.bulk-excel-table):not(.stock-table):not(.finance-table):not(.finance-voucher-table) {
@@ -9806,43 +9836,43 @@ button[type="submit"]:not(:disabled):hover,
 }
 
 .shell-page table:not(.bulk-excel-table) th {
-  background: var(--color-polish-22);
-  color: var(--color-brand-dark);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-strong);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-align: center;
-  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
-  border-right: var(--border-width) solid var(--color-polish-21);
-  white-space: normal;
-  word-break: normal;
-  overflow-wrap: break-word;
-  line-height: var(--line-height);
-  vertical-align: middle;
+  background: var(--color-polish-22) !important;
+  color: var(--color-brand-dark) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  text-align: center !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
+  vertical-align: middle !important;
 }
 
 .shell-page table:not(.bulk-excel-table) td {
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
-  border-bottom: var(--border-width) solid var(--color-polish-21);
-  border-right: var(--border-width) solid var(--color-polish-21);
-  white-space: normal;
-  word-break: normal;
-  overflow-wrap: break-word;
-  line-height: var(--line-height);
-  vertical-align: middle;
+  font-size: var(--font-size-sm) !important;
+  color: var(--color-text) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: var(--line-height) !important;
+  vertical-align: middle !important;
 }
 
 .shell-page table:not(.bulk-excel-table) th:last-child,
 .shell-page table:not(.bulk-excel-table) td:last-child {
-  border-right: none;
+  border-right: none !important;
 }
 
 .shell-page table:not(.bulk-excel-table) tbody tr:last-child td {
-  border-bottom: none;
+  border-bottom: none !important;
 }
 
 .shell-page table:not(.bulk-excel-table) td a:not(.btn):not(.button):not(.action-link):not(.trading-doc-link) {
@@ -9874,8 +9904,13 @@ button[type="submit"]:not(:disabled):hover,
 .shell-page .score-badge,
 .modern-table .state-chip,
 .modern-table .money-display,
+.modern-table .stock-sku-code,
+.modern-table .sku-code,
+.modern-table .entity-code,
+.modern-table .batch-code,
 .catalogue-uom-badge {
   white-space: nowrap !important;
+  word-break: keep-all !important;
 }
 
 .shell-page table .state-chip,

@@ -428,7 +428,7 @@
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
   text-align: center !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
 }

@@ -817,20 +817,29 @@ export function StockPage() {
                                       </p>
                                     ) : (
                                       <table className="modern-table stock-nested-table">
+                                        <colgroup>
+                                          <col className="nested-col-batch" />
+                                          <col className="nested-col-expiry" />
+                                          <col className="nested-col-condition" />
+                                          <col className="nested-col-fefo" />
+                                          <col className="nested-col-on-hand" />
+                                          <col className="nested-col-unit-cost" />
+                                          {canReprice && <col className="nested-col-actions" />}
+                                        </colgroup>
                                         <thead>
                                           <tr>
-                                            <th>{t("inventory.column.batch").text}</th>
-                                            <th>{t("inventory.column.expiry").text}</th>
-                                            <th>{t("inventory.column.condition").text}</th>
-                                            <th>{t("inventory.column.fefo").text}</th>
-                                            <th className="numeric-cell">
+                                            <th className="nested-col-batch">{t("inventory.column.batch").text}</th>
+                                            <th className="nested-col-expiry">{t("inventory.column.expiry").text}</th>
+                                            <th className="nested-col-condition">{t("inventory.column.condition").text}</th>
+                                            <th className="nested-col-fefo">{t("inventory.column.fefo").text}</th>
+                                            <th className="nested-col-on-hand numeric-cell">
                                               {t("inventory.column.on_hand").text}
                                             </th>
-                                            <th className="numeric-cell">
+                                            <th className="nested-col-unit-cost numeric-cell">
                                               {t("inventory.column.unit_cost").text}
                                             </th>
                                             {canReprice && (
-                                              <th className="col-actions">
+                                              <th className="nested-col-actions col-actions">
                                                 {t("inventory.actions").text}
                                               </th>
                                             )}
@@ -839,20 +848,20 @@ export function StockPage() {
                                         <tbody>
                                           {lots.map((lot) => (
                                             <tr key={lot.stockLotId}>
-                                              <td>
+                                              <td className="nested-col-batch">
                                                 {isSyntheticBatchNo(lot.batchNo)
                                                   ? t("inventory.field.batch_not_tracked").text
                                                   : (lot.batchNo || "—")}
                                               </td>
-                                              <td>
+                                              <td className="nested-col-expiry">
                                                 {lot.expiryDate ? formatDate(lot.expiryDate) : "—"}
                                               </td>
-                                              <td>
+                                              <td className="nested-col-condition">
                                                 <span className="condition-chip">
                                                   {t(`inventory.condition.${lot.condition}`).text}
                                                 </span>
                                               </td>
-                                              <td>
+                                              <td className="nested-col-fefo">
                                                 {lot.expired ? (
                                                   <span className="condition-chip">
                                                     {t("inventory.lot.expired").text}
@@ -861,8 +870,8 @@ export function StockPage() {
                                                   (lot.fefoRank ?? "—")
                                                 )}
                                               </td>
-                                              <td className="numeric-cell">{lot.qtyOnHand}</td>
-                                              <td className="numeric-cell">
+                                              <td className="nested-col-on-hand numeric-cell">{lot.qtyOnHand}</td>
+                                              <td className="nested-col-unit-cost numeric-cell">
                                                 {lot.unitCost != null ? (
                                                   <MoneyDisplay amount={lot.unitCost} />
                                                 ) : (
@@ -870,10 +879,10 @@ export function StockPage() {
                                                 )}
                                               </td>
                                               {canReprice && (
-                                                <td className="col-actions">
+                                                <td className="nested-col-actions col-actions">
                                                   <button
                                                     type="button"
-                                                    className="button button--small button--secondary"
+                                                    className="table-action-btn"
                                                     onClick={() => setSelectedLot(lot)}
                                                   >
                                                     {t("inventory.reprice.action").text}

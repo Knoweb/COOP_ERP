@@ -43,7 +43,7 @@
 }
 
 .reporting-data-table th {
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
   background: var(--color-polish-22);
   color: var(--color-brand-dark);
   font-size: var(--font-size-xs);
@@ -336,7 +336,7 @@
   text-align: center;
   color: var(--color-brand-dark);
   background: var(--color-polish-22);
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
 }
 
 .estimator-col-mix {
@@ -1348,7 +1348,7 @@
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
   border-right: var(--border-width) solid var(--color-polish-21);
   white-space: nowrap;
   text-align: center;
@@ -3080,7 +3080,7 @@
 .sales-targets-table th {
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   font-size: var(--font-size-xs) !important;
@@ -4488,7 +4488,7 @@
 .shop-reports-table th {
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   font-size: var(--font-size-xs) !important;
@@ -5175,7 +5175,7 @@
 .assets-table th {
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   font-size: var(--font-size-xs) !important;
@@ -6474,7 +6474,7 @@
 .pnl-table th {
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   font-size: var(--font-size-xs) !important;

@@ -357,7 +357,7 @@
 .notifications-section .modern-table th {
   background: var(--color-polish-22);
   color: var(--color-brand-dark);
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
 }
 
 .notifications-section .modern-table td {
