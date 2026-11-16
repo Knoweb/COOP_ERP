@@ -8,6 +8,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
+import { CustomSelect } from "./CustomSelect";
 import { useCustomersApi, type Account, type AccountAction } from "./customersApi";
 import { MFA_REQUIRED, accountActions, errorText, limitsChange, problemCode, raisesLimit } from "./customersView";
 import "./customers.css";
@@ -82,34 +83,100 @@ function LimitsForm({ account, customerId }: { account: Account; customerId: str
     amend.mutate();
   };
   return (
-    <form className="customers-form customers-subsection" onSubmit={submit} aria-labelledby="customers-limits-title">
-      <h3 id="customers-limits-title">{t("customers.limits.title").text}</h3>
-      <label className="customers-field">
-        {t("customers.account.limit").text}
-        <input type="number" min="0" step="0.01" required value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
-      </label>
+    <form className="customers-form customers-subcard" onSubmit={submit} aria-labelledby="customers-limits-title">
+      <h3 id="customers-limits-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+          <path d="M12 18V6" />
+        </svg>
+        <span>{t("customers.limits.title").text}</span>
+      </h3>
+      <div className="customers-form-row customers-form-row--2col">
+        <label className="customers-field">
+          <span className="customers-field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+              <path d="M12 18V6" />
+            </svg>
+            <span>{t("customers.account.limit").text}</span>
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            aria-label={t("customers.account.limit").text}
+            value={creditLimit}
+            onChange={(e) => setCreditLimit(e.target.value)}
+          />
+        </label>
+        <label className="customers-field">
+          <span className="customers-field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            <span>{t("customers.account.offline_cap").text}</span>
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            aria-label={t("customers.account.offline_cap").text}
+            value={offlineCap}
+            onChange={(e) => setOfflineCap(e.target.value)}
+          />
+        </label>
+      </div>
       <label className="customers-check">
         <input type="checkbox" checked={hardBlock} onChange={(e) => setHardBlock(e.target.checked)} />
-        {t("customers.limits.hard_block").text}
+        <span>{t("customers.limits.hard_block").text}</span>
       </label>
       <label className="customers-field">
-        {t("customers.account.offline_cap").text}
-        <input type="number" min="0" step="0.01" value={offlineCap} onChange={(e) => setOfflineCap(e.target.value)} />
-      </label>
-      <label className="customers-field">
-        {t("customers.reason").text}
-        <input maxLength={200} required value={reason} onChange={(e) => setReason(e.target.value)} />
+        <span className="customers-field-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+          </svg>
+          <span>{t("customers.reason").text}</span>
+        </span>
+        <input
+          maxLength={200}
+          required
+          aria-label={t("customers.reason").text}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
       </label>
       {raisesLimit(account, change) && (
         <label className="customers-field">
-          {t("customers.limits.nic").text}
-          <input maxLength={20} autoComplete="off" value={nic} onChange={(e) => setNic(e.target.value)} />
+          <span className="customers-field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <line x1="15" y1="8" x2="17" y2="8" />
+              <line x1="7" y1="16" x2="17" y2="16" />
+            </svg>
+            <span>{t("customers.limits.nic").text}</span>
+          </span>
+          <input
+            maxLength={20}
+            autoComplete="off"
+            aria-label={t("customers.limits.nic").text}
+            value={nic}
+            onChange={(e) => setNic(e.target.value)}
+          />
         </label>
       )}
-      {raisesLimit(account, change) && <p role="note">{t("customers.limits.step_up").text}</p>}
-      <button type="submit" disabled={amend.isPending || change === null || reason.trim() === ""}>
-        {t("customers.limits.submit").text}
-      </button>
+      {raisesLimit(account, change) && <p role="note" className="customers-hint-text">{t("customers.limits.step_up").text}</p>}
+      <div className="customers-form-actions">
+        <button type="submit" className="customers-btn-primary" disabled={amend.isPending || change === null || reason.trim() === ""}>
+          <span>{t("customers.limits.submit").text}</span>
+        </button>
+      </div>
       {amend.isError && (
         <p role="alert">
           {problemCode(amend.error) === MFA_REQUIRED
@@ -152,31 +219,60 @@ function StatusActions({ account, customerId }: { account: Account; customerId: 
     change.mutate();
   };
   return (
-    <form className="customers-form customers-subsection" onSubmit={submit} aria-labelledby="customers-status-title">
-      <h3 id="customers-status-title">{t("customers.status_action.title").text}</h3>
-      <label className="customers-field">
-        {t("customers.status_action.action").text}
-        <select
-          aria-label={t("customers.status_action.action").text}
-          value={action}
-          required
-          onChange={(e) => setAction(e.target.value as AccountAction | "")}
-        >
-          <option value="">{t("customers.status_action.choose").text}</option>
-          {actions.map((each) => (
-            <option key={each} value={each}>
-              {t(`customers.status_action.${each}`).text}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="customers-field">
-        {t("customers.reason").text}
-        <input maxLength={200} required value={reason} onChange={(e) => setReason(e.target.value)} />
-      </label>
-      <button type="submit" disabled={change.isPending || action === "" || reason.trim() === ""}>
-        {t("customers.status_action.submit").text}
-      </button>
+    <form className="customers-form customers-subcard" onSubmit={submit} aria-labelledby="customers-status-title">
+      <h3 id="customers-status-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <span>{t("customers.status_action.title").text}</span>
+      </h3>
+      <div className="customers-form-row customers-form-row--2col">
+        <label className="customers-field">
+          <span className="customers-field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="9 11 12 14 22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            <span>{t("customers.status_action.action").text}</span>
+          </span>
+          <CustomSelect
+            ariaLabel={t("customers.status_action.action").text}
+            required
+            value={action}
+            onChange={(val) => setAction(val as AccountAction | "")}
+            options={[
+              { value: "", label: t("customers.status_action.choose").text },
+              ...actions.map((each) => ({
+                value: each,
+                label: t(`customers.status_action.${each}`).text
+              }))
+            ]}
+          />
+        </label>
+        <label className="customers-field">
+          <span className="customers-field-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+            </svg>
+            <span>{t("customers.reason").text}</span>
+          </span>
+          <input
+            maxLength={200}
+            required
+            aria-label={t("customers.reason").text}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="customers-form-actions">
+        <button type="submit" className="customers-btn-primary" disabled={change.isPending || action === "" || reason.trim() === ""}>
+          <span>{t("customers.status_action.submit").text}</span>
+        </button>
+      </div>
       {change.isError && <p role="alert">{errorText(change.error, t("customers.error.generic").text)}</p>}
     </form>
   );
@@ -237,22 +333,38 @@ function Adjustments({
     ask.mutate();
   };
   return (
-    <section className="customers-subsection" aria-labelledby="customers-adjustments-title">
-      <h3 id="customers-adjustments-title">{t("customers.adjustment.title").text}</h3>
+    <section className="customers-subcard" aria-labelledby="customers-adjustments-title">
+      <h3 id="customers-adjustments-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="16" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+        </svg>
+        <span>{t("customers.adjustment.title").text}</span>
+      </h3>
       {list.data && list.data.length > 0 && (
-        <ul className="customers-list">
+        <ul className="customers-list customer-phone-history-list" style={{ marginBottom: "var(--space-2)" }}>
           {list.data.map((adjustment) => (
-            <li key={adjustment.adjustmentId}>
-              <MoneyDisplay amount={adjustment.amount} /> · {adjustment.reason} · {formatInstant(adjustment.requestedAt)}{" "}
-              <StateChip
-                state={adjustment.status === "APPROVED" ? "issued" : "draft"}
-                label={t(`customers.adjustment.status.${adjustment.status}`).text}
-              />
-              {canApprove && adjustment.status === "REQUESTED" && (
-                <button type="button" disabled={approve.isPending} onClick={() => approve.mutate(adjustment.adjustmentId)}>
-                  {t("customers.adjustment.approve").text}
-                </button>
-              )}
+            <li key={adjustment.adjustmentId} className="customer-phone-history-item">
+              <span>
+                <MoneyDisplay amount={adjustment.amount} /> · {adjustment.reason} · {formatInstant(adjustment.requestedAt)}
+              </span>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+                <StateChip
+                  state={adjustment.status === "APPROVED" ? "issued" : "draft"}
+                  label={t(`customers.adjustment.status.${adjustment.status}`).text}
+                />
+                {canApprove && adjustment.status === "REQUESTED" && (
+                  <button
+                    type="button"
+                    className="customers-btn-primary"
+                    disabled={approve.isPending}
+                    onClick={() => approve.mutate(adjustment.adjustmentId)}
+                  >
+                    <span>{t("customers.adjustment.approve").text}</span>
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -260,18 +372,49 @@ function Adjustments({
       {approve.isError && <p role="alert">{errorText(approve.error, t("customers.error.generic").text)}</p>}
       {canAdjust && account.status !== "CLOSED" && (
         <form className="customers-form" onSubmit={submit}>
-          <p>{t("customers.adjustment.explain").text}</p>
-          <label className="customers-field">
-            {t("customers.adjustment.amount").text}
-            <input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </label>
-          <label className="customers-field">
-            {t("customers.reason").text}
-            <input maxLength={200} required value={reason} onChange={(e) => setReason(e.target.value)} />
-          </label>
-          <button type="submit" disabled={ask.isPending || !(Number(amount) !== 0) || reason.trim() === ""}>
-            {t("customers.adjustment.request").text}
-          </button>
+          <p className="customers-hint-text">{t("customers.adjustment.explain").text}</p>
+          <div className="customers-form-row customers-form-row--2col">
+            <label className="customers-field">
+              <span className="customers-field-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+                  <path d="M12 18V6" />
+                </svg>
+                <span>{t("customers.adjustment.amount").text}</span>
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                required
+                aria-label={t("customers.adjustment.amount").text}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </label>
+            <label className="customers-field">
+              <span className="customers-field-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                </svg>
+                <span>{t("customers.reason").text}</span>
+              </span>
+              <input
+                maxLength={200}
+                required
+                aria-label={t("customers.reason").text}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="customers-form-actions">
+            <button type="submit" className="customers-btn-primary" disabled={ask.isPending || !(Number(amount) !== 0) || reason.trim() === ""}>
+              <span>{t("customers.adjustment.request").text}</span>
+            </button>
+          </div>
           {ask.isError && <p role="alert">{errorText(ask.error, t("customers.error.generic").text)}</p>}
         </form>
       )}
@@ -289,12 +432,19 @@ function History({ accountId }: { accountId: string }) {
     return null;
   }
   return (
-    <section className="customers-subsection" aria-labelledby="customers-history-title">
-      <h3 id="customers-history-title">{t("customers.history.title").text}</h3>
-      <ul className="customers-list">
+    <section className="customers-subcard" aria-labelledby="customers-history-title">
+      <h3 id="customers-history-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <span>{t("customers.history.title").text}</span>
+      </h3>
+      <ul className="customers-list customer-phone-history-list">
         {history.data.map((entry) => (
-          <li key={entry.historyId}>
-            {formatInstant(entry.changedAt)} · {t(`customers.history.${entry.action}`).text} · {entry.reason}
+          <li key={entry.historyId} className="customer-phone-history-item">
+            <span>{t(`customers.history.${entry.action}`).text} · {entry.reason}</span>
+            <span className="customer-phone-dates">{formatInstant(entry.changedAt)}</span>
           </li>
         ))}
       </ul>
