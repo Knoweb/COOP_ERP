@@ -310,16 +310,17 @@ export function PrivacyRequestForm({ customerId }: { customerId: string }) {
         </div>
       </div>
       <div className="customers-form-row customers-form-row--2col">
-        <label className="customers-field">
-          <span className="customers-field-label">
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="privacy-request-kind">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <span>{t("customers.privacy.record.kind").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="privacy-request-kind"
             ariaLabel={t("customers.privacy.record.kind").text}
             required
             value={kind}
@@ -332,7 +333,7 @@ export function PrivacyRequestForm({ customerId }: { customerId: string }) {
               }))
             ]}
           />
-        </label>
+        </div>
         <label className="customers-field">
           <span className="customers-field-label">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

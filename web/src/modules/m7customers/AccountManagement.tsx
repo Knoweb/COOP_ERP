@@ -228,15 +228,16 @@ function StatusActions({ account, customerId }: { account: Account; customerId: 
         <span>{t("customers.status_action.title").text}</span>
       </h3>
       <div className="customers-form-row customers-form-row--2col">
-        <label className="customers-field">
-          <span className="customers-field-label">
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="account-status-action">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="9 11 12 14 22 4" />
               <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
             </svg>
             <span>{t("customers.status_action.action").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="account-status-action"
             ariaLabel={t("customers.status_action.action").text}
             required
             value={action}
@@ -249,7 +250,7 @@ function StatusActions({ account, customerId }: { account: Account; customerId: 
               }))
             ]}
           />
-        </label>
+        </div>
         <label className="customers-field">
           <span className="customers-field-label">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

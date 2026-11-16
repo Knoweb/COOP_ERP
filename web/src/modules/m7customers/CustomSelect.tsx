@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 export type CustomSelectOption = {
   value: string;
@@ -6,6 +6,7 @@ export type CustomSelectOption = {
 };
 
 export function CustomSelect({
+  id: explicitId,
   label,
   value,
   onChange,
@@ -14,6 +15,7 @@ export function CustomSelect({
   disabled,
   ariaLabel
 }: {
+  id?: string;
   label?: string;
   value: string;
   onChange: (value: string) => void;
@@ -22,6 +24,8 @@ export function CustomSelect({
   disabled?: boolean;
   ariaLabel?: string;
 }) {
+  const rawId = useId();
+  const selectId = explicitId || `custom-select-${rawId.replace(/:/g, "")}`;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -108,10 +112,10 @@ export function CustomSelect({
       )}
 
       <select
+        id={selectId}
         aria-label={ariaLabel || label}
         className="visually-hidden"
         tabIndex={-1}
-        aria-hidden="true"
         value={value}
         required={required}
         disabled={disabled}

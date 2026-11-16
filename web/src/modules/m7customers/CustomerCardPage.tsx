@@ -472,15 +472,16 @@ function RepaymentForm({ account, customerId }: { account: Account; customerId: 
             onChange={(e) => setAmount(e.target.value)}
           />
         </label>
-        <label className="customers-field">
-          <span className="customers-field-label">
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="customer-payment-method">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
               <line x1="1" y1="10" x2="23" y2="10" />
             </svg>
             <span>{t("customers.payment.method").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="customer-payment-method"
             ariaLabel={t("customers.payment.method").text}
             value={method}
             onChange={(val) => setMethod(val as (typeof METHODS)[number])}
@@ -489,7 +490,7 @@ function RepaymentForm({ account, customerId }: { account: Account; customerId: 
               label: t(`customers.payment.method.${each}`).text
             }))}
           />
-        </label>
+        </div>
         <label className="customers-field">
           <span className="customers-field-label">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -749,14 +750,15 @@ function EnrollLoyaltyForm({
         </label>
       </div>
       <div className="customers-form-row customers-form-row--2col">
-        <label className="customers-field">
-          <span className="customers-field-label">
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="enroll-loyalty-tier">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
             <span>{t("customers.loyalty.tier").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="enroll-loyalty-tier"
             ariaLabel={t("customers.loyalty.tier").text}
             value={loyaltyTier}
             onChange={(val) => setLoyaltyTier(val as (typeof TIERS)[number])}
@@ -765,16 +767,17 @@ function EnrollLoyaltyForm({
               label: t(`customers.loyalty.tier.${tier}`).text
             }))}
           />
-        </label>
-        <label className="customers-field">
-          <span className="customers-field-label">
+        </div>
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="enroll-registered-location">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
             <span>{t("customers.loyalty.registered_location").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="enroll-registered-location"
             ariaLabel={t("customers.loyalty.registered_location").text}
             required
             value={registeredLocationId}
@@ -784,7 +787,7 @@ function EnrollLoyaltyForm({
               label: locationLabel(loc)
             }))}
           />
-        </label>
+        </div>
       </div>
       <div className="customers-consents-card">
         <label className="customers-check">
@@ -938,14 +941,15 @@ function UpdateLoyaltyForm({
         </label>
       </div>
       <div className="customers-form-row customers-form-row--3col">
-        <label className="customers-field">
-          <span className="customers-field-label">
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="update-loyalty-tier">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
             <span>{t("customers.loyalty.tier").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="update-loyalty-tier"
             ariaLabel={t("customers.loyalty.tier").text}
             value={loyaltyTier}
             onChange={(val) => setLoyaltyTier(val as (typeof TIERS)[number])}
@@ -954,16 +958,17 @@ function UpdateLoyaltyForm({
               label: t(`customers.loyalty.tier.${tier}`).text
             }))}
           />
-        </label>
-        <label className="customers-field">
-          <span className="customers-field-label">
+        </div>
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="update-loyalty-status">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
             <span>{t("customers.loyalty.status").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="update-loyalty-status"
             ariaLabel={t("customers.loyalty.status").text}
             value={status}
             onChange={(val) => setStatus(val as (typeof LOYALTY_STATUSES)[number])}
@@ -972,16 +977,17 @@ function UpdateLoyaltyForm({
               label: t(`customers.loyalty.status.${st}`).text
             }))}
           />
-        </label>
-        <label className="customers-field">
-          <span className="customers-field-label">
+        </div>
+        <div className="customers-field">
+          <label className="customers-field-label" htmlFor="update-registered-location">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
             <span>{t("customers.loyalty.registered_location").text}</span>
-          </span>
+          </label>
           <CustomSelect
+            id="update-registered-location"
             ariaLabel={t("customers.loyalty.registered_location").text}
             required
             value={registeredLocationId}
@@ -991,7 +997,7 @@ function UpdateLoyaltyForm({
               label: locationLabel(loc)
             }))}
           />
-        </label>
+        </div>
       </div>
       <div className="customers-consents-card">
         <label className="customers-check">
