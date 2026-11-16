@@ -690,7 +690,7 @@ table.modern-table th {
   text-transform: uppercase;
   text-align: center;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21);
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19);
   border-right: var(--border-width) solid var(--color-polish-21);
   white-space: normal;
   word-break: normal;

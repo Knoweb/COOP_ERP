@@ -196,16 +196,28 @@ export function ReorderControlsPage() {
 
   return (
     <main className="shell-page">
+      <div>
+        <Link className="back-pill-btn" to="/inventory">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("inventory.back").text}
+        </Link>
+      </div>
       <PageHeader
         icon="stock"
         title={t("inventory.reorder.title").text}
-        actions={
-          <div className="button-group">
-            <Link className="action-link" to="/inventory">
-              {t("inventory.back").text}
-            </Link>
-          </div>
-        }
       />
       <p className="modern-intro-text">{t("inventory.reorder.intro").text}</p>
 

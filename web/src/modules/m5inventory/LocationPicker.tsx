@@ -46,14 +46,17 @@ export function LocationPicker({ value, onChange }: { value: string; onChange: (
   }));
 
   return (
-    <label className="inventory-form-field">
-      <span className="inventory-form-field__label">{t("inventory.field.location").text}</span>
+    <div className="inventory-form-field">
+      <label htmlFor="inventory-location-select" className="inventory-form-field__label">
+        {t("inventory.field.location").text}
+      </label>
       <CustomSelect
+        id="inventory-location-select"
         value={value}
         onChange={onChange}
         ariaLabel={t("inventory.field.location").text}
         options={options}
       />
-    </label>
+    </div>
   );
 }

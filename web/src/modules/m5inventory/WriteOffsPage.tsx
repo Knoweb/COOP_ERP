@@ -107,7 +107,7 @@ export function WriteOffsPage() {
       </div>
       <PageHeader
         icon="writeoffs"
-        title={t("inventory.title").text}
+        title={t("inventory.writeoff.title").text}
       />
 
       <div className="inventory-control-links">
@@ -153,11 +153,18 @@ export function WriteOffsPage() {
       </section>
 
       <section className="modern-table-card">
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.writeoff.list").text}</h2>
+        <div className="inventory-card-header">
+          <span className="inventory-card-header__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </span>
+          <h2 className="inventory-card-header__title">{t("inventory.writeoff.list").text}</h2>
         </div>
-        {writeOffs.isError && <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(writeOffs.error, t("inventory.error.generic").text)}</p>}
-        {writeOffs.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.writeoff.none").text}</p>}
+        {writeOffs.isError && <p role="alert" style={{ padding: 'var(--space-3) var(--space-4)' }}>{errorText(writeOffs.error, t("inventory.error.generic").text)}</p>}
+        {writeOffs.data?.length === 0 && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.writeoff.none").text}</p>}
         {writeOffs.data && writeOffs.data.length > 0 && (
           <div className="modern-table-scroll">
             <table className="modern-table stock-table">
@@ -183,7 +190,7 @@ export function WriteOffsPage() {
                       />
                     </td>
                     <td>
-                      <Link to={`/inventory/write-offs/${writeOff.writeOffId}`}>{t("inventory.writeoff.open").text}</Link>
+                      <Link className="table-action-btn" to={`/inventory/write-offs/${writeOff.writeOffId}`}>{t("inventory.writeoff.open").text}</Link>
                     </td>
                   </tr>
                 ))}
@@ -194,10 +201,17 @@ export function WriteOffsPage() {
       </section>
 
       {canRequest && locationId !== "" && (
-        <section className="modern-table-card inventory-section" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
-          <h2>{t("inventory.writeoff.new").text}</h2>
-          <label className="inventory-form-field">
-            <span>{t("inventory.writeoff.category").text}</span>
+        <section className="modern-table-card inventory-form-card">
+          <div className="inventory-card-header">
+            <span className="inventory-card-header__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            <h2 className="inventory-card-header__title">{t("inventory.writeoff.new").text}</h2>
+          </div>
+          <label className="inventory-form-field writeoff-category-field">
+            <span className="writeoff-field-label">{t("inventory.writeoff.category").text}</span>
             <CustomSelect<string>
               ariaLabel={t("inventory.writeoff.category").text}
               value={category}
@@ -259,17 +273,23 @@ export function WriteOffsPage() {
               </table>
             </div>
           )}
-          <label className="inventory-form-field">
-            {t("inventory.writeoff.note").text}
+          <label className="inventory-form-field writeoff-note-field">
+            <span className="writeoff-field-label">{t("inventory.writeoff.note").text}</span>
             <textarea value={note} rows={2} onChange={(event) => setNote(event.target.value)} />
           </label>
           <div className="inventory-action-bar">
             <button
               type="button"
+              className="modern-btn modern-btn--primary inventory-submit-btn"
               disabled={category === "" || lines.length === 0 || request.isPending}
               onClick={() => request.mutate()}
             >
-              {t("inventory.writeoff.save").text}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              <span>{t("inventory.writeoff.save").text}</span>
             </button>
           </div>
           {request.isError && <p role="alert">{errorText(request.error, t("inventory.error.generic").text)}</p>}

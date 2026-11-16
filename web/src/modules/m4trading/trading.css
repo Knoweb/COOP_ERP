@@ -428,7 +428,7 @@
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
   text-align: center !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
 }
@@ -452,7 +452,9 @@
   background: var(--color-polish-31) !important;
 }
 
-.trading-doc-link {
+.trading-doc-link,
+.modern-table td a.trading-doc-link,
+.shell-page table td a.trading-doc-link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-half);
@@ -460,19 +462,40 @@
   border-radius: calc(var(--radius) * 1.5);
   background: var(--color-polish-31);
   border: var(--border-width) solid var(--color-polish-22);
-  color: var(--color-accent);
-  font-weight: var(--font-weight-strong);
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
   font-size: var(--font-size-sm);
-  text-decoration: none;
+  text-decoration: none !important;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.trading-doc-link:hover {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-on-accent);
+.trading-doc-link:hover,
+.trading-doc-link:focus,
+.trading-doc-link:focus-visible,
+.trading-doc-link:active,
+.modern-table td a.trading-doc-link:hover,
+.modern-table td a.trading-doc-link:focus,
+.modern-table td a.trading-doc-link:focus-visible,
+.modern-table td a.trading-doc-link:active,
+.shell-page table td a.trading-doc-link:hover,
+.shell-page table td a.trading-doc-link:focus,
+.shell-page table td a.trading-doc-link:focus-visible,
+.shell-page table td a.trading-doc-link:active {
+  background: var(--color-polish-22) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+  text-decoration: none !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-13) !important;
+  transform: translateY(calc(var(--border-width) * -1)) !important;
+}
+
+.trading-doc-link:visited,
+.modern-table td a.trading-doc-link:visited,
+.shell-page table td a.trading-doc-link:visited {
+  color: var(--color-accent) !important;
 }
 
 .trading-cell-numeric {
@@ -721,3 +744,521 @@
   font-weight: var(--font-weight-strong);
   color: var(--color-polish-25);
 }
+
+/* ---- New Order Requisition & Item Finder -------------------------------- */
+
+.modern-filter-panel--trading {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-polish-22);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 4);
+  box-shadow: 0 var(--space-1) calc(var(--space-4) - var(--space-half)) var(--color-polish-23);
+  box-sizing: border-box;
+}
+
+.trading-order-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.trading-order-fields-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.trading-order-fields-row .trading-form-field {
+  flex: 1 1 calc(var(--space-8) * 3);
+  min-width: min(calc(var(--space-8) * 3), 100%);
+}
+
+.trading-form-field__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-polish-25);
+  text-transform: uppercase;
+  margin-bottom: var(--space-half);
+}
+
+.trading-empty-hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  margin: var(--space-1) 0;
+}
+
+.trading-order-table-card {
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.trading-qty-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: var(--space-half) var(--space-1);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trading-qty-input:hover:not(:disabled) {
+  border-color: var(--color-polish-19);
+}
+
+.trading-qty-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-27);
+}
+
+.trading-order-submit-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.trading-finder-card {
+  margin-top: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 3);
+  box-shadow: 0 var(--space-1) calc(var(--space-4) - var(--space-half)) var(--color-polish-23);
+  overflow: hidden;
+}
+
+.trading-finder-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-polish-22);
+  border-bottom: var(--border-width) solid var(--color-polish-21);
+}
+
+.trading-finder-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+
+.trading-finder-title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+}
+
+.trading-finder-body {
+  padding: var(--space-3);
+}
+
+.trading-search-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+}
+
+.trading-search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.trading-search-icon {
+  position: absolute;
+  left: var(--space-2);
+  stroke: var(--color-accent);
+  pointer-events: none;
+}
+
+.trading-search-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-2);
+  padding-left: calc(var(--space-4) + var(--space-1));
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 2.5);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  outline: none;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trading-search-input:hover:not(:disabled) {
+  border-color: var(--color-polish-19);
+  background: var(--color-polish-29);
+}
+
+.trading-search-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-27);
+  background: var(--color-surface);
+}
+
+.trading-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.trading-results-panel {
+  margin-top: var(--space-3);
+  border: var(--border-width) solid var(--color-polish-21);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-surface);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-23);
+  overflow: hidden;
+}
+
+.trading-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-polish-22);
+  border-bottom: var(--border-width) solid var(--color-polish-21);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-polish-25);
+}
+
+.trading-results-dismiss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: var(--space-half);
+  border-radius: var(--radius);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.trading-results-dismiss-btn:hover {
+  color: var(--color-accent);
+  background-color: var(--color-polish-29);
+}
+
+.trading-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.trading-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-polish-18);
+  transition: background-color 0.15s ease;
+}
+
+.trading-result-item:last-child {
+  border-bottom: none;
+}
+
+.trading-result-item:hover {
+  background-color: var(--color-polish-29);
+}
+
+.trading-result-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1;
+}
+
+.trading-sku-code-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-half) var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-polish-31);
+  color: var(--color-polish-25);
+  border: var(--border-width) solid var(--color-polish-21);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.trading-sku-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trading-add-sku-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  padding: var(--space-half) var(--space-2);
+  border-radius: calc(var(--radius) * 2);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.trading-add-icon {
+  font-weight: var(--font-weight-strong);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+/* ---- Trading Dropdown Select (unified custom dropdown) ---- */
+
+.trading-dropdown-select {
+  position: relative !important;
+  width: 100% !important;
+}
+
+.trading-dropdown-select > select.visually-hidden {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.trading-dropdown-select .custom-dropdown__trigger {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-half)) !important;
+  height: auto !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-text) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-1) !important;
+  cursor: pointer !important;
+  outline: none !important;
+  text-align: left !important;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease, background-color 0.2s ease !important;
+}
+
+.trading-dropdown-select .custom-dropdown__trigger:hover:not(:disabled) {
+  border-color: var(--color-polish-19) !important;
+  background: var(--color-polish-29) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-text) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width) var(--color-polish-27) !important;
+}
+
+.trading-dropdown-select .custom-dropdown__trigger:focus-visible,
+.trading-dropdown-select .custom-dropdown__trigger:active,
+.trading-dropdown-select.custom-dropdown--open .custom-dropdown__trigger {
+  border-color: var(--color-accent) !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  transform: translateY(calc(var(--border-width) * -1.5)) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13), 0 0 0 var(--border-width-strong) var(--color-polish-13) !important;
+}
+
+.trading-dropdown-select .custom-dropdown__trigger:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.trading-dropdown-select .custom-dropdown__value {
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-text) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 !important;
+}
+
+.trading-dropdown-select .custom-dropdown__arrow {
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-accent) !important;
+  stroke-width: var(--border-width-strong) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  fill: none !important;
+  flex-shrink: 0 !important;
+  margin-left: var(--space-1) !important;
+  transition: transform 0.2s ease !important;
+}
+
+.trading-dropdown-select.custom-dropdown--open .custom-dropdown__arrow {
+  transform: rotate(180deg) !important;
+}
+
+.trading-dropdown-select .custom-dropdown__menu,
+.trading-dropdown-menu {
+  position: absolute !important;
+  top: calc(100% + var(--space-half));
+  left: 0;
+  right: auto !important;
+  min-width: 100%;
+  width: max-content !important;
+  max-width: min(calc(var(--space-8) * 7), 90vw) !important;
+  z-index: 100 !important;
+  margin: 0 !important;
+  padding: var(--space-half) 0 !important;
+  list-style: none !important;
+  box-sizing: border-box !important;
+  background: var(--color-surface) !important;
+  background-color: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-border) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-23), 0 var(--border-width-strong) var(--space-1) var(--color-polish-3) !important;
+  overflow-y: auto !important;
+  max-height: calc(var(--space-8) * 4) !important;
+  animation: customDropdownFadeIn 0.15s ease-out !important;
+}
+
+.trading-dropdown-select.custom-dropdown--up .custom-dropdown__menu {
+  top: auto !important;
+  bottom: calc(100% + var(--space-half)) !important;
+  animation: customDropdownFadeInUp 0.15s ease-out !important;
+}
+
+.trading-dropdown-menu.trading-dropdown-portal {
+  position: fixed !important;
+  top: auto;
+  bottom: auto;
+  right: auto !important;
+  min-width: auto;
+  width: max-content !important;
+  max-width: min(calc(var(--space-8) * 7), 90vw) !important;
+  margin-top: var(--space-half) !important;
+  z-index: 10100 !important;
+}
+
+.trading-dropdown-menu.trading-dropdown-portal.custom-dropdown__menu--up {
+  margin-top: 0 !important;
+  margin-bottom: var(--space-half) !important;
+  animation: customDropdownFadeInUp 0.15s ease-out !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item,
+.trading-dropdown-menu .custom-dropdown__item {
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  padding: calc(var(--space-half) + var(--space-half) / 2) calc(var(--space-1) + var(--space-half)) !important;
+  background: var(--color-surface) !important;
+  border: none !important;
+  border-left: none !important;
+  border-radius: 0 !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-polish-25) !important;
+  text-align: left !important;
+  text-transform: none !important;
+  white-space: normal !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+  user-select: none !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item:not(:last-child),
+.trading-dropdown-menu .custom-dropdown__item:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--color-polish-14) !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item:hover,
+.trading-dropdown-select .custom-dropdown__item:focus-visible,
+.trading-dropdown-menu .custom-dropdown__item:hover,
+.trading-dropdown-menu .custom-dropdown__item:focus-visible {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-polish-25) !important;
+  outline: none !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item--selected,
+.trading-dropdown-select .custom-dropdown__item--selected:hover,
+.trading-dropdown-menu .custom-dropdown__item--selected,
+.trading-dropdown-menu .custom-dropdown__item--selected:hover {
+  background-color: var(--color-surface) !important;
+  color: var(--color-polish-25) !important;
+  font-weight: var(--font-weight-strong) !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item-bar,
+.trading-dropdown-menu .custom-dropdown__item-bar {
+  width: var(--border-width-strong) !important;
+  height: var(--space-2) !important;
+  background-color: var(--color-polish-25) !important;
+  border-radius: var(--radius-pill) !important;
+  margin-right: var(--space-1) !important;
+  flex-shrink: 0 !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item-spacer,
+.trading-dropdown-menu .custom-dropdown__item-spacer {
+  width: var(--border-width-strong) !important;
+  margin-right: var(--space-1) !important;
+  flex-shrink: 0 !important;
+}
+
+.trading-dropdown-select .custom-dropdown__item-label,
+.trading-dropdown-menu .custom-dropdown__item-label {
+  flex: 1 !important;
+}
+
+.trading-dropdown-select .custom-dropdown__checkmark,
+.trading-dropdown-menu .custom-dropdown__checkmark {
+  width: var(--space-2) !important;
+  height: var(--space-2) !important;
+  stroke: var(--color-polish-25) !important;
+  fill: none !important;
+  stroke-width: var(--border-width-strong) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  flex-shrink: 0 !important;
+  margin-left: var(--space-2) !important;
+}
+
+

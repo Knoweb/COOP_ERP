@@ -121,7 +121,7 @@ export function CountsPage() {
       </div>
       <PageHeader
         icon="counts"
-        title={t("inventory.title").text}
+        title={t("inventory.count.title").text}
       />
 
       <div className="inventory-control-links">
@@ -167,35 +167,67 @@ export function CountsPage() {
       </section>
 
       {canSchedule && canRecord && locationId !== "" && (
-        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)' }}>
-          <h2>{t("inventory.count.start_section").text}</h2>
-          <label className="inventory-form-field">
-            <span>{t("inventory.count.scope").text}</span>
-            <CustomSelect
-              ariaLabel={t("inventory.count.scope").text}
-              value={scopeKind}
-              onChange={(val) => setScopeKind(val as "FULL" | "SKUS")}
-              options={[
-                { value: "SKUS", label: t("inventory.count.scope.SKUS").text },
-                { value: "FULL", label: t("inventory.count.scope.FULL").text }
-              ]}
-            />
-          </label>
+        <section className="modern-table-card count-start-card">
+          <div className="count-start-card__header">
+            <span className="count-start-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </span>
+            <h2 className="count-start-title">{t("inventory.count.start_section").text}</h2>
+          </div>
+          <div className="count-form-field">
+            <label className="count-field-label" htmlFor="count-scope-select">
+              <span>{t("inventory.count.scope").text}</span>
+            </label>
+            <div className="count-select-wrapper">
+              <CustomSelect
+                id="count-scope-select"
+                ariaLabel={t("inventory.count.scope").text}
+                value={scopeKind}
+                onChange={(val) => setScopeKind(val as "FULL" | "SKUS")}
+                options={[
+                  { value: "SKUS", label: t("inventory.count.scope.SKUS").text },
+                  { value: "FULL", label: t("inventory.count.scope.FULL").text }
+                ]}
+              />
+            </div>
+          </div>
           {scopeKind === "SKUS" && (
-            <fieldset className="inventory-form-row">
-              <legend>{t("inventory.count.pick_items").text}</legend>
-              {skuIds.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
-              {skuIds.map((skuId) => (
-                <label key={skuId}>
-                  <input type="checkbox" checked={picked.includes(skuId)} onChange={() => toggle(skuId)} />{" "}
-                  <SkuLabel skuId={skuId} />
-                </label>
-              ))}
-            </fieldset>
+            <div className="count-items-group" role="group" aria-labelledby="pick-items-legend">
+              <span id="pick-items-legend" className="count-field-label">
+                {t("inventory.count.pick_items").text}
+              </span>
+              <div className="count-items-container">
+                {skuIds.length === 0 && <p className="count-items-empty">{t("inventory.balances.empty").text}</p>}
+                {skuIds.map((skuId) => (
+                  <label key={skuId} className={`count-item-row ${picked.includes(skuId) ? "count-item-row--selected" : ""}`}>
+                    <input
+                      type="checkbox"
+                      className="count-item-checkbox"
+                      checked={picked.includes(skuId)}
+                      onChange={() => toggle(skuId)}
+                    />
+                    <span className="count-item-label">
+                      <SkuLabel skuId={skuId} />
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
           )}
-          <div className="inventory-action-bar">
-            <button type="button" disabled={!ready || start.isPending} onClick={() => start.mutate()}>
-              {t("inventory.count.start").text}
+          <div className="count-action-bar">
+            <button
+              type="button"
+              className="modern-btn modern-btn--primary count-start-btn"
+              disabled={!ready || start.isPending}
+              onClick={() => start.mutate()}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+              </svg>
+              <span>{t("inventory.count.start").text}</span>
             </button>
           </div>
           {start.isError && <p role="alert">{errorText(start.error, t("inventory.error.generic").text)}</p>}
@@ -203,11 +235,18 @@ export function CountsPage() {
       )}
 
       <section className="modern-table-card">
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.count.list").text}</h2>
+        <div className="inventory-card-header">
+          <span className="inventory-card-header__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+              <polyline points="9 14 11 16 15 12" />
+            </svg>
+          </span>
+          <h2 className="inventory-card-header__title">{t("inventory.count.list").text}</h2>
         </div>
-        {counts.isError && <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(counts.error, t("inventory.error.generic").text)}</p>}
-        {counts.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.count.none").text}</p>}
+        {counts.isError && <p role="alert" style={{ padding: 'var(--space-3) var(--space-4)' }}>{errorText(counts.error, t("inventory.error.generic").text)}</p>}
+        {counts.data?.length === 0 && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.count.none").text}</p>}
         {counts.data && counts.data.length > 0 && (
           <div className="modern-table-scroll">
             <table className="modern-table stock-table">
@@ -229,7 +268,7 @@ export function CountsPage() {
                       {count.outcome && ` ${t(`inventory.count.outcome.${count.outcome}`).text}`}
                     </td>
                     <td>
-                      <Link to={`/inventory/counts/${count.taskId}`}>{t("inventory.count.open").text}</Link>
+                      <Link className="table-action-btn" to={`/inventory/counts/${count.taskId}`}>{t("inventory.count.open").text}</Link>
                     </td>
                   </tr>
                 ))}
@@ -240,10 +279,16 @@ export function CountsPage() {
       </section>
 
       <section className="modern-table-card" style={{ marginTop: 'var(--space-4)' }}>
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.negative.title").text}</h2>
+        <div className="inventory-card-header">
+          <span className="inventory-card-header__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+          </span>
+          <h2 className="inventory-card-header__title">{t("inventory.negative.title").text}</h2>
         </div>
-        {negative.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.negative.none").text}</p>}
+        {negative.data?.length === 0 && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.negative.none").text}</p>}
         {negative.data && negative.data.length > 0 && (
           <div className="modern-table-scroll">
             <table className="modern-table stock-table">
@@ -269,7 +314,7 @@ export function CountsPage() {
                       {lot.acknowledgedAt ? (
                         formatInstant(lot.acknowledgedAt)
                       ) : canSchedule ? (
-                        <button type="button" onClick={() => setAcknowledging(lot.stockLotId)}>
+                        <button type="button" className="table-action-btn" onClick={() => setAcknowledging(lot.stockLotId)}>
                           {t("inventory.negative.acknowledge").text}
                         </button>
                       ) : null}
