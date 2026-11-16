@@ -695,6 +695,7 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
                 type="search"
                 className="repack-finder-input"
                 value={q}
+                aria-label={t("inventory.field.find_item").text}
                 placeholder={t("inventory.field.find_item").text}
                 onChange={(event) => setQ(event.target.value)}
               />
@@ -736,6 +737,12 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
                     <button
                       type="button"
                       className="repack-finder-result-btn"
+                      aria-label={
+                        t("inventory.add_item", undefined, {
+                          code: sku.skuCode,
+                          name: inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa)
+                        }).text
+                      }
                       onClick={() => {
                         onPick(sku);
                         setFound(null);

@@ -2686,14 +2686,14 @@ button[type="submit"]:not(:disabled):hover,
   border-bottom: none;
 }
 
-.modern-table td a {
+.modern-table td a:not(.trading-doc-link) {
   color: var(--color-polish-25);
   font-weight: 600;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
-.modern-table td a:hover {
+.modern-table td a:not(.trading-doc-link):hover {
   color: var(--color-polish-30);
   text-decoration: underline;
 }
