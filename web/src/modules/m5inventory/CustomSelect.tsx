@@ -129,8 +129,14 @@ export function CustomSelect<T extends string>({
   useLayoutEffect(() => {
     if (!open) return;
     if (portal) updatePlacement();
-    optionRefs.current[activeIndex]?.focus({ preventScroll: true });
-  }, [activeIndex, open, portal, updatePlacement]);
+  }, [open, portal, updatePlacement]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (activeIndex >= 0) {
+      optionRefs.current[activeIndex]?.focus({ preventScroll: true });
+    }
+  }, [activeIndex, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -253,7 +259,7 @@ export function CustomSelect<T extends string>({
           tabIndex={activeIndex === 0 ? 0 : -1}
           className={`custom-dropdown__item ${String(value) === "" ? "custom-dropdown__item--selected" : ""}`}
           onClick={(e) => handleSelectOption(e, "" as T)}
-          onMouseEnter={() => setActiveIndex(0)}
+          onMouseMove={() => setActiveIndex(0)}
         >
           {String(value) === "" ? (
             <span className="custom-dropdown__item-bar" aria-hidden="true" />
@@ -282,7 +288,7 @@ export function CustomSelect<T extends string>({
             tabIndex={activeIndex === selectableIndex ? 0 : -1}
             className={`custom-dropdown__item ${isSelected ? "custom-dropdown__item--selected" : ""}`}
             onClick={(e) => handleSelectOption(e, opt.value)}
-            onMouseEnter={() => setActiveIndex(selectableIndex)}
+            onMouseMove={() => setActiveIndex(selectableIndex)}
           >
             {isSelected ? (
               <span className="custom-dropdown__item-bar" aria-hidden="true" />
