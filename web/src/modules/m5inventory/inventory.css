@@ -667,13 +667,12 @@
   min-width: auto;
   width: max-content !important;
   max-width: min(calc(var(--space-8) * 7), 90vw) !important;
-  margin-top: var(--space-half) !important;
+  margin: 0 !important;
   z-index: 10100 !important;
 }
 
 .inventory-dropdown-menu.inventory-dropdown-portal.custom-dropdown__menu--up {
-  margin-top: 0 !important;
-  margin-bottom: var(--space-half) !important;
+  margin: 0 !important;
   animation: customDropdownFadeInUp 0.15s ease-out !important;
 }
 
