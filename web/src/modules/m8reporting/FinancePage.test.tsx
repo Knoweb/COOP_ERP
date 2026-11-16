@@ -366,4 +366,33 @@ describe("FinancePage", () => {
       expect(api.exportFinalAccountsCsv).toHaveBeenCalledWith("2026-10");
     });
   });
+
+  it("opens the custom MonthPicker calendar popup and selects a month", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Final Accounts & Expenses" }));
+
+    await waitFor(() => {
+      expect(api.getFinalAccounts).toHaveBeenCalled();
+    });
+
+    const monthInput = screen.getByLabelText(/Period/) as HTMLInputElement;
+    const trigger = monthInput.closest(".catalogue-datepicker-wrap")?.querySelector<HTMLButtonElement>(
+      ".catalogue-datepicker-trigger"
+    );
+    expect(trigger).toBeTruthy();
+    fireEvent.click(trigger!);
+
+    const popup = document.querySelector(".catalogue-calendar-popup");
+    expect(popup).not.toBeNull();
+    const monthButtons = popup!.querySelectorAll<HTMLButtonElement>(".catalogue-calendar-month");
+    expect(monthButtons).toHaveLength(12);
+
+    // Pick August (index 7) so this works cleanly regardless of the current calendar month.
+    fireEvent.click(monthButtons[7]!);
+
+    await waitFor(() => {
+      expect(api.getFinalAccounts).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-08$/));
+    });
+  });
 });

@@ -1461,7 +1461,7 @@
   font-style: italic;
 }
 
-.opening-balance-table input,
+.opening-balance-table input:not(.catalogue-datepicker-input),
 .opening-balance-table select:not(.visually-hidden) {
   width: 100%;
   box-sizing: border-box;
@@ -1474,7 +1474,7 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.opening-balance-table input:focus,
+.opening-balance-table input:not(.catalogue-datepicker-input):focus,
 .opening-balance-table select:not(.visually-hidden):focus {
   outline: none;
   border-color: var(--color-accent);

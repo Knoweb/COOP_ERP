@@ -7,6 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
@@ -234,10 +235,14 @@ export function OrderPage() {
         )}
         {amendRows && (
           <>
-            <label className="trading-form-field">
-              {t("trading.order.amend.eta").text}
-              <input type="date" min={businessToday()} value={amendEta} onChange={(event) => setAmendEta(event.target.value)} />
-            </label>
+            <div className="trading-form-field">
+              <DatePicker
+                label={t("trading.order.amend.eta").text}
+                min={businessToday()}
+                value={amendEta}
+                onChange={setAmendEta}
+              />
+            </div>
             <label className="trading-form-field">
               {t("trading.order.amend.reason").text ?? "Reason"}
               <input type="text" value={amendReason} onChange={(event) => setAmendReason(event.target.value)} required />
@@ -262,10 +267,14 @@ export function OrderPage() {
         )}
         {deciding && (
           <>
-            <label className="trading-form-field">
-              {t("trading.field.committed_eta").text}
-              <input type="date" min={businessToday()} value={eta} onChange={(event) => setEta(event.target.value)} />
-            </label>
+            <div className="trading-form-field">
+              <DatePicker
+                label={t("trading.field.committed_eta").text}
+                min={businessToday()}
+                value={eta}
+                onChange={setEta}
+              />
+            </div>
             <button type="button" disabled={accept.isPending || !eta || relationship.isLoading} onClick={() => accept.mutate()}>
               {t("trading.order.accept").text}
             </button>
