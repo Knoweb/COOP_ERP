@@ -12479,8 +12479,8 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   /* 2. Reset canvas and typography for clean paper output */
   html,
   body {
-    background: #ffffff !important;
-    color: #111827 !important;
+    background: var(--color-surface) !important;
+    color: var(--color-text) !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
@@ -12508,9 +12508,9 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
 
   /* 3. Document Header structured cleanly for print */
   .shell-page .document-header {
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
-    border-top: 4px solid #8e0e5b !important;
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
+    border-top: 4px solid var(--color-accent) !important;
     border-radius: 8px !important;
     padding: 16px 20px !important;
     margin-bottom: 20px !important;
@@ -12529,7 +12529,7 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .document-header__code {
     font-size: 11pt !important;
     font-weight: 700 !important;
-    color: #8e0e5b !important;
+    color: var(--color-accent) !important;
     letter-spacing: 0.5px !important;
     text-transform: uppercase !important;
     display: block !important;
@@ -12539,7 +12539,7 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .document-header__title {
     font-size: 20pt !important;
     font-weight: 700 !important;
-    color: #111827 !important;
+    color: var(--color-text) !important;
     margin: 0 !important;
   }
 
@@ -12549,7 +12549,7 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
     gap: 12px 16px !important;
     margin: 16px 0 0 0 !important;
     padding-top: 14px !important;
-    border-top: 1px solid #e5e7eb !important;
+    border-top: 1px solid var(--color-border) !important;
     background: transparent !important;
   }
 
@@ -12563,7 +12563,7 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
     font-size: 8.5pt !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    color: #4b5563 !important;
+    color: var(--color-text-muted) !important;
     letter-spacing: 0.4px !important;
     margin-bottom: 2px !important;
   }
@@ -12571,12 +12571,12 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .document-header__fact dd {
     font-size: 10pt !important;
     font-weight: 600 !important;
-    color: #111827 !important;
+    color: var(--color-text) !important;
     margin: 0 !important;
   }
 
   .document-header__fact dd a {
-    color: #111827 !important;
+    color: var(--color-text) !important;
     text-decoration: none !important;
   }
 
@@ -12584,8 +12584,8 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .modern-table-card,
   .invoice-lines-card,
   .delivery-drop-card {
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
     border-radius: 8px !important;
     box-shadow: none !important;
     margin: 16px 0 !important;
@@ -12597,15 +12597,15 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
 
   .delivery-drop-card__header {
     padding: 10px 14px !important;
-    background: #f9fafb !important;
-    border-bottom: 1px solid #d1d5db !important;
+    background: var(--color-surface-subtle) !important;
+    border-bottom: 1px solid var(--color-border) !important;
   }
 
   .delivery-drop-card__header h2 {
     font-size: 11pt !important;
     font-weight: 700 !important;
     margin: 0 !important;
-    color: #111827 !important;
+    color: var(--color-text) !important;
   }
 
   .modern-table-scroll {
@@ -12623,14 +12623,14 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .modern-table thead th,
   .invoice-table thead th,
   table thead th {
-    background: #f9fafb !important;
-    color: #374151 !important;
+    background: var(--color-surface-subtle) !important;
+    color: var(--color-text) !important;
     font-weight: 700 !important;
     font-size: 8.5pt !important;
     text-transform: uppercase !important;
     letter-spacing: 0.4px !important;
     padding: 10px 12px !important;
-    border-bottom: 2px solid #d1d5db !important;
+    border-bottom: 2px solid var(--color-border) !important;
     border-top: none !important;
   }
 
@@ -12638,8 +12638,8 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .invoice-table tbody td,
   table tbody td {
     padding: 9px 12px !important;
-    border-bottom: 1px solid #e5e7eb !important;
-    color: #111827 !important;
+    border-bottom: 1px solid var(--color-border) !important;
+    color: var(--color-text) !important;
     vertical-align: middle !important;
   }
 
@@ -12655,8 +12655,8 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
 
   /* 5. Totals section on print */
   .invoice-totals-card {
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
     border-radius: 8px !important;
     box-shadow: none !important;
     padding: 14px 20px !important;
