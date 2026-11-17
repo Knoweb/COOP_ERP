@@ -217,11 +217,11 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 var(--space-1);
-  background: linear-gradient(135deg, var(--color-polish-29), var(--color-surface));
+  background: var(--color-surface);
   border: var(--border-width) solid var(--color-polish-21);
   border-top: var(--border-width-strong) solid var(--color-accent);
   border-radius: calc(var(--radius) * 3);
-  box-shadow: 0 var(--border-width-strong) var(--space-2) var(--color-polish-14);
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-13), 0 var(--space-half) var(--space-2) var(--color-polish-14);
   overflow: hidden;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -242,7 +242,7 @@
   height: var(--space-4);
   margin: var(--space-2) 0 var(--space-2) var(--space-3);
   border-radius: calc(var(--radius) * 2);
-  background: var(--color-surface);
+  background: var(--color-polish-31);
   border: var(--border-width) solid var(--color-polish-22);
   color: var(--color-accent);
   flex-shrink: 0;
@@ -316,9 +316,8 @@
   grid-column: 1 / -1;
   grid-row: 2;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: 0 var(--space-3) var(--space-3) var(--space-3);
   background: var(--color-surface);
-  border-top: var(--border-width) solid var(--color-border);
 }
 
 .trading-state-box {
@@ -422,13 +421,13 @@
 }
 
 .trading-table th {
-  background: var(--color-polish-22) !important;
+  background: var(--color-polish-29) !important;
   color: var(--color-brand-dark) !important;
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
   text-align: center !important;
-  border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
 }
@@ -442,6 +441,7 @@
   border-bottom: var(--border-width) solid var(--color-polish-21) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  vertical-align: middle !important;
 }
 
 .trading-table tbody tr:last-child td {
@@ -450,6 +450,31 @@
 
 .trading-table tbody tr:hover td {
   background: var(--color-polish-31) !important;
+}
+
+.trading-table .state-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-half);
+  padding: calc(var(--space-half) / 2) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+}
+
+.trading-table .state-chip--issued {
+  background: var(--color-issued-bg) !important;
+  color: var(--color-issued-text) !important;
+  border: var(--border-width) solid var(--color-issued-text) !important;
+}
+
+.trading-action-row {
+  margin: var(--space-2) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .trading-doc-link,
@@ -1260,5 +1285,339 @@
   flex-shrink: 0 !important;
   margin-left: var(--space-2) !important;
 }
+
+/* ---- Invoice Header Actions & Print Layout ------------------------------- */
+.trading-header-actions,
+.invoice-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-polish-21);
+}
+
+.trading-print-btn,
+.invoice-print-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-3);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--line-height);
+  color: var(--color-accent);
+  background: var(--color-surface);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.trading-print-btn:hover:not(:disabled),
+.invoice-print-btn:hover:not(:disabled),
+.trading-print-btn:focus-visible:not(:disabled),
+.invoice-print-btn:focus-visible:not(:disabled) {
+  background: var(--color-polish-29);
+  color: var(--color-polish-25);
+  border-color: var(--color-polish-25);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-polish-13);
+  transform: translateY(calc(-1 * var(--border-width)));
+}
+
+.trading-print-btn:active:not(:disabled),
+.invoice-print-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.trading-print-btn:focus-visible,
+.invoice-print-btn:focus-visible {
+  outline: none;
+}
+
+.trading-print-btn:disabled,
+.invoice-print-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  border-style: solid;
+}
+
+.trading-print-btn svg,
+.trading-print-btn__icon,
+.invoice-print-btn svg,
+.invoice-print-btn__icon {
+  width: var(--space-2);
+  height: var(--space-2);
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.invoice-lines-card,
+.invoice-totals-card {
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.invoice-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2 + var(--space-4)), 1fr));
+  gap: var(--space-2);
+}
+
+.invoice-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  max-width: 100%;
+  padding: calc(var(--space-half) / 2) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-polish-22);
+  color: var(--color-accent) !important;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--line-height);
+  text-decoration: none !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.invoice-doc-link:hover {
+  background: var(--color-polish-29);
+  border-color: var(--color-accent);
+  color: var(--color-accent) !important;
+  transform: translateY(calc(var(--border-width) * -1));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13);
+}
+
+.invoice-doc-link:focus-visible {
+  outline: var(--border-width-strong) solid var(--color-accent);
+  outline-offset: var(--border-width-strong);
+}
+
+.invoice-doc-link__icon {
+  width: var(--space-2);
+  height: var(--space-2);
+  flex-shrink: 0;
+}
+
+.delivery-drop-card {
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.delivery-drop-card__header {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.delivery-drop-card__header h2 {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.delivery-drop-action {
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  border-top: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+/* ---- Credit & Exposure KPI Cards (Matching Stock Module Design System) ---- */
+
+.shell-page .exposure-kpi-grid,
+.exposure-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin-top: var(--space-2) !important;
+  margin-bottom: var(--space-3) !important;
+  width: 100%;
+}
+
+.exposure-kpi-card {
+  position: relative;
+  border-radius: calc(var(--radius) * 2.5);
+  border: var(--border-width) solid var(--color-border);
+  padding: calc(var(--space-1) + var(--space-half) / 2) var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-half);
+  min-height: calc(var(--space-6) + var(--space-2));
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-3);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.exposure-kpi-card:hover {
+  transform: translateY(calc(var(--border-width) * -2));
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-8);
+}
+
+.exposure-kpi-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-half) / 4);
+  min-width: 0;
+  flex: 1;
+}
+
+.exposure-kpi-title {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-strong);
+  line-height: 1.15;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  white-space: normal;
+  margin: 0;
+  padding: 0;
+}
+
+.exposure-kpi-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  word-break: break-word;
+  margin: 0;
+  padding: 0;
+}
+
+.exposure-kpi-value .money,
+.exposure-kpi-value .money--total,
+.exposure-kpi-value .money-display {
+  font-size: var(--font-size-lg) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: inherit !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  display: inline-block !important;
+}
+
+.exposure-kpi-subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.15;
+  margin-top: calc(var(--space-half) / 4);
+  white-space: nowrap;
+}
+
+.exposure-kpi-card__icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-8), 0 0 0 var(--border-width) var(--color-polish-3);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.exposure-kpi-card__icon-badge svg {
+  display: block;
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+.exposure-kpi-card:hover .exposure-kpi-card__icon-badge {
+  transform: scale(1.08);
+}
+
+/* Card Themes: Soft Tinted Backgrounds & Coordinated Palette */
+
+.exposure-kpi-card--primary {
+  background: var(--color-polish-31);
+  border-color: var(--color-polish-18);
+}
+.exposure-kpi-card--primary .exposure-kpi-title,
+.exposure-kpi-card--primary .exposure-kpi-value,
+.exposure-kpi-card--primary .exposure-kpi-card__icon-badge {
+  color: var(--color-accent);
+}
+
+.exposure-kpi-card--info {
+  background: var(--color-draft-bg);
+  border-color: var(--color-polish-5);
+}
+.exposure-kpi-card--info .exposure-kpi-title,
+.exposure-kpi-card--info .exposure-kpi-value,
+.exposure-kpi-card--info .exposure-kpi-card__icon-badge {
+  color: var(--color-draft-text);
+}
+
+.exposure-kpi-card--warning {
+  background: var(--color-disputed-bg);
+  border-color: var(--color-polish-28);
+}
+.exposure-kpi-card--warning .exposure-kpi-title,
+.exposure-kpi-card--warning .exposure-kpi-value,
+.exposure-kpi-card--warning .exposure-kpi-card__icon-badge {
+  color: var(--color-disputed-text);
+}
+
+.exposure-kpi-card--success {
+  background: var(--color-issued-bg);
+  border-color: var(--color-polish-28);
+}
+.exposure-kpi-card--success .exposure-kpi-title,
+.exposure-kpi-card--success .exposure-kpi-value,
+.exposure-kpi-card--success .exposure-kpi-card__icon-badge {
+  color: var(--color-issued-text);
+}
+
+.exposure-kpi-card--exposure {
+  background: var(--color-polish-29);
+  border-color: var(--color-polish-21);
+}
+.exposure-kpi-card--exposure .exposure-kpi-title,
+.exposure-kpi-card--exposure .exposure-kpi-value,
+.exposure-kpi-card--exposure .exposure-kpi-card__icon-badge {
+  color: var(--color-accent);
+}
+
+.exposure-kpi-card--alert {
+  background: var(--color-alert-bg);
+  border-color: var(--color-polish-28);
+}
+.exposure-kpi-card--alert .exposure-kpi-title,
+.exposure-kpi-card--alert .exposure-kpi-value,
+.exposure-kpi-card--alert .exposure-kpi-card__icon-badge {
+  color: var(--color-alert-text);
+}
+
+
+
+
 
 

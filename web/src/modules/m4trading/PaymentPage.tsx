@@ -146,7 +146,7 @@ export function PaymentPage() {
             {showPrint && (
               <button
                 type="button"
-                className="payment-btn payment-btn--secondary"
+                className="trading-print-btn payment-btn payment-btn--secondary"
                 disabled={print.isPending}
                 onClick={openPrint}
               >
