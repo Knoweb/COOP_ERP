@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "../i18n/useT";
+import { DropdownSelect } from "./DropdownSelect";
 
 /**
  * The small form a command with a reason opens before it runs (doc 30 section 2.2; 21A: a
@@ -33,48 +34,16 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
   // and the empty-code check below stop a Confirm without a choice.
   const [code, setCode] = useState("");
   const [text, setText] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (dropdownOpen) {
-          setDropdownOpen(false);
-        } else if (!pending) {
-          onCancel();
-        }
+      if (e.key === "Escape" && !pending) {
+        onCancel();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [dropdownOpen, onCancel, pending]);
-
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [dropdownOpen]);
-
-  useEffect(() => {
-    if (dropdownOpen && menuRef.current) {
-      const selected = menuRef.current.querySelector<HTMLElement>(".register-dropdown-option--selected, .register-dropdown-option--active");
-      if (selected) {
-        selected.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [dropdownOpen]);
+  }, [onCancel, pending]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -82,18 +51,6 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
       return;
     }
     onConfirm(code, text.trim() === "" ? null : text.trim());
-  };
-
-  const selectedOption = codes.find((item) => item.code === code);
-
-  const toggleDropdown = () => {
-    setDropdownOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setHoveredCode(code || codes[0]?.code || null);
-      }
-      return next;
-    });
   };
 
   return (
@@ -120,109 +77,19 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
           <label htmlFor="reason-capture-code" className="reason-capture__label">
             {t("shell.reason.code").text}
           </label>
-          <div className="reason-capture__control-wrap" ref={containerRef}>
-            <select
+          <div className="reason-capture__control-wrap">
+            <DropdownSelect
               id="reason-capture-code"
-              className="visually-hidden"
+              aria-label={t("shell.reason.code").text}
               value={code}
-              onChange={(event) => {
-                setCode(event.target.value);
-                setHoveredCode(event.target.value);
-              }}
+              onChange={(val) => setCode(val)}
+              placeholder={t("shell.reason.choose").text}
               required
-            >
-              <option value="">{t("shell.reason.choose").text}</option>
-              {codes.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              className="register-dropdown-trigger custom-status-dropdown__trigger reason-dropdown-trigger"
-              aria-haspopup="listbox"
-              aria-expanded={dropdownOpen}
-              onClick={toggleDropdown}
-              tabIndex={-1}
-              aria-hidden="true"
-            >
-              <span className="custom-status-dropdown__label">
-                {selectedOption ? selectedOption.label : t("shell.reason.choose").text}
-              </span>
-              <svg
-                className="custom-status-dropdown__arrow"
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-
-            {dropdownOpen && (
-              <ul
-                ref={menuRef}
-                className="register-dropdown-menu custom-status-dropdown__menu reason-dropdown-menu"
-                role="listbox"
-                aria-hidden="true"
-              >
-                {codes.map((option) => {
-                  const isSelected = code === option.code;
-                  const isActive = isSelected || (!code && (hoveredCode === option.code || (!hoveredCode && codes[0]?.code === option.code)));
-                  return (
-                    <li key={option.code} role="presentation">
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        tabIndex={-1}
-                        className={
-                          isSelected
-                            ? "custom-status-dropdown__option custom-status-dropdown__option--selected register-dropdown-option register-dropdown-option--selected"
-                            : isActive
-                              ? "custom-status-dropdown__option custom-status-dropdown__option--active register-dropdown-option register-dropdown-option--active"
-                              : "custom-status-dropdown__option register-dropdown-option"
-                        }
-                        onMouseEnter={() => setHoveredCode(option.code)}
-                        onClick={() => {
-                          setCode(option.code);
-                          setHoveredCode(option.code);
-                          setDropdownOpen(false);
-                        }}
-                      >
-                        <span className="register-dropdown-option-label custom-status-dropdown__option-label">
-                          {option.label}
-                        </span>
-                        {isSelected && (
-                          <span className="custom-status-dropdown__check" aria-hidden="true">
-                            <svg
-                              viewBox="0 0 24 24"
-                              width="16"
-                              height="16"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              fill="none"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+              options={codes.map((item) => ({
+                value: item.code,
+                label: item.label
+              }))}
+            />
           </div>
         </div>
 

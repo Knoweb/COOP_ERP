@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { Link } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
+import { DropdownSelect } from "../../shell/components/DropdownSelect";
 import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
@@ -40,235 +41,6 @@ const DISTRICTS = [
   "Trincomalee",
   "Vavuniya"
 ];
-
-/** Custom Status dropdown with styled selection, checkmark, custom hover and responsive layout */
-function StatusDropdown(props: {
-  value: SocietyStatus | "";
-  onChange: (value: SocietyStatus | "") => void;
-  anyLabel: string;
-  ariaLabel?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const t = useT();
-
-  const options: { value: SocietyStatus | ""; label: string }[] = [
-    { value: "", label: props.anyLabel },
-    ...STATUSES.map((status) => ({
-      value: status,
-      label: t(statusMessageId(status)).text
-    }))
-  ];
-
-  const currentOption = options.find((opt) => opt.value === props.value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div className="custom-status-dropdown" ref={containerRef}>
-      <button
-        type="button"
-        className="custom-status-dropdown__trigger"
-        aria-label={props.ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <span className="custom-status-dropdown__label">{currentOption.label}</span>
-        <svg
-          className="custom-status-dropdown__arrow"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="m7 9 5 5 5-5" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul className="custom-status-dropdown__menu" role="listbox">
-          {options.map((opt) => {
-            const isSelected = props.value === opt.value;
-            return (
-              <li key={opt.value} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={
-                    isSelected
-                      ? "custom-status-dropdown__option custom-status-dropdown__option--selected"
-                      : "custom-status-dropdown__option"
-                  }
-                  onClick={() => {
-                    props.onChange(opt.value);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="custom-status-dropdown__option-label">{opt.label}</span>
-                  {isSelected && (
-                    <span className="custom-status-dropdown__check" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-/** Custom District dropdown with styled selection, checkmark, custom hover and scrollable list */
-function DistrictDropdown(props: {
-  value: string;
-  onChange: (value: string) => void;
-  anyLabel: string;
-  ariaLabel?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
-
-  const options: { value: string; label: string }[] = [
-    { value: "", label: props.anyLabel },
-    ...DISTRICTS.map((name) => ({
-      value: name,
-      label: name
-    }))
-  ];
-
-  const currentOption = options.find((opt) => opt.value === props.value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open && menuRef.current) {
-      const selected = menuRef.current.querySelector<HTMLElement>(".custom-status-dropdown__option--selected");
-      if (selected) {
-        selected.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [open]);
-
-  return (
-    <div className="custom-status-dropdown" ref={containerRef}>
-      <button
-        type="button"
-        className="custom-status-dropdown__trigger"
-        aria-label={props.ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <span className="custom-status-dropdown__label">{currentOption.label}</span>
-        <svg
-          className="custom-status-dropdown__arrow"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="m7 9 5 5 5-5" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul ref={menuRef} className="custom-status-dropdown__menu custom-status-dropdown__menu--scrollable" role="listbox">
-          {options.map((opt) => {
-            const isSelected = props.value === opt.value;
-            return (
-              <li key={opt.value} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={
-                    isSelected
-                      ? "custom-status-dropdown__option custom-status-dropdown__option--selected"
-                      : "custom-status-dropdown__option"
-                  }
-                  onClick={() => {
-                    props.onChange(opt.value);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="custom-status-dropdown__option-label">{opt.label}</span>
-                  {isSelected && (
-                    <span className="custom-status-dropdown__check" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
@@ -328,29 +100,43 @@ export function SocietyRegisterPage() {
       />
 
       <div className="society-filters-wrap">
-        <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="society-filter-panel">
+        <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel society-filter-panel">
           <label className="modern-field">
             <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
             <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
           </label>
           <div className="modern-field">
             <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
-            <StatusDropdown
+            <DropdownSelect
+              id="society-status-filter"
+              aria-label={t("party.filter.status").text}
               value={status}
-              onChange={(val) => setStatus(val)}
-              anyLabel={t("party.filter.status.any").text}
-              ariaLabel={t("party.filter.status").text}
+              onChange={(val) => setStatus(val as SocietyStatus | "")}
+              options={[
+                { value: "", label: t("party.filter.status.any").text },
+                ...STATUSES.map((s) => ({
+                  value: s,
+                  label: t(statusMessageId(s)).text
+                }))
+              ]}
             />
           </div>
           <div className="modern-field">
             <span className="modern-field__label party-filter-label">
               {t("party.filter.district").text}
             </span>
-            <DistrictDropdown
+            <DropdownSelect
+              id="society-district-filter"
+              aria-label={t("party.filter.district").text}
               value={district}
               onChange={(val) => setDistrict(val)}
-              anyLabel={t("party.filter.district.any").text}
-              ariaLabel={t("party.filter.district").text}
+              options={[
+                { value: "", label: t("party.filter.district.any").text },
+                ...DISTRICTS.map((name) => ({
+                  value: name,
+                  label: name
+                }))
+              ]}
             />
           </div>
         </form>
