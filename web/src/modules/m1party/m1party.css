@@ -801,3 +801,139 @@ table.modern-table tbody tr:hover td {
   word-break: normal !important;
   overflow-wrap: break-word !important;
 }
+
+/* ---- Society Register Detail Card Metadata Grid & Actions -------------- */
+
+.shell-page .society-card-container .document-header__facts {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 5.25), 1fr)) !important;
+  gap: var(--space-2) !important;
+  margin: 0 !important;
+  padding: var(--space-2) !important;
+  background: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
+  border-radius: calc(var(--radius) * 3) !important;
+  box-sizing: border-box !important;
+}
+
+.shell-page .society-card-container .document-header__fact {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-1) var(--space-2) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-18) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-23) !important;
+  transform: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.shell-page .society-card-container .document-header__fact:last-child:nth-child(odd) {
+  grid-column: 1 / -1 !important;
+}
+
+.shell-page .society-card-container .document-header__fact:hover {
+  background: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-14) !important;
+  transform: none !important;
+}
+
+.shell-page .society-card-container .document-header__fact dt {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-brand-dark) !important;
+  text-transform: uppercase !important;
+  letter-spacing: calc(var(--border-width) / 2) !important;
+  line-height: var(--line-height) !important;
+  margin: 0 !important;
+}
+
+.shell-page .society-card-container .document-header__fact dd {
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+  line-height: var(--line-height) !important;
+  text-align: right !important;
+  margin: 0 !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+.shell-page .society-card-container .approval-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: var(--space-2) !important;
+  margin: 0 !important;
+  padding-top: var(--space-2) !important;
+  border-top: var(--border-width) solid var(--color-border) !important;
+}
+
+.shell-page .society-card-container .approval-bar__button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--space-1) !important;
+  height: calc(var(--space-4) + var(--space-1)) !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding: 0 var(--space-3) !important;
+  border-radius: var(--radius-pill) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  line-height: var(--line-height) !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
+}
+
+.shell-page .society-card-container .approval-bar__button--suspend,
+.shell-page .society-card-container .approval-bar__button--reinstate {
+  background: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-19) !important;
+  color: var(--color-polish-25) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+}
+
+.shell-page .society-card-container .approval-bar__button--suspend:hover:not(:disabled),
+.shell-page .society-card-container .approval-bar__button--reinstate:hover:not(:disabled) {
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6) !important;
+  transform: translateY(calc(var(--border-width) * -1)) !important;
+}
+
+.shell-page .society-card-container .approval-bar__button--primary {
+  background: var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-6) !important;
+}
+
+.shell-page .society-card-container .approval-bar__button--primary:hover:not(:disabled) {
+  background: var(--color-polish-25) !important;
+  border-color: var(--color-polish-25) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6) !important;
+  transform: translateY(calc(var(--border-width) * -1)) !important;
+}
+
+.shell-page .society-card-container .approval-bar__button:focus-visible {
+  outline: var(--border-width-strong) solid var(--color-accent) !important;
+  outline-offset: var(--border-width-strong) !important;
+}
+
+.shell-page .society-card-container .approval-bar__button:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+}

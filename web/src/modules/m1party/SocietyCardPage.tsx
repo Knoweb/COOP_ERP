@@ -15,6 +15,7 @@ import { usePartyApi } from "./partyApi";
 import type { ReasonRequest, Society } from "./partyApi";
 import { REINSTATE_REASONS, STATUS_LOOK, SUSPEND_REASONS, legalNameIn, statusMessageId } from "./societyView";
 import { errorText } from "./SocietyRegisterPage";
+import "./m1party.css";
 
 type PendingReason = "suspend" | "reinstate" | null;
 

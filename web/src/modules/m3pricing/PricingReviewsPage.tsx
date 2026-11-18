@@ -68,7 +68,24 @@ export function PricingReviewsPage() {
           </p>
         )}
         {reviewsQuery.data?.length === 0 && (
-          <div className="modern-empty-state pricing-reviews-empty">{t("pricing.reviews.empty").text}</div>
+          <div className="pricing-reviews-empty" role="status">
+            <div className="pricing-reviews-empty__badge" aria-hidden="true">
+              <svg
+                className="pricing-reviews-empty__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <p className="pricing-reviews-empty__title">{t("pricing.reviews.empty").text}</p>
+            <p className="pricing-reviews-empty__hint">{t("pricing.reviews.empty_hint").text}</p>
+          </div>
         )}
 
         {reviewsQuery.data && reviewsQuery.data.length > 0 && (

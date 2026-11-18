@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
@@ -32,6 +32,7 @@ export function GazettePage() {
   const canEnter = useHasPermission("prc.controlprice.enter");
   const today = businessToday();
   const [searchQuery, setSearchQuery] = useState("");
+  const [rescindingId, setRescindingId] = useState<string | null>(null);
 
   const rows = useQuery({ queryKey: ["pricing", "controlPrices"], queryFn: () => api.listControlPrices() });
 
@@ -183,32 +184,54 @@ export function GazettePage() {
                     ) : (
                       filteredRows.map((row) => {
                         const state = controlPriceState(row, today);
+                        const isRescinding = canEnter && state !== "ended" && rescindingId === row.controlPriceId;
                         return (
-                          <tr key={row.controlPriceId}>
-                            <td className="pricing-cell-item pricing-gazette-cell-item">
-                              <SkuName skuId={row.skuId} />
-                            </td>
-                            <td className="pricing-cell-numeric pricing-gazette-cell-price">
-                              <MoneyDisplay amount={row.ceilingPrice} />
-                            </td>
-                            <td className="pricing-cell-center pricing-gazette-cell-unit">{row.ceilingUomCode}</td>
-                            <td className="pricing-cell-center pricing-gazette-cell-from">{formatDate(row.effectiveFrom)}</td>
-                            <td className="pricing-cell-center pricing-gazette-cell-to">{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
-                            <td className="pricing-cell-center pricing-gazette-cell-ref">{row.gazetteReference}</td>
-                            <td className="pricing-cell-center pricing-gazette-cell-status">
-                              <StateChip state={controlPriceChip(state)} label={t(`pricing.gazette.state.${state}`).text} />
-                            </td>
-                            {canEnter && (
-                              <td className="pricing-cell-center pricing-gazette-cell-actions">
-                                {state !== "ended" && (
+                          <Fragment key={row.controlPriceId}>
+                            <tr className={isRescinding ? "pricing-gazette-row--active" : undefined}>
+                              <td className="pricing-cell-item pricing-gazette-cell-item">
+                                <SkuName skuId={row.skuId} />
+                              </td>
+                              <td className="pricing-cell-numeric pricing-gazette-cell-price">
+                                <MoneyDisplay amount={row.ceilingPrice} />
+                              </td>
+                              <td className="pricing-cell-center pricing-gazette-cell-unit">{row.ceilingUomCode}</td>
+                              <td className="pricing-cell-center pricing-gazette-cell-from">{formatDate(row.effectiveFrom)}</td>
+                              <td className="pricing-cell-center pricing-gazette-cell-to">{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
+                              <td className="pricing-cell-center pricing-gazette-cell-ref">{row.gazetteReference}</td>
+                              <td className="pricing-cell-center pricing-gazette-cell-status">
+                                <StateChip state={controlPriceChip(state)} label={t(`pricing.gazette.state.${state}`).text} />
+                              </td>
+                              {canEnter && (
+                                <td className="pricing-cell-center pricing-gazette-cell-actions">
+                                  {state !== "ended" && (
+                                    <button
+                                      type="button"
+                                      aria-expanded={isRescinding}
+                                      onClick={() =>
+                                        setRescindingId(isRescinding ? null : row.controlPriceId)
+                                      }
+                                    >
+                                      {isRescinding ? t("pricing.cancel").text : t("pricing.gazette.rescind").text}
+                                    </button>
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                            {isRescinding && (
+                              <tr className="pricing-gazette-rescind-row">
+                                <td colSpan={8} className="pricing-gazette-rescind-cell">
                                   <RescindForm
                                     row={row}
-                                    onRescinded={() => queryClient.invalidateQueries({ queryKey: ["pricing"] })}
+                                    onCancel={() => setRescindingId(null)}
+                                    onRescinded={() => {
+                                      setRescindingId(null);
+                                      void queryClient.invalidateQueries({ queryKey: ["pricing"] });
+                                    }}
                                   />
-                                )}
-                              </td>
+                                </td>
+                              </tr>
                             )}
-                          </tr>
+                          </Fragment>
                         );
                       })
                     )}
@@ -271,18 +294,20 @@ function EnterForm({ onEntered }: { onEntered: () => void }) {
     <section className="pricing-section" aria-labelledby="pricing-gazette-enter">
       <h2 id="pricing-gazette-enter" className="pricing-gazette-heading">{t("pricing.gazette.enter").text}</h2>
       <div className="pricing-card pricing-gazette-entry-card">
-        {sku ? (
-          <div className="pricing-gazette-selected-sku">
-            <span className="pricing-gazette-selected-sku__name">
-              <SkuName skuId={sku.skuId} />
-            </span>
-            <button type="button" className="pricing-btn-secondary" onClick={() => setSku(null)}>
-              {t("pricing.gazette.change_item").text}
-            </button>
-          </div>
-        ) : (
-          <SkuPicker onPick={setSku} />
-        )}
+        <div className="pricing-gazette-entry-header">
+          {sku ? (
+            <div className="pricing-gazette-selected-sku">
+              <span className="pricing-gazette-selected-sku__name">
+                <SkuName skuId={sku.skuId} />
+              </span>
+              <button type="button" className="pricing-btn-secondary" onClick={() => setSku(null)}>
+                {t("pricing.gazette.change_item").text}
+              </button>
+            </div>
+          ) : (
+            <SkuPicker onPick={setSku} />
+          )}
+        </div>
         <form onSubmit={submit} className="pricing-gazette-form">
           <label className="pricing-form-field">
             <span className="pricing-filter-label">{t("pricing.column.ceiling_price").text}</span>
@@ -324,11 +349,18 @@ function EnterForm({ onEntered }: { onEntered: () => void }) {
 }
 
 /** Rescind a control price: its last day, why, and the gazette that withdraws it. */
-function RescindForm({ row, onRescinded }: { row: ControlPrice; onRescinded: () => void }) {
+function RescindForm({
+  row,
+  onCancel,
+  onRescinded
+}: {
+  row: ControlPrice;
+  onCancel: () => void;
+  onRescinded: () => void;
+}) {
   const t = useT();
   const api = usePricingApi();
   const key = useIdempotencyKey();
-  const [open, setOpen] = useState(false);
   const [lastDay, setLastDay] = useState(businessToday());
   const [reason, setReason] = useState("");
   const [gazette, setGazette] = useState("");
@@ -338,7 +370,6 @@ function RescindForm({ row, onRescinded }: { row: ControlPrice; onRescinded: () 
       api.rescindControlPrice(row.controlPriceId, { lastDay, reason: reason.trim(), gazetteReference: gazette.trim() }, key.current()),
     onSuccess: () => {
       key.next();
-      setOpen(false);
       onRescinded();
     },
     onError: (error) => {
@@ -348,37 +379,45 @@ function RescindForm({ row, onRescinded }: { row: ControlPrice; onRescinded: () 
     }
   });
 
-  if (!open) {
-    return (
-      <button type="button" onClick={() => setOpen(true)}>
-        {t("pricing.gazette.rescind").text}
-      </button>
-    );
-  }
   const submit = (event: FormEvent) => {
     event.preventDefault();
     rescind.mutate();
   };
+
   return (
-    <form onSubmit={submit} className="pricing-form-grid">
-      <div className="pricing-form-field">
+    <form onSubmit={submit} className="pricing-gazette-rescind-form">
+      <div className="pricing-form-field pricing-gazette-rescind-field--date">
         <DatePicker label={t("pricing.gazette.field.last_day").text} required value={lastDay} onChange={setLastDay} />
       </div>
-      <label className="pricing-form-field">
-        {t("pricing.gazette.field.reason").text}
+      <label className="pricing-form-field pricing-gazette-rescind-field--reason">
+        <span className="pricing-filter-label">{t("pricing.gazette.field.reason").text}</span>
         <input type="text" required maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
-      <label className="pricing-form-field">
-        {t("pricing.column.gazette").text}
+      <label className="pricing-form-field pricing-gazette-rescind-field--gazette">
+        <span className="pricing-filter-label">{t("pricing.column.gazette").text}</span>
         <input type="text" required maxLength={80} value={gazette} onChange={(e) => setGazette(e.target.value)} />
       </label>
-      <button type="submit" disabled={rescind.isPending || !reason.trim() || !gazette.trim()}>
-        {t("pricing.gazette.rescind_submit").text}
-      </button>
-      <button type="button" onClick={() => setOpen(false)}>
-        {t("pricing.cancel").text}
-      </button>
-      {rescind.isError && <p role="alert">{errorText(rescind.error, t("pricing.error.generic").text)}</p>}
+      <div className="pricing-gazette-rescind-actions">
+        <button
+          type="submit"
+          className="modern-btn modern-btn--primary pricing-gazette-rescind-submit"
+          disabled={rescind.isPending || !reason.trim() || !gazette.trim()}
+        >
+          {t("pricing.gazette.rescind_submit").text}
+        </button>
+        <button
+          type="button"
+          className="modern-btn modern-btn--secondary pricing-gazette-rescind-cancel"
+          onClick={onCancel}
+        >
+          {t("pricing.cancel").text}
+        </button>
+      </div>
+      {rescind.isError && (
+        <p role="alert" className="pricing-alert-box pricing-alert-box--error pricing-gazette-rescind-error">
+          {errorText(rescind.error, t("pricing.error.generic").text)}
+        </p>
+      )}
     </form>
   );
 }
