@@ -9,7 +9,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
-import { DropdownSelect } from "../../shell/components/DropdownSelect";
+import { CustomSelect } from "./CustomSelect";
 import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
@@ -107,9 +107,9 @@ export function SocietyRegisterPage() {
           </label>
           <div className="modern-field">
             <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
-            <DropdownSelect
+            <CustomSelect
               id="society-status-filter"
-              aria-label={t("party.filter.status").text}
+              ariaLabel={t("party.filter.status").text}
               value={status}
               onChange={(val) => setStatus(val as SocietyStatus | "")}
               options={[
@@ -125,9 +125,9 @@ export function SocietyRegisterPage() {
             <span className="modern-field__label party-filter-label">
               {t("party.filter.district").text}
             </span>
-            <DropdownSelect
+            <CustomSelect
               id="society-district-filter"
-              aria-label={t("party.filter.district").text}
+              ariaLabel={t("party.filter.district").text}
               value={district}
               onChange={(val) => setDistrict(val)}
               options={[

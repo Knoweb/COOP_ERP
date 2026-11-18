@@ -11380,17 +11380,22 @@ button[type="submit"]:not(:disabled):hover,
   background-color: var(--color-accent) !important;
   border-radius: 2px !important;
   margin-right: 8px !important;
-  display: inline-block !important;
+  display: none !important;
   flex-shrink: 0 !important;
   opacity: 0 !important;
   transition: opacity 0.15s ease !important;
 }
 
-/* Moving hover indicator: displays ONLY on hover and is removed from the selected item */
-.dropdown-select__item:hover .dropdown-select__indicator {
+/* Accent indicator: displays ONLY on the selected option, never on hover */
+.dropdown-select__item--selected .dropdown-select__indicator {
   opacity: 1 !important;
   background-color: var(--color-accent) !important;
   display: inline-block !important;
+}
+
+.dropdown-select__item:not(.dropdown-select__item--selected) .dropdown-select__indicator {
+  opacity: 0 !important;
+  display: none !important;
 }
 
 .dropdown-select__item:hover .dropdown-select__item-text {

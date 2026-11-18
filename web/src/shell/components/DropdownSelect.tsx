@@ -166,7 +166,7 @@ export function DropdownSelect({
                 onClick={() => handleSelect(opt.value)}
               >
                 <div className="dropdown-select__item-content">
-                  <span className={`dropdown-select__indicator ${isSelected ? "dropdown-select__indicator--selected" : ""}`} />
+                  <span className="dropdown-select__indicator" />
                   <span className={`dropdown-select__item-text ${isSelected ? "dropdown-select__item-text--selected" : ""}`}>
                     {opt.label}
                   </span>
