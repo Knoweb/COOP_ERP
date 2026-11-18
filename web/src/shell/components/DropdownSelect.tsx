@@ -125,7 +125,7 @@ export function DropdownSelect({
         disabled={disabled}
         required={required}
         tabIndex={-1}
-        className="dropdown-select__native"
+        className="visually-hidden"
       >
         {placeholder && !options.some((o) => o.value === "") && (
           <option value="">{placeholder}</option>

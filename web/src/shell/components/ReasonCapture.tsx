@@ -1,7 +1,6 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useT } from "../i18n/useT";
-import { DropdownSelect } from "./DropdownSelect";
 
 /**
  * The small form a command with a reason opens before it runs (doc 30 section 2.2; 21A: a
@@ -77,20 +76,20 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
           <label htmlFor="reason-capture-code" className="reason-capture__label">
             {t("shell.reason.code").text}
           </label>
-          <div className="reason-capture__control-wrap">
-            <DropdownSelect
-              id="reason-capture-code"
-              aria-label={t("shell.reason.code").text}
-              value={code}
-              onChange={(val) => setCode(val)}
-              placeholder={t("shell.reason.choose").text}
-              required
-              options={codes.map((item) => ({
-                value: item.code,
-                label: item.label
-              }))}
-            />
-          </div>
+          <select
+            id="reason-capture-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            required
+            className="reason-capture__select"
+          >
+            <option value="">{t("shell.reason.choose").text}</option>
+            {codes.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="reason-capture__field">
