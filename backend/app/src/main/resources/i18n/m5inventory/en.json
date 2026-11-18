@@ -127,6 +127,7 @@
   "m5.reprice.qty_exceeded": "Reprice quantity exceeds the quantity available on this lot",
   "m5.reprice.invalid_cost": "Unit cost must be zero or greater with at most 4 decimal places",
   "m5.reprice.reason_required": "A reason is required for repricing",
+  "m5.reprice.temporarily_unavailable": "Stock repricing is temporarily unavailable pending the approved M5/M8 inventory ledger and accounting correction",
   "m5.expiry.location_required": "A location is required",
   "m5.opening.batch_required": "A batch number is required for this item",
   "m5.opening.batch_no_too_long": "Batch number cannot exceed 40 characters",

@@ -67,11 +67,12 @@ export type StockTakeReviewLine = components["schemas"]["StockTakeReviewLine"];
 export type StockTakeReconcileRequest = components["schemas"]["StockTakeReconcileRequest"];
 export type StockTakeReconcileResponse = components["schemas"]["StockTakeReconcileResponse"];
 
-export function useInventoryApi() {
-  const api = useApiClient<paths>();
-  const party = useApiClient<partyPaths>();
-  const catalogue = useApiClient<cataloguePaths>();
-  const trading = useApiClient<tradingPaths>();
+export function useInventoryApi(locationId?: string | null) {
+  const scope = locationId === undefined ? undefined : { locationId };
+  const api = useApiClient<paths>(scope);
+  const party = useApiClient<partyPaths>(scope);
+  const catalogue = useApiClient<cataloguePaths>(scope);
+  const trading = useApiClient<tradingPaths>(scope);
 
   return useMemo(
     () => ({
@@ -434,6 +435,13 @@ export function useInventoryApi() {
         if (!upload.ok) {
           throw new Error(`upload ${upload.status}`);
         }
+      },
+
+      async writeOffPhoto(writeOffId: string, attachmentId: string): Promise<string> {
+        const { data } = await api.GET("/v1/inventory/write-offs/{writeOffId}/photos/{attachmentId}", {
+          params: { path: { writeOffId, attachmentId } }
+        });
+        return data!.url;
       },
 
       async writeOffStep(

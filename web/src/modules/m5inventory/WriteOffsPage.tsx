@@ -196,9 +196,11 @@ export function WriteOffsPage() {
       {canRequest && locationId !== "" && (
         <section className="modern-table-card inventory-section" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
           <h2>{t("inventory.writeoff.new").text}</h2>
-          <label className="inventory-form-field">
+          <label htmlFor="writeoff-category" className="inventory-form-field">
             <span>{t("inventory.writeoff.category").text}</span>
             <CustomSelect<string>
+              id="writeoff-category"
+              portal
               ariaLabel={t("inventory.writeoff.category").text}
               value={category}
               onChange={(val) => setCategory(val as Category)}

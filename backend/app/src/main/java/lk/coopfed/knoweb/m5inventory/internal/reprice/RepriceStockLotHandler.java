@@ -30,24 +30,17 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Reprices a stock lot or part of it with new unit cost and optional condition change (PGL-M2-03).
  *
- * <p>Guards:
- * <ul>
- *   <li>Scope must be OWN</li>
- *   <li>Location must match scope location if scope is location-bound</li>
- *   <li>Lot must exist under caller's scope and have positive quantity on hand</li>
- *   <li>Reprice quantity must be greater than zero and not exceed quantity on hand</li>
- *   <li>New unit cost must be greater than or equal to zero</li>
- *   <li>Reason must not be blank</li>
- * </ul>
- *
- * <p>Conserves physical inventory quantities without intake manipulation, revalues entity weighted
- * average cost per IAS 2, and preserves full lot traceability.
+ * <p><b>Temporary Safety Block (Option B):</b> All repricing mutations are currently refused with
+ * {@link #ERROR_TEMPORARILY_UNAVAILABLE} before any inventory, cost, repricing ledger, audit, or
+ * outbox writes occur, pending approval and implementation of the permanent M5/M8 ledger and
+ * accounting correction (Option A). Existing repricing history reads remain available.
  */
 @Service
 @CommandHandler(permission = "inv.stock.reprice")
 public class RepriceStockLotHandler implements Handles<RepriceStockLot, StockRepricingResult> {
 
     public static final String AUDIT_REPRICED = "STOCK_REPRICED";
+    public static final String ERROR_TEMPORARILY_UNAVAILABLE = "m5.reprice.temporarily_unavailable";
 
     private final RepriceStore store;
     private final JdbcTemplate jdbc;
@@ -70,6 +63,12 @@ public class RepriceStockLotHandler implements Handles<RepriceStockLot, StockRep
         // ---- 1. Guards ---------------------------------------------------------------------
         if (scope.policyClass() != PolicyClass.OWN) {
             throw new ProblemException("m5.scope.own_required");
+        }
+
+        // Option B immediate safety correction: block all unsafe repricing mutations before any
+        // inventory, valuation, repricing ledger, audit, or outbox writes can occur.
+        if (repricingMutationsBlocked()) {
+            throw new ProblemException(ERROR_TEMPORARILY_UNAVAILABLE);
         }
 
         if (command.stockLotId() == null) {
@@ -289,5 +288,9 @@ public class RepriceStockLotHandler implements Handles<RepriceStockLot, StockRep
                 command.reason().trim(),
                 scope.userId(),
                 now);
+    }
+
+    private static boolean repricingMutationsBlocked() {
+        return true;
     }
 }

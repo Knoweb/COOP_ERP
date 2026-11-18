@@ -427,7 +427,7 @@ export interface paths {
         put?: never;
         /**
          * Reprice a stock lot or part of it with new unit cost and optional condition change
-         * @description Conserves physical inventory quantity and revalues entity weighted average cost under IAS 2. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded, m5.reprice.invalid_cost, m5.reprice.reason_required.
+         * @description Temporarily unavailable (Option B safety correction) pending the approved M5/M8 inventory ledger and accounting correction. All mutation requests are refused with 422 m5.reprice.temporarily_unavailable before any inventory or valuation changes occur. Codes this operation can answer with 422: m5.scope.own_required, m5.reprice.temporarily_unavailable, m5.location.not_in_scope, m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded, m5.reprice.invalid_cost, m5.reprice.reason_required.
          */
         post: operations["repriceStockLot"];
         delete?: never;
@@ -747,6 +747,26 @@ export interface paths {
          * @description Answers a URL the client PUTs the bytes to, with the content type given here. Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found, m5.writeoff.not_draft, attachment.content_type_not_allowed, attachment.too_large.
          */
         post: operations["addWriteOffPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}/photos/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Authorise a short-lived view of one verified write-off photograph
+         * @description Returns a fresh signed read URL only when the photograph belongs to this write-off, is verified, and both the write-off and its kernel document attachment are visible in the caller's current entity/location scope. The object itself is never made public.
+         */
+        get: operations["getWriteOffPhoto"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1532,6 +1552,10 @@ export interface components {
             url: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        PhotoViewResponse: {
+            /** @description Short-lived signed object-store URL; request a new one after it expires */
+            url: string;
         };
         WriteOffResponse: {
             /** Format: uuid */
@@ -3271,6 +3295,36 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    getWriteOffPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+                attachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A fresh short-lived view link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoViewResponse"];
+                };
+            };
+            /** @description No such verified photograph, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     submitWriteOff: {
