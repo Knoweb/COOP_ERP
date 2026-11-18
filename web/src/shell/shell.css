@@ -458,7 +458,7 @@ button:disabled {
   border-radius: var(--radius);
   background: var(--color-surface);
   font-family: inherit;
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-md);
   color: var(--color-text);
 }
 
