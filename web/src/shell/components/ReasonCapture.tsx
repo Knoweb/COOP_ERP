@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n/useT";
 
 /**
@@ -33,16 +33,35 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
   // and the empty-code check below stop a Confirm without a choice.
   const [code, setCode] = useState("");
   const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !pending) {
-        onCancel();
+        if (open) {
+          setOpen(false);
+        } else {
+          onCancel();
+        }
+      }
+    };
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel, pending]);
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [onCancel, pending, open]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -51,6 +70,9 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
     }
     onConfirm(code, text.trim() === "" ? null : text.trim());
   };
+
+  const selectedItem = codes.find((item) => item.code === code);
+  const triggerText = selectedItem?.label ?? t("shell.reason.choose").text;
 
   return (
     <div
@@ -76,20 +98,71 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
           <label htmlFor="reason-capture-code" className="reason-capture__label">
             {t("shell.reason.code").text}
           </label>
-          <select
-            id="reason-capture-code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-            className="reason-capture__select"
-          >
-            <option value="">{t("shell.reason.choose").text}</option>
-            {codes.map((item) => (
-              <option key={item.code} value={item.code}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <div className={`custom-dropdown reason-capture__dropdown ${open ? "custom-dropdown--open" : ""}`} ref={containerRef}>
+            {/* Native select kept as the single accessible combobox for form validation and Playwright automation */}
+            <select
+              id="reason-capture-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              className="reason-capture__native-select"
+              tabIndex={-1}
+            >
+              <option value="">{t("shell.reason.choose").text}</option>
+              {codes.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Custom interactive trigger button matching the system standard dropdowns */}
+            <button
+              type="button"
+              className="custom-dropdown__trigger reason-dropdown-trigger"
+              onClick={() => setOpen((prev) => !prev)}
+              aria-haspopup="listbox"
+              aria-expanded={open}
+            >
+              <span className={`custom-dropdown__value ${!code ? "custom-dropdown__value--placeholder" : ""}`}>
+                {triggerText}
+              </span>
+              <svg
+                className={`custom-dropdown__arrow ${open ? "custom-dropdown__arrow--open" : ""}`}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {open && (
+              <ul className="custom-dropdown__menu reason-dropdown-menu" role="listbox">
+                {codes.map((item) => {
+                  const isSelected = item.code === code;
+                  return (
+                    <li
+                      key={item.code}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`custom-dropdown__item ${isSelected ? "custom-dropdown__item--selected" : ""}`}
+                      onClick={() => {
+                        setCode(item.code);
+                        setOpen(false);
+                      }}
+                    >
+                      <span className="custom-dropdown__item-label">{item.label}</span>
+                      {isSelected && (
+                        <svg className="custom-dropdown__checkmark" viewBox="0 0 24 24" aria-hidden="true">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="reason-capture__field">

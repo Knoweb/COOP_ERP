@@ -1,19 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
-export interface CustomSelectOption<T extends string> {
+export interface CustomSelectOption<T extends string | number> {
   value: T;
   label: string;
 }
 
-export interface CustomSelectProps<T extends string> {
+export interface CustomSelectProps<T extends string | number> {
+  id?: string;
   value: T;
   options: CustomSelectOption<T>[];
   onChange: (value: T) => void;
   ariaLabel: string;
   placeholder?: string;
+  menuClassName?: string;
 }
 
-export function CustomSelect<T extends string>({ value, options, onChange, ariaLabel, placeholder }: CustomSelectProps<T>) {
+export function CustomSelect<T extends string | number>({
+  id,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  placeholder,
+  menuClassName
+}: CustomSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,17 +67,26 @@ export function CustomSelect<T extends string>({ value, options, onChange, ariaL
   return (
     <div className={`custom-dropdown ${open ? "custom-dropdown--open" : ""} ${openUp ? "custom-dropdown--up" : ""}`} ref={containerRef}>
       <select
+        id={id}
         className="visually-hidden"
         value={value}
-        onChange={(e) => onChange(e.target.value as T)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const matched = options.find((opt) => String(opt.value) === raw);
+          if (matched) {
+            onChange(matched.value);
+          } else {
+            onChange(raw as unknown as T);
+          }
+        }}
         aria-label={ariaLabel}
         tabIndex={-1}
       >
-        {placeholder && !options.some((o) => o.value === "") && (
+        {placeholder && !options.some((o) => String(o.value) === "") && (
           <option value="">{placeholder}</option>
         )}
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option key={String(opt.value)} value={opt.value}>
             {opt.label}
           </option>
         ))}
@@ -91,12 +110,12 @@ export function CustomSelect<T extends string>({ value, options, onChange, ariaL
       </button>
 
       {open && (
-        <ul className="custom-dropdown__menu" role="listbox">
+        <ul className={`custom-dropdown__menu ${menuClassName ?? ""}`.trim()} role="listbox">
           {options.map((opt) => {
             const isSelected = opt.value === value;
             return (
               <li
-                key={opt.value}
+                key={String(opt.value)}
                 role="option"
                 aria-selected={isSelected}
                 className={`custom-dropdown__item ${isSelected ? "custom-dropdown__item--selected" : ""}`}
