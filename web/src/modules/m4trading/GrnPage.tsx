@@ -107,9 +107,22 @@ export function GrnPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/trading">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("trading.back").text}
+      <Link className="back-link back-pill-btn" to="/trading">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back").text}</span>
       </Link>
       <DocumentHeader
         code={g.docNumber ?? t("trading.order.draft_number").text}
@@ -123,51 +136,76 @@ export function GrnPage() {
           },
           {
             label: t("trading.note.title").text,
-            value: g.deliveryNoteId && <Link to={`/trading/delivery-notes/${g.deliveryNoteId}`}>{t("trading.note.open").text}</Link>
+            value: g.deliveryNoteId && (
+              <Link className="trading-doc-link" to={`/trading/delivery-notes/${g.deliveryNoteId}`}>
+                {t("trading.note.open").text}
+              </Link>
+            )
           },
           { label: t("trading.field.received_on").text, value: g.receivedOn && formatDate(g.receivedOn) },
           { label: t("trading.field.confirmed_at").text, value: g.confirmedAt && formatInstant(g.confirmedAt) },
           {
             label: t("trading.field.discrepancy").text,
             value: g.discrepancyId && (
-              <Link to={`/trading/discrepancies/${g.discrepancyId}`}>{t("trading.grn.discrepancy_raised").text}</Link>
+              <Link className="trading-doc-link" to={`/trading/discrepancies/${g.discrepancyId}`}>
+                {t("trading.grn.discrepancy_raised").text}
+              </Link>
             )
           }
         ]}
-      />
+      >
+        <div className="trading-header-actions">
+          <button
+            type="button"
+            className="trading-print-btn"
+            onClick={() => window.print()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>{t("trading.invoice.print").text}</span>
+          </button>
+        </div>
+      </DocumentHeader>
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("trading.column.item").text}</th>
-            <th>{t("trading.column.expected").text}</th>
-            <th>{t("trading.column.received").text}</th>
-            <th>{t("trading.column.damaged").text}</th>
-            <th>{t("trading.column.batch").text}</th>
-            <th>{t("trading.column.expiry").text}</th>
-            <th>{t("trading.column.mrp").text}</th>
-            <th>{t("trading.column.unit_cost").text}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {g.lines.map((line) => (
-            <tr key={line.lineId}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{line.expectedQty}</td>
-              <td>{line.receivedQty}</td>
-              <td>{line.damagedQty}</td>
-              <td>{isSyntheticBatchNo(line.batchNo) ? t("trading.field.batch_not_tracked").text : line.batchNo}</td>
-              <td>{line.expiryDate && formatDate(line.expiryDate)}</td>
-              <td>{line.printedMrp !== undefined && <MoneyDisplay amount={line.printedMrp} />}</td>
-              <td>{line.unitCost !== undefined && <MoneyDisplay amount={line.unitCost} />}</td>
-              <td>{line.expectedQty !== undefined && line.receivedQty < line.expectedQty && <strong>{t("trading.grn.short").text}</strong>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="modern-table-card trading-table-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table trading-table">
+            <thead>
+              <tr>
+                <th>{t("trading.column.item").text}</th>
+                <th>{t("trading.column.expected").text}</th>
+                <th>{t("trading.column.received").text}</th>
+                <th>{t("trading.column.damaged").text}</th>
+                <th>{t("trading.column.batch").text}</th>
+                <th>{t("trading.column.expiry").text}</th>
+                <th className="trading-cell-numeric">{t("trading.column.mrp").text}</th>
+                <th className="trading-cell-numeric">{t("trading.column.unit_cost").text}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {g.lines.map((line) => (
+                <tr key={line.lineId}>
+                  <td>
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>{line.expectedQty}</td>
+                  <td>{line.receivedQty}</td>
+                  <td>{line.damagedQty}</td>
+                  <td>{isSyntheticBatchNo(line.batchNo) ? t("trading.field.batch_not_tracked").text : line.batchNo}</td>
+                  <td className="trading-cell-date">{line.expiryDate && formatDate(line.expiryDate)}</td>
+                  <td className="trading-cell-numeric">{line.printedMrp !== undefined && <MoneyDisplay amount={line.printedMrp} />}</td>
+                  <td className="trading-cell-numeric">{line.unitCost !== undefined && <MoneyDisplay amount={line.unitCost} />}</td>
+                  <td>{line.expectedQty !== undefined && line.receivedQty < line.expectedQty && <strong>{t("trading.grn.short").text}</strong>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {isReceiver && canConfirm && g.status === "DRAFT" && (
         <section className="trading-section">
