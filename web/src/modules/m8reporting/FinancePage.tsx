@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { DatePicker } from "../../shell/components/DatePicker";
+import { MonthPicker } from "../../shell/components/MonthPicker";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { DatePicker } from "../../shell/components/DatePicker";
 import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { openServerFile } from "../../shell/api/openServerFile";
 import { useReportingApi } from "./reportingApi";
@@ -35,7 +36,6 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
   const [printingVoucher, setPrintingVoucher] = useState(false);
 
   // Tab 4: Final Accounts Filters
-  const [finalAccountsDate, setFinalAccountsDate] = useState<string>(() => businessToday());
   const [finalAccountsPeriod, setFinalAccountsPeriod] = useState<string>(() => businessToday().substring(0, 7));
   const [downloadingFinalAccounts, setDownloadingFinalAccounts] = useState(false);
 
@@ -288,6 +288,8 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
           {/* As Of Filter - Single Balanced Pill */}
           <div className="finance-as-of-filter-bar">
             <DatePicker
+              id="finance-as-of-date"
+              ariaLabel={t("reporting.finance.as_of").text}
               value={asOfDate}
               onChange={setAsOfDate}
               prefixLabel={`${t("reporting.finance.as_of").text}:`}
@@ -692,6 +694,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
               </label>
               <DatePicker
                 id="goods-from-date"
+                max={goodsTo || undefined}
                 value={goodsFrom}
                 onChange={setGoodsFrom}
                 placeholder={businessToday()}
@@ -705,6 +708,7 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
               </label>
               <DatePicker
                 id="goods-to-date"
+                min={goodsFrom || undefined}
                 value={goodsTo}
                 onChange={setGoodsTo}
                 placeholder={businessToday()}
@@ -1049,19 +1053,13 @@ export function FinancePage({ initialTab = "exports" }: { initialTab?: "exports"
           {/* Period Filter & Download */}
           <div className="finance-goods-filters finance-final-accounts-filters">
             <div className="finance-filter-field">
-              <label className="finance-filter-field-label" htmlFor="final-accounts-date">
+              <label className="finance-filter-field-label" htmlFor="finance-final-accounts-period">
                 {t("reporting.finance.period").text}:
               </label>
-              <DatePicker
-                id="final-accounts-date"
-                value={finalAccountsDate}
-                onChange={(val) => {
-                  setFinalAccountsDate(val);
-                  if (val) {
-                    setFinalAccountsPeriod(val.substring(0, 7));
-                  }
-                }}
-                placeholder={businessToday()}
+              <MonthPicker
+                id="finance-final-accounts-period"
+                value={finalAccountsPeriod}
+                onChange={setFinalAccountsPeriod}
                 className="finance-compact-datepicker"
               />
             </div>

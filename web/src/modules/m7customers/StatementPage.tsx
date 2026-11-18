@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { useCustomersApi } from "./customersApi";
 import { MFA_REQUIRED, errorText, isReversible, problemCode, startOfMonthBefore } from "./customersView";
+import { CustomersDatePicker } from "./CustomersDatePicker";
 import "./customers.css";
 
 /**
@@ -29,6 +30,7 @@ export function StatementPage() {
   const [to, setTo] = useState(today);
   const canReverse = useHasPermission("cus.payment.reverse");
   const [reversing, setReversing] = useState<string | null>(null);
+  const [hoveredReverseDocId, setHoveredReverseDocId] = useState<string | null>(null);
   const statement = useQuery({
     queryKey: ["customers", "statement", accountId, from, to],
     queryFn: () => api.statement(accountId, from, to),
@@ -37,83 +39,151 @@ export function StatementPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to={`/customers/${customerId}`}>
-        <svg viewBox="0 0 24 24">
+      <Link className="back-link back-pill-btn customers-back-link" to={`/customers/${customerId}`}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" />
           <path d="M9 12h10" />
         </svg>
-        {t("customers.statement.back").text}
+        <span>{t("customers.statement.back").text}</span>
       </Link>
       <PageHeader icon="statement" title={t("customers.statement.title").text} />
-      <div className="customers-filter-bar">
-        <label className="customers-field">
-          {t("customers.statement.from").text}
-          <input type="date" max={to} value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label className="customers-field">
-          {t("customers.statement.to").text}
-          <input type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
+
+      <div className="customers-section-card statement-filter-card">
+        <div className="statement-filter-grid">
+          <CustomersDatePicker
+            label={t("customers.statement.from").text}
+            value={from}
+            max={to}
+            onChange={(val) => setFrom(val)}
+          />
+          <CustomersDatePicker
+            label={t("customers.statement.to").text}
+            value={to}
+            min={from}
+            onChange={(val) => setTo(val)}
+          />
+        </div>
       </div>
+
       {reversing && <ReverseForm documentId={reversing} accountId={accountId} onDone={() => setReversing(null)} />}
-      {statement.isLoading && <p>{t("customers.loading").text}</p>}
-      {statement.isError && <p role="alert">{errorText(statement.error, t("customers.error.generic").text)}</p>}
+
+      {statement.isLoading && (
+        <div className="customers-state-box">
+          <p>{t("customers.loading").text}</p>
+        </div>
+      )}
+
+      {statement.isError && (
+        <div className="customers-state-box customers-state-box--error" role="alert">
+          <p>{errorText(statement.error, t("customers.error.generic").text)}</p>
+        </div>
+      )}
+
       {statement.data && (
         <>
-          <p>
-            {t("customers.statement.opening").text}: <MoneyDisplay amount={statement.data.openingBalance} />
-          </p>
+          <div className="statement-summary-bar">
+            <div className="statement-summary-pill">
+              <span className="statement-summary-label">{t("customers.statement.opening").text}</span>
+              <span className="statement-summary-value">
+                <MoneyDisplay amount={statement.data.openingBalance} />
+              </span>
+            </div>
+            <div className="statement-summary-pill statement-summary-pill--closing">
+              <span className="statement-summary-label">{t("customers.statement.closing").text}</span>
+              <span className="statement-summary-value">
+                <MoneyDisplay amount={statement.data.closingBalance} />
+              </span>
+            </div>
+          </div>
+
           {statement.data.lines.length === 0 ? (
-            <p>{t("customers.statement.empty").text}</p>
+            <div className="customers-state-box customers-state-box--empty">
+              <p>{t("customers.statement.empty").text}</p>
+            </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("customers.statement.date").text}</th>
-                  <th>{t("customers.statement.kind").text}</th>
-                  <th>{t("customers.statement.document").text}</th>
-                  <th>{t("customers.statement.amount").text}</th>
-                  <th>{t("customers.statement.settled").text}</th>
-                  <th>{t("customers.statement.running").text}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statement.data.lines.map((line) => (
-                  <tr key={line.postingId}>
-                    <td>{formatDate(line.businessDate)}</td>
-                    <td>
-                      {t(`customers.statement.kind.${line.kind}`).text}
-                      {line.limitBreached && <> · {t("customers.statement.breached").text}</>}
-                    </td>
-                    <td>
-                      {line.documentNumber}
-                      {line.reversed && <> · {t("customers.statement.reversed").text}</>}
-                      {canReverse && isReversible(line) && (
-                        <>
-                          {" "}
-                          <button type="button" onClick={() => setReversing(line.documentId)}>
-                            {t("customers.reverse.open").text}
-                          </button>
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      <MoneyDisplay amount={line.amount} />
-                    </td>
-                    <td>
-                      <MoneyDisplay amount={line.settled} />
-                    </td>
-                    <td>
-                      <MoneyDisplay amount={line.runningBalance} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <p>
-            {t("customers.statement.closing").text}: <MoneyDisplay amount={statement.data.closingBalance} size="total" />
-          </p>
+            <div className="statement-table-wrap">
+              <div className="modern-table-scroll">
+                <table className="customers-data-table statement-table">
+                    <thead>
+                      <tr>
+                        <th>{t("customers.statement.date").text}</th>
+                        <th>{t("customers.statement.kind").text}</th>
+                        <th>{t("customers.statement.document").text}</th>
+                        <th className="customers-th-right">{t("customers.statement.amount").text}</th>
+                        <th className="customers-th-right">{t("customers.statement.settled").text}</th>
+                        <th className="customers-th-right">{t("customers.statement.running").text}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statement.data.lines.map((line) => (
+                        <tr key={line.postingId}>
+                          <td className="customers-code-cell">{formatDate(line.businessDate)}</td>
+                          <td>
+                            <span className={`statement-kind-badge statement-kind-badge--${line.kind.toLowerCase()}`}>
+                              {t(`customers.statement.kind.${line.kind}`).text}
+                            </span>
+                            {line.limitBreached && (
+                              <span className="statement-breach-badge">
+                                {t("customers.statement.breached").text}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="statement-doc-cell">
+                              <span className="customers-code-cell">{line.documentNumber}</span>
+                              {line.reversed && (
+                                <span className="statement-reversed-badge">
+                                  {t("customers.statement.reversed").text}
+                                </span>
+                              )}
+                              {canReverse && isReversible(line) && (
+                                <button
+                                  type="button"
+                                  className="statement-btn-reverse"
+                                  onClick={() => setReversing(line.documentId)}
+                                  onMouseEnter={() => setHoveredReverseDocId(line.documentId)}
+                                  onMouseLeave={() => setHoveredReverseDocId(null)}
+                                  style={{
+                                    color:
+                                      hoveredReverseDocId === line.documentId
+                                        ? "var(--color-text)"
+                                        : "var(--color-accent)",
+                                    borderWidth: "var(--border-width-strong)",
+                                    borderStyle: "solid",
+                                    borderColor: "var(--color-accent)"
+                                  }}
+                                >
+                                  <span
+                                    className="statement-btn-reverse-text"
+                                    style={{
+                                      color:
+                                        hoveredReverseDocId === line.documentId
+                                          ? "var(--color-text)"
+                                          : "var(--color-accent)"
+                                    }}
+                                  >
+                                    {t("customers.reverse.open").text}
+                                  </span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="customers-td-right">
+                            <MoneyDisplay amount={line.amount} />
+                          </td>
+                          <td className="customers-td-right">
+                            <MoneyDisplay amount={line.settled} />
+                          </td>
+                          <td className="customers-td-right statement-running-cell">
+                            <MoneyDisplay amount={line.runningBalance} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
         </>
       )}
     </main>
@@ -130,6 +200,22 @@ function ReverseForm({ documentId, accountId, onDone }: { documentId: string; ac
   const queryClient = useQueryClient();
   const key = useIdempotencyKey();
   const [reason, setReason] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onDone();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onDone]);
+
   const reverse = useMutation({
     mutationFn: () => api.reversePayment(documentId, reason.trim(), key.current()),
     onSuccess: () => {
@@ -149,28 +235,52 @@ function ReverseForm({ documentId, accountId, onDone }: { documentId: string; ac
     reverse.mutate();
   };
   return (
-    <form className="customers-form customers-subsection" role="dialog" aria-labelledby="customers-reverse-title" onSubmit={submit}>
-      <h2 id="customers-reverse-title">{t("customers.reverse.title").text}</h2>
-      <p>{t("customers.reverse.explain").text}</p>
-      <label className="customers-field">
-        {t("customers.reason").text}
-        <input maxLength={200} required value={reason} onChange={(e) => setReason(e.target.value)} />
-      </label>
-      <div className="customers-filter-bar">
-        <button type="submit" disabled={reverse.isPending || reason.trim() === ""}>
-          {t("customers.reverse.submit").text}
-        </button>
-        <button type="button" onClick={onDone}>
-          {t("customers.reverse.cancel").text}
-        </button>
-      </div>
-      {reverse.isError && (
-        <p role="alert">
-          {problemCode(reverse.error) === MFA_REQUIRED
-            ? t("customers.limits.step_up_needed").text
-            : errorText(reverse.error, t("customers.error.generic").text)}
-        </p>
-      )}
-    </form>
+    <div
+      className="statement-reverse-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onDone();
+        }
+      }}
+    >
+      <form className="statement-reverse-dialog" role="dialog" aria-modal="true" aria-labelledby="customers-reverse-title" onSubmit={submit}>
+        <h2 id="customers-reverse-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {t("customers.reverse.title").text}
+        </h2>
+        <p>{t("customers.reverse.explain").text}</p>
+        <label className="customers-field">
+          {t("customers.reason").text}
+          <input
+            ref={inputRef}
+            maxLength={200}
+            required
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </label>
+        <div className="statement-reverse-actions">
+          <button type="submit" className="statement-btn-reverse-submit" disabled={reverse.isPending || reason.trim() === ""}>
+            {t("customers.reverse.submit").text}
+          </button>
+          <button type="button" className="statement-btn-cancel" onClick={onDone}>
+            {t("customers.reverse.cancel").text}
+          </button>
+        </div>
+        {reverse.isError && (
+          <div className="customers-state-box customers-state-box--error" role="alert">
+            <p>
+              {problemCode(reverse.error) === MFA_REQUIRED
+                ? t("customers.limits.step_up_needed").text
+                : errorText(reverse.error, t("customers.error.generic").text)}
+            </p>
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

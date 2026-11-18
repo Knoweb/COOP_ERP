@@ -46,6 +46,7 @@ function StatusDropdown(props: {
   value: SocietyStatus | "";
   onChange: (value: SocietyStatus | "") => void;
   anyLabel: string;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,7 @@ function StatusDropdown(props: {
       <button
         type="button"
         className="custom-status-dropdown__trigger"
+        aria-label={props.ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
@@ -154,6 +156,7 @@ function DistrictDropdown(props: {
   value: string;
   onChange: (value: string) => void;
   anyLabel: string;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -205,6 +208,7 @@ function DistrictDropdown(props: {
       <button
         type="button"
         className="custom-status-dropdown__trigger"
+        aria-label={props.ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
@@ -335,6 +339,7 @@ export function SocietyRegisterPage() {
               value={status}
               onChange={(val) => setStatus(val)}
               anyLabel={t("party.filter.status.any").text}
+              ariaLabel={t("party.filter.status").text}
             />
           </div>
           <div className="modern-field">
@@ -345,6 +350,7 @@ export function SocietyRegisterPage() {
               value={district}
               onChange={(val) => setDistrict(val)}
               anyLabel={t("party.filter.district.any").text}
+              ariaLabel={t("party.filter.district").text}
             />
           </div>
         </form>

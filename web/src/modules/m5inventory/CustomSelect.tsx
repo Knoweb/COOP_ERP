@@ -63,13 +63,15 @@ export function CustomSelect<T extends string>({
   const updatePlacement = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
+    const triggerRect = triggerRef.current?.getBoundingClientRect() ?? rect;
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
     const menuHeight = portalRef.current?.getBoundingClientRect().height ?? 200;
     const shouldOpenUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
     setOpenUp(shouldOpenUp);
     if (portal) {
       const viewportGap = 8;
+      const menuGap = 4;
       const menuWidth = portalRef.current?.getBoundingClientRect().width ?? rect.width;
       const safeLeft = Math.min(
         Math.max(viewportGap, rect.left),
@@ -77,13 +79,13 @@ export function CustomSelect<T extends string>({
       );
       if (shouldOpenUp) {
         setPortalCoords({
-          bottom: window.innerHeight - rect.top,
+          bottom: window.innerHeight - triggerRect.top + menuGap,
           left: safeLeft,
           minWidth: rect.width
         });
       } else {
         setPortalCoords({
-          top: rect.bottom,
+          top: triggerRect.bottom + menuGap,
           left: safeLeft,
           minWidth: rect.width
         });
@@ -127,8 +129,14 @@ export function CustomSelect<T extends string>({
   useLayoutEffect(() => {
     if (!open) return;
     if (portal) updatePlacement();
-    optionRefs.current[activeIndex]?.focus({ preventScroll: true });
-  }, [activeIndex, open, portal, updatePlacement]);
+  }, [open, portal, updatePlacement]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (activeIndex >= 0) {
+      optionRefs.current[activeIndex]?.focus({ preventScroll: true });
+    }
+  }, [activeIndex, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -251,7 +259,7 @@ export function CustomSelect<T extends string>({
           tabIndex={activeIndex === 0 ? 0 : -1}
           className={`custom-dropdown__item ${String(value) === "" ? "custom-dropdown__item--selected" : ""}`}
           onClick={(e) => handleSelectOption(e, "" as T)}
-          onMouseEnter={() => setActiveIndex(0)}
+          onMouseMove={() => setActiveIndex(0)}
         >
           {String(value) === "" ? (
             <span className="custom-dropdown__item-bar" aria-hidden="true" />
@@ -280,7 +288,7 @@ export function CustomSelect<T extends string>({
             tabIndex={activeIndex === selectableIndex ? 0 : -1}
             className={`custom-dropdown__item ${isSelected ? "custom-dropdown__item--selected" : ""}`}
             onClick={(e) => handleSelectOption(e, opt.value)}
-            onMouseEnter={() => setActiveIndex(selectableIndex)}
+            onMouseMove={() => setActiveIndex(selectableIndex)}
           >
             {isSelected ? (
               <span className="custom-dropdown__item-bar" aria-hidden="true" />

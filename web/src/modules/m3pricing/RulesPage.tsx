@@ -7,6 +7,7 @@ import { businessToday, formatMoneyDigits, useFormatDate } from "../../shell/i18
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
@@ -129,7 +130,7 @@ export function RulesPage() {
       )}
 
       <section className="pricing-section">
-        <div className="pricing-filter-bar">
+        <div className="pricing-filter-bar pricing-rules-filter-panel">
           <label className="pricing-form-field">
             <span className="pricing-filter-label">{t("pricing.rules.filter_status").text}</span>
             <PricingSelect
@@ -672,24 +673,22 @@ function AuthorRuleForm({ onCreated, locations }: { onCreated: () => void; locat
         </div>
 
         <div className="pricing-filter-bar">
-          <label className="pricing-form-field">
-            <span>{t("pricing.rules.field.valid_from").text}</span>
-            <input
-              type="date"
+          <div className="pricing-form-field">
+            <DatePicker
+              label={t("pricing.rules.field.valid_from").text}
               value={validFrom}
-              onChange={(e) => setValidFrom(e.target.value)}
+              onChange={setValidFrom}
               required
             />
-          </label>
+          </div>
 
-          <label className="pricing-form-field">
-            <span>{t("pricing.rules.field.valid_to").text}</span>
-            <input
-              type="date"
+          <div className="pricing-form-field">
+            <DatePicker
+              label={t("pricing.rules.field.valid_to").text}
               value={validTo}
-              onChange={(e) => setValidTo(e.target.value)}
+              onChange={setValidTo}
             />
-          </label>
+          </div>
 
           <div className="pricing-form-field" style={{ alignSelf: "flex-end" }}>
             <button type="submit" className="btn btn--primary" disabled={createMutation.isPending}>

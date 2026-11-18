@@ -200,15 +200,18 @@ export function GrantsPage() {
               />
             </label>
 
-            <label className="party-form-field">
-              <span className="party-form-field__label">{t("party.grants.until").text}</span>
+            <div className="party-form-field">
+              <label htmlFor="grant-until-input" className="party-form-field__label">
+                {t("party.grants.until").text}
+              </label>
               <CustomDatePicker
+                id="grant-until-input"
                 value={until}
                 onChange={(val) => setUntil(val)}
                 ariaLabel={t("party.grants.until").text}
                 required
               />
-            </label>
+            </div>
 
             <label className="party-form-field party-form-field--full">
               <span className="party-form-field__label">{t("party.grants.reason").text}</span>

@@ -8,6 +8,7 @@ import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { isOpenableFileUrl, openServerFile } from "../../shell/api/openServerFile";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
@@ -183,24 +184,30 @@ export function ReportPage() {
           <div className="report-viewer-controls__query">
             {definition.period && (
               <>
-                <label className="report-viewer-field">
-                  <span className="report-viewer-field__label">{t("reporting.field.from").text}</span>
-                  <input
-                    type="date"
+                <div className="report-viewer-field">
+                  <label htmlFor="report-from-date" className="report-viewer-field__label">
+                    {t("reporting.field.from").text}
+                  </label>
+                  <DatePicker
+                    id="report-from-date"
+                    required
+                    max={form.to || undefined}
                     value={form.from}
-                    required
-                    onChange={(event) => setForm({ ...form, from: event.target.value })}
+                    onChange={(nextFrom) => setForm({ ...form, from: nextFrom })}
                   />
-                </label>
-                <label className="report-viewer-field">
-                  <span className="report-viewer-field__label">{t("reporting.field.to").text}</span>
-                  <input
-                    type="date"
+                </div>
+                <div className="report-viewer-field">
+                  <label htmlFor="report-to-date" className="report-viewer-field__label">
+                    {t("reporting.field.to").text}
+                  </label>
+                  <DatePicker
+                    id="report-to-date"
+                    required
+                    min={form.from || undefined}
                     value={form.to}
-                    required
-                    onChange={(event) => setForm({ ...form, to: event.target.value })}
+                    onChange={(nextTo) => setForm({ ...form, to: nextTo })}
                   />
-                </label>
+                </div>
               </>
             )}
             {definition.location && (

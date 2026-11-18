@@ -185,29 +185,37 @@ export function TransfersPage() {
       </section>
 
       <section className="modern-table-card">
-        <div style={{ padding: 'var(--space-4) var(--space-4) var(--space-2)' }}>
-          <h2>{t("inventory.transfer.list").text}</h2>
+        <div className="inventory-card-header">
+          <span className="inventory-card-header__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="M17 3l4 4-4 4" />
+              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+              <path d="M7 21l-4-4 4-4" />
+              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+            </svg>
+          </span>
+          <h2 className="inventory-card-header__title">{t("inventory.transfer.list").text}</h2>
         </div>
 
         {locationId !== "" && allTransfers.length > 0 && (
-          <div style={{ display: 'flex', gap: 'var(--space-2)', padding: '0 var(--space-4) var(--space-3)' }}>
+          <div className="transfer-filter-tabs">
             <button
               type="button"
-              className={`button ${filter === "all" ? "button--primary" : "button--secondary"}`}
+              className={`transfer-filter-tab ${filter === "all" ? "transfer-filter-tab--active" : ""}`}
               onClick={() => setFilter("all")}
             >
               {t("inventory.transfer.all").text}
             </button>
             <button
               type="button"
-              className={`button ${filter === "outbound" ? "button--primary" : "button--secondary"}`}
+              className={`transfer-filter-tab ${filter === "outbound" ? "transfer-filter-tab--active" : ""}`}
               onClick={() => setFilter("outbound")}
             >
               {t("inventory.transfer.outbound").text}
             </button>
             <button
               type="button"
-              className={`button ${filter === "inbound" ? "button--primary" : "button--secondary"}`}
+              className={`transfer-filter-tab ${filter === "inbound" ? "transfer-filter-tab--active" : ""}`}
               onClick={() => setFilter("inbound")}
             >
               {t("inventory.transfer.inbound").text}
@@ -216,204 +224,243 @@ export function TransfersPage() {
         )}
 
         {locationId !== "" && filteredTransfers.length === 0 && (
-          <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.transfer.none").text}</p>
+          <p className="transfer-empty-msg">{t("inventory.transfer.none").text}</p>
         )}
 
-        {filteredTransfers.map((transfer: Transfer) => {
-          const isSource = transfer.fromLocationId === locationId;
-          const isDest = transfer.toLocationId === locationId;
-          const isCancelling = cancellingTransferId === transfer.transferId;
+        <div className="transfer-list-items">
+          {filteredTransfers.map((transfer: Transfer) => {
+            const isSource = transfer.fromLocationId === locationId;
+            const isDest = transfer.toLocationId === locationId;
+            const isCancelling = cancellingTransferId === transfer.transferId;
 
-          return (
-            <section key={transfer.transferId} className="inventory-section" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
-              <p>
-                <strong>{`${nameOf(transfer.fromLocationId)} → ${nameOf(transfer.toLocationId)}`}</strong>
-                {transfer.documentNo ? ` · ${transfer.documentNo}` : ""}
-                {" "}
-                <StateChip
-                  state={transferChip(transfer.status)}
-                  label={t(`inventory.transfer.status.${transfer.status}`).text}
-                />
-              </p>
-              {transfer.issuedAt && (
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
-                  {formatInstant(transfer.issuedAt)}
-                </p>
-              )}
-              <div className="modern-table-scroll">
-                <table className="modern-table stock-table">
-                <thead>
-                  <tr>
-                    <th>{t("inventory.column.item").text}</th>
-                    <th>{t("inventory.column.qty").text}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transfer.lines.map((line) => (
-                    <tr key={line.lineNo}>
-                      <td className="col-item" data-label={t("inventory.column.item").text}>
-                        <SkuLabel skuId={line.skuId} />
-                      </td>
-                      <td className="numeric-cell" data-label={t("inventory.column.qty").text}>{line.qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                </table>
-              </div>
+            return (
+              <article key={transfer.transferId} className="transfer-item-card">
+                <div className="transfer-item-card__header">
+                  <div className="transfer-item-route">
+                    <span className="transfer-item-route__locations">
+                      {`${nameOf(transfer.fromLocationId)} → ${nameOf(transfer.toLocationId)}`}
+                    </span>
+                    {transfer.documentNo ? (
+                      <span className="transfer-item-docno">· {transfer.documentNo}</span>
+                    ) : null}
+                  </div>
+                  <StateChip
+                    state={transferChip(transfer.status)}
+                    label={t(`inventory.transfer.status.${transfer.status}`).text}
+                  />
+                </div>
+                {transfer.issuedAt && (
+                  <div className="transfer-item-date">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span>{formatInstant(transfer.issuedAt)}</span>
+                  </div>
+                )}
+                {transfer.lines.length > 0 && (
+                  <div className="modern-table-scroll transfer-table-wrapper">
+                    <table className="modern-table stock-table">
+                      <thead>
+                        <tr>
+                          <th>{t("inventory.column.item").text}</th>
+                          <th>{t("inventory.column.qty").text}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transfer.lines.map((line) => (
+                          <tr key={line.lineNo}>
+                            <td className="col-item" data-label={t("inventory.column.item").text}>
+                              <SkuLabel skuId={line.skuId} />
+                            </td>
+                            <td className="numeric-cell" data-label={t("inventory.column.qty").text}>
+                              {line.qty}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-                {transfer.status === "ISSUED" && isSource && canIssue && (
-                  <button
-                    type="button"
-                    disabled={dispatch.isPending}
-                    onClick={() => dispatch.mutate(transfer.transferId)}
-                  >
-                    {t("inventory.transfer.dispatch").text}
-                  </button>
-                )}
-                {transfer.status === "IN_TRANSIT" && isDest && canReceive && (
-                  <button
-                    type="button"
-                    disabled={receive.isPending}
-                    onClick={() => receive.mutate(transfer)}
-                  >
-                    {t("inventory.transfer.receive").text}
-                  </button>
-                )}
-                {(transfer.status === "ISSUED" || transfer.status === "IN_TRANSIT") && isSource && canIssue && !isCancelling && (
-                  <button
-                    type="button"
-                    className="button--secondary"
-                    onClick={() => openCancel(transfer)}
-                  >
-                    {t("inventory.transfer.cancel").text}
-                  </button>
-                )}
-              </div>
-
-              {isCancelling && (
-                <div className="modern-filter-panel" style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)' }}>
-                  <label className="inventory-form-field">
-                    {t("inventory.transfer.cancel_reason").text}
-                    <input
-                      type="text"
-                      maxLength={500}
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      placeholder={t("inventory.transfer.cancel_reason").text}
-                    />
-                  </label>
-                  {transfer.status === "IN_TRANSIT" && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                      <input
-                        type="checkbox"
-                        checked={physicalReturnVerified}
-                        onChange={(e) => setPhysicalReturnVerified(e.target.checked)}
-                      />
-                      {t("inventory.transfer.physical_return_verified").text}
-                    </label>
-                  )}
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+                <div className="transfer-item-actions">
+                  {transfer.status === "ISSUED" && isSource && canIssue && (
                     <button
                       type="button"
-                      disabled={
-                        cancel.isPending ||
-                        cancelReason.trim() === "" ||
-                        (transfer.status === "IN_TRANSIT" && !physicalReturnVerified)
-                      }
-                      onClick={() =>
-                        cancel.mutate({
-                          transferId: transfer.transferId,
-                          request: {
-                            reason: cancelReason.trim(),
-                            physicalReturnVerified: transfer.status === "IN_TRANSIT" ? physicalReturnVerified : undefined
-                          }
-                        })
-                      }
+                      className="table-action-btn"
+                      disabled={dispatch.isPending}
+                      onClick={() => dispatch.mutate(transfer.transferId)}
                     >
-                      {t("inventory.transfer.cancel_confirm").text}
+                      {t("inventory.transfer.dispatch").text}
                     </button>
-                    <button type="button" className="button--secondary" onClick={closeCancel}>
-                      {t("inventory.transfer.cancel_close").text}
+                  )}
+                  {transfer.status === "IN_TRANSIT" && isDest && canReceive && (
+                    <button
+                      type="button"
+                      className="table-action-btn"
+                      disabled={receive.isPending}
+                      onClick={() => receive.mutate(transfer)}
+                    >
+                      {t("inventory.transfer.receive").text}
                     </button>
-                  </div>
+                  )}
+                  {(transfer.status === "ISSUED" || transfer.status === "IN_TRANSIT") && isSource && canIssue && !isCancelling && (
+                    <button
+                      type="button"
+                      className="table-action-btn table-action-btn--danger"
+                      onClick={() => openCancel(transfer)}
+                    >
+                      {t("inventory.transfer.cancel").text}
+                    </button>
+                  )}
                 </div>
-              )}
-            </section>
-          );
-        })}
+
+                {isCancelling && (
+                  <div className="transfer-cancel-panel">
+                    <label className="transfer-cancel-field">
+                      <span className="transfer-field-label">{t("inventory.transfer.cancel_reason").text}</span>
+                      <input
+                        type="text"
+                        className="transfer-cancel-input"
+                        maxLength={500}
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder={t("inventory.transfer.cancel_reason").text}
+                      />
+                    </label>
+                    {transfer.status === "IN_TRANSIT" && (
+                      <label className="transfer-verify-label">
+                        <input
+                          type="checkbox"
+                          className="transfer-verify-checkbox"
+                          checked={physicalReturnVerified}
+                          onChange={(e) => setPhysicalReturnVerified(e.target.checked)}
+                        />
+                        <span>{t("inventory.transfer.physical_return_verified").text}</span>
+                      </label>
+                    )}
+                    <div className="transfer-cancel-actions">
+                      <button
+                        type="button"
+                        className="table-action-btn table-action-btn--danger"
+                        disabled={
+                          cancel.isPending ||
+                          cancelReason.trim() === "" ||
+                          (transfer.status === "IN_TRANSIT" && !physicalReturnVerified)
+                        }
+                        onClick={() =>
+                          cancel.mutate({
+                            transferId: transfer.transferId,
+                            request: {
+                              reason: cancelReason.trim(),
+                              physicalReturnVerified: transfer.status === "IN_TRANSIT" ? physicalReturnVerified : undefined
+                            }
+                          })
+                        }
+                      >
+                        {t("inventory.transfer.cancel_confirm").text}
+                      </button>
+                      <button type="button" className="table-action-btn" onClick={closeCancel}>
+                        {t("inventory.transfer.cancel_close").text}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
 
         {dispatch.isError && (
-          <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(dispatch.error, t("inventory.error.generic").text)}</p>
+          <p role="alert" className="transfer-error-alert">{errorText(dispatch.error, t("inventory.error.generic").text)}</p>
         )}
         {receive.isError && (
-          <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(receive.error, t("inventory.error.generic").text)}</p>
+          <p role="alert" className="transfer-error-alert">{errorText(receive.error, t("inventory.error.generic").text)}</p>
         )}
         {cancel.isError && (
-          <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(cancel.error, t("inventory.error.generic").text)}</p>
+          <p role="alert" className="transfer-error-alert">{errorText(cancel.error, t("inventory.error.generic").text)}</p>
         )}
       </section>
 
       {canIssue && !locations.isError && (
-        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
-          <h2>{t("inventory.transfer.send").text}</h2>
-          <label className="inventory-form-field">
-            <span>{t("inventory.transfer.destination").text}</span>
-            <CustomSelect
-              ariaLabel={t("inventory.transfer.destination").text}
-              value={toLocationId}
-              onChange={setToLocationId}
-              options={[
-                { value: "", label: "" },
-                ...destinations.map((l) => ({
-                  value: l.locationId,
-                  label: locationText(l, locale)
-                }))
-              ]}
-            />
-          </label>
-          {sendable.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
-          {sendable.length > 0 && (
-            <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
-              <table className="modern-table stock-table">
-              <thead>
-                <tr>
-                  <th>{t("inventory.column.item").text}</th>
-                  <th>{t("inventory.column.batch").text}</th>
-                  <th>{t("inventory.column.on_hand").text}</th>
-                  <th>{t("inventory.transfer.qty_to_send").text}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sendable.map((lot) => (
-                  <tr key={lot.stockLotId}>
-                    <td>
-                      <SkuLabel skuId={lot.skuId} />
-                    </td>
-                    <td>{lot.batchNo ?? ""}</td>
-                    <td>{lot.qtyOnHand}</td>
-                    <td>
-                      <input
-                        inputMode="decimal"
-                        aria-label={t("inventory.transfer.qty_to_send").text}
-                        value={quantities[lot.batchId] ?? ""}
-                        onChange={(event) => setQuantities({ ...quantities, [lot.batchId]: event.target.value })}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              </table>
+        <section className="modern-table-card inventory-form-card" style={{ marginTop: 'var(--space-4)' }}>
+          <div className="inventory-card-header">
+            <span className="inventory-card-header__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <path d="M22 2L11 13" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+              </svg>
+            </span>
+            <h2 className="inventory-card-header__title">{t("inventory.transfer.send").text}</h2>
+          </div>
+          <div className="transfer-send-body">
+            <label className="inventory-form-field transfer-destination-field">
+              <span className="transfer-field-label">{t("inventory.transfer.destination").text}</span>
+              <CustomSelect
+                ariaLabel={t("inventory.transfer.destination").text}
+                value={toLocationId}
+                onChange={setToLocationId}
+                options={[
+                  { value: "", label: "" },
+                  ...destinations.map((l) => ({
+                    value: l.locationId,
+                    label: locationText(l, locale)
+                  }))
+                ]}
+              />
+            </label>
+            {sendable.length === 0 && <p className="transfer-empty-msg">{t("inventory.balances.empty").text}</p>}
+            {sendable.length > 0 && (
+              <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
+                <table className="modern-table stock-table">
+                  <thead>
+                    <tr>
+                      <th>{t("inventory.column.item").text}</th>
+                      <th>{t("inventory.column.batch").text}</th>
+                      <th>{t("inventory.column.on_hand").text}</th>
+                      <th>{t("inventory.transfer.qty_to_send").text}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sendable.map((lot) => (
+                      <tr key={lot.stockLotId}>
+                        <td>
+                          <SkuLabel skuId={lot.skuId} />
+                        </td>
+                        <td>{lot.batchNo ?? ""}</td>
+                        <td className="numeric-cell">{lot.qtyOnHand}</td>
+                        <td className="numeric-cell">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="transfer-qty-input"
+                            aria-label={t("inventory.transfer.qty_to_send").text}
+                            value={quantities[lot.batchId] ?? ""}
+                            onChange={(event) => setQuantities({ ...quantities, [lot.batchId]: event.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="inventory-action-bar">
+              <button
+                type="button"
+                className="modern-btn modern-btn--primary inventory-submit-btn"
+                disabled={issue.isPending || toLocationId === "" || lineCount === 0}
+                onClick={() => issue.mutate()}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M22 2L11 13" />
+                  <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                </svg>
+                <span>{t("inventory.transfer.issue").text}</span>
+              </button>
             </div>
-          )}
-          <button
-            type="button"
-            disabled={issue.isPending || toLocationId === "" || lineCount === 0}
-            onClick={() => issue.mutate()}
-          >
-            {t("inventory.transfer.issue").text}
-          </button>
-          {issue.isError && <p role="alert">{errorText(issue.error, t("inventory.error.generic").text)}</p>}
+            {issue.isError && <p role="alert">{errorText(issue.error, t("inventory.error.generic").text)}</p>}
+          </div>
         </section>
       )}
     </main>

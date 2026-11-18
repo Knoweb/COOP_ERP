@@ -127,7 +127,7 @@ export function TransferRequestsPage() {
       </div>
       <PageHeader
         icon="transfers"
-        title={t("inventory.title").text}
+        title={t("inventory.request.title").text}
       />
 
       <div className="inventory-control-links">
@@ -167,150 +167,179 @@ export function TransferRequestsPage() {
       </div>
 
       {canRequest && (
-        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
-          <h2>{t("inventory.request.new").text}</h2>
-          <section className="modern-filter-panel modern-filter-panel--stock">
-            <div className="modern-location-picker">
-              <LocationPicker value={shopId} onChange={setShopId} />
+        <section className="modern-table-card inventory-form-card" style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="inventory-card-header">
+            <span className="inventory-card-header__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <rect x="1" y="3" width="15" height="13" />
+                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                <circle cx="5.5" cy="18.5" r="2.5" />
+                <circle cx="18.5" cy="18.5" r="2.5" />
+              </svg>
+            </span>
+            <h2 className="inventory-card-header__title">{t("inventory.request.new").text}</h2>
+          </div>
+          <div style={{ padding: 'var(--space-4)' }}>
+            <section className="modern-filter-panel modern-filter-panel--stock">
+              <div className="modern-location-picker">
+                <LocationPicker value={shopId} onChange={setShopId} />
+              </div>
+            </section>
+            {shelf.data && items.length === 0 && <p style={{ padding: 'var(--space-2) 0' }}>{t("inventory.balances.empty").text}</p>}
+            {items.length > 0 && (
+              <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
+                <table className="modern-table stock-table">
+                  <thead>
+                    <tr>
+                      <th>{t("inventory.column.item").text}</th>
+                      <th>{t("inventory.request.qty").text}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((skuId) => (
+                      <tr key={skuId}>
+                        <td>
+                          <SkuLabel skuId={skuId} />
+                        </td>
+                        <td>
+                          <input
+                            inputMode="decimal"
+                            aria-label={t("inventory.request.qty").text}
+                            value={quantities[skuId] ?? ""}
+                            onChange={(event) => setQuantities({ ...quantities, [skuId]: event.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <label className="inventory-form-field" style={{ marginTop: 'var(--space-3)' }}>
+              {t("inventory.request.reason").text}
+              <input type="text" maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} />
+            </label>
+            <div className="inventory-action-bar">
+              <button
+                type="button"
+                className="inventory-submit-btn"
+                disabled={ask.isPending || shopId === "" || requestLinesOf(quantities).length === 0}
+                onClick={() => ask.mutate()}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" />
+                </svg>
+                <span>{t("inventory.request.send").text}</span>
+              </button>
             </div>
-          </section>
-          {shelf.data && items.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
-          {items.length > 0 && (
-            <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
-              <table className="modern-table stock-table">
-              <thead>
-                <tr>
-                  <th>{t("inventory.column.item").text}</th>
-                  <th>{t("inventory.request.qty").text}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((skuId) => (
-                  <tr key={skuId}>
-                    <td>
-                      <SkuLabel skuId={skuId} />
-                    </td>
-                    <td>
-                      <input
-                        inputMode="decimal"
-                        aria-label={t("inventory.request.qty").text}
-                        value={quantities[skuId] ?? ""}
-                        onChange={(event) => setQuantities({ ...quantities, [skuId]: event.target.value })}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              </table>
-            </div>
-          )}
-          <label className="inventory-form-field">
-            {t("inventory.request.reason").text}
-            <input type="text" maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} />
-          </label>
-          <button
-            type="button"
-            disabled={ask.isPending || shopId === "" || requestLinesOf(quantities).length === 0}
-            onClick={() => ask.mutate()}
-          >
-            {t("inventory.request.send").text}
-          </button>
-          {ask.isError && <p role="alert">{errorText(ask.error, t("inventory.error.generic").text)}</p>}
+            {ask.isError && <p role="alert">{errorText(ask.error, t("inventory.error.generic").text)}</p>}
+          </div>
         </section>
       )}
 
       <section className="modern-table-card">
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.request.list").text}</h2>
+        <div className="inventory-card-header">
+          <span className="inventory-card-header__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <rect x="1" y="3" width="15" height="13" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 8" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+          </span>
+          <h2 className="inventory-card-header__title">{t("inventory.request.list").text}</h2>
         </div>
-      {requests.isLoading && <p style={{ padding: '0 var(--space-4)' }}>{t("inventory.loading").text}</p>}
-      {requests.isError && <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(requests.error, t("inventory.error.generic").text)}</p>}
-      {requests.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.request.none").text}</p>}
-      {(requests.data ?? []).map((request) => (
-        <section key={request.requestId} className="inventory-section" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
-          <p>
-            {`${nameOf(request.fromLocationId)} → ${nameOf(request.toLocationId)} · ${formatInstant(request.requestedAt)} `}
-            <StateChip
-              state={requestChip(request.status)}
-              label={t(`inventory.request.status.${request.status}`).text}
-            />
-          </p>
-          {request.reason && <p>{request.reason}</p>}
-          {request.rejectReason && <p>{request.rejectReason}</p>}
-          <div className="modern-table-scroll">
-            <table className="modern-table stock-table">
-            <thead>
-              <tr>
-                <th>{t("inventory.column.item").text}</th>
-                <th>{t("inventory.column.qty").text}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {request.lines.map((line) => (
-                <tr key={line.lineId}>
-                  <td>
-                    <SkuLabel skuId={line.skuId} />
-                  </td>
-                  <td>{line.qty}</td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
-          {request.status === "APPROVED" && (
+        {requests.isLoading && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.loading").text}</p>}
+        {requests.isError && <p role="alert" style={{ padding: 'var(--space-3) var(--space-4)' }}>{errorText(requests.error, t("inventory.error.generic").text)}</p>}
+        {requests.data?.length === 0 && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.request.none").text}</p>}
+        {(requests.data ?? []).map((request) => (
+          <section key={request.requestId} className="inventory-section" style={{ padding: 'var(--space-3) var(--space-4)' }}>
             <p>
-              {request.transferStatus
-                ? t(`inventory.transfer.status.${request.transferStatus}`).text
-                : t("inventory.request.transfer_pending").text}{" "}
-              <Link to="/inventory/transfers">{t("inventory.transfer.link").text}</Link>
+              {`${nameOf(request.fromLocationId)} → ${nameOf(request.toLocationId)} · ${formatInstant(request.requestedAt)} `}
+              <StateChip
+                state={requestChip(request.status)}
+                label={t(`inventory.request.status.${request.status}`).text}
+              />
             </p>
-          )}
-          {request.status === "REQUESTED" && canDecide && (
-            <div className="inventory-control-links">
-              <label className="inventory-form-field">
-                <span>{t("inventory.request.source").text}</span>
-                <CustomSelect
-                  ariaLabel={t("inventory.request.source").text}
-                  value={sourceFor(request, sources, locations.data ?? []) ?? ""}
-                  onChange={(val) => setSources({ ...sources, [request.requestId]: val })}
-                  options={[
-                    { value: "", label: "" },
-                    ...(locations.data ?? [])
-                      .filter((l) => l.locationId !== request.toLocationId)
-                      .map((l) => ({
-                        value: l.locationId,
-                        label: locationText(l, locale)
-                      }))
-                  ]}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={approve.isPending || !sourceFor(request, sources, locations.data ?? [])}
-                onClick={() => approve.mutate(request)}
-              >
-                {t("inventory.request.approve").text}
-              </button>
-              <label className="inventory-form-field">
-                {t("inventory.request.reject_reason").text}
-                <input
-                  type="text"
-                  maxLength={500}
-                  value={rejectReasons[request.requestId] ?? ""}
-                  onChange={(event) => setRejectReasons({ ...rejectReasons, [request.requestId]: event.target.value })}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={reject.isPending || (rejectReasons[request.requestId] ?? "").trim() === ""}
-                onClick={() => reject.mutate(request.requestId)}
-              >
-                {t("inventory.request.reject").text}
-              </button>
+            {request.reason && <p>{request.reason}</p>}
+            {request.rejectReason && <p>{request.rejectReason}</p>}
+            <div className="modern-table-scroll">
+              <table className="modern-table stock-table">
+                <thead>
+                  <tr>
+                    <th>{t("inventory.column.item").text}</th>
+                    <th>{t("inventory.column.qty").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {request.lines.map((line) => (
+                    <tr key={line.lineId}>
+                      <td>
+                        <SkuLabel skuId={line.skuId} />
+                      </td>
+                      <td>{line.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </section>
-      ))}
+            {request.status === "APPROVED" && (
+              <p style={{ marginTop: 'var(--space-2)' }}>
+                {request.transferStatus
+                  ? t(`inventory.transfer.status.${request.transferStatus}`).text
+                  : t("inventory.request.transfer_pending").text}{" "}
+                <Link to="/inventory/transfers">{t("inventory.transfer.link").text}</Link>
+              </p>
+            )}
+            {request.status === "REQUESTED" && canDecide && (
+              <div className="inventory-control-links" style={{ marginTop: 'var(--space-3)' }}>
+                <label className="inventory-form-field">
+                  <span>{t("inventory.request.source").text}</span>
+                  <CustomSelect
+                    ariaLabel={t("inventory.request.source").text}
+                    value={sourceFor(request, sources, locations.data ?? []) ?? ""}
+                    onChange={(val) => setSources({ ...sources, [request.requestId]: val })}
+                    options={[
+                      { value: "", label: "" },
+                      ...(locations.data ?? [])
+                        .filter((l) => l.locationId !== request.toLocationId)
+                        .map((l) => ({
+                          value: l.locationId,
+                          label: locationText(l, locale)
+                        }))
+                    ]}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="modern-btn modern-btn--primary table-action-btn"
+                  disabled={approve.isPending || !sourceFor(request, sources, locations.data ?? [])}
+                  onClick={() => approve.mutate(request)}
+                >
+                  {t("inventory.request.approve").text}
+                </button>
+                <label className="inventory-form-field">
+                  {t("inventory.request.reject_reason").text}
+                  <input
+                    type="text"
+                    maxLength={500}
+                    value={rejectReasons[request.requestId] ?? ""}
+                    onChange={(event) => setRejectReasons({ ...rejectReasons, [request.requestId]: event.target.value })}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="table-action-btn table-action-btn--danger"
+                  disabled={reject.isPending || (rejectReasons[request.requestId] ?? "").trim() === ""}
+                  onClick={() => reject.mutate(request.requestId)}
+                >
+                  {t("inventory.request.reject").text}
+                </button>
+              </div>
+            )}
+          </section>
+        ))}
       </section>
       {[approve, reject].map((m, i) =>
         m.isError ? (
