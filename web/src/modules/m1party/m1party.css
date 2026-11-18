@@ -7,7 +7,17 @@
   width: 100%;
 }
 
-/* Society Register Filter Panel Dropdowns: Matches search input box dimensions and corners */
+/* Society Register & Registration Form Dropdowns: Matches input box dimensions and corners */
+.society-filter-panel .custom-dropdown,
+.users-filter-panel .custom-dropdown,
+.register-field-group .custom-dropdown {
+  position: relative !important;
+  width: 100% !important;
+}
+
+.society-filter-panel .custom-dropdown__trigger,
+.users-filter-panel .custom-dropdown__trigger,
+.register-field-group .custom-dropdown__trigger,
 .society-filter-panel .dropdown-select__trigger {
   box-sizing: border-box !important;
   width: 100% !important;
@@ -20,8 +30,20 @@
   font-weight: var(--font-weight-normal) !important;
   color: var(--color-text) !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+  outline: none !important;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
+.society-filter-panel .custom-dropdown__trigger:hover,
+.users-filter-panel .custom-dropdown__trigger:hover,
+.register-field-group .custom-dropdown__trigger:hover,
 .society-filter-panel .dropdown-select__trigger:hover {
   background-color: var(--color-polish-29) !important;
   border-color: var(--color-polish-19) !important;
@@ -29,6 +51,12 @@
   transform: translateY(calc(var(--border-width) * -1.5)) !important;
 }
 
+.society-filter-panel .custom-dropdown--open .custom-dropdown__trigger,
+.society-filter-panel .custom-dropdown__trigger:focus,
+.users-filter-panel .custom-dropdown--open .custom-dropdown__trigger,
+.users-filter-panel .custom-dropdown__trigger:focus,
+.register-field-group .custom-dropdown--open .custom-dropdown__trigger,
+.register-field-group .custom-dropdown__trigger:focus,
 .society-filter-panel .dropdown-select--open .dropdown-select__trigger,
 .society-filter-panel .dropdown-select__trigger:focus,
 .society-filter-panel .dropdown-select__trigger--active {
@@ -36,6 +64,173 @@
   border-color: var(--color-accent) !important;
   box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-21), 0 0 0 calc(var(--border-width-strong) + var(--border-width)) var(--color-polish-27) !important;
   transform: translateY(calc(var(--border-width) * -1.5)) !important;
+}
+
+.society-filter-panel .custom-dropdown__value,
+.users-filter-panel .custom-dropdown__value,
+.register-field-group .custom-dropdown__value {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+}
+
+.society-filter-panel .custom-dropdown__arrow,
+.users-filter-panel .custom-dropdown__arrow,
+.register-field-group .custom-dropdown__arrow {
+  width: calc(var(--space-2) - var(--space-half) / 2) !important;
+  height: calc(var(--space-2) - var(--space-half) / 2) !important;
+  stroke: var(--color-polish-25) !important;
+  stroke-width: var(--border-width-strong) !important;
+  fill: none !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease !important;
+}
+
+.society-filter-panel .custom-dropdown--open .custom-dropdown__arrow,
+.users-filter-panel .custom-dropdown--open .custom-dropdown__arrow,
+.register-field-group .custom-dropdown--open .custom-dropdown__arrow {
+  transform: rotate(180deg) !important;
+}
+
+/* Custom Dropdown Menu Floating Popup */
+.custom-dropdown__menu {
+  position: absolute !important;
+  top: calc(100% + var(--space-half)) !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1050 !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-border) !important;
+  border-radius: calc(var(--radius) * 1.5) !important;
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-8), 0 var(--border-width-strong) var(--space-1) var(--color-polish-23) !important;
+  padding: calc(var(--space-half) * 0.75) !important;
+  margin: 0 !important;
+  list-style: none !important;
+  max-height: calc(var(--space-8) * 3.5) !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+.custom-dropdown--up .custom-dropdown__menu {
+  top: auto !important;
+  bottom: calc(100% + var(--space-half)) !important;
+}
+
+.custom-dropdown__item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: var(--space-half) var(--space-2) var(--space-half) calc(var(--space-2) + var(--space-half)) !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: var(--radius) !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.custom-dropdown__item:hover {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+}
+
+.custom-dropdown__item--selected {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
+}
+
+.custom-dropdown__item--selected::before {
+  content: "" !important;
+  position: absolute !important;
+  left: var(--space-1) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: calc(var(--border-width) * 3) !important;
+  height: calc(var(--space-2) + var(--space-half)) !important;
+  background-color: var(--color-accent) !important;
+  border-radius: var(--radius-pill) !important;
+  display: block !important;
+}
+
+.custom-dropdown__item:not(.custom-dropdown__item--selected)::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* Society Register Form Dropdowns: Consistent selected indicator, hover & checkmark */
+.register-dropdown-option,
+.custom-status-dropdown__option {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-height: calc(var(--space-4) + var(--space-half) / 2) !important;
+  padding: var(--space-half) var(--space-2) var(--space-half) calc(var(--space-2) + var(--space-half)) !important;
+  border-radius: var(--radius) !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.register-dropdown-option:hover,
+.custom-status-dropdown__option:hover {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+}
+
+.register-dropdown-option--selected,
+.custom-status-dropdown__option--selected {
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
+}
+
+.register-dropdown-option--selected::before,
+.custom-status-dropdown__option--selected::before {
+  content: "" !important;
+  position: absolute !important;
+  left: var(--space-1) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: calc(var(--border-width) * 3) !important;
+  height: calc(var(--space-2) + var(--space-half)) !important;
+  background-color: var(--color-accent) !important;
+  border-radius: var(--radius-pill) !important;
+  display: block !important;
+}
+
+.register-dropdown-option:not(.register-dropdown-option--selected)::before,
+.custom-status-dropdown__option:not(.custom-status-dropdown__option--selected)::before {
+  display: none !important;
+  content: none !important;
+}
+
+.custom-dropdown__item-label {
+  flex: 1 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.custom-dropdown__checkmark {
+  width: var(--font-size-sm) !important;
+  height: var(--font-size-sm) !important;
+  stroke: var(--color-accent) !important;
+  fill: none !important;
+  stroke-width: var(--border-width-strong) !important;
+  flex-shrink: 0 !important;
+  margin-left: var(--space-1) !important;
 }
 
 .party-load-more {
