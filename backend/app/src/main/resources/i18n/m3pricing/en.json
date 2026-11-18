@@ -91,5 +91,10 @@
   "m3.rule.location_invalid": "The specified branch or shop location does not belong to your entity",
   "m3.customer.location_required": "A shop location is required to look up customer prices",
   "m3.customer.item_not_found": "No price found for this product at the selected store",
-  "m3.customer.lookup_failed": "Price lookup could not be completed"
+  "m3.customer.lookup_failed": "Price lookup could not be completed",
+  "m3.price_list.import.sku_not_found": "The item was not found in the catalogue",
+  "m3.price_list.import.empty": "The price list sheet has no lines to import",
+  "m3.price_list.import.parse_failed": "Could not parse the price list sheet",
+  "m3.price_list.line.price_invalid": "The price is not a valid number",
+  "m3.price_list.line.invalid": "The price list line is invalid"
 }

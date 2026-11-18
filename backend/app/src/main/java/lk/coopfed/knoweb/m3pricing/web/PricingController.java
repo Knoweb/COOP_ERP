@@ -20,6 +20,8 @@ import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.EnterControlPrice;
 import lk.coopfed.knoweb.m3pricing.api.EvaluateExpirySlowMovingDiscounts;
 import lk.coopfed.knoweb.m3pricing.api.ExpirySlowMovingEvaluationResult;
+import lk.coopfed.knoweb.m3pricing.api.ImportPriceListLines;
+import lk.coopfed.knoweb.m3pricing.api.PriceListImportReport;
 import lk.coopfed.knoweb.m3pricing.api.PrintShelfLabels;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.RescindControlPrice;
@@ -33,6 +35,7 @@ import lk.coopfed.knoweb.m3pricing.internal.ceiling.RescindControlPriceHandler;
 import lk.coopfed.knoweb.m3pricing.internal.label.PrintShelfLabelsHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.CreatePriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
+import lk.coopfed.knoweb.m3pricing.internal.list.ImportPriceListLinesHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.WithdrawDraftHandler;
@@ -61,11 +64,14 @@ import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.EvaluateExpirySlowMovingDiscountsRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingDiscountResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingEvaluationResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ImportPriceListLinesRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.LabelJobResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.MrpPolicyResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListDetailResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.PriceListImportProblem;
+import lk.coopfed.knoweb.m3pricing.web.generated.PriceListImportReportResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListLineResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PricingApi;
@@ -101,6 +107,7 @@ class PricingController implements PricingApi {
     private final CreatePriceListHandler create;
     private final DraftNewVersionHandler draftNewVersion;
     private final SetLinesHandler setLines;
+    private final ImportPriceListLinesHandler importPriceListLines;
     private final PublishPriceListHandler publish;
     private final WithdrawDraftHandler withdrawDraft;
     private final AuthorRuleHandler authorRule;
@@ -120,6 +127,7 @@ class PricingController implements PricingApi {
             CreatePriceListHandler create,
             DraftNewVersionHandler draftNewVersion,
             SetLinesHandler setLines,
+            ImportPriceListLinesHandler importPriceListLines,
             PublishPriceListHandler publish,
             WithdrawDraftHandler withdrawDraft,
             AuthorRuleHandler authorRule,
@@ -141,6 +149,7 @@ class PricingController implements PricingApi {
         this.create = create;
         this.draftNewVersion = draftNewVersion;
         this.setLines = setLines;
+        this.importPriceListLines = importPriceListLines;
         this.publish = publish;
         this.withdrawDraft = withdrawDraft;
         this.authorRule = authorRule;
@@ -534,6 +543,47 @@ class PricingController implements PricingApi {
                                 .ceilingValue(outcome.ceilingValue())
                                 .ceilingRef(outcome.ceilingRef()))
                         .toList()));
+    }
+
+    @Override
+    public ResponseEntity<PriceListImportReportResponse> importPriceListLines(
+            String idempotencyKey, UUID listId, ImportPriceListLinesRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<ImportPriceListLines.ImportLineRow> rows = null;
+        if (request.getLines() != null) {
+            rows = request.getLines().stream()
+                    .map(l -> new ImportPriceListLines.ImportLineRow(
+                            l.getSku(), l.getSkuId(), l.getUomCode(), l.getTierFromQty(), l.getPrice()))
+                    .toList();
+        }
+        boolean replace = request.getReplace() == null || Boolean.TRUE.equals(request.getReplace());
+        ImportPriceListLines command = new ImportPriceListLines(listId, request.getSheet(), rows, replace);
+        PriceListImportReport report = importPriceListLines.handle(command, scope);
+
+        List<LineOutcome> outcomes = report.outcomes().stream()
+                .map(outcome -> new LineOutcome(outcome.skuId(), outcome.uomCode(), outcome.tierFromQty(), outcome.ok())
+                        .reason(outcome.reason())
+                        .review(outcome.review())
+                        .ceilingKind(outcome.ceilingKind())
+                        .ceilingValue(outcome.ceilingValue())
+                        .ceilingRef(outcome.ceilingRef()))
+                .toList();
+
+        List<PriceListImportProblem> problems = report.problems().stream()
+                .map(p -> new PriceListImportProblem(p.line(), p.message())
+                        .sku(p.sku())
+                        .field(p.field()))
+                .toList();
+
+        PriceListImportReportResponse response = new PriceListImportReportResponse(
+                report.priceListId(),
+                report.saved(),
+                report.totalRows(),
+                report.importedLines(),
+                report.errorRows(),
+                problems,
+                outcomes);
+        return ResponseEntity.ok(response);
     }
 
     @Override

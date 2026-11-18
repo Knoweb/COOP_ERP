@@ -91,5 +91,10 @@
   "m3.rule.location_invalid": "නියමිත ශාඛාව හෝ සාප්පු ස්ථානය ඔබගේ ආයතනයට අයත් නොවේ",
   "m3.customer.location_required": "පාරිභෝගික මිල පිරික්සීම සඳහා වෙළඳසැල් ස්ථානයක් අවශ්‍ය වේ",
   "m3.customer.item_not_found": "තෝරාගත් වෙළඳසැලේ මෙම භාණ්ඩය සඳහා මිලක් හමු නොවීය",
-  "m3.customer.lookup_failed": "මිල පිරික්සුම සම්පූර්ණ කළ නොහැකි විය"
+  "m3.customer.lookup_failed": "මිල පිරික්සුම සම්පූර්ණ කළ නොහැකි විය",
+  "m3.price_list.import.sku_not_found": "භාණ්ඩය නාමාවලියෙහි සොයාගත නොහැකි විය",
+  "m3.price_list.import.empty": "මිල ලැයිස්තු පත්‍රයේ ආයාත කිරීමට පේළි නොමැත",
+  "m3.price_list.import.parse_failed": "මිල ලැයිස්තු පත්‍රය කියවීමට නොහැකි විය",
+  "m3.price_list.line.price_invalid": "මිල වලංගු අංකයක් නොවේ",
+  "m3.price_list.line.invalid": "මිල ලැයිස්තු පේළිය අවලංගු වේ"
 }
