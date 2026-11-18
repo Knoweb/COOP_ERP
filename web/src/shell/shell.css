@@ -451,11 +451,15 @@ button:disabled {
   gap: var(--space-half);
 }
 
-.reason-capture textarea {
+.reason-capture textarea,
+.reason-capture select {
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--color-border-control);
   border-radius: var(--radius);
   background: var(--color-surface);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
 }
 
 .reason-capture__actions {
