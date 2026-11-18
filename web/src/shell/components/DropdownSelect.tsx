@@ -137,15 +137,11 @@ export function DropdownSelect({
         ))}
       </select>
 
-      {/* Custom Trigger */}
+      {/* Custom Trigger - visual representation; hidden from AT/test tree to avoid duplicate combobox/label collisions */}
       <div
         className={`dropdown-select__trigger ${isOpen ? "dropdown-select__trigger--active" : ""}`}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        role="combobox"
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        aria-label={effectiveAriaLabel}
-        tabIndex={disabled ? -1 : 0}
+        aria-hidden="true"
       >
         <span className="dropdown-select__label">{displayText}</span>
         <svg
@@ -158,16 +154,14 @@ export function DropdownSelect({
         </svg>
       </div>
 
-      {/* Custom Floating Menu */}
+      {/* Custom Floating Menu - visual layer synchronized with authoritative native select */}
       {isOpen && (
-        <ul ref={menuRef} className="dropdown-select__menu" role="listbox">
+        <ul ref={menuRef} className="dropdown-select__menu" aria-hidden="true">
           {options.map((opt) => {
             const isSelected = opt.value === value;
             return (
               <li
                 key={opt.value}
-                role="option"
-                aria-selected={isSelected}
                 className={`dropdown-select__item ${isSelected ? "dropdown-select__item--selected" : ""}`}
                 onClick={() => handleSelect(opt.value)}
               >
