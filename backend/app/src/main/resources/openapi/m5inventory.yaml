@@ -615,10 +615,13 @@ paths:
       operationId: repriceStockLot
       summary: Reprice a stock lot or part of it with new unit cost and optional condition change
       description: >
-        Conserves physical inventory quantity and revalues entity weighted average cost under IAS 2.
-        Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope,
-        m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded,
-        m5.reprice.invalid_cost, m5.reprice.reason_required.
+        Temporarily unavailable (Option B safety correction) pending the approved M5/M8 inventory
+        ledger and accounting correction. All mutation requests are refused with 422
+        m5.reprice.temporarily_unavailable before any inventory or valuation changes occur.
+        Codes this operation can answer with 422: m5.scope.own_required,
+        m5.reprice.temporarily_unavailable, m5.location.not_in_scope, m5.reprice.not_found,
+        m5.reprice.invalid_qty, m5.reprice.qty_exceeded, m5.reprice.invalid_cost,
+        m5.reprice.reason_required.
       x-permission: inv.stock.reprice
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -1122,6 +1125,30 @@ paths:
               schema: { $ref: '#/components/schemas/PhotoUploadResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}/photos/{attachmentId}:
+    get:
+      tags: [StockControl]
+      operationId: getWriteOffPhoto
+      summary: Authorise a short-lived view of one verified write-off photograph
+      description: >
+        Returns a fresh signed read URL only when the photograph belongs to this write-off, is
+        verified, and both the write-off and its kernel document attachment are visible in the
+        caller's current entity/location scope. The object itself is never made public.
+      x-permission: inv.stock.view
+      parameters:
+        - $ref: '#/components/parameters/WriteOffId'
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: A fresh short-lived view link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PhotoViewResponse' }
+        '404':
+          description: No such verified photograph, or the caller's scope may not see it
   /v1/inventory/write-offs/{writeOffId}/submit:
     post:
       tags: [StockControl]
@@ -2006,6 +2033,13 @@ components:
         attachmentId: { type: string, format: uuid }
         url: { type: string }
         expiresAt: { type: string, format: date-time }
+    PhotoViewResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: Short-lived signed object-store URL; request a new one after it expires
     WriteOffResponse:
       type: object
       required: [writeOffId, locationId, category, status, remoteWitness, photosRequired, lines, photos]

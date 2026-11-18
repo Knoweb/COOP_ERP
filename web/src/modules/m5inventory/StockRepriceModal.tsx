@@ -14,6 +14,10 @@ export interface StockRepriceModalProps {
   onSuccess: () => void;
 }
 
+// Option B immediate safety correction (PGL-M2-03): block unsafe repricing submissions until the
+// approved M5/M8 inventory ledger and accounting correction is implemented.
+const REPRICING_TEMPORARILY_UNAVAILABLE = true;
+
 export function StockRepriceModal({
   isOpen,
   onClose,
@@ -76,6 +80,11 @@ export function StockRepriceModal({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+
+    if (REPRICING_TEMPORARILY_UNAVAILABLE) {
+      setError(t("inventory.reprice.temporarily_unavailable").text);
+      return;
+    }
 
     if (isNaN(parsedQty) || parsedQty <= 0) {
       setError(t("inventory.reprice.invalid_qty").text);
@@ -246,6 +255,12 @@ export function StockRepriceModal({
             </label>
           </div>
 
+          {REPRICING_TEMPORARILY_UNAVAILABLE && (
+            <div role="status" className="inventory-modal-alert">
+              {t("inventory.reprice.temporarily_unavailable").text}
+            </div>
+          )}
+
           <div className="inventory-modal-actions">
             <button
               type="button"
@@ -258,7 +273,8 @@ export function StockRepriceModal({
             <button
               type="submit"
               className="button button--primary"
-              disabled={submitting}
+              disabled={REPRICING_TEMPORARILY_UNAVAILABLE || submitting}
+              title={REPRICING_TEMPORARILY_UNAVAILABLE ? t("inventory.reprice.temporarily_unavailable").text : undefined}
             >
               {submitting ? t("inventory.reprice.submitting").text : t("inventory.reprice.submit").text}
             </button>

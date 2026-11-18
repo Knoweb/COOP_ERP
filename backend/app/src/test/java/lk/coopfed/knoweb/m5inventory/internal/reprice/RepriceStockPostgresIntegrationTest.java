@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -22,12 +21,10 @@ import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.RepriceStockLot;
 import lk.coopfed.knoweb.m5inventory.api.RequestWriteOff;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
-import lk.coopfed.knoweb.m5inventory.api.StockRepriced;
 import lk.coopfed.knoweb.m5inventory.api.StockRepricingResult;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.StockRepricingView;
-import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.OuterCommand;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
@@ -80,7 +77,7 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void fullLotRepriceAdjustsUnitCostAndEntityWeightedAverage() {
+    void blockedFullRepriceCreatesNoMovementCostChangeRepricingAuditOrOutbox() {
         UUID sku = fixture.sku(MPCS, "SKU_REPRICE_FULL");
         UUID batch = fixture.batch(sku, MPCS, "BAT_FULL", EXPIRY);
         ScopeContext scope = at(MPCS, shop);
@@ -89,84 +86,43 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
         postReceipt(shop, batch, new BigDecimal("10.000"), new BigDecimal("100.0000"), MPCS);
         kernel.reset();
 
-        LotBalance lot = queries.balances(shop, sku, false, scope).get(0);
-        assertThat(lot.unitCost()).isEqualByComparingTo("100.0000");
+        LotBalance lotBefore = queries.balances(shop, sku, false, scope).get(0);
+        int movementsBefore = count("select count(*) from inventory.stock_movement where location_id = ?", shop);
+        int lotsBefore = count("select count(*) from inventory.stock_lot where location_id = ?", shop);
+        int repricingsBefore = count("select count(*) from inventory.stock_repricing where location_id = ?", shop);
+        int outboxBefore = count("select count(*) from kernel.event_outbox");
 
-        // When repricing the full lot to Rs 70 as a top-level command
-        StockRepricingResult result = repriceHandler.handle(
-                new RepriceStockLot(
-                        lot.stockLotId(),
-                        new BigDecimal("10.000"),
-                        new BigDecimal("70.0000"),
-                        LotCondition.GOOD,
-                        "Market price drop"),
-                scope);
+        // When attempting full in-place repricing
+        assertThatThrownBy(() -> repriceHandler.handle(
+                        new RepriceStockLot(
+                                lotBefore.stockLotId(),
+                                new BigDecimal("10.000"),
+                                new BigDecimal("70.0000"),
+                                LotCondition.GOOD,
+                                "Market price drop"),
+                        scope))
+                .isInstanceOf(ProblemException.class)
+                .hasMessage(RepriceStockLotHandler.ERROR_TEMPORARILY_UNAVAILABLE);
 
-        // Then lot unit cost is updated to 70.0000
+        // Then nothing changed in inventory, cost, repricing ledger, audit, or outbox
         LotBalance lotAfter = queries.balances(shop, sku, false, scope).get(0);
-        assertThat(lotAfter.unitCost()).isEqualByComparingTo("70.0000");
+        assertThat(lotAfter.unitCost()).isEqualByComparingTo("100.0000");
         assertThat(lotAfter.qtyOnHand()).isEqualByComparingTo("10.000");
-
-        // Entity weighted average cost is revalued to 70.0000
-        BigDecimal avgCost = superuserJdbc()
-                .queryForObject(
-                        "select avg_cost from inventory.entity_sku_cost where owner_entity_id = ? and sku_id = ?",
-                        BigDecimal.class,
-                        MPCS,
-                        sku);
-        assertThat(avgCost).isEqualByComparingTo("70.0000");
-
-        // Repricing ledger record exists
-        List<StockRepricingView> repricings = queries.repricings(shop, sku, scope);
-        assertThat(repricings).hasSize(1);
-        StockRepricingView record = repricings.get(0);
-        assertThat(record.repricingId()).isEqualTo(result.repricingId());
-        assertThat(record.previousUnitCost()).isEqualByComparingTo("100.0000");
-        assertThat(record.newUnitCost()).isEqualByComparingTo("70.0000");
-        assertThat(record.valueAdjustment()).isEqualByComparingTo("-300.00");
-        assertThat(record.reason()).isEqualTo("Market price drop");
-
-        // Audit and domain event verified
-        assertThat(audits(RepriceStockLotHandler.AUDIT_REPRICED)).hasSize(1);
-        assertThat(events(StockRepriced.class)).hasSize(1);
+        assertThat(lotAfter.condition()).isEqualTo("GOOD");
+        assertThat(avgCostOf(MPCS, sku)).isEqualByComparingTo("100.0000");
+        assertThat(count("select count(*) from inventory.stock_movement where location_id = ?", shop))
+                .isEqualTo(movementsBefore);
+        assertThat(count("select count(*) from inventory.stock_lot where location_id = ?", shop))
+                .isEqualTo(lotsBefore);
+        assertThat(count("select count(*) from inventory.stock_repricing where location_id = ?", shop))
+                .isEqualTo(repricingsBefore);
+        assertThat(count("select count(*) from kernel.event_outbox")).isEqualTo(outboxBefore);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test
-    void partialRepriceInPlaceBlendsLotCostAndEntityWeightedAverage() {
-        UUID sku = fixture.sku(MPCS, "SKU_REPRICE_PARTIAL");
-        UUID batch = fixture.batch(sku, MPCS, "BAT_PART", EXPIRY);
-        ScopeContext scope = at(MPCS, shop);
-
-        // Given 10 units at Rs 100
-        postReceipt(shop, batch, new BigDecimal("10.000"), new BigDecimal("100.0000"), MPCS);
-        kernel.reset();
-        LotBalance lot = queries.balances(shop, sku, false, scope).get(0);
-
-        // When partially repricing 4 units in-place to Rs 70: (4*70 + 6*100) / 10 = 88.0000
-        repriceHandler.handle(
-                new RepriceStockLot(
-                        lot.stockLotId(),
-                        new BigDecimal("4.000"),
-                        new BigDecimal("70.0000"),
-                        LotCondition.GOOD,
-                        "Partial stock discount"),
-                scope);
-
-        LotBalance lotAfter = queries.balances(shop, sku, false, scope).get(0);
-        assertThat(lotAfter.unitCost()).isEqualByComparingTo("88.0000");
-        assertThat(lotAfter.qtyOnHand()).isEqualByComparingTo("10.000");
-
-        BigDecimal avgCost = superuserJdbc()
-                .queryForObject(
-                        "select avg_cost from inventory.entity_sku_cost where owner_entity_id = ? and sku_id = ?",
-                        BigDecimal.class,
-                        MPCS,
-                        sku);
-        assertThat(avgCost).isEqualByComparingTo("88.0000");
-    }
-
-    @Test
-    void partialRepriceWithConditionDowngradeCreatesTargetLot() {
+    void blockedConditionDowngradeCreatesNoMovementTargetLotCostChangeAuditOrOutbox() {
         UUID sku = fixture.sku(MPCS, "SKU_REPRICE_DOWNGRADE");
         UUID batch = fixture.batch(sku, MPCS, "BAT_DOWN", EXPIRY);
         ScopeContext scope = at(MPCS, shop);
@@ -174,161 +130,90 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
         // Given 10 units at Rs 100 in GOOD condition
         postReceipt(shop, batch, new BigDecimal("10.000"), new BigDecimal("100.0000"), MPCS);
         kernel.reset();
-        LotBalance lot = queries.balances(shop, sku, false, scope).get(0);
+        LotBalance lotBefore = queries.balances(shop, sku, false, scope).get(0);
+        int movementsBefore = count("select count(*) from inventory.stock_movement where location_id = ?", shop);
+        int outboxBefore = count("select count(*) from kernel.event_outbox");
 
-        // When repricing 3 units with condition change to DAMAGED at Rs 50
-        StockRepricingResult result = repriceHandler.handle(
-                new RepriceStockLot(
-                        lot.stockLotId(),
-                        new BigDecimal("3.000"),
-                        new BigDecimal("50.0000"),
-                        LotCondition.DAMAGED,
-                        "Water damage markdown"),
-                scope);
+        // When attempting partial repricing with condition change to DAMAGED
+        assertThatThrownBy(() -> repriceHandler.handle(
+                        new RepriceStockLot(
+                                lotBefore.stockLotId(),
+                                new BigDecimal("3.000"),
+                                new BigDecimal("50.0000"),
+                                LotCondition.DAMAGED,
+                                "Water damage markdown"),
+                        scope))
+                .isInstanceOf(ProblemException.class)
+                .hasMessage(RepriceStockLotHandler.ERROR_TEMPORARILY_UNAVAILABLE);
 
-        // Source lot reduced to 7 units at Rs 100
+        // Then only the original GOOD lot remains untouched and ledger invariants hold
         List<LotBalance> lotsAfter = queries.balances(shop, sku, false, scope);
-        assertThat(lotsAfter).hasSize(2);
-
-        LotBalance goodLot = lotsAfter.stream()
-                .filter(l -> "GOOD".equals(l.condition()))
-                .findFirst()
-                .orElseThrow();
-        assertThat(goodLot.qtyOnHand()).isEqualByComparingTo("7.000");
-        assertThat(goodLot.unitCost()).isEqualByComparingTo("100.0000");
-
-        LotBalance damagedLot = lotsAfter.stream()
-                .filter(l -> "DAMAGED".equals(l.condition()))
-                .findFirst()
-                .orElseThrow();
-        assertThat(damagedLot.qtyOnHand()).isEqualByComparingTo("3.000");
-        assertThat(damagedLot.unitCost()).isEqualByComparingTo("50.0000");
-        assertThat(damagedLot.stockLotId()).isEqualTo(result.targetLotId());
-
-        // Entity weighted average cost is revalued: (7*100 + 3*50)/10 = 85.0000
-        BigDecimal avgCost = superuserJdbc()
-                .queryForObject(
-                        "select avg_cost from inventory.entity_sku_cost where owner_entity_id = ? and sku_id = ?",
-                        BigDecimal.class,
-                        MPCS,
-                        sku);
-        assertThat(avgCost).isEqualByComparingTo("85.0000");
+        assertThat(lotsAfter).hasSize(1);
+        assertThat(lotsAfter.get(0).condition()).isEqualTo("GOOD");
+        assertThat(lotsAfter.get(0).qtyOnHand()).isEqualByComparingTo("10.000");
+        assertThat(lotsAfter.get(0).unitCost()).isEqualByComparingTo("100.0000");
+        assertThat(avgCostOf(MPCS, sku)).isEqualByComparingTo("100.0000");
+        assertThat(count("select count(*) from inventory.stock_movement where location_id = ?", shop))
+                .isEqualTo(movementsBefore);
+        assertThat(count("select count(*) from inventory.stock_repricing where location_id = ?", shop))
+                .isZero();
+        assertThat(count("select count(*) from kernel.event_outbox")).isEqualTo(outboxBefore);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test
-    void conditionDowngradeBlendsIntoExistingTargetLot() {
-        UUID sku = fixture.sku(MPCS, "SKU_REPRICE_MERGE_TARGET");
-        UUID batch = fixture.batch(sku, MPCS, "BAT_MERGE", EXPIRY);
+    void existingRepricingHistoryRemainsReadableWhileMutationsAreBlocked() {
+        UUID sku = fixture.sku(MPCS, "SKU_REPRICE_HISTORY");
+        UUID batch = fixture.batch(sku, MPCS, "BAT_HIST", EXPIRY);
         ScopeContext scope = at(MPCS, shop);
 
-        // 10 units GOOD at Rs 100
         postReceipt(shop, batch, new BigDecimal("10.000"), new BigDecimal("100.0000"), MPCS);
-        kernel.reset();
-        LotBalance goodLot = queries.balances(shop, sku, false, scope).get(0);
-
-        // First downgrade 2 units to DAMAGED at Rs 60 (creates DAMAGED lot)
-        repriceHandler.handle(
-                new RepriceStockLot(
-                        goodLot.stockLotId(),
-                        new BigDecimal("2.000"),
-                        new BigDecimal("60.0000"),
-                        LotCondition.DAMAGED,
-                        "Initial damage"),
-                scope);
-        kernel.reset();
-
-        // Now downgrade another 3 units from GOOD (currently 8 units) to DAMAGED at Rs 50
-        // Existing target lot: 2 units at Rs 60
-        // Blended target cost: (2*60 + 3*50)/5 = 270/5 = 54.0000
-        StockRepricingResult result = repriceHandler.handle(
-                new RepriceStockLot(
-                        goodLot.stockLotId(),
-                        new BigDecimal("3.000"),
-                        new BigDecimal("50.0000"),
-                        LotCondition.DAMAGED,
-                        "Subsequent damage"),
-                scope);
-
-        List<LotBalance> lotsAfter = queries.balances(shop, sku, false, scope);
-        assertThat(lotsAfter).hasSize(2);
-
-        LotBalance goodAfter = lotsAfter.stream()
-                .filter(l -> "GOOD".equals(l.condition()))
-                .findFirst()
-                .orElseThrow();
-        assertThat(goodAfter.qtyOnHand()).isEqualByComparingTo("5.000");
-        assertThat(goodAfter.unitCost()).isEqualByComparingTo("100.0000");
-
-        LotBalance damagedAfter = lotsAfter.stream()
-                .filter(l -> "DAMAGED".equals(l.condition()))
-                .findFirst()
-                .orElseThrow();
-        assertThat(damagedAfter.qtyOnHand()).isEqualByComparingTo("5.000");
-        assertThat(damagedAfter.unitCost()).isEqualByComparingTo("54.0000");
-        assertThat(damagedAfter.stockLotId()).isEqualTo(result.targetLotId());
-    }
-
-    @Test
-    void guardsPreventInvalidInputs() {
-        UUID sku = fixture.sku(MPCS, "SKU_REPRICE_GUARDS");
-        UUID batch = fixture.batch(sku, MPCS, "BAT_GUARDS", EXPIRY);
-        ScopeContext scope = at(MPCS, shop);
-
-        postReceipt(shop, batch, new BigDecimal("5.000"), new BigDecimal("50.0000"), MPCS);
-        kernel.reset();
         LotBalance lot = queries.balances(shop, sku, false, scope).get(0);
+        UUID historicalRepricingId = Ids.next();
 
-        // 1. Negative cost
+        superuserJdbc()
+                .update(
+                        """
+                        insert into inventory.stock_repricing
+                            (repricing_id, owner_entity_id, location_id, stock_lot_id, sku_id, batch_id,
+                             condition, qty_affected, previous_unit_cost, new_unit_cost, target_condition,
+                             target_lot_id, value_adjustment, reason, repriced_by, repriced_at)
+                        values (?, ?, ?, ?, ?, ?, 'GOOD', 4.000, 100.0000, 80.0000, 'GOOD',
+                                null, -80.00, 'Historical markdown', ?, now())
+                        """,
+                        historicalRepricingId,
+                        MPCS,
+                        shop,
+                        lot.stockLotId(),
+                        sku,
+                        batch,
+                        scope.userId());
+        kernel.reset();
+
+        // Blocked new mutation does not disturb historical records
         assertThatThrownBy(() -> repriceHandler.handle(
                         new RepriceStockLot(
                                 lot.stockLotId(),
                                 new BigDecimal("2.000"),
-                                new BigDecimal("-10.0000"),
+                                new BigDecimal("60.0000"),
                                 LotCondition.GOOD,
-                                "reason"),
+                                "Blocked attempt"),
                         scope))
                 .isInstanceOf(ProblemException.class)
-                .hasMessage("m5.reprice.invalid_cost");
+                .hasMessage(RepriceStockLotHandler.ERROR_TEMPORARILY_UNAVAILABLE);
 
-        // 2. Quantity exceeds available
-        assertThatThrownBy(() -> repriceHandler.handle(
-                        new RepriceStockLot(
-                                lot.stockLotId(),
-                                new BigDecimal("10.000"),
-                                new BigDecimal("40.0000"),
-                                LotCondition.GOOD,
-                                "reason"),
-                        scope))
-                .isInstanceOf(ProblemException.class)
-                .hasMessage("m5.reprice.qty_exceeded");
-
-        // 3. Blank reason
-        assertThatThrownBy(() -> repriceHandler.handle(
-                        new RepriceStockLot(
-                                lot.stockLotId(),
-                                new BigDecimal("2.000"),
-                                new BigDecimal("40.0000"),
-                                LotCondition.GOOD,
-                                "   "),
-                        scope))
-                .isInstanceOf(ProblemException.class)
-                .hasMessage("m5.reprice.reason_required");
-
-        // 4. Non-existent lot
-        assertThatThrownBy(() -> repriceHandler.handle(
-                        new RepriceStockLot(
-                                UUID.randomUUID(),
-                                new BigDecimal("2.000"),
-                                new BigDecimal("40.0000"),
-                                LotCondition.GOOD,
-                                "reason"),
-                        scope))
-                .isInstanceOf(ProblemException.class)
-                .hasMessage("m5.reprice.not_found");
+        List<StockRepricingView> history = queries.repricings(shop, sku, scope);
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).repricingId()).isEqualTo(historicalRepricingId);
+        assertThat(history.get(0).reason()).isEqualTo("Historical markdown");
+        assertThat(queries.repricings(shop, sku, at(OTHER_ENTITY, otherShop))).isEmpty();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test
-    void tenantIsolationUnderRls() {
+    void crossTenantAttemptIsAlsoBlockedWithoutSideEffects() {
         UUID sku = fixture.sku(MPCS, "SKU_REPRICE_TENANT");
         UUID batch = fixture.batch(sku, MPCS, "BAT_TENANT", EXPIRY);
         ScopeContext scope = at(MPCS, shop);
@@ -339,7 +224,6 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
 
         ScopeContext otherScope = at(OTHER_ENTITY, otherShop);
 
-        // Attempt to reprice by another entity is rejected (lot invisible under other entity's RLS scope)
         assertThatThrownBy(() -> repriceHandler.handle(
                         new RepriceStockLot(
                                 lot.stockLotId(),
@@ -349,7 +233,10 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
                                 "cross-tenant attempt"),
                         otherScope))
                 .isInstanceOf(ProblemException.class)
-                .hasMessage("m5.reprice.not_found");
+                .hasMessage(RepriceStockLotHandler.ERROR_TEMPORARILY_UNAVAILABLE);
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test
@@ -430,16 +317,17 @@ class RepriceStockPostgresIntegrationTest extends PostgresIntegrationTest {
         outer.run(scope, () -> ledger.post(new PostMovements(Ids.next(), null, null, List.of(m)), scope));
     }
 
-    private List<KernelRecorder.AuditRecord> audits(String type) {
-        return kernel.committedAudit().stream()
-                .filter(a -> type.equals(a.eventType()))
-                .toList();
+    private int count(String sql, Object... args) {
+        Integer value = superuserJdbc().queryForObject(sql, Integer.class, args);
+        return value != null ? value : 0;
     }
 
-    private <T extends DomainEvent> List<T> events(Class<T> type) {
-        return kernel.committedEvents().stream()
-                .filter(type::isInstance)
-                .map(type::cast)
-                .toList();
+    private BigDecimal avgCostOf(UUID entityId, UUID skuId) {
+        return superuserJdbc()
+                .queryForObject(
+                        "select avg_cost from inventory.entity_sku_cost where owner_entity_id = ? and sku_id = ?",
+                        BigDecimal.class,
+                        entityId,
+                        skuId);
     }
 }

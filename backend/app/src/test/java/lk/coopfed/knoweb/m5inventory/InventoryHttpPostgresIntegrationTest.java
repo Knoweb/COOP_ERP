@@ -617,6 +617,75 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    @Test
+    void stockRepricingPostIsBlockedWith422AndLeavesNoSideEffectsWhileHistoryStaysReadable() {
+        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(USER, MPCS);
+        String stockLotId = get("/v1/inventory/locations/" + warehouse + "/balances", headers)
+                .getBody()
+                .get(0)
+                .get("stockLotId")
+                .asText();
+        int movementsBefore = superuserJdbc()
+                .queryForObject(
+                        "select count(*) from inventory.stock_movement where location_id = ?",
+                        Integer.class,
+                        warehouse);
+        int outboxBefore = superuserJdbc().queryForObject("select count(*) from kernel.event_outbox", Integer.class);
+        kernel.reset();
+
+        ResponseEntity<JsonNode> blocked = post(
+                "/v1/inventory/lots/" + stockLotId + "/reprice",
+                java.util.Map.of(
+                        "qty",
+                        5,
+                        "newUnitCost",
+                        30.0,
+                        "targetCondition",
+                        "DAMAGED",
+                        "reason",
+                        "Blocked Option B check"),
+                USER);
+
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(blocked.getBody().get("code").asText()).isEqualTo("m5.reprice.temporarily_unavailable");
+        assertThat(blocked.getBody().get("title").asText()).contains("temporarily unavailable");
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where location_id = ?",
+                                Integer.class,
+                                warehouse))
+                .isEqualTo(movementsBefore);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_repricing where location_id = ?",
+                                Integer.class,
+                                warehouse))
+                .isZero();
+        assertThat(superuserJdbc().queryForObject("select count(*) from kernel.event_outbox", Integer.class))
+                .isEqualTo(outboxBefore);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select unit_cost from inventory.stock_lot where stock_lot_id = ?::uuid",
+                                BigDecimal.class,
+                                stockLotId))
+                .isEqualByComparingTo("45.5000");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select avg_cost from inventory.entity_sku_cost where owner_entity_id = ? and sku_id = ?",
+                                BigDecimal.class,
+                                MPCS,
+                                sku))
+                .isEqualByComparingTo("45.5000");
+
+        // Read-side repricing history remains available
+        ResponseEntity<JsonNode> history = get("/v1/inventory/repricings?locationId=" + warehouse, headers);
+        assertThat(history.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(history.getBody().isArray()).isTrue();
+    }
+
     private ResponseEntity<JsonNode> get(String url, HttpHeaders headers) {
         return http.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
     }

@@ -210,9 +210,11 @@ export function WriteOffsPage() {
             </span>
             <h2 className="inventory-card-header__title">{t("inventory.writeoff.new").text}</h2>
           </div>
-          <label className="inventory-form-field writeoff-category-field">
+          <label htmlFor="writeoff-category" className="inventory-form-field writeoff-category-field">
             <span className="writeoff-field-label">{t("inventory.writeoff.category").text}</span>
             <CustomSelect<string>
+              id="writeoff-category"
+              portal
               ariaLabel={t("inventory.writeoff.category").text}
               value={category}
               onChange={(val) => setCategory(val as Category)}
