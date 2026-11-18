@@ -132,6 +132,15 @@ export function CountsPage() {
           </svg>
           <span>{t("inventory.counts.link").text}</span>
         </Link>
+        {canRecord && (
+          <Link className="action-link" to="/inventory/stock-take">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+              <line x1="12" y1="18" x2="12.01" y2="18" />
+            </svg>
+            <span>{t("inventory.stock_take.link").text}</span>
+          </Link>
+        )}
         <Link className="action-link" to="/inventory/write-offs">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
