@@ -10,6 +10,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { ApiProblem } from "../../shell/api/client";
 import { LocationPicker } from "./LocationPicker";
 import { CustomSelect } from "./CustomSelect";
+import { errorText } from "./stockView";
 import {
   useInventoryApi,
   type StockTakeScanRequest,
@@ -55,6 +56,7 @@ export function MobileStockTakePage() {
   const [offlineQueue, setOfflineQueue] = useState<StockTakeScanRequest[]>([]);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Reconciliation options
   const [uncountedHandling, setUncountedHandling] = useState<"ZERO" | "SKIP">("ZERO");
@@ -108,29 +110,39 @@ export function MobileStockTakePage() {
     }
   }, [specificSessionQuery.data, locationId]);
 
-  // Load offline queue from localStorage
+  // Load offline queue from localStorage (reset when switching sessions)
   useEffect(() => {
-    if (!currentSessionId) return;
+    if (!currentSessionId) {
+      setOfflineQueue([]);
+      return;
+    }
     try {
       const stored = localStorage.getItem(`stock_take_queue_${currentSessionId}`);
-      if (stored) {
-        setOfflineQueue(JSON.parse(stored));
-      }
+      setOfflineQueue(stored ? (JSON.parse(stored) as StockTakeScanRequest[]) : []);
     } catch {
-      // localStorage may be disabled or mocked
+      setOfflineQueue([]);
     }
   }, [currentSessionId]);
 
-  // Save offline queue to localStorage
-  const updateQueue = (newQueue: StockTakeScanRequest[]) => {
-    setOfflineQueue(newQueue);
-    if (currentSessionId) {
-      try {
-        localStorage.setItem(`stock_take_queue_${currentSessionId}`, JSON.stringify(newQueue));
-      } catch {
-        // localStorage error fallback
+  // Save offline queue to localStorage using functional state updates to avoid stale closures
+  const updateQueue = (
+    updater: StockTakeScanRequest[] | ((prev: StockTakeScanRequest[]) => StockTakeScanRequest[])
+  ) => {
+    setOfflineQueue((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      if (currentSessionId) {
+        try {
+          if (next.length === 0) {
+            localStorage.removeItem(`stock_take_queue_${currentSessionId}`);
+          } else {
+            localStorage.setItem(`stock_take_queue_${currentSessionId}`, JSON.stringify(next));
+          }
+        } catch {
+          // localStorage error fallback
+        }
       }
-    }
+      return next;
+    });
   };
 
   // 2. Scans List Query
@@ -162,6 +174,7 @@ export function MobileStockTakePage() {
       return res;
     },
     onSuccess: (res) => {
+      setErrorMessage(null);
       setFeedbackMessage(null);
       queryClient.invalidateQueries({ queryKey: ["inventory", "stock-take"] });
       if (res.locationId) {
@@ -172,6 +185,8 @@ export function MobileStockTakePage() {
       if (err instanceof ApiProblem) {
         openKey.next();
       }
+      setFeedbackMessage(null);
+      setErrorMessage(errorText(err, t("inventory.error.generic").text));
     }
   });
 
@@ -196,6 +211,7 @@ export function MobileStockTakePage() {
       setQuantityInput("1");
       setNotesInput("");
       setFeedbackMessage(null);
+      setErrorMessage(null);
       if (res.wasDuplicate) {
         setDuplicateNotice(t("inventory.stock_take.duplicate_detected").text);
       } else {
@@ -208,29 +224,35 @@ export function MobileStockTakePage() {
     onError: (err, variables) => {
       // If network failure or offline, queue locally
       if (err instanceof TypeError || !isOnline || !(err instanceof ApiProblem)) {
-        updateQueue([...offlineQueue, variables]);
+        updateQueue((prev) => [...prev, variables]);
         setBarcodeInput("");
         setQuantityInput("1");
         setNotesInput("");
+        setErrorMessage(null);
         setFeedbackMessage(t("inventory.stock_take.scan_added_offline").text);
       } else {
         scanKey.next();
+        setFeedbackMessage(null);
+        setErrorMessage(errorText(err, t("inventory.error.generic").text));
       }
     }
   });
 
   // Mutation: Sync offline batch
   const syncBatchMutation = useMutation({
-    mutationFn: async () => {
-      if (offlineQueue.length === 0) return null;
+    networkMode: "always",
+    mutationFn: async (scansToSync: StockTakeScanRequest[]) => {
+      if (scansToSync.length === 0) return null;
       const key = syncKey.current();
-      const res = await api.batchStockTakeScan(currentSessionId, { scans: offlineQueue }, key);
+      const res = await api.batchStockTakeScan(currentSessionId, { scans: scansToSync }, key);
       syncKey.next();
       return res;
     },
-    onSuccess: (res) => {
+    onSuccess: (res, scansToSync) => {
       if (res) {
-        updateQueue([]);
+        const syncedIds = new Set(scansToSync.map((s) => s.scanId));
+        updateQueue((prev) => prev.filter((s) => !syncedIds.has(s.scanId)));
+        setErrorMessage(null);
         setFeedbackMessage(
           t("inventory.stock_take.sync_success", undefined, { count: res.processedCount }).text
         );
@@ -248,6 +270,8 @@ export function MobileStockTakePage() {
       if (err instanceof ApiProblem) {
         syncKey.next();
       }
+      setFeedbackMessage(null);
+      setErrorMessage(errorText(err, t("inventory.error.generic").text));
     }
   });
 
@@ -267,6 +291,7 @@ export function MobileStockTakePage() {
       return res;
     },
     onSuccess: () => {
+      setErrorMessage(null);
       setFeedbackMessage(t("inventory.stock_take.reconciled_success").text);
       queryClient.invalidateQueries({ queryKey: ["inventory", "stock-take"] });
     },
@@ -274,6 +299,8 @@ export function MobileStockTakePage() {
       if (err instanceof ApiProblem) {
         reconcileKey.next();
       }
+      setFeedbackMessage(null);
+      setErrorMessage(errorText(err, t("inventory.error.generic").text));
     }
   });
 
@@ -294,12 +321,14 @@ export function MobileStockTakePage() {
     };
 
     if (!isOnline) {
-      updateQueue([...offlineQueue, scanRequest]);
+      updateQueue((prev) => [...prev, scanRequest]);
       setBarcodeInput("");
       setQuantityInput("1");
       setNotesInput("");
+      setErrorMessage(null);
       setFeedbackMessage(t("inventory.stock_take.scan_added_offline").text);
     } else {
+      setErrorMessage(null);
       recordScanMutation.mutate(scanRequest);
     }
   };
@@ -334,22 +363,6 @@ export function MobileStockTakePage() {
         }
       />
 
-      {/* Control Navigation Links */}
-      <div className="inventory-control-links">
-        <Link className="action-link action-link--primary" to="/inventory/stock-take">
-          <span>{t("inventory.stock_take.link").text}</span>
-        </Link>
-        <Link className="action-link" to="/inventory/counts">
-          <span>{t("inventory.counts.link").text}</span>
-        </Link>
-        <Link className="action-link" to="/inventory/write-offs">
-          <span>{t("inventory.writeoffs.link").text}</span>
-        </Link>
-        <Link className="action-link" to="/inventory/repacks">
-          <span>{t("inventory.repacks.link").text}</span>
-        </Link>
-      </div>
-
       {/* Location Selector */}
       <section className="modern-filter-panel modern-filter-panel--stock">
         <div className="modern-location-picker">
@@ -370,8 +383,8 @@ export function MobileStockTakePage() {
           <button
             type="button"
             className="action-button action-button--primary"
-            onClick={() => syncBatchMutation.mutate()}
-            disabled={syncBatchMutation.isPending || !currentSessionId}
+            onClick={() => syncBatchMutation.mutate(offlineQueue)}
+            disabled={syncBatchMutation.isPending || !currentSessionId || !isOnline}
           >
             {syncBatchMutation.isPending
               ? t("inventory.stock_take.syncing").text
@@ -381,6 +394,12 @@ export function MobileStockTakePage() {
       )}
 
       {/* Feedback & Notice Messages */}
+      {errorMessage && (
+        <div className="mobile-stock-take-alert mobile-stock-take-alert--warning" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
       {feedbackMessage && (
         <div className="mobile-stock-take-alert mobile-stock-take-alert--info" role="status">
           {feedbackMessage}
