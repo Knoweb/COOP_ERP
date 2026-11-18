@@ -1119,12 +1119,15 @@
 .shell-page .stock-positions-table th.col-item {
   text-align: left !important;
   white-space: normal !important;
+  padding-inline: calc(var(--space-1) + var(--space-half)) !important;
 }
 .shell-page .stock-positions-table td.col-item {
   text-align: left !important;
   white-space: normal !important;
   word-break: normal !important;
   overflow-wrap: break-word !important;
+  padding-inline: calc(var(--space-1) + var(--space-half)) !important;
+  line-height: var(--line-height) !important;
 }
 
 /* 3. Col Dept */
@@ -1319,20 +1322,40 @@
   box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6) !important;
 }
 
+.shell-page .stock-positions-table td.col-item .entity-link,
+.stock-positions-table td.col-item .entity-link,
 .stock-positions-table .entity-link {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-half);
-  text-decoration: none;
-  color: var(--color-text);
-  transition: color 0.15s ease;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: var(--border-width-strong) !important;
+  text-align: left !important;
+  text-decoration: none !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: 1.3 !important;
+  word-break: normal !important;
   min-width: 0;
   max-width: 100%;
+  transition: color 0.15s ease;
 }
 
+.shell-page .stock-positions-table td.col-item .entity-link:hover,
+.stock-positions-table td.col-item .entity-link:hover,
 .stock-positions-table .entity-link:hover {
-  color: var(--color-accent);
+  color: var(--color-accent) !important;
+  text-decoration: underline !important;
+  text-underline-offset: var(--space-half) !important;
+}
+
+.shell-page .stock-positions-table td.col-item .entity-link:hover .stock-sku-code,
+.shell-page .stock-positions-table td.col-item .entity-link:hover .stock-sku-name,
+.stock-positions-table .entity-link:hover .stock-sku-code,
+.stock-positions-table .entity-link:hover .stock-sku-name {
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
 }
 
 .stock-positions-table .entity-link__icon {
@@ -1352,17 +1375,24 @@
   stroke-linejoin: round;
 }
 
+.shell-page .stock-positions-table .stock-sku-code,
 .stock-positions-table .stock-sku-code {
-  font-weight: var(--font-weight-strong);
-  color: var(--color-polish-25);
+  display: block !important;
+  font-size: calc(var(--font-size-xs) + var(--border-width)) !important;
+  font-weight: var(--font-weight-strong) !important;
+  line-height: 1.25 !important;
+  color: var(--color-polish-25) !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
-  flex-shrink: 0;
 }
 
+.shell-page .stock-positions-table .stock-sku-name,
 .stock-positions-table .stock-sku-name {
-  color: var(--color-text);
-  font-weight: var(--font-weight-normal);
+  display: block !important;
+  font-size: var(--font-size-sm) !important;
+  line-height: 1.35 !important;
+  color: var(--color-text) !important;
+  font-weight: var(--font-weight-normal) !important;
   white-space: normal !important;
   word-break: normal !important;
   overflow-wrap: break-word !important;
@@ -1681,9 +1711,11 @@
 
 .expiry-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 2.5), 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 3), 1fr));
+  align-items: stretch;
+  gap: var(--space-2);
   margin-block: var(--space-3) var(--space-4);
+  width: 100%;
 }
 
 .expiry-kpi-card {
@@ -1691,17 +1723,18 @@
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-polish-21);
   border-radius: calc(var(--radius) * 2.5);
-  padding: calc(var(--space-2) + var(--space-half)) var(--space-3);
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  min-height: calc(var(--space-8) * 1.2);
+  gap: var(--space-1);
+  min-height: calc(var(--space-6) + var(--space-4));
+  height: auto;
+  overflow: visible;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.2s ease;
-  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -1714,7 +1747,8 @@
 .expiry-kpi-card__content {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space-half) / 2);
+  justify-content: center;
+  gap: var(--border-width-strong);
   min-width: 0;
   flex: 1;
 }
@@ -1723,22 +1757,37 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: var(--line-height);
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  overflow: visible;
 }
 
 .expiry-kpi-count {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1.2;
+}
+
+.expiry-kpi-subtitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-muted);
+  line-height: var(--line-height);
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  overflow: visible;
 }
 
 .expiry-kpi-card__icon-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--space-4) + var(--space-1));
-  height: calc(var(--space-4) + var(--space-1));
+  width: calc(var(--space-4) + var(--space-half));
+  height: calc(var(--space-4) + var(--space-half));
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14),
@@ -1769,7 +1818,7 @@
 
 .expiry-kpi-card--warning {
   background: var(--color-disputed-bg);
-  border-color: var(--color-polish-21);
+  border-color: var(--color-polish-28);
 }
 .expiry-kpi-card--warning .expiry-kpi-title,
 .expiry-kpi-card--warning .expiry-kpi-count,
@@ -2732,38 +2781,58 @@
   background-color: var(--color-surface-subtle);
 }
 
+.shell-page .stock-positions-table td.stock-nested-cell,
+.stock-positions-table td.stock-nested-cell,
 .stock-nested-cell {
-  padding: var(--space-2) var(--space-3) var(--space-3) var(--space-3) !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: var(--space-1) var(--space-2) var(--space-2) var(--space-2) !important;
   background-color: var(--color-polish-31) !important;
+  font-weight: var(--font-weight-normal) !important;
+  text-align: left !important;
+  border-right: none !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-wrap,
 .stock-nested-wrap {
+  display: block !important;
+  width: 100% !important;
+  max-width: calc(var(--space-8) * 13.25) !important;
+  margin: 0 !important;
   background: var(--color-surface) !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   padding: 0 !important;
   overflow-x: auto !important;
-  max-width: 100% !important;
   -webkit-overflow-scrolling: touch !important;
   box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-13) !important;
 }
 
+.shell-page .stock-positions-table table.modern-table.stock-nested-table,
 .shell-page table.modern-table.stock-nested-table,
 .stock-nested-table {
   width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
-  table-layout: fixed !important;
+  table-layout: auto !important;
   margin: 0 !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table thead tr,
 .shell-page .stock-nested-table thead tr,
 .stock-nested-table thead tr {
   background: var(--color-polish-22) !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th,
 .shell-page .stock-nested-table th,
 .stock-nested-table th {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
   border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
@@ -2773,26 +2842,34 @@
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
-  padding: var(--space-2) var(--space-3) !important;
+  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-2) !important;
   white-space: nowrap !important;
-  line-height: var(--line-height) !important;
+  line-height: 1.3 !important;
   vertical-align: middle !important;
   text-align: center !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table td,
 .shell-page .stock-nested-table td,
 .stock-nested-table td {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
   border-bottom: var(--border-width) solid var(--color-polish-21) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   border-left: none !important;
   font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
   color: var(--color-text) !important;
-  padding: var(--space-2) var(--space-3) !important;
+  padding: calc(var(--space-1) + var(--border-width-strong)) var(--space-2) !important;
+  line-height: var(--line-height) !important;
   vertical-align: middle !important;
   text-align: center !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th:last-child,
+.shell-page .stock-positions-table .stock-nested-table td:last-child,
 .shell-page .stock-nested-table th:last-child,
 .shell-page .stock-nested-table td:last-child,
 .stock-nested-table th:last-child,
@@ -2800,42 +2877,51 @@
   border-right: none !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table tbody tr:last-child td,
 .shell-page .stock-nested-table tbody tr:last-child td,
 .stock-nested-table tbody tr:last-child td {
   border-bottom: none !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table tbody tr td,
 .shell-page .stock-nested-table tbody tr td,
 .stock-nested-table tbody tr td {
   background-color: var(--color-surface) !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table tbody tr:hover td,
 .shell-page .stock-nested-table tbody tr:hover td,
 .stock-nested-table tbody tr:hover td {
   background-color: var(--color-polish-31) !important;
 }
 
 /* Specific columns in nested lot table */
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-batch,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-batch,
 .shell-page .stock-nested-table th.nested-col-batch,
 .shell-page .stock-nested-table td.nested-col-batch,
 .stock-nested-table th.nested-col-batch,
 .stock-nested-table td.nested-col-batch,
 .stock-nested-table col.nested-col-batch,
+.shell-page .stock-positions-table .stock-nested-table th:first-child,
+.shell-page .stock-positions-table .stock-nested-table td:first-child,
 .shell-page .stock-nested-table th:first-child,
 .shell-page .stock-nested-table td:first-child,
 .stock-nested-table th:first-child,
 .stock-nested-table td:first-child {
-  width: 28% !important;
-  min-width: calc(var(--space-8) * 2.2) !important;
+  width: 24% !important;
+  min-width: calc(var(--space-8) * 2) !important;
+  max-width: none !important;
+  padding-inline: var(--space-2) !important;
   text-align: left !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
   font-weight: var(--font-weight-strong) !important;
   color: var(--color-brand-dark) !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-expiry,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-expiry,
 .shell-page .stock-nested-table th.nested-col-expiry,
 .shell-page .stock-nested-table td.nested-col-expiry,
 .stock-nested-table th.nested-col-expiry,
@@ -2846,11 +2932,14 @@
 .stock-nested-table th:nth-child(2),
 .stock-nested-table td:nth-child(2) {
   width: 15% !important;
-  min-width: calc(var(--space-8) * 1.4) !important;
+  min-width: calc(var(--space-8) * 1.5) !important;
   text-align: center !important;
   white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-condition,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-condition,
 .shell-page .stock-nested-table th.nested-col-condition,
 .shell-page .stock-nested-table td.nested-col-condition,
 .stock-nested-table th.nested-col-condition,
@@ -2861,11 +2950,13 @@
 .stock-nested-table th:nth-child(3),
 .stock-nested-table td:nth-child(3) {
   width: 15% !important;
-  min-width: calc(var(--space-8) * 1.4) !important;
+  min-width: calc(var(--space-8) * 1.5) !important;
   text-align: center !important;
   white-space: nowrap !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-fefo,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-fefo,
 .shell-page .stock-nested-table th.nested-col-fefo,
 .shell-page .stock-nested-table td.nested-col-fefo,
 .stock-nested-table th.nested-col-fefo,
@@ -2876,11 +2967,14 @@
 .stock-nested-table th:nth-child(4),
 .stock-nested-table td:nth-child(4) {
   width: 14% !important;
-  min-width: var(--space-8) !important;
+  min-width: calc(var(--space-8) * 1.4) !important;
   text-align: center !important;
   white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-on-hand,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-on-hand,
 .shell-page .stock-nested-table th.nested-col-on-hand,
 .shell-page .stock-nested-table td.nested-col-on-hand,
 .stock-nested-table th.nested-col-on-hand,
@@ -2891,24 +2985,28 @@
 .stock-nested-table th.numeric-cell,
 .stock-nested-table td.numeric-cell {
   width: 14% !important;
-  min-width: var(--space-8) !important;
-  text-align: right !important;
-  white-space: nowrap !important;
-  font-variant-numeric: tabular-nums !important;
-}
-
-.shell-page .stock-nested-table th.nested-col-unit-cost,
-.shell-page .stock-nested-table td.nested-col-unit-cost,
-.stock-nested-table th.nested-col-unit-cost,
-.stock-nested-table td.nested-col-unit-cost,
-.stock-nested-table col.nested-col-unit-cost {
-  width: 14% !important;
   min-width: calc(var(--space-8) * 1.4) !important;
   text-align: right !important;
   white-space: nowrap !important;
   font-variant-numeric: tabular-nums !important;
 }
 
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-unit-cost,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-unit-cost,
+.shell-page .stock-nested-table th.nested-col-unit-cost,
+.shell-page .stock-nested-table td.nested-col-unit-cost,
+.stock-nested-table th.nested-col-unit-cost,
+.stock-nested-table td.nested-col-unit-cost,
+.stock-nested-table col.nested-col-unit-cost {
+  width: 18% !important;
+  min-width: calc(var(--space-8) * 1.6) !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.shell-page .stock-positions-table .stock-nested-table th.nested-col-actions,
+.shell-page .stock-positions-table .stock-nested-table td.nested-col-actions,
 .shell-page .stock-nested-table th.nested-col-actions,
 .shell-page .stock-nested-table td.nested-col-actions,
 .stock-nested-table th.nested-col-actions,
@@ -2918,9 +3016,26 @@
 .shell-page .stock-nested-table td.col-actions,
 .stock-nested-table th.col-actions,
 .stock-nested-table td.col-actions {
-  width: 1% !important;
+  width: 12% !important;
+  min-width: calc(var(--space-8) * 1.3) !important;
   white-space: nowrap !important;
-  text-align: right !important;
+  text-align: center !important;
+}
+
+.shell-page .stock-nested-table .condition-chip,
+.stock-nested-table .condition-chip {
+  min-height: var(--space-3) !important;
+  padding: var(--border-width-strong) var(--space-1) !important;
+  font-size: var(--font-size-xs) !important;
+  line-height: 1.2 !important;
+}
+
+.shell-page .stock-nested-table .table-action-btn,
+.stock-nested-table .table-action-btn {
+  min-height: var(--space-3) !important;
+  padding: var(--border-width-strong) var(--space-1) !important;
+  font-size: var(--font-size-xs) !important;
+  line-height: 1.2 !important;
 }
 
 .stock-nested-empty {
@@ -2928,7 +3043,7 @@
   font-size: var(--font-size-sm);
   margin: 0;
   text-align: center;
-  padding: var(--space-3);
+  padding: var(--space-2);
 }
 
 /* Modal styles */
@@ -2988,8 +3103,8 @@
   font-size: var(--font-size-xs) !important;
 }
 
-.shell-page .stock-sku-name,
-.stock-sku-name {
+.shell-page .stock-modal-sku-subtitle .stock-sku-name,
+.stock-modal-sku-subtitle .stock-sku-name {
   font-weight: var(--font-weight-strong) !important;
   color: var(--color-text) !important;
   font-size: var(--font-size-md) !important;

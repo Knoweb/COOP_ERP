@@ -490,213 +490,230 @@ function AuthorRuleForm({ onCreated, locations }: { onCreated: () => void; locat
   };
 
   return (
-    <section className="modern-card pricing-section">
-      <h2>{t("pricing.rules.author_title").text}</h2>
-
-      {error && (
-        <p className="pricing-alert-text" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="pricing-filter-bar">
-        <label className="pricing-form-field">
-          <span>{t("pricing.rules.field.name").text}</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            maxLength={120}
-            placeholder={t("pricing.rules.field.name_placeholder").text}
-          />
-        </label>
-
-        <label className="pricing-form-field">
-          <span>{t("pricing.rules.field.kind").text}</span>
-          <PricingSelect
-            aria-label={t("pricing.rules.field.kind").text}
-            value={kind}
-            onChange={(nextKind) => handleKindChange(nextKind as RuleKind)}
-            options={[
-              { value: "TIME_LIMITED_PRICE", label: t("pricing.rules.kind.TIME_LIMITED_PRICE").text },
-              { value: "QUANTITY_BREAK", label: t("pricing.rules.kind.QUANTITY_BREAK").text },
-              { value: "BILL_THRESHOLD", label: t("pricing.rules.kind.BILL_THRESHOLD").text },
-              { value: "EXPIRY_MARKDOWN", label: t("pricing.rules.kind.EXPIRY_MARKDOWN").text }
-            ]}
-          />
-        </label>
-
-        <label className="pricing-form-field">
-          <span>{t("pricing.rules.field.customer_class").text}</span>
-          <PricingSelect
-            aria-label={t("pricing.rules.field.customer_class").text}
-            value={customerClass}
-            onChange={(next) => setCustomerClass(next)}
-            options={[
-              { value: "GENERAL", label: t("pricing.rules.customer_class.GENERAL").text },
-              { value: "MEMBER", label: t("pricing.rules.customer_class.MEMBER").text },
-              { value: "EMPLOYEE", label: t("pricing.rules.customer_class.EMPLOYEE").text }
-            ]}
-          />
-        </label>
-
-        <label className="pricing-form-field">
-          <span>{t("pricing.rules.field.location").text}</span>
-          <PricingSelect
-            aria-label={t("pricing.rules.field.location").text}
-            value={locationId}
-            onChange={(next) => setLocationId(next)}
-            options={[
-              { value: "", label: t("pricing.rules.location.all").text },
-              ...(locations ?? [])
-                .filter((l) => l.locationType === "SHOP")
-                .map((loc) => ({
-                  value: loc.locationId,
-                  label: `${loc.locationCode} — ${inLocale(locale, loc.nameEn, loc.nameSi, loc.nameTa)}`
-                }))
-            ]}
-          />
-        </label>
-      </div>
-
-      {kind !== "BILL_THRESHOLD" && (
-        <div className="pricing-form-field">
-          <span>{t("pricing.column.item").text}</span>
-          {sku ? (
-            <p className="pricing-header-row">
-              <SkuName skuId={sku.skuId} />
-              <button type="button" onClick={() => setSku(null)}>
-                {t("pricing.gazette.change_item").text}
-              </button>
-            </p>
-          ) : (
-            <SkuPicker onPick={setSku} />
-          )}
+    <section className="pricing-section">
+      <div className="pricing-rule-author-card">
+        <div className="pricing-rule-author-header">
+          <h2 className="pricing-rule-author-title">{t("pricing.rules.author_title").text}</h2>
         </div>
-      )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="pricing-filter-bar">
-          {kind === "TIME_LIMITED_PRICE" && (
+        <div className="pricing-rule-author-body">
+          <div className="pricing-rule-author-grid pricing-rule-author-grid--two">
             <label className="pricing-form-field">
-              <span>{t("pricing.rules.field.uom").text}</span>
+              <span className="pricing-filter-label">{t("pricing.rules.field.name").text}</span>
               <input
                 type="text"
-                value={uomCode}
-                onChange={(e) => setUomCode(e.target.value)}
-                placeholder={sku?.baseUomCode ?? "e.g. EACH"}
-                maxLength={10}
-              />
-            </label>
-          )}
-
-          {kind === "QUANTITY_BREAK" && (
-            <label className="pricing-form-field">
-              <span>{t("pricing.rules.field.min_qty").text}</span>
-              <input
-                type="number"
-                step="0.001"
-                min="0.001"
-                value={minQty}
-                onChange={(e) => setMinQty(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
+                maxLength={120}
+                placeholder={t("pricing.rules.field.name_placeholder").text}
               />
             </label>
-          )}
 
-          {kind === "BILL_THRESHOLD" && (
             <label className="pricing-form-field">
-              <span>{t("pricing.rules.field.bill_total_from").text}</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={billTotalFrom}
-                onChange={(e) => setBillTotalFrom(e.target.value)}
-                required
+              <span className="pricing-filter-label">{t("pricing.rules.field.kind").text}</span>
+              <PricingSelect
+                aria-label={t("pricing.rules.field.kind").text}
+                value={kind}
+                onChange={(nextKind) => handleKindChange(nextKind as RuleKind)}
+                options={[
+                  { value: "TIME_LIMITED_PRICE", label: t("pricing.rules.kind.TIME_LIMITED_PRICE").text },
+                  { value: "QUANTITY_BREAK", label: t("pricing.rules.kind.QUANTITY_BREAK").text },
+                  { value: "BILL_THRESHOLD", label: t("pricing.rules.kind.BILL_THRESHOLD").text },
+                  { value: "EXPIRY_MARKDOWN", label: t("pricing.rules.kind.EXPIRY_MARKDOWN").text }
+                ]}
               />
             </label>
-          )}
 
-          {kind === "EXPIRY_MARKDOWN" && (
             <label className="pricing-form-field">
-              <span>{t("pricing.rules.field.days_to_expiry").text}</span>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                max="3650"
-                value={daysToExpiry}
-                onChange={(e) => setDaysToExpiry(e.target.value)}
-                required
+              <span className="pricing-filter-label">{t("pricing.rules.field.customer_class").text}</span>
+              <PricingSelect
+                aria-label={t("pricing.rules.field.customer_class").text}
+                value={customerClass}
+                onChange={(next) => setCustomerClass(next)}
+                options={[
+                  { value: "GENERAL", label: t("pricing.rules.customer_class.GENERAL").text },
+                  { value: "MEMBER", label: t("pricing.rules.customer_class.MEMBER").text },
+                  { value: "EMPLOYEE", label: t("pricing.rules.customer_class.EMPLOYEE").text }
+                ]}
               />
             </label>
+
+            <label className="pricing-form-field">
+              <span className="pricing-filter-label">{t("pricing.rules.field.location").text}</span>
+              <PricingSelect
+                aria-label={t("pricing.rules.field.location").text}
+                value={locationId}
+                onChange={(next) => setLocationId(next)}
+                options={[
+                  { value: "", label: t("pricing.rules.location.all").text },
+                  ...(locations ?? [])
+                    .filter((l) => l.locationType === "SHOP")
+                    .map((loc) => ({
+                      value: loc.locationId,
+                      label: `${loc.locationCode} — ${inLocale(locale, loc.nameEn, loc.nameSi, loc.nameTa)}`
+                    }))
+                ]}
+              />
+            </label>
+          </div>
+
+          {kind !== "BILL_THRESHOLD" && (
+            <div className="pricing-rule-author-section">
+              {sku ? (
+                <div className="pricing-form-field">
+                  <span className="pricing-filter-label">{t("pricing.column.item").text}</span>
+                  <div className="pricing-gazette-selected-sku">
+                    <span className="pricing-gazette-selected-sku__name">
+                      <SkuName skuId={sku.skuId} />
+                    </span>
+                    <button type="button" className="modern-btn modern-btn--secondary" onClick={() => setSku(null)}>
+                      {t("pricing.gazette.change_item").text}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <SkuPicker onPick={setSku} />
+              )}
+            </div>
           )}
-
-          <label className="pricing-form-field">
-            <span>{t("pricing.rules.field.benefit_kind").text}</span>
-            <PricingSelect
-              aria-label={t("pricing.rules.field.benefit_kind").text}
-              value={benefitKind}
-              onChange={(nextBk) => setBenefitKind(nextBk as BenefitKind)}
-              options={ALLOWED_BENEFITS[kind].map((bk) => ({
-                value: bk,
-                label: t(`pricing.rules.benefit_kind.${bk}`).text
-              }))}
-            />
-          </label>
-
-          <label className="pricing-form-field">
-            <span>{t("pricing.rules.field.benefit_value").text}</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={benefitKind === "PERCENT_OFF" ? "99.99" : undefined}
-              value={benefitValue}
-              onChange={(e) => setBenefitValue(e.target.value)}
-              required
-            />
-          </label>
-
-          <label className="pricing-form-field">
-            <span>{t("pricing.rules.field.priority").text}</span>
-            <input
-              type="number"
-              min="0"
-              max="32767"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-            />
-          </label>
         </div>
 
-        <div className="pricing-filter-bar">
-          <div className="pricing-form-field">
-            <DatePicker
-              label={t("pricing.rules.field.valid_from").text}
-              value={validFrom}
-              onChange={setValidFrom}
-              required
-            />
+        <form onSubmit={handleSubmit} className="pricing-rule-author-form">
+          <div className="pricing-rule-author-body pricing-rule-author-body--compact">
+            <div className="pricing-rule-author-grid pricing-rule-author-grid--four">
+              {kind === "TIME_LIMITED_PRICE" && (
+                <label className="pricing-form-field">
+                  <span className="pricing-filter-label">{t("pricing.rules.field.uom").text}</span>
+                  <input
+                    type="text"
+                    value={uomCode}
+                    onChange={(e) => setUomCode(e.target.value)}
+                    placeholder={sku?.baseUomCode ?? "e.g. EACH"}
+                    maxLength={10}
+                  />
+                </label>
+              )}
+
+              {kind === "QUANTITY_BREAK" && (
+                <label className="pricing-form-field">
+                  <span className="pricing-filter-label">{t("pricing.rules.field.min_qty").text}</span>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    value={minQty}
+                    onChange={(e) => setMinQty(e.target.value)}
+                    required
+                  />
+                </label>
+              )}
+
+              {kind === "BILL_THRESHOLD" && (
+                <label className="pricing-form-field">
+                  <span className="pricing-filter-label">{t("pricing.rules.field.bill_total_from").text}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={billTotalFrom}
+                    onChange={(e) => setBillTotalFrom(e.target.value)}
+                    required
+                  />
+                </label>
+              )}
+
+              {kind === "EXPIRY_MARKDOWN" && (
+                <label className="pricing-form-field">
+                  <span className="pricing-filter-label">{t("pricing.rules.field.days_to_expiry").text}</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="3650"
+                    value={daysToExpiry}
+                    onChange={(e) => setDaysToExpiry(e.target.value)}
+                    required
+                  />
+                </label>
+              )}
+
+              <label className="pricing-form-field">
+                <span className="pricing-filter-label">{t("pricing.rules.field.benefit_kind").text}</span>
+                <PricingSelect
+                  aria-label={t("pricing.rules.field.benefit_kind").text}
+                  value={benefitKind}
+                  onChange={(nextBk) => setBenefitKind(nextBk as BenefitKind)}
+                  options={ALLOWED_BENEFITS[kind].map((bk) => ({
+                    value: bk,
+                    label: t(`pricing.rules.benefit_kind.${bk}`).text
+                  }))}
+                />
+              </label>
+
+              <label className="pricing-form-field">
+                <span className="pricing-filter-label">{t("pricing.rules.field.benefit_value").text}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={benefitKind === "PERCENT_OFF" ? "99.99" : undefined}
+                  value={benefitValue}
+                  onChange={(e) => setBenefitValue(e.target.value)}
+                  required
+                />
+              </label>
+
+              <label className="pricing-form-field">
+                <span className="pricing-filter-label">{t("pricing.rules.field.priority").text}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="32767"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                />
+              </label>
+            </div>
           </div>
 
-          <div className="pricing-form-field">
-            <DatePicker
-              label={t("pricing.rules.field.valid_to").text}
-              value={validTo}
-              onChange={setValidTo}
-            />
-          </div>
+          <div className="pricing-rule-author-footer">
+            <div className="pricing-rule-author-dates">
+              <div className="pricing-form-field pricing-rule-author-date">
+                <DatePicker
+                  label={t("pricing.rules.field.valid_from").text}
+                  value={validFrom}
+                  onChange={setValidFrom}
+                  required
+                />
+              </div>
 
-          <div className="pricing-form-field" style={{ alignSelf: "flex-end" }}>
-            <button type="submit" className="btn btn--primary" disabled={createMutation.isPending}>
-              {t("pricing.rules.action.save_draft").text}
-            </button>
+              <div className="pricing-form-field pricing-rule-author-date">
+                <DatePicker
+                  label={t("pricing.rules.field.valid_to").text}
+                  value={validTo}
+                  onChange={setValidTo}
+                />
+              </div>
+            </div>
+
+            <div className="pricing-rule-author-actions">
+              {error && (
+                <span className="pricing-alert-box pricing-alert-box--error" role="alert">
+                  {error}
+                </span>
+              )}
+              <button
+                type="submit"
+                className="modern-btn modern-btn--primary pricing-rule-author-submit"
+                disabled={createMutation.isPending}
+              >
+                {t("pricing.rules.action.save_draft").text}
+              </button>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </section>
   );
 }

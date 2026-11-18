@@ -49,7 +49,12 @@ const api = {
       status: "DRAFT",
       createdAt: "2026-10-01T00:00:00Z"
     };
-  })
+  }),
+  withdrawDraft: vi.fn(async (listId: string): Promise<PriceList> => ({
+    ...COMMERCIAL_LIST,
+    priceListId: listId,
+    status: "WITHDRAWN"
+  }))
 };
 
 vi.mock("./pricingApi", () => ({ usePricingApi: () => api }));
@@ -120,5 +125,38 @@ describe("ShelfPricesPage - Commercial Price Authoring", () => {
 
     expect(await screen.findByText("Commercial Bulk Prices")).toBeTruthy();
     expect(screen.getByText(text("pricing.kind.commercial"))).toBeTruthy();
+  });
+
+  it("allows withdrawing a DRAFT list via the row remove button while keeping PUBLISHED lists immutable", async () => {
+    let commercialLists: PriceList[] = [COMMERCIAL_LIST];
+    api.listPriceLists.mockImplementation(async (kind?: PriceList["kind"]) => {
+      if (kind === "RETAIL") return [RETAIL_LIST];
+      if (kind === "COMMERCIAL") return commercialLists;
+      return [];
+    });
+    api.withdrawDraft.mockImplementationOnce(async (listId: string) => {
+      commercialLists = [{ ...COMMERCIAL_LIST, priceListId: listId, status: "WITHDRAWN" }];
+      return commercialLists[0];
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Commercial Bulk Prices")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: `${text("pricing.remove")} ${RETAIL_LIST.name}` })).toBeNull();
+
+    const removeBtn = screen.getByRole("button", { name: `${text("pricing.remove")} ${COMMERCIAL_LIST.name}` });
+    fireEvent.click(removeBtn);
+
+    await waitFor(() => {
+      expect(api.withdrawDraft).toHaveBeenCalledWith(
+        COMMERCIAL_LIST.priceListId,
+        { reason: text("pricing.draft.remove_reason") },
+        expect.any(String)
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Commercial Bulk Prices")).toBeNull();
+    });
   });
 });

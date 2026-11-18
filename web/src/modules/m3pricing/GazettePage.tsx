@@ -269,38 +269,56 @@ function EnterForm({ onEntered }: { onEntered: () => void }) {
 
   return (
     <section className="pricing-section" aria-labelledby="pricing-gazette-enter">
-      <h2 id="pricing-gazette-enter">{t("pricing.gazette.enter").text}</h2>
-      {sku ? (
-        <p className="pricing-header-row">
-          <SkuName skuId={sku.skuId} />
-          <button type="button" onClick={() => setSku(null)}>
-            {t("pricing.gazette.change_item").text}
-          </button>
-        </p>
-      ) : (
-        <SkuPicker onPick={setSku} />
-      )}
-      <form onSubmit={submit} className="pricing-form-grid">
-        <label className="pricing-form-field">
-          {t("pricing.column.ceiling_price").text}
-          <input type="number" min="0.01" step="0.01" required value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
-        </label>
-        <div className="pricing-form-field">
-          <DatePicker label={t("pricing.column.from").text} required value={from} onChange={setFrom} />
-        </div>
-        <div className="pricing-form-field">
-          <DatePicker label={t("pricing.gazette.field.to").text} value={to} onChange={setTo} />
-        </div>
-        <label className="pricing-form-field">
-          {t("pricing.column.gazette").text}
-          <input type="text" required maxLength={80} value={gazette} onChange={(e) => setGazette(e.target.value)} />
-        </label>
-        <button type="submit" disabled={enter.isPending || !sku || !ceiling || !from || !gazette.trim()}>
-          {t("pricing.gazette.submit").text}
-        </button>
-      </form>
-      {enter.isSuccess && <p role="status">{t("pricing.gazette.entered").text}</p>}
-      {enter.isError && <p role="alert">{errorText(enter.error, t("pricing.error.generic").text)}</p>}
+      <h2 id="pricing-gazette-enter" className="pricing-gazette-heading">{t("pricing.gazette.enter").text}</h2>
+      <div className="pricing-card pricing-gazette-entry-card">
+        {sku ? (
+          <div className="pricing-gazette-selected-sku">
+            <span className="pricing-gazette-selected-sku__name">
+              <SkuName skuId={sku.skuId} />
+            </span>
+            <button type="button" className="pricing-btn-secondary" onClick={() => setSku(null)}>
+              {t("pricing.gazette.change_item").text}
+            </button>
+          </div>
+        ) : (
+          <SkuPicker onPick={setSku} />
+        )}
+        <form onSubmit={submit} className="pricing-gazette-form">
+          <label className="pricing-form-field">
+            <span className="pricing-filter-label">{t("pricing.column.ceiling_price").text}</span>
+            <input type="number" min="0.01" step="0.01" required value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
+          </label>
+          <div className="pricing-form-field">
+            <DatePicker label={t("pricing.column.from").text} required value={from} onChange={setFrom} />
+          </div>
+          <div className="pricing-form-field">
+            <DatePicker label={t("pricing.gazette.field.to").text} value={to} onChange={setTo} />
+          </div>
+          <label className="pricing-form-field">
+            <span className="pricing-filter-label">{t("pricing.column.gazette").text}</span>
+            <input type="text" required maxLength={80} value={gazette} onChange={(e) => setGazette(e.target.value)} />
+          </label>
+          <div className="pricing-gazette-form__actions">
+            <button
+              type="submit"
+              className="modern-btn modern-btn--primary"
+              disabled={enter.isPending || !sku || !ceiling || !from || !gazette.trim()}
+            >
+              {t("pricing.gazette.submit").text}
+            </button>
+            {enter.isSuccess && (
+              <span role="status" className="pricing-alert-box pricing-alert-box--success">
+                {t("pricing.gazette.entered").text}
+              </span>
+            )}
+            {enter.isError && (
+              <span role="alert" className="pricing-alert-box pricing-alert-box--error">
+                {errorText(enter.error, t("pricing.error.generic").text)}
+              </span>
+            )}
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

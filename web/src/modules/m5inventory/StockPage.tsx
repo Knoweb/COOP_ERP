@@ -709,7 +709,7 @@ export function StockPage() {
                                   </span>
                                   <span className="stock-sku-code">{item.skuCode}</span>
                                   {item.skuNameEn && (
-                                    <span className="stock-sku-name"> — {item.skuNameEn}</span>
+                                    <span className="stock-sku-name">{item.skuNameEn}</span>
                                   )}
                                 </Link>
                               </td>

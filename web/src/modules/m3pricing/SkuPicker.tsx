@@ -30,6 +30,14 @@ export function SkuPicker({ onPick }: { onPick: (sku: Sku) => void }) {
     setFound(await api.searchSkus(q.trim()));
   };
 
+  const dismiss = (skuId: string) => {
+    setFound((current) => {
+      if (!current) return null;
+      const next = current.filter((item) => item.skuId !== skuId);
+      return next.length > 0 ? next : null;
+    });
+  };
+
   return (
     <div className="pricing-card pricing-sku-picker-card">
       <form onSubmit={search} className="pricing-search-form">
@@ -52,13 +60,46 @@ export function SkuPicker({ onPick }: { onPick: (sku: Sku) => void }) {
         {found?.length === 0 && <p className="pricing-muted">{t("pricing.find.none").text}</p>}
         {found && found.length > 0 && (
           <ul className="pricing-sku-results">
-            {found.map((sku) => (
-              <li key={sku.skuId} className="pricing-sku-result-item">
-                <button type="button" className="pricing-sku-add-btn" onClick={() => onPick(sku)}>
-                  {t("pricing.add_item", undefined, { code: sku.skuCode, name: inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa) }).text}
-                </button>
-              </li>
-            ))}
+            {found.map((sku) => {
+              const itemName = inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa);
+              return (
+                <li key={sku.skuId} className="pricing-sku-result-item">
+                  <button
+                    type="button"
+                    className="pricing-sku-add-btn"
+                    aria-label={t("pricing.add_item", undefined, { code: sku.skuCode, name: itemName }).text}
+                    onClick={() => onPick(sku)}
+                  >
+                    <span className="pricing-sku-add-btn__info">
+                      <span className="pricing-sku-badge">{sku.skuCode}</span>
+                      <span className="pricing-sku-add-btn__name">{itemName}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="pricing-sku-dismiss-btn"
+                    aria-label={t("pricing.remove").text}
+                    onClick={() => dismiss(sku.skuId)}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </form>
