@@ -84,9 +84,8 @@ class PriceListImportPostgresIntegrationTest extends PostgresIntegrationTest {
         insertSku(admin, flour, "M3-IMP-FLOUR", "Flour 1kg", "SHARED");
 
         admin.update(
-                "insert into catalogue.sku_barcode (barcode_id, sku_id, barcode, owner_entity_id, status)"
-                        + " values (?, ?, '4790001112223', ?, 'ACTIVE')",
-                Ids.next(),
+                "insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id, status)"
+                        + " values ('4790001112223', 'EAN13', ?, 'EA', ?, 'ACTIVE')",
                 flour,
                 FEDERATION);
         kernel.reset();

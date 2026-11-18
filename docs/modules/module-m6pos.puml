@@ -15,8 +15,8 @@ Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApp
 }
 
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
-Rel(CoopErpApplication.CoopErpApplication.M6PointofSale, CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M6PointofSale, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M6PointofSale, CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "uses", $techn="", $tags="", $link="")
 
 SHOW_LEGEND(true)
 @enduml
