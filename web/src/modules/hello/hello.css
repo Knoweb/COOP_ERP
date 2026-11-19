@@ -1,10 +1,19 @@
-/* Layout and tokens-only styling for the template screen. */
+/* Layout and tokens-only styling for the Greetings (hello) screen.
+ * Follows design/tokens.css: tokens only, no literal lengths or colours.
+ */
 
 .hello-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
+
+/* ==========================================================================
+   Read-only Banner (Shown when user has view-only access)
+   ========================================================================== */
 
 .hello-readonly-banner {
   display: flex;
@@ -16,6 +25,7 @@
   border-left: calc(var(--border-width-strong) * 2) solid var(--color-accent);
   border-radius: calc(var(--radius) * 3);
   box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-14);
+  box-sizing: border-box;
 }
 
 .hello-readonly-banner__icon {
@@ -49,20 +59,29 @@
   line-height: var(--line-height);
 }
 
+/* ==========================================================================
+   Registration Form Card
+   ========================================================================== */
+
 .hello-form-card {
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-polish-21);
-  border-top: var(--border-width-strong) solid var(--color-accent);
+  border-top: calc(var(--border-width-strong) * 1.5) solid var(--color-accent);
   border-radius: calc(var(--radius) * 3);
   padding: var(--space-3);
-  box-shadow: 0 var(--border-width-strong) var(--space-2) var(--color-polish-14);
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-14), 0 var(--border-width) var(--space-1) var(--color-polish-8);
   box-sizing: border-box;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.hello-form-card:hover {
+  box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-13), 0 var(--border-width) var(--space-1) var(--color-polish-8);
 }
 
 .hello-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .hello-form-fields {
@@ -74,7 +93,7 @@
 .hello-field {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space-half) * 1.5);
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -96,13 +115,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: calc(var(--space-2) + var(--space-half));
+  height: calc(var(--space-2) + var(--space-half));
+  border-radius: calc(var(--radius) * 1.5);
+  background: var(--color-polish-31);
+  border: var(--border-width) solid var(--color-polish-22);
   color: var(--color-accent);
   flex-shrink: 0;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
 }
 
 .hello-field__icon svg {
-  width: var(--space-2);
-  height: var(--space-2);
+  width: calc(var(--space-1) + var(--space-half));
+  height: calc(var(--space-1) + var(--space-half));
   stroke: currentColor;
   stroke-width: var(--border-width-strong);
   stroke-linecap: round;
@@ -114,7 +139,7 @@
 .hello-field__input {
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--target-min);
+  min-height: calc(var(--space-4) + var(--space-half));
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--color-polish-21);
   border-radius: calc(var(--radius) * 2.5);
@@ -157,6 +182,7 @@
   color: var(--color-alert-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
+  margin-top: calc(var(--space-half) / 2);
 }
 
 .hello-form-actions {
@@ -167,7 +193,7 @@
   gap: var(--space-2);
   margin-top: var(--space-half);
   padding-top: var(--space-2);
-  border-top: var(--border-width) solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-polish-21);
 }
 
 .shell-page .hello-submit-btn,
@@ -176,18 +202,21 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  min-height: var(--target-min);
+  min-height: calc(var(--space-4) + var(--space-half));
   padding: var(--space-1) var(--space-3);
   border: var(--border-width) solid var(--color-polish-19);
   border-radius: var(--radius-pill);
   background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
   background-color: var(--color-polish-19);
   color: var(--color-on-accent);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
   cursor: pointer;
   box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .shell-page .hello-submit-btn svg,
@@ -204,9 +233,10 @@
 
 .shell-page .hello-submit-btn:hover:not(:disabled),
 .hello-submit-btn:hover:not(:disabled) {
-  transform: translateY(calc(var(--border-width) * -1));
+  transform: translateY(calc(var(--border-width) * -1.5));
   box-shadow: 0 var(--space-1) var(--space-3) var(--color-polish-21);
   color: var(--color-on-accent);
+  opacity: 0.95;
 }
 
 .shell-page .hello-submit-btn:active:not(:disabled),
@@ -222,16 +252,22 @@
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
+  opacity: 0.65;
 }
+
+/* ==========================================================================
+   Feedback Messages (Success & Error alerts)
+   ========================================================================== */
 
 .hello-feedback {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2);
+  gap: var(--space-1-half, var(--space-2));
+  padding: var(--space-2) var(--space-2);
   border-radius: calc(var(--radius) * 2);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
+  box-sizing: border-box;
 }
 
 .hello-feedback__icon {
@@ -260,18 +296,25 @@
   background: var(--color-issued-bg);
   border: var(--border-width) solid var(--color-issued-text);
   color: var(--color-issued-text);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
 }
 
 .hello-feedback--error {
   background: var(--color-alert-bg);
   border: var(--border-width) solid var(--color-alert-text);
   color: var(--color-alert-text);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
 }
+
+/* ==========================================================================
+   Greetings List Section
+   ========================================================================== */
 
 .hello-list-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  width: 100%;
 }
 
 .hello-list-header {
@@ -280,6 +323,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-2);
+  padding-bottom: var(--space-1);
 }
 
 .hello-list-heading {
@@ -289,7 +333,7 @@
 }
 
 .hello-list-heading__accent {
-  width: var(--border-width-strong);
+  width: calc(var(--border-width-strong) * 1.5);
   height: calc(var(--space-2) + var(--space-half));
   border-radius: var(--radius-pill);
   background: var(--color-accent);
@@ -316,37 +360,42 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
   font-variant-numeric: tabular-nums;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
 }
 
+/* Empty & Loading State Cards */
 .hello-state-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-6) var(--space-3);
   border-radius: calc(var(--radius) * 3);
-  background: var(--color-surface-subtle);
+  background: linear-gradient(135deg, var(--color-surface), var(--color-polish-29));
   border: var(--border-width) dashed var(--color-polish-21);
   color: var(--color-text-muted);
   text-align: center;
+  box-sizing: border-box;
 }
 
 .hello-state-card__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-4);
-  height: var(--space-4);
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-polish-22);
   color: var(--color-accent);
   flex-shrink: 0;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-14);
 }
 
 .hello-state-card__icon svg {
-  width: var(--space-2);
-  height: var(--space-2);
+  width: var(--space-3);
+  height: var(--space-3);
   stroke: currentColor;
   stroke-width: var(--border-width-strong);
   stroke-linecap: round;
@@ -357,11 +406,14 @@
 .hello-state-card__text {
   margin: 0;
   font-size: var(--font-size-md);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text-muted);
 }
 
+/* Greetings List Cards */
 .hello-list {
   display: grid;
-  gap: calc(var(--space-1) + var(--space-half));
+  gap: var(--space-2);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -371,37 +423,52 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
+  border-left: calc(var(--border-width-strong) * 1.5) solid transparent;
   border-radius: calc(var(--radius) * 2.5);
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-3);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-left-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-sizing: border-box;
 }
 
 .hello-item:hover {
   border-color: var(--color-polish-21);
+  border-left-color: var(--color-accent);
   background: var(--color-polish-29);
-  box-shadow: 0 var(--border-width-strong) var(--space-2) var(--color-polish-13);
-  transform: translateY(calc(var(--border-width) * -1));
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13), 0 var(--border-width) var(--space-1) var(--color-polish-21);
+  transform: translateY(calc(var(--border-width) * -1.5));
 }
 
 .hello-item__avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-4);
-  height: var(--space-4);
-  border-radius: calc(var(--radius) * 2);
+  width: calc(var(--space-4) + var(--space-half));
+  height: calc(var(--space-4) + var(--space-half));
+  border-radius: calc(var(--radius) * 2.5);
   background: var(--color-polish-31);
   border: var(--border-width) solid var(--color-polish-22);
   color: var(--color-accent);
   flex-shrink: 0;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hello-item:hover .hello-item__avatar {
+  transform: scale(1.06);
+  border-color: var(--color-accent);
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-21);
 }
 
 .hello-item__avatar svg {
-  width: var(--space-2);
-  height: var(--space-2);
+  width: calc(var(--space-2) + var(--space-half) / 2);
+  height: calc(var(--space-2) + var(--space-half) / 2);
   stroke: currentColor;
   stroke-width: var(--border-width-strong);
   stroke-linecap: round;
@@ -412,7 +479,7 @@
 .hello-item__body {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space-half) * 1.5);
+  gap: var(--space-1);
   min-width: 0;
   flex: 1;
 }
@@ -430,19 +497,20 @@
   align-items: center;
   gap: var(--space-half);
   width: fit-content;
-  padding: calc(var(--space-half) / 2) var(--space-1);
+  padding: calc(var(--space-half) / 1.5) var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--color-surface-subtle);
   border: var(--border-width) solid var(--color-border);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .hello-item:hover .hello-item__meta {
   background: var(--color-surface);
   border-color: var(--color-polish-22);
+  color: var(--color-accent);
 }
 
 .hello-item__meta svg {
@@ -454,4 +522,9 @@
   stroke-linejoin: round;
   fill: none;
   flex-shrink: 0;
+  transition: stroke 0.2s ease;
+}
+
+.hello-item:hover .hello-item__meta svg {
+  stroke: var(--color-accent);
 }
