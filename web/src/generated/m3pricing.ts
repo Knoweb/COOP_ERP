@@ -91,6 +91,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/lists/{listId}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk import price list lines from a sheet or rows into a draft price list
+         * @description Parses a CSV/TSV sheet or line items, validates each line against catalogue SKUs and authoring rules, and populates an existing draft price list without activating/publishing prices. Guards: price list must exist in DRAFT status in the caller's owner scope. Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+         */
+        post: operations["importPriceListLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/lists/{listId}/publish": {
         parameters: {
             query?: never;
@@ -633,6 +655,48 @@ export interface components {
             /** @description The gazette reference of a control price, the batch number of an MRP */
             ceilingRef?: string | null;
         };
+        ImportPriceListLinesRequest: {
+            /** @description Raw CSV, TSV or delimited spreadsheet text with headers (e.g. sku,uom,tier,price) */
+            sheet?: string;
+            lines?: components["schemas"]["ImportPriceListLineRow"][];
+            /**
+             * @description When true, replaces existing draft lines; when false, merges lines into the draft list
+             * @default true
+             */
+            replace: boolean;
+        };
+        ImportPriceListLineRow: {
+            /** @description SKU code, barcode, or SKU UUID */
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** @description Unit of measure; defaults to SKU base UOM if omitted */
+            uomCode?: string;
+            /**
+             * @description Quantity threshold from which the price applies
+             * @default 0
+             */
+            tierFromQty: number;
+            /** @description Unit price */
+            price: number;
+        };
+        PriceListImportReportResponse: {
+            /** Format: uuid */
+            priceListId: string;
+            /** @description True if lines were saved into the draft list */
+            saved: boolean;
+            totalRows: number;
+            importedLines: number;
+            errorRows: number;
+            problems: components["schemas"]["PriceListImportProblem"][];
+            outcomes: components["schemas"]["LineOutcome"][];
+        };
+        PriceListImportProblem: {
+            line: number;
+            sku?: string | null;
+            field?: string | null;
+            message: string;
+        };
         RetailPriceResponse: {
             /** Format: uuid */
             locationId: string;
@@ -1171,6 +1235,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetLinesResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    importPriceListLines: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportPriceListLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description Import report with outcome status, row counts, problems, and per-line outcomes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListImportReportResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

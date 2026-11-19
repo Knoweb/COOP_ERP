@@ -151,6 +151,38 @@ paths:
               schema: { $ref: '#/components/schemas/SetLinesResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/lists/{listId}/import:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: importPriceListLines
+      summary: Bulk import price list lines from a sheet or rows into a draft price list
+      description: >
+        Parses a CSV/TSV sheet or line items, validates each line against catalogue SKUs and authoring rules,
+        and populates an existing draft price list without activating/publishing prices.
+        Guards: price list must exist in DRAFT status in the caller's owner scope.
+        Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+      x-permission: prc.pricelist.author
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportPriceListLinesRequest' }
+      responses:
+        '200':
+          description: Import report with outcome status, row counts, problems, and per-line outcomes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListImportReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/pricing/lists/{listId}/publish:
     parameters:
       - in: path
@@ -974,6 +1006,78 @@ components:
           description: CONTROL_PRICE or MRP, the binding ceiling of a RETAIL or ADVISORY line (refused or not), or the MRP a TRADE line is reviewed against
         ceilingValue: { type: [number, 'null'] }
         ceilingRef: { type: [string, 'null'], description: 'The gazette reference of a control price, the batch number of an MRP' }
+    ImportPriceListLinesRequest:
+      type: object
+      properties:
+        sheet:
+          type: string
+          description: Raw CSV, TSV or delimited spreadsheet text with headers (e.g. sku,uom,tier,price)
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportPriceListLineRow'
+        replace:
+          type: boolean
+          default: true
+          description: When true, replaces existing draft lines; when false, merges lines into the draft list
+    ImportPriceListLineRow:
+      type: object
+      required: [price]
+      properties:
+        sku:
+          type: string
+          description: SKU code, barcode, or SKU UUID
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+          description: Unit of measure; defaults to SKU base UOM if omitted
+        tierFromQty:
+          type: number
+          minimum: 0
+          default: 0
+          description: Quantity threshold from which the price applies
+        price:
+          type: number
+          minimum: 0
+          description: Unit price
+    PriceListImportReportResponse:
+      type: object
+      required: [priceListId, saved, totalRows, importedLines, errorRows, problems, outcomes]
+      properties:
+        priceListId:
+          type: string
+          format: uuid
+        saved:
+          type: boolean
+          description: True if lines were saved into the draft list
+        totalRows:
+          type: integer
+        importedLines:
+          type: integer
+        errorRows:
+          type: integer
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceListImportProblem'
+        outcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineOutcome'
+    PriceListImportProblem:
+      type: object
+      required: [line, message]
+      properties:
+        line:
+          type: integer
+        sku:
+          type: [string, 'null']
+        field:
+          type: [string, 'null']
+        message:
+          type: string
     RetailPriceResponse:
       type: object
       required: [locationId, skuId, uomCode, sellable, capReason, policy, engineVersion]

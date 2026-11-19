@@ -91,5 +91,10 @@
   "m3.rule.location_invalid": "குறிப்பிட்ட கிளை அல்லது கடை அமைவிடம் உங்கள் நிறுவனத்திற்கு உரியது அல்ல",
   "m3.customer.location_required": "வாடிக்கையாளர் விலையைத் தேட கடை அமைவிடம் தேவை",
   "m3.customer.item_not_found": "தேர்ந்தெடுக்கப்பட்ட கடையில் இந்த பொருளுக்கான விலை எதுவும் காணப்படவில்லை",
-  "m3.customer.lookup_failed": "விலை தேடலை முடிக்க முடியவில்லை"
+  "m3.customer.lookup_failed": "விலை தேடலை முடிக்க முடியவில்லை",
+  "m3.price_list.import.sku_not_found": "பட்டியலில் பொருள் காணப்படவில்லை",
+  "m3.price_list.import.empty": "விலைப் பட்டியல் தாளில் இறக்குமதி செய்ய வரிகள் இல்லை",
+  "m3.price_list.import.parse_failed": "விலைப் பட்டியல் தாளைப் பாகுபடுத்த முடியவில்லை",
+  "m3.price_list.line.price_invalid": "விலை செல்லுபடியாகும் எண் அல்ல",
+  "m3.price_list.line.invalid": "விலைப் பட்டியல் வரி செல்லுபடியாகாது"
 }
