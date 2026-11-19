@@ -33,48 +33,35 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
   // and the empty-code check below stop a Confirm without a choice.
   const [code, setCode] = useState("");
   const [text, setText] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (dropdownOpen) {
-          setDropdownOpen(false);
-        } else if (!pending) {
+      if (e.key === "Escape" && !pending) {
+        if (open) {
+          setOpen(false);
+        } else {
           onCancel();
         }
       }
     };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [dropdownOpen, onCancel, pending]);
-
-  useEffect(() => {
-    if (!dropdownOpen) return;
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
+        setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
     return () => {
+      document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
     };
-  }, [dropdownOpen]);
-
-  useEffect(() => {
-    if (dropdownOpen && menuRef.current) {
-      const selected = menuRef.current.querySelector<HTMLElement>(".register-dropdown-option--selected, .register-dropdown-option--active");
-      if (selected) {
-        selected.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [dropdownOpen]);
+  }, [onCancel, pending, open]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -84,17 +71,8 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
     onConfirm(code, text.trim() === "" ? null : text.trim());
   };
 
-  const selectedOption = codes.find((item) => item.code === code);
-
-  const toggleDropdown = () => {
-    setDropdownOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setHoveredCode(code || codes[0]?.code || null);
-      }
-      return next;
-    });
-  };
+  const selectedItem = codes.find((item) => item.code === code);
+  const triggerText = selectedItem?.label ?? t("shell.reason.choose").text;
 
   return (
     <div
@@ -120,104 +98,65 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
           <label htmlFor="reason-capture-code" className="reason-capture__label">
             {t("shell.reason.code").text}
           </label>
-          <div className="reason-capture__control-wrap" ref={containerRef}>
+          <div className={`custom-dropdown reason-capture__dropdown ${open ? "custom-dropdown--open" : ""}`} ref={containerRef}>
+            {/* Native select kept as the single accessible combobox for form validation and Playwright automation */}
             <select
               id="reason-capture-code"
-              className="visually-hidden"
               value={code}
-              onChange={(event) => {
-                setCode(event.target.value);
-                setHoveredCode(event.target.value);
-              }}
+              onChange={(e) => setCode(e.target.value)}
               required
+              className="reason-capture__native-select"
+              tabIndex={-1}
             >
               <option value="">{t("shell.reason.choose").text}</option>
-              {codes.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.label}
+              {codes.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.label}
                 </option>
               ))}
             </select>
 
+            {/* Custom interactive trigger button matching the system standard dropdowns */}
             <button
               type="button"
-              className="register-dropdown-trigger custom-status-dropdown__trigger reason-dropdown-trigger"
+              className="custom-dropdown__trigger reason-dropdown-trigger"
+              onClick={() => setOpen((prev) => !prev)}
               aria-haspopup="listbox"
-              aria-expanded={dropdownOpen}
-              onClick={toggleDropdown}
-              tabIndex={-1}
-              aria-hidden="true"
+              aria-expanded={open}
             >
-              <span className="custom-status-dropdown__label">
-                {selectedOption ? selectedOption.label : t("shell.reason.choose").text}
+              <span className={`custom-dropdown__value ${!code ? "custom-dropdown__value--placeholder" : ""}`}>
+                {triggerText}
               </span>
               <svg
-                className="custom-status-dropdown__arrow"
+                className={`custom-dropdown__arrow ${open ? "custom-dropdown__arrow--open" : ""}`}
                 viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <polyline points="6 9 12 15 18 9" />
+                <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
 
-            {dropdownOpen && (
-              <ul
-                ref={menuRef}
-                className="register-dropdown-menu custom-status-dropdown__menu reason-dropdown-menu"
-                role="listbox"
-                aria-hidden="true"
-              >
-                {codes.map((option) => {
-                  const isSelected = code === option.code;
-                  const isActive = isSelected || (!code && (hoveredCode === option.code || (!hoveredCode && codes[0]?.code === option.code)));
+            {open && (
+              <ul className="custom-dropdown__menu reason-dropdown-menu" role="listbox">
+                {codes.map((item) => {
+                  const isSelected = item.code === code;
                   return (
-                    <li key={option.code} role="presentation">
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        tabIndex={-1}
-                        className={
-                          isSelected
-                            ? "custom-status-dropdown__option custom-status-dropdown__option--selected register-dropdown-option register-dropdown-option--selected"
-                            : isActive
-                              ? "custom-status-dropdown__option custom-status-dropdown__option--active register-dropdown-option register-dropdown-option--active"
-                              : "custom-status-dropdown__option register-dropdown-option"
-                        }
-                        onMouseEnter={() => setHoveredCode(option.code)}
-                        onClick={() => {
-                          setCode(option.code);
-                          setHoveredCode(option.code);
-                          setDropdownOpen(false);
-                        }}
-                      >
-                        <span className="register-dropdown-option-label custom-status-dropdown__option-label">
-                          {option.label}
-                        </span>
-                        {isSelected && (
-                          <span className="custom-status-dropdown__check" aria-hidden="true">
-                            <svg
-                              viewBox="0 0 24 24"
-                              width="16"
-                              height="16"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              fill="none"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </span>
-                        )}
-                      </button>
+                    <li
+                      key={item.code}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`custom-dropdown__item ${isSelected ? "custom-dropdown__item--selected" : ""}`}
+                      onClick={() => {
+                        setCode(item.code);
+                        setOpen(false);
+                      }}
+                    >
+                      <span className="custom-dropdown__item-label">{item.label}</span>
+                      {isSelected && (
+                        <svg className="custom-dropdown__checkmark" viewBox="0 0 24 24" aria-hidden="true">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
                     </li>
                   );
                 })}

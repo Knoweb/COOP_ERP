@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { usePartyApi } from "./partyApi";
 import type { RegisterSocietyRequest } from "./partyApi";
 import { errorText } from "./SocietyRegisterPage";
+import { CustomSelect } from "./CustomSelect";
 
 const ENTITY_TYPES: RegisterSocietyRequest["entityType"][] = ["MPCS", "DISTRIBUTOR"];
 const LANGUAGES: RegisterSocietyRequest["defaultLanguage"][] = ["en", "si", "ta"];
@@ -328,131 +329,22 @@ function FormDropdown<T extends string | number>(props: {
   error?: string;
   required?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
-
-  const currentOption = props.options.find((opt) => opt.value === props.value) ?? props.options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open && menuRef.current) {
-      const selected = menuRef.current.querySelector<HTMLElement>(".register-dropdown-option--selected");
-      if (selected) {
-        selected.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [open]);
-
   return (
-    <div
-      className={`register-field-group ${open ? "register-field-group--open" : ""}`}
-      ref={containerRef}
-    >
+    <div className="register-field-group">
       <label htmlFor={props.id} className="register-field-label">
         {props.icon && <span className="register-field-icon" aria-hidden="true">{props.icon}</span>}
         <span>{props.label}</span>
         {props.required && <span className="register-field-required" aria-hidden="true">*</span>}
       </label>
 
-      {/* Visually hidden native select kept in sync for accessibility and automation */}
-      <select
+      <CustomSelect
         id={props.id}
-        className="visually-hidden"
+        ariaLabel={props.label}
         value={props.value}
-        onChange={(e) => props.onChange(e.target.value as unknown as T)}
-        tabIndex={-1}
-        aria-hidden="true"
-      >
-        {props.options.map((opt) => (
-          <option key={String(opt.value)} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-
-      <button
-        type="button"
-        className="register-input-control register-dropdown-trigger"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-invalid={props.error ? true : undefined}
-        onClick={() => setOpen(!open)}
-      >
-        <span className="custom-status-dropdown__label">{currentOption?.label}</span>
-        <svg
-          className="custom-status-dropdown__arrow"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="m7 9 5 5 5-5" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul ref={menuRef} className={`register-dropdown-menu ${props.menuClassName ?? ""}`.trim()} role="listbox">
-          {props.options.map((opt) => {
-            const isSelected = props.value === opt.value;
-            return (
-              <li key={String(opt.value)} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={
-                    isSelected
-                      ? "custom-status-dropdown__option custom-status-dropdown__option--selected register-dropdown-option register-dropdown-option--selected"
-                      : "custom-status-dropdown__option register-dropdown-option"
-                  }
-                  onClick={() => {
-                    props.onChange(opt.value);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="register-dropdown-option-label custom-status-dropdown__option-label">{opt.label}</span>
-                  {isSelected && (
-                    <span className="custom-status-dropdown__check" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+        onChange={props.onChange}
+        options={props.options}
+        menuClassName={props.menuClassName}
+      />
 
       {props.error && <FieldError text={props.error} />}
     </div>
