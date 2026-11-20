@@ -65,12 +65,14 @@ export function StockExplanationModal({
   const data = explanationQuery.data;
   const lots = data?.lots ?? [];
   const reservations = data?.reservations ?? [];
-  const incomingTransfers = data?.incomingTransfers ?? [];
-  const outgoingTransfers = data?.outgoingTransfers ?? [];
-  const allTransfers = useMemo(() => [
-    ...incomingTransfers.map((tx) => ({ ...tx, direction: "incoming" as const })),
-    ...outgoingTransfers.map((tx) => ({ ...tx, direction: "outgoing" as const }))
-  ], [incomingTransfers, outgoingTransfers]);
+  const allTransfers = useMemo(() => {
+    const incoming = data?.incomingTransfers ?? [];
+    const outgoing = data?.outgoingTransfers ?? [];
+    return [
+      ...incoming.map((tx) => ({ ...tx, direction: "incoming" as const })),
+      ...outgoing.map((tx) => ({ ...tx, direction: "outgoing" as const }))
+    ];
+  }, [data?.incomingTransfers, data?.outgoingTransfers]);
   const count = data?.latestCount;
 
   const displayName = skuName || data?.skuNameEn || skuCode || data?.skuCode || skuId;

@@ -9,7 +9,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
-import { useInventoryApi, type Location, type TransferRequest } from "./inventoryApi";
+import { useInventoryApi, type Location, type Sku, type TransferRequest } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
 import { CustomSelect } from "./CustomSelect";
 import "./inventory.css";
@@ -48,7 +48,7 @@ export function TransferRequestsPage() {
     queryFn: () => api.balances(shopId),
     enabled: canRequest && shopId !== ""
   });
-  const items = [...new Set((shelf.data ?? []).map((lot) => lot.skuId))];
+  const items = useMemo(() => [...new Set((shelf.data ?? []).map((lot) => lot.skuId))], [shelf.data]);
 
   const summariesQuery = useQuery({
     queryKey: ["inventory", "stock-summaries", shopId],
@@ -89,7 +89,7 @@ export function TransferRequestsPage() {
         if (summary.code?.toLowerCase().includes(q)) return true;
         if (summary.name?.toLowerCase().includes(q)) return true;
       }
-      const cached = queryClient.getQueryData<any>(["inventory", "sku", skuId]);
+      const cached = queryClient.getQueryData<Sku>(["inventory", "sku", skuId]);
       if (cached) {
         if (cached.skuCode?.toLowerCase().includes(q)) return true;
         if (cached.nameEn?.toLowerCase().includes(q)) return true;
