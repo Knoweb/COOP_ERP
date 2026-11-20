@@ -15,6 +15,7 @@ import kotlinx.datetime.TimeZone
 import lk.coopfed.knoweb.till.core.TillService
 import lk.coopfed.knoweb.till.core.id.UuidV7
 import lk.coopfed.knoweb.till.core.port.TillClock
+import lk.coopfed.knoweb.till.core.port.TillStore
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotVerifier
 import lk.coopfed.knoweb.till.db.EncryptedJvmDatabase
 import lk.coopfed.knoweb.till.db.NativeSqlite
@@ -32,7 +33,10 @@ val APP_VERSION: String = DesktopTill::class.java.`package`?.implementationVersi
  * opened with the key from the OS key vault, the HTTP sync client, the JDK's Ed25519, Argon2id
  * from BouncyCastle, the shop's clock. Everything else is the shared TillService.
  */
-class DesktopTill(val config: DesktopConfig = DesktopConfig()) : AutoCloseable {
+class DesktopTill(
+    val config: DesktopConfig = DesktopConfig(),
+    storeDecorator: (TillStore) -> TillStore = { it },
+) : AutoCloseable {
 
     val zone: TimeZone = TimeZone.of("Asia/Colombo")
     private val ids = UuidV7({ System.currentTimeMillis() })
@@ -60,8 +64,10 @@ class DesktopTill(val config: DesktopConfig = DesktopConfig()) : AutoCloseable {
         config.caFile?.let { ca -> engine { config { sslContext(trusting(ca)) } } }
     }
 
+    val store: TillStore = storeDecorator(SqlTillStore(driver))
+
     val service = TillService(
-        store = SqlTillStore(driver),
+        store = store,
         central = HttpCentral(http, ids, { Clock.System.now() }, JvmGzip, config.tokenEndpointOverride),
         verifier = SnapshotVerifier(JdkEd25519Verifier),
         pins = Argon2PinVerifier,
