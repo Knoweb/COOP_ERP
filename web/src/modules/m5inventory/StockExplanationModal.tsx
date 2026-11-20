@@ -1,9 +1,12 @@
-import { useEffect, useId, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { createPortal } from "react-dom";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
+import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { useInventoryApi } from "./inventoryApi";
+import { useInventoryApi, type LotBalance, type Sku } from "./inventoryApi";
+import { StockRepriceModal } from "./StockRepriceModal";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 
 export interface StockExplanationModalProps {
@@ -13,6 +16,7 @@ export interface StockExplanationModalProps {
   skuId: string | null;
   skuCode?: string;
   skuName?: string;
+  onRepriceLot?: (lot: LotBalance) => void;
 }
 
 type TabType = "lots" | "reservations" | "transfers" | "count";
@@ -23,29 +27,34 @@ export function StockExplanationModal({
   locationId,
   skuId,
   skuCode,
-  skuName
+  skuName,
+  onRepriceLot
 }: StockExplanationModalProps) {
   const t = useT();
   const formatDate = useFormatDate();
   const api = useInventoryApi();
+  const queryClient = useQueryClient();
+  const canReprice = useHasPermission("inv.stock.reprice");
   const titleId = useId();
   const [activeTab, setActiveTab] = useState<TabType>("lots");
+  const [selectedLotForReprice, setSelectedLotForReprice] = useState<LotBalance | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setActiveTab("lots");
+      setSelectedLotForReprice(null);
     }
   }, [isOpen, skuId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
+      if (event.key === "Escape" && isOpen && !selectedLotForReprice) {
         onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, selectedLotForReprice]);
 
   const explanationQuery = useQuery({
     queryKey: ["inventory", "stock-explanation", locationId, skuId],
@@ -53,36 +62,57 @@ export function StockExplanationModal({
     enabled: isOpen && Boolean(skuId) && Boolean(locationId)
   });
 
-  if (!isOpen || !skuId) {
-    return null;
-  }
-
   const data = explanationQuery.data;
   const lots = data?.lots ?? [];
   const reservations = data?.reservations ?? [];
   const incomingTransfers = data?.incomingTransfers ?? [];
   const outgoingTransfers = data?.outgoingTransfers ?? [];
-  const allTransfers = [
+  const allTransfers = useMemo(() => [
     ...incomingTransfers.map((tx) => ({ ...tx, direction: "incoming" as const })),
     ...outgoingTransfers.map((tx) => ({ ...tx, direction: "outgoing" as const }))
-  ];
+  ], [incomingTransfers, outgoingTransfers]);
   const count = data?.latestCount;
 
   const displayName = skuName || data?.skuNameEn || skuCode || data?.skuCode || skuId;
   const displayCode = skuCode || data?.skuCode;
 
-  return (
-    <div
-      className="inventory-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+  const handleRepriceClick = (lot: LotBalance) => {
+    if (onRepriceLot) {
+      onRepriceLot(lot);
+    } else {
+      setSelectedLotForReprice(lot);
+    }
+  };
+
+  const skuObject = useMemo<Sku | null>(() => {
+    if (!skuId) return null;
+    return {
+      skuId,
+      skuCode: displayCode || "",
+      nameEn: displayName || "",
+      nameSi: data?.skuNameSi ?? "",
+      nameTa: data?.skuNameTa ?? "",
+      status: "SHARED"
+    } as unknown as Sku;
+  }, [skuId, displayCode, displayName, data]);
+
+  if (!isOpen || !skuId) {
+    return null;
+  }
+
+  const content = (
+    <>
+      <div
+        className="inventory-modal-backdrop stock-explanation-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
       <div className="inventory-modal stock-explanation-modal">
         <div className="stock-modal-header">
           <div>
@@ -287,41 +317,62 @@ export function StockExplanationModal({
                     </p>
                   ) : (
                     <table className="modern-table stock-modal-table">
+                      <colgroup>
+                        <col className="modal-col-batch" />
+                        <col className="modal-col-expiry" />
+                        <col className="modal-col-condition" />
+                        <col className="modal-col-fefo" />
+                        <col className="modal-col-on-hand" />
+                        <col className="modal-col-unit-cost" />
+                        {canReprice && <col className="modal-col-actions" />}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>{t("inventory.column.batch").text}</th>
-                          <th>{t("inventory.column.expiry").text}</th>
-                          <th>{t("inventory.column.condition").text}</th>
-                          <th>{t("inventory.column.fefo").text}</th>
-                          <th className="numeric-cell">{t("inventory.column.on_hand").text}</th>
-                          <th className="numeric-cell">{t("inventory.column.unit_cost").text}</th>
+                          <th className="modal-col-batch">{t("inventory.column.batch").text}</th>
+                          <th className="modal-col-expiry">{t("inventory.column.expiry").text}</th>
+                          <th className="modal-col-condition">{t("inventory.column.condition").text}</th>
+                          <th className="modal-col-fefo">{t("inventory.column.fefo").text}</th>
+                          <th className="modal-col-on-hand numeric-cell">{t("inventory.column.on_hand").text}</th>
+                          <th className="modal-col-unit-cost numeric-cell">{t("inventory.column.unit_cost").text}</th>
+                          {canReprice && <th className="modal-col-actions">{t("inventory.actions").text}</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {lots.map((lot) => (
                           <tr key={lot.stockLotId}>
-                            <td>
+                            <td className="modal-col-batch">
                               {isSyntheticBatchNo(lot.batchNo)
                                 ? t("inventory.field.batch_not_tracked").text
                                 : (lot.batchNo || "—")}
                             </td>
-                            <td>{lot.expiryDate ? formatDate(lot.expiryDate) : "—"}</td>
-                            <td>
+                            <td className="modal-col-expiry">{lot.expiryDate ? formatDate(lot.expiryDate) : "—"}</td>
+                            <td className="modal-col-condition">
                               <span className="condition-chip">
                                 {t(`inventory.condition.${lot.condition}`).text}
                               </span>
                             </td>
-                            <td>
+                            <td className="modal-col-fefo">
                               {lot.expired ? (
                                 <span className="condition-chip">{t("inventory.lot.expired").text}</span>
                               ) : (
                                 (lot.fefoRank ?? "—")
                               )}
                             </td>
-                            <td className="numeric-cell">{lot.qtyOnHand}</td>
-                            <td className="numeric-cell">
+                            <td className="modal-col-on-hand numeric-cell">{lot.qtyOnHand}</td>
+                            <td className="modal-col-unit-cost numeric-cell">
                               {lot.unitCost != null ? <MoneyDisplay amount={lot.unitCost} /> : "—"}
                             </td>
+                            {canReprice && (
+                              <td className="modal-col-actions">
+                                <button
+                                  type="button"
+                                  className="table-action-btn"
+                                  onClick={() => handleRepriceClick(lot)}
+                                >
+                                  {t("inventory.reprice.action").text}
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -338,23 +389,29 @@ export function StockExplanationModal({
                     </p>
                   ) : (
                     <table className="modern-table stock-modal-table">
+                      <colgroup>
+                        <col className="modal-col-res-doc" />
+                        <col className="modal-col-res-status" />
+                        <col className="modal-col-res-qty" />
+                        <col className="modal-col-res-date" />
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>{t("inventory.stock.explain.doc_no").text}</th>
-                          <th>{t("inventory.stock.explain.status").text}</th>
-                          <th className="numeric-cell">{t("inventory.stock.column.reserved").text}</th>
-                          <th>{t("inventory.stock.explain.date").text}</th>
+                          <th className="modal-col-res-doc">{t("inventory.stock.explain.doc_no").text}</th>
+                          <th className="modal-col-res-status">{t("inventory.stock.explain.status").text}</th>
+                          <th className="modal-col-res-qty numeric-cell">{t("inventory.stock.column.reserved").text}</th>
+                          <th className="modal-col-res-date">{t("inventory.stock.explain.date").text}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {reservations.map((res) => (
                           <tr key={res.pickListId}>
-                            <td>{res.deliveryDocNumber || res.pickListId.slice(0, 8)}</td>
-                            <td>
+                            <td className="modal-col-res-doc">{res.deliveryDocNumber || res.pickListId.slice(0, 8)}</td>
+                            <td className="modal-col-res-status">
                               <span className="condition-chip">{res.pickStatus}</span>
                             </td>
-                            <td className="numeric-cell">{res.reservedQty}</td>
-                            <td>{res.reservedAt ? formatDate(res.reservedAt) : "—"}</td>
+                            <td className="modal-col-res-qty numeric-cell">{res.reservedQty}</td>
+                            <td className="modal-col-res-date">{res.reservedAt ? formatDate(res.reservedAt) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -371,20 +428,28 @@ export function StockExplanationModal({
                     </p>
                   ) : (
                     <table className="modern-table stock-modal-table">
+                      <colgroup>
+                        <col className="modal-col-tx-dir" />
+                        <col className="modal-col-tx-doc" />
+                        <col className="modal-col-tx-fromto" />
+                        <col className="modal-col-tx-qty" />
+                        <col className="modal-col-tx-status" />
+                        <col className="modal-col-tx-date" />
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>{t("inventory.stock.explain.direction").text}</th>
-                          <th>{t("inventory.stock.explain.doc_no").text}</th>
-                          <th>{t("inventory.stock.explain.from_to").text}</th>
-                          <th className="numeric-cell">{t("inventory.stock.explain.qty").text}</th>
-                          <th>{t("inventory.stock.explain.status").text}</th>
-                          <th>{t("inventory.stock.explain.date").text}</th>
+                          <th className="modal-col-tx-dir">{t("inventory.stock.explain.direction").text}</th>
+                          <th className="modal-col-tx-doc">{t("inventory.stock.explain.doc_no").text}</th>
+                          <th className="modal-col-tx-fromto">{t("inventory.stock.explain.from_to").text}</th>
+                          <th className="modal-col-tx-qty numeric-cell">{t("inventory.stock.explain.qty").text}</th>
+                          <th className="modal-col-tx-status">{t("inventory.stock.explain.status").text}</th>
+                          <th className="modal-col-tx-date">{t("inventory.stock.explain.date").text}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {allTransfers.map((tx, idx) => (
                           <tr key={`${tx.transferId}-${idx}`}>
-                            <td>
+                            <td className="modal-col-tx-dir">
                               <span
                                 className={`stock-direction-badge stock-direction-badge--${tx.direction}`}
                               >
@@ -393,13 +458,13 @@ export function StockExplanationModal({
                                   : t("inventory.stock.in_transit.outgoing", undefined, { qty: tx.qty }).text}
                               </span>
                             </td>
-                            <td>{tx.documentNo || tx.transferId.slice(0, 8)}</td>
-                            <td>{tx.locationName || tx.locationId?.slice(0, 8) || "—"}</td>
-                            <td className="numeric-cell">{tx.qty}</td>
-                            <td>
+                            <td className="modal-col-tx-doc">{tx.documentNo || tx.transferId.slice(0, 8)}</td>
+                            <td className="modal-col-tx-fromto">{tx.locationName || tx.locationId?.slice(0, 8) || "—"}</td>
+                            <td className="modal-col-tx-qty numeric-cell">{tx.qty}</td>
+                            <td className="modal-col-tx-status">
                               <span className="condition-chip">{tx.status}</span>
                             </td>
-                            <td>{tx.dispatchedAt ? formatDate(tx.dispatchedAt) : "—"}</td>
+                            <td className="modal-col-tx-date">{tx.dispatchedAt ? formatDate(tx.dispatchedAt) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -505,5 +570,27 @@ export function StockExplanationModal({
         </div>
       </div>
     </div>
+
+    <StockRepriceModal
+      isOpen={selectedLotForReprice !== null}
+      onClose={() => setSelectedLotForReprice(null)}
+      lot={selectedLotForReprice}
+      sku={skuObject}
+      onSuccess={() => {
+        setSelectedLotForReprice(null);
+        queryClient.invalidateQueries({
+          queryKey: ["inventory", "stock-explanation", locationId, skuId]
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["inventory", "balances", locationId]
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["inventory", "stock-summaries", locationId]
+        });
+      }}
+    />
+  </>
   );
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : content;
 }

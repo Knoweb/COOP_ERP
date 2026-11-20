@@ -1,35 +1,27 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { useFormatDate } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import "./inventory.css";
 import {
   useInventoryApi,
-  type LotBalance,
-  type Sku,
   type StockSummary,
   type DepartmentCategory,
   type Uom
 } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
 import { CustomSelect } from "./CustomSelect";
-import { StockRepriceModal } from "./StockRepriceModal";
 import { StockExplanationModal } from "./StockExplanationModal";
-import { errorText, isSyntheticBatchNo } from "./stockView";
+import { errorText } from "./stockView";
 
 type StatusFilter = "all" | "in_stock" | "out_of_stock" | "reserved" | "in_transit" | "discrepant";
 
 export function StockPage() {
   const t = useT();
-  const formatDate = useFormatDate();
   const api = useInventoryApi();
-  const queryClient = useQueryClient();
   const canPrepare = useHasPermission("inv.opening.prepare");
-  const canReprice = useHasPermission("inv.stock.reprice");
   const canViewStock = useHasPermission("inv.stock.view");
   const canManageReorderControls = useHasPermission("inv.reorder.manage");
   const canViewReorderControls = canViewStock || canManageReorderControls;
@@ -39,9 +31,7 @@ export function StockPage() {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [uomFilter, setUomFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [expandedSkuIds, setExpandedSkuIds] = useState<Set<string>>(new Set());
 
-  const [selectedLot, setSelectedLot] = useState<LotBalance | null>(null);
   const [explainingSku, setExplainingSku] = useState<{
     skuId: string;
     skuCode?: string;
@@ -76,22 +66,6 @@ export function StockPage() {
       }),
     enabled: locationId !== ""
   });
-
-  const balancesQuery = useQuery({
-    queryKey: ["inventory", "balances", locationId],
-    queryFn: () => api.balances(locationId),
-    enabled: locationId !== ""
-  });
-
-  const lotsBySkuId = useMemo(() => {
-    const map = new Map<string, LotBalance[]>();
-    for (const lot of balancesQuery.data ?? []) {
-      const existing = map.get(lot.skuId) ?? [];
-      existing.push(lot);
-      map.set(lot.skuId, existing);
-    }
-    return map;
-  }, [balancesQuery.data]);
 
   const summaries = useMemo(() => summariesQuery.data ?? [], [summariesQuery.data]);
 
@@ -177,32 +151,6 @@ export function StockPage() {
       return false;
     });
   }, [summaries, searchQuery, statusFilter]);
-
-  const toggleExpand = (skuId: string) => {
-    setExpandedSkuIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(skuId)) {
-        next.delete(skuId);
-      } else {
-        next.add(skuId);
-      }
-      return next;
-    });
-  };
-
-  const selectedSkuObject = useMemo<Sku | null>(() => {
-    if (!selectedLot) return null;
-    const summary = summaries.find((s) => s.skuId === selectedLot.skuId);
-    if (!summary) return null;
-    return {
-      skuId: summary.skuId,
-      skuCode: summary.skuCode,
-      nameEn: summary.skuNameEn,
-      nameSi: summary.skuNameSi ?? "",
-      nameTa: summary.skuNameTa ?? "",
-      status: "SHARED"
-    } as unknown as Sku;
-  }, [selectedLot, summaries]);
 
   return (
     <main className="shell-page">
@@ -621,7 +569,6 @@ export function StockPage() {
               <div className="modern-table-scroll stock-positions-scroll">
                 <table className="modern-table stock-table stock-positions-table">
                   <colgroup>
-                    <col className="col-expand" />
                     <col className="col-item" />
                     <col className="col-dept" />
                     <col className="col-uom" />
@@ -634,7 +581,6 @@ export function StockPage() {
                   </colgroup>
                   <thead>
                     <tr>
-                      <th className="col-expand" aria-label={t("inventory.stock.action.expand_lots").text} />
                       <th className="col-item">{t("inventory.stock.column.sku").text}</th>
                       <th className="col-dept">{t("inventory.stock.column.department").text}</th>
                       <th className="col-uom">{t("inventory.stock.column.uom").text}</th>
@@ -650,53 +596,20 @@ export function StockPage() {
                   <tbody>
                     {filteredSummaries.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="empty-table-cell">
+                        <td colSpan={9} className="empty-table-cell">
                           {t("inventory.find.none").text}
                         </td>
                       </tr>
                     ) : (
                       filteredSummaries.map((item) => {
-                        const isExpanded = expandedSkuIds.has(item.skuId);
-                        const lots = lotsBySkuId.get(item.skuId) ?? [];
                         const inTransitText =
                           item.inTransitIncomingQty > 0 || item.inTransitOutgoingQty > 0
                             ? `${item.inTransitIncomingQty > 0 ? `+${item.inTransitIncomingQty}` : ""} ${item.inTransitOutgoingQty > 0 ? `-${item.inTransitOutgoingQty}` : ""}`.trim()
                             : t("inventory.stock.in_transit.none").text;
 
                         return (
-                          <React.Fragment key={item.skuId}>
-                            <tr className={`stock-sku-row ${isExpanded ? "stock-sku-row--expanded" : ""}`}>
-                              <td className="col-expand">
-                                <button
-                                  type="button"
-                                  className="stock-expand-btn"
-                                  onClick={() => toggleExpand(item.skuId)}
-                                  aria-expanded={isExpanded}
-                                  aria-label={
-                                    isExpanded
-                                      ? t("inventory.stock.action.collapse_lots").text
-                                      : t("inventory.stock.action.expand_lots").text
-                                  }
-                                >
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    width="12"
-                                    height="12"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className={`stock-expand-chevron ${isExpanded ? "stock-expand-chevron--expanded" : ""}`}
-                                    aria-hidden="true"
-                                    focusable="false"
-                                  >
-                                    <polyline points="9 18 15 12 9 6" />
-                                  </svg>
-                                </button>
-                              </td>
-
-                              <td className="col-item">
+                          <tr key={item.skuId} className="stock-sku-row">
+                            <td className="col-item">
                                 <Link
                                   className="entity-link"
                                   to={`/inventory/locations/${locationId}/skus/${item.skuId}`}
@@ -806,99 +719,6 @@ export function StockPage() {
                                 </button>
                               </td>
                             </tr>
-
-                            {isExpanded && (
-                              <tr className="stock-nested-row">
-                                <td colSpan={10} className="stock-nested-cell">
-                                  <div className="stock-nested-wrap">
-                                    {lots.length === 0 ? (
-                                      <p className="stock-nested-empty">
-                                        {t("inventory.stock.explain.no_lots").text}
-                                      </p>
-                                    ) : (
-                                      <table className="modern-table stock-nested-table">
-                                        <colgroup>
-                                          <col className="nested-col-batch" />
-                                          <col className="nested-col-expiry" />
-                                          <col className="nested-col-condition" />
-                                          <col className="nested-col-fefo" />
-                                          <col className="nested-col-on-hand" />
-                                          <col className="nested-col-unit-cost" />
-                                          {canReprice && <col className="nested-col-actions" />}
-                                        </colgroup>
-                                        <thead>
-                                          <tr>
-                                            <th className="nested-col-batch">{t("inventory.column.batch").text}</th>
-                                            <th className="nested-col-expiry">{t("inventory.column.expiry").text}</th>
-                                            <th className="nested-col-condition">{t("inventory.column.condition").text}</th>
-                                            <th className="nested-col-fefo">{t("inventory.column.fefo").text}</th>
-                                            <th className="nested-col-on-hand numeric-cell">
-                                              {t("inventory.column.on_hand").text}
-                                            </th>
-                                            <th className="nested-col-unit-cost numeric-cell">
-                                              {t("inventory.column.unit_cost").text}
-                                            </th>
-                                            {canReprice && (
-                                              <th className="nested-col-actions col-actions">
-                                                {t("inventory.actions").text}
-                                              </th>
-                                            )}
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {lots.map((lot) => (
-                                            <tr key={lot.stockLotId}>
-                                              <td className="nested-col-batch">
-                                                {isSyntheticBatchNo(lot.batchNo)
-                                                  ? t("inventory.field.batch_not_tracked").text
-                                                  : (lot.batchNo || "—")}
-                                              </td>
-                                              <td className="nested-col-expiry">
-                                                {lot.expiryDate ? formatDate(lot.expiryDate) : "—"}
-                                              </td>
-                                              <td className="nested-col-condition">
-                                                <span className="condition-chip">
-                                                  {t(`inventory.condition.${lot.condition}`).text}
-                                                </span>
-                                              </td>
-                                              <td className="nested-col-fefo">
-                                                {lot.expired ? (
-                                                  <span className="condition-chip">
-                                                    {t("inventory.lot.expired").text}
-                                                  </span>
-                                                ) : (
-                                                  (lot.fefoRank ?? "—")
-                                                )}
-                                              </td>
-                                              <td className="nested-col-on-hand numeric-cell">{lot.qtyOnHand}</td>
-                                              <td className="nested-col-unit-cost numeric-cell">
-                                                {lot.unitCost != null ? (
-                                                  <MoneyDisplay amount={lot.unitCost} />
-                                                ) : (
-                                                  "—"
-                                                )}
-                                              </td>
-                                              {canReprice && (
-                                                <td className="nested-col-actions col-actions">
-                                                  <button
-                                                    type="button"
-                                                    className="table-action-btn"
-                                                    onClick={() => setSelectedLot(lot)}
-                                                  >
-                                                    {t("inventory.reprice.action").text}
-                                                  </button>
-                                                </td>
-                                              )}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
                         );
                       })
                     )}
@@ -918,17 +738,6 @@ export function StockPage() {
         skuId={explainingSku?.skuId ?? null}
         skuCode={explainingSku?.skuCode}
         skuName={explainingSku?.skuName}
-      />
-
-      <StockRepriceModal
-        isOpen={selectedLot !== null}
-        onClose={() => setSelectedLot(null)}
-        lot={selectedLot}
-        sku={selectedSkuObject}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["inventory", "balances", locationId] });
-          queryClient.invalidateQueries({ queryKey: ["inventory", "stock-summaries", locationId] });
-        }}
       />
     </main>
   );

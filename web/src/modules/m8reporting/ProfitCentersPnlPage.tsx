@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
@@ -421,8 +422,9 @@ export function ProfitCentersPnlPage() {
       )}
 
       {/* Creation Modal */}
-      {modalOpen && (
-        <div className="pnl-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pnl-modal-title">
+      {modalOpen && (() => {
+        const modalNode = (
+          <div className="pnl-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pnl-modal-title">
           <div className="pnl-modal">
             <div className="pnl-modal__header">
               <div className="pnl-modal__title-group">
@@ -515,7 +517,9 @@ export function ProfitCentersPnlPage() {
             </form>
           </div>
         </div>
-      )}
+        );
+        return typeof document !== "undefined" ? createPortal(modalNode, document.body) : modalNode;
+      })()}
     </main>
   );
 

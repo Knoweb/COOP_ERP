@@ -162,7 +162,7 @@ export function UnitsOfMeasurePage() {
           canManage && !showDefineForm && !editingUom ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="modern-btn modern-btn--primary"
               onClick={() => {
                 setShowDefineForm(true);
                 setSuccessMsg("");
@@ -193,8 +193,19 @@ export function UnitsOfMeasurePage() {
 
       {/* Define Form Card */}
       {showDefineForm && (
-        <div className="card" style={{ marginBottom: "var(--space-3)", padding: "var(--space-2)" }}>
-          <h3 style={{ margin: "0 0 var(--space-2) 0" }}>{t("catalogue.uom.define_title").text}</h3>
+        <div className="catalogue-department-card">
+          <div className="catalogue-department-card__header">
+            <div className="catalogue-department-card__icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
+                <path d="m14.5 12.5 2-2" />
+                <path d="m11.5 9.5 2-2" />
+                <path d="m8.5 6.5 2-2" />
+                <path d="m17.5 15.5 2-2" />
+              </svg>
+            </div>
+            <h3 className="catalogue-department-card__title">{t("catalogue.uom.define_title").text}</h3>
+          </div>
           <form onSubmit={handleDefineSubmit} className="catalogue-form-grid">
             <label className="catalogue-form-field">
               <span>
@@ -244,7 +255,7 @@ export function UnitsOfMeasurePage() {
               />
             </label>
 
-            <label className="catalogue-form-field" style={{ gridColumn: "1 / -1" }}>
+            <label className="catalogue-form-field catalogue-form-field--full">
               <span>{t("catalogue.uom.description").text}</span>
               <input
                 type="text"
@@ -254,7 +265,7 @@ export function UnitsOfMeasurePage() {
               />
             </label>
 
-            <div className="catalogue-form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+            <div className="catalogue-checkbox-row">
               <input
                 type="checkbox"
                 id="define-is-weight"
@@ -262,22 +273,22 @@ export function UnitsOfMeasurePage() {
                 checked={isWeight}
                 onChange={(e) => setIsWeight(e.target.checked)}
               />
-              <label htmlFor="define-is-weight" style={{ margin: 0, cursor: "pointer" }}>
+              <label htmlFor="define-is-weight" className="catalogue-checkbox-row__label">
                 {t("catalogue.uom.is_weight").text}
               </label>
             </div>
 
-            <div className="catalogue-form-actions" style={{ gridColumn: "1 / -1", marginTop: "var(--space-2)" }}>
+            <div className="catalogue-form-actions">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="modern-btn modern-btn--primary"
                 disabled={defineMutation.isPending}
               >
                 {defineMutation.isPending ? "..." : t("catalogue.uom.save").text}
               </button>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="modern-btn modern-btn--secondary"
                 onClick={() => {
                   setShowDefineForm(false);
                   setErrorMsg("");
@@ -292,10 +303,18 @@ export function UnitsOfMeasurePage() {
 
       {/* Edit Form Card */}
       {editingUom && (
-        <div className="card" style={{ marginBottom: "var(--space-3)", padding: "var(--space-2)" }}>
-          <h3 style={{ margin: "0 0 var(--space-2) 0" }}>
-            {t("catalogue.uom.edit_title").text}: <strong>{editingUom.uomCode}</strong>
-          </h3>
+        <div className="catalogue-department-card">
+          <div className="catalogue-department-card__header">
+            <div className="catalogue-department-card__icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </div>
+            <h3 className="catalogue-department-card__title">
+              {t("catalogue.uom.edit_title").text}: {editingUom.uomCode}
+            </h3>
+          </div>
           <form onSubmit={handleUpdateSubmit} className="catalogue-form-grid">
             <label className="catalogue-form-field">
               <span>{t("catalogue.uom.code").text}</span>
@@ -336,7 +355,7 @@ export function UnitsOfMeasurePage() {
               />
             </label>
 
-            <label className="catalogue-form-field" style={{ gridColumn: "1 / -1" }}>
+            <label className="catalogue-form-field catalogue-form-field--full">
               <span>{t("catalogue.uom.description").text}</span>
               <input
                 type="text"
@@ -357,7 +376,7 @@ export function UnitsOfMeasurePage() {
               </select>
             </label>
 
-            <div className="catalogue-form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+            <div className="catalogue-checkbox-row">
               <input
                 type="checkbox"
                 id="edit-is-weight"
@@ -365,22 +384,22 @@ export function UnitsOfMeasurePage() {
                 checked={editIsWeight}
                 onChange={(e) => setEditIsWeight(e.target.checked)}
               />
-              <label htmlFor="edit-is-weight" style={{ margin: 0, cursor: "pointer" }}>
+              <label htmlFor="edit-is-weight" className="catalogue-checkbox-row__label">
                 {t("catalogue.uom.is_weight").text}
               </label>
             </div>
 
-            <div className="catalogue-form-actions" style={{ gridColumn: "1 / -1", marginTop: "var(--space-2)" }}>
+            <div className="catalogue-form-actions">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="modern-btn modern-btn--primary"
                 disabled={updateMutation.isPending}
               >
                 {updateMutation.isPending ? "..." : t("catalogue.uom.update").text}
               </button>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="modern-btn modern-btn--secondary"
                 onClick={cancelEdit}
               >
                 {t("catalogue.uom.cancel").text}

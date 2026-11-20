@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useT } from "../../shell/i18n/useT";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
@@ -119,30 +120,84 @@ export function StockRepriceModal({
     }
   };
 
-  return (
-    <div className="inventory-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="inventory-modal">
-        <h2 id={titleId} className="inventory-modal-title">
-          {t("inventory.reprice.modal_title").text}
-        </h2>
-
-        <div className="inventory-modal-summary">
-          <div>
-            <strong>{sku?.skuCode ?? lot.skuId}</strong>
-            {sku?.nameEn && <span> — {sku.nameEn}</span>}
+  const modalNode = (
+    <div
+      className="inventory-modal-backdrop stock-reprice-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting) {
+          onClose();
+        }
+      }}
+    >
+      <div className="inventory-modal stock-reprice-modal">
+        {/* Header with icon badge, title & close button */}
+        <div className="stock-modal-header stock-reprice-modal__header">
+          <div className="stock-reprice-modal__header-title-wrap">
+            <div className="stock-reprice-modal__icon-badge" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
+              </svg>
+            </div>
+            <h2 id={titleId} className="inventory-modal-title stock-reprice-modal__title">
+              {t("inventory.reprice.modal_title").text}
+            </h2>
           </div>
-          <div className="inventory-modal-summary-grid">
-            <div>
-              <span>{t("inventory.column.batch").text}: </span>
-              <strong>{lot.batchNo || "—"}</strong>
+          <button
+            type="button"
+            className="stock-modal-close-btn"
+            onClick={onClose}
+            disabled={submitting}
+            aria-label={t("inventory.stock.explain.close").text}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Info summary card */}
+        <div className="inventory-modal-summary stock-reprice-summary-card">
+          <div className="stock-reprice-summary-card__top">
+            <span className="stock-reprice-sku-badge">{sku?.skuCode ?? lot.skuId}</span>
+            {sku?.nameEn && <span className="stock-reprice-sku-name">{sku.nameEn}</span>}
+          </div>
+          <div className="inventory-modal-summary-grid stock-reprice-summary-grid">
+            <div className="stock-reprice-summary-item">
+              <span className="stock-reprice-summary-label">{t("inventory.column.batch").text}</span>
+              <strong className="stock-reprice-summary-value">{lot.batchNo || "—"}</strong>
             </div>
-            <div>
-              <span>{t("inventory.reprice.available_qty").text}: </span>
-              <strong>{lot.qtyOnHand}</strong>
+            <div className="stock-reprice-summary-item">
+              <span className="stock-reprice-summary-label">{t("inventory.reprice.available_qty").text}</span>
+              <strong className="stock-reprice-summary-value">{lot.qtyOnHand}</strong>
             </div>
-            <div>
-              <span>{t("inventory.reprice.current_cost").text}: </span>
-              <strong>
+            <div className="stock-reprice-summary-item">
+              <span className="stock-reprice-summary-label">{t("inventory.reprice.current_cost").text}</span>
+              <strong className="stock-reprice-summary-value stock-reprice-summary-value--money">
                 <MoneyDisplay amount={lot.unitCost ?? 0} />
               </strong>
             </div>
@@ -155,11 +210,14 @@ export function StockRepriceModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="stock-reprice-form">
           <div className="inventory-modal-grid-2">
             <div>
-              <label htmlFor="reprice-qty" className="inventory-form-field">
-                {t("inventory.reprice.qty_label").text} *
+              <label htmlFor="reprice-qty" className="inventory-form-field stock-reprice-field-label">
+                <span className="stock-reprice-label-text">
+                  {t("inventory.reprice.qty_label").text}
+                  <span className="register-field-required"> *</span>
+                </span>
                 <input
                   id="reprice-qty"
                   type="number"
@@ -169,15 +227,18 @@ export function StockRepriceModal({
                   required
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
-                  className="input"
+                  className="input modern-input stock-reprice-input"
                   disabled={submitting}
                 />
               </label>
             </div>
 
             <div>
-              <label htmlFor="reprice-cost" className="inventory-form-field">
-                {t("inventory.reprice.new_cost_label").text} *
+              <label htmlFor="reprice-cost" className="inventory-form-field stock-reprice-field-label">
+                <span className="stock-reprice-label-text">
+                  {t("inventory.reprice.new_cost_label").text}
+                  <span className="register-field-required"> *</span>
+                </span>
                 <input
                   id="reprice-cost"
                   type="number"
@@ -186,7 +247,7 @@ export function StockRepriceModal({
                   required
                   value={newUnitCost}
                   onChange={(e) => setNewUnitCost(e.target.value)}
-                  className="input"
+                  className="input modern-input stock-reprice-input"
                   disabled={submitting}
                 />
               </label>
@@ -194,8 +255,11 @@ export function StockRepriceModal({
           </div>
 
           <div className="inventory-modal-field-group">
-            <label htmlFor="reprice-target-condition" className="inventory-form-field">
-              <span>{t("inventory.reprice.target_condition").text} *</span>
+            <label htmlFor="reprice-target-condition" className="inventory-form-field stock-reprice-field-label">
+              <span className="stock-reprice-label-text">
+                {t("inventory.reprice.target_condition").text}
+                <span className="register-field-required"> *</span>
+              </span>
               <CustomSelect
                 id="reprice-target-condition"
                 portal
@@ -212,17 +276,59 @@ export function StockRepriceModal({
           </div>
 
           {valueAdjustment !== null && (
-            <div className="inventory-modal-diff-row">
-              <span>{t("inventory.reprice.value_diff").text}:</span>
-              <strong>
+            <div
+              className={`inventory-modal-diff-row stock-reprice-diff-card ${
+                parseFloat(valueAdjustment) < 0
+                  ? "stock-reprice-diff-card--down"
+                  : parseFloat(valueAdjustment) > 0
+                    ? "stock-reprice-diff-card--up"
+                    : ""
+              }`}
+            >
+              <div className="stock-reprice-diff-card__left">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span className="stock-reprice-diff-card__label">{t("inventory.reprice.value_diff").text}:</span>
+              </div>
+              <strong className="stock-reprice-diff-card__amount">
                 <MoneyDisplay amount={parseFloat(valueAdjustment)} />
               </strong>
             </div>
           )}
 
           {blendedCost !== null && (
-            <div className="inventory-modal-blended-row">
-              <span>{t("inventory.reprice.blended_cost_note").text}:</span>
+            <div className="inventory-modal-blended-row stock-reprice-blended-card">
+              <div className="stock-reprice-blended-card__left">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>{t("inventory.reprice.blended_cost_note").text}:</span>
+              </div>
               <strong>
                 <MoneyDisplay amount={parseFloat(blendedCost)} />
               </strong>
@@ -230,8 +336,11 @@ export function StockRepriceModal({
           )}
 
           <div className="inventory-modal-field-group">
-            <label htmlFor="reprice-reason" className="inventory-form-field">
-              {t("inventory.reprice.reason_label").text} *
+            <label htmlFor="reprice-reason" className="inventory-form-field stock-reprice-field-label">
+              <span className="stock-reprice-label-text">
+                {t("inventory.reprice.reason_label").text}
+                <span className="register-field-required"> *</span>
+              </span>
               <textarea
                 id="reprice-reason"
                 required
@@ -240,16 +349,16 @@ export function StockRepriceModal({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={t("inventory.reprice.reason_placeholder").text}
-                className="input"
+                className="input modern-input stock-reprice-textarea"
                 disabled={submitting}
               />
             </label>
           </div>
 
-          <div className="inventory-modal-actions">
+          <div className="inventory-modal-actions stock-reprice-modal__actions">
             <button
               type="button"
-              className="button button--secondary"
+              className="button button--secondary modern-btn modern-btn--secondary"
               onClick={onClose}
               disabled={submitting}
             >
@@ -257,7 +366,7 @@ export function StockRepriceModal({
             </button>
             <button
               type="submit"
-              className="button button--primary"
+              className="button button--primary modern-btn modern-btn--primary"
               disabled={submitting}
             >
               {submitting ? t("inventory.reprice.submitting").text : t("inventory.reprice.submit").text}
@@ -267,4 +376,6 @@ export function StockRepriceModal({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalNode, document.body) : modalNode;
 }

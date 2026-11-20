@@ -1030,9 +1030,9 @@
 .shell-page table.modern-table.stock-positions-table,
 .stock-table.stock-positions-table {
   width: 100% !important;
-  min-width: calc(var(--space-8) * 13.5) !important;
+  min-width: 100% !important;
   max-width: 100% !important;
-  table-layout: auto !important;
+  table-layout: fixed !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
 }
@@ -1046,7 +1046,7 @@
 .stock-positions-table th {
   background: var(--color-polish-22) !important;
   color: var(--color-brand-dark) !important;
-  font-size: var(--font-size-xs) !important;
+  font-size: calc(var(--font-size-xs) * 0.88) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
   text-align: center !important;
@@ -1054,11 +1054,13 @@
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   border-left: none !important;
-  padding: var(--space-1) var(--space-1) !important;
+  padding: var(--space-1) calc(var(--space-half) / 2) !important;
   white-space: normal !important;
   word-break: normal !important;
-  overflow-wrap: break-word !important;
-  line-height: var(--line-height) !important;
+  overflow-wrap: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.25 !important;
   vertical-align: middle !important;
 }
 
@@ -1071,7 +1073,8 @@
   font-size: var(--font-size-sm) !important;
   color: var(--color-text) !important;
   vertical-align: middle !important;
-  padding: calc(var(--space-1) + var(--border-width)) var(--space-1) !important;
+  padding: calc(var(--space-1) + var(--border-width)) calc(var(--space-half) + var(--border-width)) !important;
+  box-sizing: border-box !important;
 }
 
 .shell-page .stock-positions-table th:last-child,
@@ -1096,152 +1099,138 @@
   background-color: var(--color-polish-31) !important;
 }
 
-/* 1. Col Expand */
-.shell-page .stock-positions-table th.col-expand,
-.shell-page .stock-positions-table td.col-expand,
-.shell-page .stock-positions-table th:first-child,
-.shell-page .stock-positions-table td:first-child,
-.stock-positions-table .col-expand,
-.stock-positions-table col.col-expand {
-  width: 3.5% !important;
-  min-width: calc(var(--space-4) + var(--space-half)) !important;
-  max-width: calc(var(--space-4) + var(--space-1)) !important;
-  padding: var(--space-1) var(--space-half) !important;
-  text-align: center !important;
-}
-
-/* 2. Col Item */
+/* 1. Col Item (SKU / ITEM) - Compact 18% width */
 .stock-positions-table .col-item,
 .stock-positions-table col.col-item {
-  width: 28% !important;
-  min-width: calc(var(--space-8) * 3.5) !important;
+  width: 18% !important;
 }
 .shell-page .stock-positions-table th.col-item {
   text-align: left !important;
-  white-space: normal !important;
-  padding-inline: calc(var(--space-1) + var(--space-half)) !important;
+  padding-left: var(--space-2) !important;
 }
 .shell-page .stock-positions-table td.col-item {
   text-align: left !important;
-  white-space: normal !important;
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
-  padding-inline: calc(var(--space-1) + var(--space-half)) !important;
-  line-height: var(--line-height) !important;
+  padding-left: var(--space-2) !important;
+  overflow: hidden !important;
 }
 
-/* 3. Col Dept */
+/* 2. Col Dept - 10% width */
 .stock-positions-table .col-dept,
 .stock-positions-table col.col-dept {
-  width: 13% !important;
-  min-width: calc(var(--space-8) * 1.5) !important;
+  width: 10% !important;
 }
 .shell-page .stock-positions-table th.col-dept,
 .shell-page .stock-positions-table td.col-dept {
-  text-align: left !important;
-  white-space: normal !important;
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
+  text-align: center !important;
+  overflow: hidden !important;
 }
 
-/* 4. Col UOM */
+/* 3. Col UOM - 7% width */
 .stock-positions-table .col-uom,
 .stock-positions-table col.col-uom {
-  width: 5.5% !important;
-  min-width: calc(var(--space-6)) !important;
+  width: 7% !important;
 }
-.shell-page .stock-positions-table th.col-uom,
-.shell-page .stock-positions-table td.col-uom {
+.shell-page .stock-positions-table th.col-uom {
   text-align: center !important;
 }
 .shell-page .stock-positions-table td.col-uom {
+  text-align: center !important;
   white-space: nowrap !important;
 }
 
-/* 5. Col On Hand */
+/* 4. Col On Hand - 9% width */
 .stock-positions-table .col-on-hand,
 .stock-positions-table col.col-on-hand {
-  width: 7.5% !important;
-  min-width: calc(var(--space-6) + var(--space-1)) !important;
+  width: 9% !important;
 }
-.shell-page .stock-positions-table th.col-on-hand,
+.shell-page .stock-positions-table th.col-on-hand {
+  text-align: right !important;
+  padding-right: var(--space-1) !important;
+}
 .shell-page .stock-positions-table td.col-on-hand {
   text-align: right !important;
+  padding-right: var(--space-1) !important;
   font-variant-numeric: tabular-nums !important;
-}
-.shell-page .stock-positions-table td.col-on-hand {
   white-space: nowrap !important;
 }
 
-/* 6. Col Reserved */
+/* 5. Col Reserved - 10% width */
 .stock-positions-table .col-reserved,
 .stock-positions-table col.col-reserved {
-  width: 7.5% !important;
-  min-width: calc(var(--space-6) + var(--space-1)) !important;
+  width: 10% !important;
 }
-.shell-page .stock-positions-table th.col-reserved,
+.shell-page .stock-positions-table th.col-reserved {
+  text-align: right !important;
+  padding-right: var(--space-1) !important;
+}
 .shell-page .stock-positions-table td.col-reserved {
   text-align: right !important;
+  padding-right: var(--space-1) !important;
   font-variant-numeric: tabular-nums !important;
-}
-.shell-page .stock-positions-table td.col-reserved {
   white-space: nowrap !important;
 }
 
-/* 7. Col Available */
+/* 6. Col Available - 10.5% width */
 .stock-positions-table .col-available,
 .stock-positions-table col.col-available {
-  width: 7.5% !important;
-  min-width: calc(var(--space-6) + var(--space-1)) !important;
+  width: 10.5% !important;
 }
-.shell-page .stock-positions-table th.col-available,
+.shell-page .stock-positions-table th.col-available {
+  text-align: right !important;
+  padding-right: var(--space-1) !important;
+}
 .shell-page .stock-positions-table td.col-available {
   text-align: right !important;
+  padding-right: var(--space-1) !important;
   font-variant-numeric: tabular-nums !important;
-}
-.shell-page .stock-positions-table td.col-available {
+  font-weight: var(--font-weight-strong) !important;
   white-space: nowrap !important;
 }
 
-/* 8. Col In-Transit */
+/* 7. Col In-Transit - 11% width */
 .stock-positions-table .col-in-transit,
 .stock-positions-table col.col-in-transit {
-  width: 8% !important;
-  min-width: calc(var(--space-8)) !important;
+  width: 11% !important;
 }
-.shell-page .stock-positions-table th.col-in-transit,
-.shell-page .stock-positions-table td.col-in-transit {
+.shell-page .stock-positions-table th.col-in-transit {
   text-align: center !important;
 }
 .shell-page .stock-positions-table td.col-in-transit {
+  text-align: center !important;
   white-space: nowrap !important;
 }
 
-/* 9. Col Variance */
+/* 8. Col Variance - 14% width */
 .stock-positions-table .col-variance,
 .stock-positions-table col.col-variance {
-  width: 12% !important;
-  min-width: calc(var(--space-8) * 1.6) !important;
+  width: 14% !important;
 }
-.shell-page .stock-positions-table th.col-variance,
-.shell-page .stock-positions-table td.col-variance {
+.shell-page .stock-positions-table th.col-variance {
   text-align: center !important;
 }
 .shell-page .stock-positions-table td.col-variance {
+  text-align: center !important;
   white-space: nowrap !important;
 }
 
-/* 10. Col Actions */
+/* 9. Col Actions - 10.5% width */
 .stock-positions-table .col-actions,
 .stock-positions-table col.col-actions {
-  width: 7.5% !important;
-  min-width: calc(var(--space-8) * 1.2) !important;
+  width: 10.5% !important;
 }
-.shell-page .stock-positions-table th.col-actions,
-.shell-page .stock-positions-table td.col-actions {
-  text-align: right !important;
+.shell-page .stock-positions-table th.col-actions {
+  text-align: center !important;
+  padding-inline: calc(var(--space-half) / 2) !important;
 }
 .shell-page .stock-positions-table td.col-actions {
+  text-align: center !important;
+  white-space: nowrap !important;
+  padding-inline: calc(var(--space-half) / 2) !important;
+}
+.shell-page .stock-positions-table td.col-actions .button {
+  padding: calc(var(--space-half) / 2) var(--space-1) !important;
+  font-size: var(--font-size-xs) !important;
+  min-height: calc(var(--target-min) * 0.7) !important;
   white-space: nowrap !important;
 }
 
@@ -1597,12 +1586,15 @@
 .shell-page .inventory-modal-backdrop,
 .inventory-modal-backdrop {
   position: fixed !important;
+  inset: 0 !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   width: 100vw !important;
+  width: 100dvw !important;
   height: 100vh !important;
+  height: 100dvh !important;
   background: var(--color-polish-8) !important;
   backdrop-filter: blur(var(--space-half)) !important;
   -webkit-backdrop-filter: blur(var(--space-half)) !important;
@@ -1615,18 +1607,34 @@
   overflow-y: auto !important;
 }
 
+.shell-page .inventory-modal-backdrop:has(.stock-reprice-modal),
+.inventory-modal-backdrop:has(.stock-reprice-modal),
+.shell-page .stock-reprice-backdrop,
+.stock-reprice-backdrop {
+  background: var(--color-polish-8) !important;
+  backdrop-filter: blur(var(--space-half)) !important;
+  -webkit-backdrop-filter: blur(var(--space-half)) !important;
+  z-index: 10050 !important;
+}
+
 .shell-page .inventory-modal,
 .inventory-modal {
-  background: var(--color-surface) !important;
-  border: var(--border-width) solid var(--color-polish-21) !important;
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface) !important;
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19) !important;
   border-radius: calc(var(--radius) * 3) !important;
   padding: var(--space-4) !important;
   width: 100% !important;
   max-width: calc(var(--space-8) * 8);
-  box-shadow: 0 var(--space-3) calc(var(--space-8) * 1.2) var(--color-polish-6) !important;
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31) !important;
   box-sizing: border-box !important;
   margin: auto !important;
-  margin-top: calc(var(--space-8) + var(--space-2)) !important;
   position: relative !important;
 }
 
@@ -1695,6 +1703,264 @@
 .inventory-modal-title {
   margin-top: 0;
   margin-bottom: var(--space-3);
+}
+
+/* Stock Reprice Modal Polish */
+.shell-page .stock-reprice-modal,
+.stock-reprice-modal {
+  max-width: calc(var(--space-8) * 8.5) !important;
+  width: 100% !important;
+  border-radius: calc(var(--radius) * 3) !important;
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19) !important;
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface) !important;
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31) !important;
+  padding: var(--space-4) !important;
+  margin: auto !important;
+}
+
+.shell-page .stock-reprice-modal__header,
+.stock-reprice-modal__header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: var(--space-2) !important;
+  margin-bottom: var(--space-3) !important;
+  padding-bottom: var(--space-3) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-18) !important;
+}
+
+.shell-page .stock-reprice-modal__header-title-wrap,
+.stock-reprice-modal__header-title-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+}
+
+.shell-page .stock-reprice-modal__icon-badge,
+.stock-reprice-modal__icon-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: calc(var(--space-4) + var(--space-half)) !important;
+  height: calc(var(--space-4) + var(--space-half)) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-polish-29) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  color: var(--color-polish-25) !important;
+  flex-shrink: 0 !important;
+}
+
+.shell-page .stock-reprice-modal__title,
+.stock-reprice-modal__title {
+  margin: 0 !important;
+  font-size: var(--font-size-xl) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-polish-25) !important;
+  line-height: 1.2 !important;
+}
+
+.shell-page .stock-reprice-modal__subtitle,
+.stock-reprice-modal__subtitle {
+  margin: calc(var(--space-half) / 2) 0 0 0 !important;
+  font-size: var(--font-size-sm) !important;
+  color: var(--color-text-muted) !important;
+}
+
+.shell-page .stock-reprice-summary-card,
+.stock-reprice-summary-card {
+  background: var(--color-polish-29) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  padding: var(--space-3) !important;
+  margin-bottom: var(--space-3) !important;
+}
+
+.shell-page .stock-reprice-summary-card__top,
+.stock-reprice-summary-card__top {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: var(--space-1) !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+.shell-page .stock-reprice-sku-badge,
+.stock-reprice-sku-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: calc(var(--space-half) / 2) var(--space-1) !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: var(--radius-pill) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-polish-25) !important;
+}
+
+.shell-page .stock-reprice-sku-name,
+.stock-reprice-sku-name {
+  font-size: var(--font-size-md) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+}
+
+.shell-page .stock-reprice-summary-grid,
+.stock-reprice-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: var(--space-2) !important;
+  margin-top: 0 !important;
+  padding-top: var(--space-2) !important;
+  border-top: var(--border-width) solid var(--color-polish-18) !important;
+}
+
+.shell-page .stock-reprice-summary-item,
+.stock-reprice-summary-item {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: calc(var(--space-half) / 2) !important;
+}
+
+.shell-page .stock-reprice-summary-label,
+.stock-reprice-summary-label {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  color: var(--color-text-muted) !important;
+}
+
+.shell-page .stock-reprice-summary-value,
+.stock-reprice-summary-value {
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+}
+
+.shell-page .stock-reprice-summary-value--money,
+.stock-reprice-summary-value--money {
+  color: var(--color-polish-25) !important;
+}
+
+.shell-page .stock-reprice-field-label,
+.stock-reprice-field-label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-half) !important;
+}
+
+.shell-page .stock-reprice-label-text,
+.stock-reprice-label-text {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  color: var(--color-polish-25) !important;
+}
+
+.shell-page .stock-reprice-input,
+.stock-reprice-input,
+.shell-page .stock-reprice-textarea,
+.stock-reprice-textarea {
+  border: var(--border-width) solid var(--color-border) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  background: var(--color-surface) !important;
+  padding: var(--space-1) var(--space-2) !important;
+  font-size: var(--font-size-md) !important;
+  color: var(--color-text) !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.shell-page .stock-reprice-input:focus,
+.stock-reprice-input:focus,
+.shell-page .stock-reprice-textarea:focus,
+.stock-reprice-textarea:focus {
+  outline: none !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21) !important;
+}
+
+.shell-page .stock-reprice-diff-card,
+.stock-reprice-diff-card {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: var(--space-2) var(--space-3) !important;
+  background: var(--color-polish-29) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  margin-bottom: var(--space-3) !important;
+}
+
+.shell-page .stock-reprice-diff-card--down,
+.stock-reprice-diff-card--down {
+  border-color: var(--color-polish-21) !important;
+}
+
+.shell-page .stock-reprice-diff-card--up,
+.stock-reprice-diff-card--up {
+  border-color: var(--color-polish-21) !important;
+}
+
+.shell-page .stock-reprice-diff-card__left,
+.stock-reprice-diff-card__left {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-1) !important;
+  color: var(--color-polish-25) !important;
+}
+
+.shell-page .stock-reprice-diff-card__label,
+.stock-reprice-diff-card__label {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+}
+
+.shell-page .stock-reprice-diff-card__amount,
+.stock-reprice-diff-card__amount {
+  font-size: var(--font-size-md) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-polish-25) !important;
+}
+
+.shell-page .stock-reprice-blended-card,
+.stock-reprice-blended-card {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: var(--space-2) var(--space-3) !important;
+  background: var(--color-surface-subtle) !important;
+  border: var(--border-width) solid var(--color-border) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  margin-bottom: var(--space-3) !important;
+  font-size: var(--font-size-sm) !important;
+  color: var(--color-text-muted) !important;
+}
+
+.shell-page .stock-reprice-blended-card__left,
+.stock-reprice-blended-card__left {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-1) !important;
+}
+
+.shell-page .stock-reprice-modal__actions,
+.stock-reprice-modal__actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  padding-top: var(--space-3) !important;
+  border-top: var(--border-width) solid var(--color-border) !important;
+  margin-top: var(--space-4) !important;
 }
 
 
@@ -2737,10 +3003,20 @@
   color: var(--color-disputed-text);
 }
 
+.stock-in-transit-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-half);
+  white-space: nowrap;
+}
+
 .stock-variance-cell {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
+  white-space: nowrap;
 }
 
 .stock-variance-qty {
@@ -3047,19 +3323,55 @@
 }
 
 /* Modal styles */
+.shell-page .stock-explanation-backdrop,
+.stock-explanation-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: var(--color-polish-8) !important;
+  backdrop-filter: blur(var(--space-half)) !important;
+  -webkit-backdrop-filter: blur(var(--space-half)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  padding: var(--space-3) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
 .shell-page .stock-explanation-modal,
 .stock-explanation-modal {
-  width: calc(100% - var(--space-4)) !important;
-  max-width: calc(var(--space-8) * 13) !important;
-  max-height: 88vh !important;
+  width: calc(100% - var(--space-6)) !important;
+  max-width: calc(var(--space-8) * 12.5) !important;
+  max-height: 94vh !important;
   overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: var(--space-2) !important;
+  gap: 0 !important;
+  padding: var(--space-3) var(--space-4) !important;
   border-radius: calc(var(--radius) * 3) !important;
-  border: var(--border-width) solid var(--color-polish-21) !important;
-  box-shadow: 0 var(--space-3) calc(var(--space-8) * 1.2) var(--color-polish-6) !important;
-  background: var(--color-surface) !important;
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19) !important;
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface) !important;
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31) !important;
+  box-sizing: border-box !important;
+  margin: auto !important;
 }
 
 .shell-page .stock-modal-header,
@@ -3069,7 +3381,7 @@
   align-items: flex-start !important;
   gap: var(--space-2) !important;
   margin-bottom: var(--space-2) !important;
-  padding-bottom: var(--space-2) !important;
+  padding-bottom: var(--space-1) !important;
   border-bottom: var(--border-width) solid var(--color-polish-18) !important;
 }
 
@@ -3168,7 +3480,7 @@
   border: none !important;
   border-radius: 0 !important;
   padding: 0 !important;
-  margin-bottom: var(--space-3) !important;
+  margin-bottom: var(--space-2) !important;
 }
 
 .shell-page .stock-modal-kpi-item,
@@ -3178,8 +3490,8 @@
   align-items: center !important;
   justify-content: space-between !important;
   gap: var(--space-1) !important;
-  padding: calc(var(--space-1) + var(--space-half) / 2) var(--space-2) !important;
-  min-height: calc(var(--space-6) + var(--space-1)) !important;
+  padding: var(--space-1) var(--space-2) !important;
+  min-height: calc(var(--space-6) + var(--space-half)) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
   border: var(--border-width) solid var(--color-border) !important;
   background: var(--color-surface) !important;
@@ -3301,7 +3613,7 @@
   align-items: center !important;
   gap: var(--space-1) !important;
   border-bottom: var(--border-width) solid var(--color-polish-21) !important;
-  padding-bottom: var(--space-2) !important;
+  padding-bottom: var(--space-1) !important;
   margin-bottom: var(--space-2) !important;
 }
 
@@ -3352,16 +3664,15 @@
 
 .shell-page .stock-modal-tab-body,
 .stock-modal-tab-body {
-  flex: 1 1 auto !important;
-  min-height: calc(var(--space-8) * 2) !important;
+  flex: 0 1 auto !important;
+  min-height: auto !important;
   display: flex !important;
   flex-direction: column !important;
 }
 
 .shell-page .stock-modal-table-wrap,
 .stock-modal-table-wrap {
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
+  overflow: hidden !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
@@ -3373,9 +3684,98 @@
 .shell-page table.modern-table.stock-modal-table,
 .stock-modal-table {
   width: 100% !important;
+  table-layout: fixed !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
   margin: 0 !important;
+}
+
+/* Lots table columns */
+.stock-modal-table col.modal-col-batch,
+.stock-modal-table .modal-col-batch {
+  width: 26% !important;
+}
+
+.stock-modal-table col.modal-col-expiry,
+.stock-modal-table .modal-col-expiry {
+  width: 14% !important;
+}
+
+.stock-modal-table col.modal-col-condition,
+.stock-modal-table .modal-col-condition {
+  width: 12% !important;
+}
+
+.stock-modal-table col.modal-col-fefo,
+.stock-modal-table .modal-col-fefo {
+  width: 10% !important;
+}
+
+.stock-modal-table col.modal-col-on-hand,
+.stock-modal-table .modal-col-on-hand {
+  width: 11% !important;
+}
+
+.stock-modal-table col.modal-col-unit-cost,
+.stock-modal-table .modal-col-unit-cost {
+  width: 13% !important;
+}
+
+.stock-modal-table col.modal-col-actions,
+.stock-modal-table .modal-col-actions {
+  width: 14% !important;
+}
+
+/* Reservations table columns */
+.stock-modal-table col.modal-col-res-doc,
+.stock-modal-table .modal-col-res-doc {
+  width: 35% !important;
+}
+
+.stock-modal-table col.modal-col-res-status,
+.stock-modal-table .modal-col-res-status {
+  width: 22% !important;
+}
+
+.stock-modal-table col.modal-col-res-qty,
+.stock-modal-table .modal-col-res-qty {
+  width: 18% !important;
+}
+
+.stock-modal-table col.modal-col-res-date,
+.stock-modal-table .modal-col-res-date {
+  width: 25% !important;
+}
+
+/* Transfers table columns */
+.stock-modal-table col.modal-col-tx-dir,
+.stock-modal-table .modal-col-tx-dir {
+  width: 20% !important;
+}
+
+.stock-modal-table col.modal-col-tx-doc,
+.stock-modal-table .modal-col-tx-doc {
+  width: 20% !important;
+}
+
+.stock-modal-table col.modal-col-tx-fromto,
+.stock-modal-table .modal-col-tx-fromto {
+  width: 24% !important;
+}
+
+.stock-modal-table col.modal-col-tx-qty,
+.stock-modal-table .modal-col-tx-qty {
+  width: 12% !important;
+}
+
+.stock-modal-table col.modal-col-tx-status,
+.stock-modal-table .modal-col-tx-status {
+  width: 12% !important;
+}
+
+.stock-modal-table col.modal-col-tx-date,
+.stock-modal-table .modal-col-tx-date {
+  width: 12% !important;
 }
 
 .shell-page .stock-modal-table thead tr,
@@ -3390,16 +3790,28 @@
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   text-transform: uppercase !important;
-  padding: var(--space-1) var(--space-1) !important;
+  padding: var(--space-1) calc(var(--space-half) / 2) !important;
   border-bottom: var(--border-width-strong) solid var(--color-polish-19) !important;
   border-right: var(--border-width) solid var(--color-polish-21) !important;
   border-top: none !important;
   border-left: none !important;
-  white-space: normal !important;
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
+  white-space: nowrap !important;
   line-height: var(--line-height) !important;
   text-align: center !important;
+}
+
+.shell-page .stock-modal-table td,
+.stock-modal-table td {
+  padding: calc(var(--space-1) + var(--border-width)) calc(var(--space-half) + var(--border-width)) !important;
+  font-size: var(--font-size-sm) !important;
+  color: var(--color-text) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
+  border-right: var(--border-width) solid var(--color-polish-21) !important;
+  border-top: none !important;
+  border-left: none !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+  white-space: nowrap !important;
 }
 
 .shell-page .stock-modal-table th:first-child,
@@ -3407,8 +3819,11 @@
 .shell-page .stock-modal-table td:first-child,
 .stock-modal-table td:first-child {
   text-align: left !important;
+  padding-left: var(--space-2) !important;
   font-weight: var(--font-weight-strong) !important;
   color: var(--color-polish-25) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .shell-page .stock-modal-table th:last-child,
@@ -3418,16 +3833,13 @@
   border-right: none !important;
 }
 
-.shell-page .stock-modal-table td,
-.stock-modal-table td {
-  padding: calc(var(--space-1) + var(--border-width)) var(--space-2) !important;
-  font-size: var(--font-size-sm) !important;
-  color: var(--color-text) !important;
-  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
-  border-right: var(--border-width) solid var(--color-polish-21) !important;
-  border-top: none !important;
-  border-left: none !important;
-  vertical-align: middle !important;
+.shell-page .stock-modal-table th.numeric-cell,
+.shell-page .stock-modal-table td.numeric-cell,
+.stock-modal-table th.numeric-cell,
+.stock-modal-table td.numeric-cell {
+  text-align: right !important;
+  padding-right: var(--space-2) !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
 .shell-page .stock-modal-table tbody tr td,
@@ -3450,8 +3862,8 @@
   display: flex !important;
   justify-content: flex-end !important;
   gap: var(--space-2) !important;
-  margin-top: var(--space-3) !important;
-  padding-top: var(--space-2) !important;
+  margin-top: var(--space-2) !important;
+  padding-top: var(--space-1) !important;
   border-top: var(--border-width) solid var(--color-border) !important;
 }
 
@@ -3481,6 +3893,33 @@
   border-color: var(--color-polish-21) !important;
   color: var(--color-polish-25) !important;
   transform: translateY(calc(var(--border-width) * -1)) !important;
+}
+
+.shell-page .inventory-modal-actions .button.button--primary,
+.shell-page .inventory-modal-actions .button--primary,
+.inventory-modal-actions .button.button--primary,
+.inventory-modal-actions .button--primary {
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  color: var(--color-on-accent) !important;
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-21) !important;
+}
+
+.shell-page .inventory-modal-actions .button.button--primary:hover:not(:disabled),
+.shell-page .inventory-modal-actions .button--primary:hover:not(:disabled),
+.inventory-modal-actions .button.button--primary:hover:not(:disabled),
+.inventory-modal-actions .button--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  color: var(--color-on-accent) !important;
+  filter: brightness(0.95) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-6) !important;
+}
+
+.shell-page .inventory-modal-actions .button:disabled,
+.inventory-modal-actions .button:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
 }
 
 .stock-direction-badge {
@@ -3998,7 +4437,7 @@
   align-items: center !important;
   gap: var(--space-2) !important;
   padding: var(--space-3) var(--space-4) !important;
-  border-bottom: var(--border-width) solid var(--color-polish-21) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-18) !important;
   background: var(--color-surface) !important;
 }
 
@@ -4006,12 +4445,12 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: var(--space-6) !important;
-  height: var(--space-6) !important;
-  border-radius: calc(var(--radius) * 4) !important;
-  background: var(--color-polish-22) !important;
+  width: calc(var(--space-4) + var(--space-half)) !important;
+  height: calc(var(--space-4) + var(--space-half)) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  background: var(--color-polish-29) !important;
   border: var(--border-width) solid var(--color-polish-21) !important;
-  color: var(--color-accent) !important;
+  color: var(--color-polish-25) !important;
   flex-shrink: 0 !important;
 }
 
@@ -4021,9 +4460,9 @@
 
 .inventory-card-header__title {
   margin: 0 !important;
-  font-size: var(--font-size-md) !important;
+  font-size: var(--font-size-lg) !important;
   font-weight: var(--font-weight-strong) !important;
-  color: var(--color-brand-dark) !important;
+  color: var(--color-polish-25) !important;
   line-height: 1.2 !important;
 }
 
@@ -4053,19 +4492,16 @@
   justify-content: center !important;
   gap: var(--space-1) !important;
   padding: var(--space-1) var(--space-4) !important;
-  min-height: var(--target-min) !important;
-  background: var(--color-accent) !important;
-  color: var(--color-surface) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
-  border-radius: calc(var(--radius) * 4) !important;
+  min-height: calc(var(--space-4) + var(--space-half)) !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  color: var(--color-on-accent) !important;
+  border: var(--border-width) solid var(--color-polish-19) !important;
+  border-radius: var(--radius-pill) !important;
   font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-strong) !important;
   cursor: pointer !important;
-  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
-  transition: background 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.18s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-21) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .inventory-submit-btn svg {
@@ -4073,14 +4509,13 @@
 }
 
 .inventory-submit-btn:hover:not(:disabled) {
-  background: var(--color-accent-hover) !important;
-  border-color: var(--color-accent-hover) !important;
-  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-8) !important;
+  filter: brightness(0.95) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-6) !important;
   transform: translateY(calc(var(--border-width) * -1)) !important;
 }
 
 .inventory-submit-btn:disabled {
-  opacity: 0.45 !important;
+  opacity: 0.5 !important;
   cursor: not-allowed !important;
   box-shadow: none !important;
   transform: none !important;
@@ -4474,6 +4909,83 @@
   width: fit-content !important;
 }
 
+.repack-grid-2 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 3), 1fr)) !important;
+  gap: var(--space-3) !important;
+  margin-bottom: var(--space-3) !important;
+}
+
+.repack-conversion-flow {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: var(--space-3) !important;
+  margin-bottom: var(--space-4) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.repack-conversion-card {
+  flex: 1 1 calc(var(--space-8) * 4) !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  padding: var(--space-3) !important;
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-14) !important;
+  box-sizing: border-box !important;
+}
+
+.repack-conversion-card--input {
+  border-left: calc(var(--border-width) * 4) solid var(--color-accent) !important;
+}
+
+.repack-conversion-card--output {
+  border-left: calc(var(--border-width) * 4) solid var(--color-success) !important;
+}
+
+.repack-conversion-card__header {
+  margin-bottom: var(--space-2) !important;
+}
+
+.repack-conversion-card__badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--space-1) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  text-transform: uppercase !important;
+  padding: calc(var(--space-half) / 2) var(--space-2) !important;
+  border-radius: var(--radius-full) !important;
+}
+
+.repack-conversion-card__badge--input {
+  background: var(--color-polish-22) !important;
+  color: var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-polish-21) !important;
+}
+
+.repack-conversion-card__badge--output {
+  background: var(--color-success-subtle) !important;
+  color: var(--color-success) !important;
+  border: var(--border-width) solid var(--color-success-subtle) !important;
+}
+
+.repack-conversion-card__body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-2) !important;
+}
+
+.repack-conversion-arrow {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--color-accent) !important;
+  flex-shrink: 0 !important;
+  padding: var(--space-1) !important;
+}
+
 /* ---------- Write-offs Form Polish ---------- */
 
 .writeoff-category-field {
@@ -4818,6 +5330,64 @@
   margin-bottom: calc(var(--space-half) / 2) !important;
 }
 
+/* ---------- Transfer Requests Form Polish (TransferRequestsPage) ---------- */
+
+.transfer-request-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  margin-top: var(--space-3) !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+.transfer-request-toolbar .stock-search-wrap {
+  flex: 0 1 calc(var(--space-8) * 3 + var(--space-6)) !important;
+  width: calc(var(--space-8) * 3 + var(--space-6)) !important;
+  max-width: 100% !important;
+}
+
+.transfer-request-table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.transfer-request-table col.transfer-col-item,
+.transfer-request-table .transfer-col-item {
+  width: 78% !important;
+}
+
+.transfer-request-table col.transfer-col-qty,
+.transfer-request-table .transfer-col-qty {
+  width: 22% !important;
+}
+
+.shell-page .transfer-request-table th.transfer-col-item,
+.transfer-request-table th.transfer-col-item {
+  text-align: left !important;
+  padding-left: var(--space-3) !important;
+}
+
+.shell-page .transfer-request-table td.transfer-col-item,
+.transfer-request-table td.transfer-col-item {
+  text-align: left !important;
+  padding-left: var(--space-3) !important;
+  font-size: var(--font-size-sm) !important;
+  vertical-align: middle !important;
+}
+
+.shell-page .transfer-request-table th.transfer-col-qty,
+.transfer-request-table th.transfer-col-qty {
+  text-align: right !important;
+  padding-right: var(--space-4) !important;
+}
+
+.shell-page .transfer-request-table td.transfer-col-qty,
+.transfer-request-table td.transfer-col-qty {
+  text-align: right !important;
+  padding-right: var(--space-4) !important;
+  vertical-align: middle !important;
+}
+
 .transfer-qty-input {
   width: calc(var(--space-8) * 1.5) !important;
   min-width: 0 !important;
@@ -4831,6 +5401,11 @@
   color: var(--color-text) !important;
   box-sizing: border-box !important;
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.transfer-qty-input:hover {
+  border-color: var(--color-polish-19) !important;
+  box-shadow: 0 0 0 var(--border-width) var(--color-polish-27) !important;
 }
 
 .transfer-qty-input:focus {

@@ -161,7 +161,7 @@ export function DepartmentCategoriesPage() {
           canManage && !showDefineForm && !editingDepartment ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="modern-btn modern-btn--primary"
               onClick={() => {
                 setShowDefineForm(true);
                 setSuccessMsg("");
@@ -190,8 +190,19 @@ export function DepartmentCategoriesPage() {
 
       {/* Define Form Card */}
       {showDefineForm && (
-        <div className="card" style={{ marginBottom: "var(--space-3)", padding: "var(--space-2)" }}>
-          <h3 style={{ margin: "0 0 var(--space-2) 0" }}>{t("catalogue.departments.define_title").text}</h3>
+        <div className="catalogue-department-card">
+          <div className="catalogue-department-card__header">
+            <div className="catalogue-department-card__icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="3" width="6" height="5" rx="1" />
+                <rect x="3" y="16" width="6" height="5" rx="1" />
+                <rect x="15" y="16" width="6" height="5" rx="1" />
+                <path d="M12 8v4" />
+                <path d="M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+              </svg>
+            </div>
+            <h3 className="catalogue-department-card__title">{t("catalogue.departments.define_title").text}</h3>
+          </div>
           <form onSubmit={handleDefineSubmit} className="catalogue-form-grid">
             <label className="catalogue-form-field">
               <span>
@@ -266,17 +277,17 @@ export function DepartmentCategoriesPage() {
               />
             </label>
 
-            <div style={{ display: "flex", gap: "var(--space-1)", marginTop: "var(--space-1)" }}>
+            <div className="catalogue-form-actions">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="modern-btn modern-btn--primary"
                 disabled={defineMutation.isPending || !code.trim() || !nameEn.trim()}
               >
                 {t("catalogue.departments.save").text}
               </button>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="modern-btn modern-btn--secondary"
                 onClick={() => setShowDefineForm(false)}
               >
                 {t("catalogue.departments.cancel").text}
@@ -288,10 +299,18 @@ export function DepartmentCategoriesPage() {
 
       {/* Edit Form Card */}
       {editingDepartment && (
-        <div className="card" style={{ marginBottom: "var(--space-3)", padding: "var(--space-2)" }}>
-          <h3 style={{ margin: "0 0 var(--space-2) 0" }}>
-            {t("catalogue.departments.edit_title").text}: {editingDepartment.code}
-          </h3>
+        <div className="catalogue-department-card">
+          <div className="catalogue-department-card__header">
+            <div className="catalogue-department-card__icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </div>
+            <h3 className="catalogue-department-card__title">
+              {t("catalogue.departments.edit_title").text}: {editingDepartment.code}
+            </h3>
+          </div>
           <form onSubmit={handleUpdateSubmit} className="catalogue-form-grid">
             <label className="catalogue-form-field">
               <span>
@@ -359,17 +378,17 @@ export function DepartmentCategoriesPage() {
               />
             </label>
 
-            <div style={{ display: "flex", gap: "var(--space-1)", marginTop: "var(--space-1)" }}>
+            <div className="catalogue-form-actions">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="modern-btn modern-btn--primary"
                 disabled={updateMutation.isPending || !editNameEn.trim()}
               >
                 {t("catalogue.departments.update").text}
               </button>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="modern-btn modern-btn--secondary"
                 onClick={cancelEdit}
               >
                 {t("catalogue.departments.cancel").text}

@@ -20,24 +20,51 @@
 }
 
 .shell-page .modern-filter-panel.integration-bar.journal-controls {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-2);
+  gap: 0;
+  padding: 0;
   margin-bottom: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: calc(var(--radius) * 3);
+  box-shadow: 0 var(--border-width-strong) var(--space-2) var(--color-polish-23);
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.journal-controls__body {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: calc(var(--radius) * 3) calc(var(--radius) * 3) 0 0;
 }
 
 .journal-controls__row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-3);
   align-items: flex-end;
   width: 100%;
+}
+
+.journal-controls__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-polish-22);
+  border-top: var(--border-width) solid var(--color-polish-14);
+  border-radius: 0 0 calc(var(--radius) * 3) calc(var(--radius) * 3);
 }
 
 .journal-controls__submit {
   margin-left: auto;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .journal-generate-btn {
@@ -45,8 +72,13 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  min-height: var(--target-min);
-  padding: var(--space-1) var(--space-3);
+  height: calc(var(--space-4) + var(--space-1));
+  min-height: calc(var(--space-4) + var(--space-1));
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
 }
 
 .journal-btn-icon {
@@ -255,11 +287,12 @@
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  min-height: var(--target-min);
+  height: calc(var(--space-4) + var(--space-1));
+  min-height: calc(var(--space-4) + var(--space-1));
   padding: 0 var(--space-2);
   border-radius: calc(var(--radius) * 2);
   border: var(--border-width) solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-surface-subtle);
   gap: var(--space-1);
   cursor: pointer;
   box-sizing: border-box;
@@ -267,7 +300,8 @@
 }
 
 .integration-bar .integration-check:hover {
-  border-color: var(--color-accent);
+  border-color: var(--color-polish-19);
+  background: var(--color-polish-29);
 }
 
 .integration-bar .integration-check--checked {
@@ -295,11 +329,12 @@
 }
 
 .journal-check-label {
-  text-transform: none;
-  letter-spacing: normal;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-strong);
-  color: var(--color-text);
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+  line-height: var(--line-height);
 }
 
 .integration-hint {
@@ -308,14 +343,16 @@
 }
 
 .journal-controls__hint {
+  flex: 1 1 calc(var(--space-8) * 5);
+  min-width: 0;
   margin: 0;
-  padding-top: var(--space-2);
-  border-top: var(--border-width) solid var(--color-polish-14);
+  padding: 0;
+  border: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-1);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--color-polish-25);
   line-height: var(--line-height);
 }
 
@@ -784,10 +821,10 @@
 }
 
 .integration-bar .cdp__trigger {
-  height: var(--target-min) !important;
-  min-height: var(--target-min) !important;
-  padding: var(--space-1) var(--space-2) !important;
-  border: var(--border-width) solid var(--color-accent) !important;
+  height: calc(var(--space-4) + var(--space-1)) !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding: 0 var(--space-2) !important;
+  border: var(--border-width) solid var(--color-border) !important;
   border-radius: calc(var(--radius) * 2) !important;
   background: var(--color-surface) !important;
   font-family: inherit !important;
@@ -795,6 +832,7 @@
   font-weight: var(--font-weight-normal) !important;
   line-height: var(--line-height) !important;
   color: var(--color-text) !important;
+  box-shadow: none !important;
 }
 
 .integration-bar .cdp--filled .cdp__trigger {
@@ -900,9 +938,11 @@
 }
 
 .journal-callout--pending {
-  background: var(--color-polish-29);
+  background: var(--color-surface);
   border-color: var(--color-polish-18);
-  color: var(--color-polish-25);
+  border-left: calc(var(--border-width) * 3) solid var(--color-accent);
+  color: var(--color-brand-dark);
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-23);
 }
 
 .journal-callout--muted {
@@ -1000,14 +1040,47 @@
 }
 
 .journal-empty-card {
-  background: var(--color-surface-subtle);
-  border: var(--border-width) dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-3);
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-polish-29) 100%);
+  border: var(--border-width) solid var(--color-polish-18);
   border-radius: calc(var(--radius) * 3);
+  box-shadow: 0 var(--border-width-strong) var(--space-2) var(--color-polish-23);
 }
 
-.journal-empty-card p {
+.journal-empty-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--color-polish-31), var(--color-accent-light));
+  border: var(--border-width) solid var(--color-polish-21);
+  color: var(--color-accent);
+  box-shadow: 0 var(--border-width) var(--space-1) var(--color-polish-14);
+}
+
+.journal-empty-card__badge svg {
+  width: var(--space-3);
+  height: var(--space-3);
+  stroke: currentColor;
+  stroke-width: var(--border-width-strong);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.journal-empty-card__title {
   margin: 0;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-brand-dark);
+  line-height: var(--line-height);
 }
 
 .journal-table-card {

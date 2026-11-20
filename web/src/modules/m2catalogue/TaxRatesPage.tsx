@@ -164,65 +164,86 @@ export function TaxRatesPage() {
       {canPublish && (
         <div className="tax-forms-grid">
           {/* Define Category Card */}
-          <section className="modern-table-card tax-card">
-            <h2 className="tax-card-title">
-              {t("catalogue.tax.define_category").text}
-            </h2>
-            <form onSubmit={handleDefineCategorySubmit} className="catalogue-form-row">
-              <label className="catalogue-form-field">
-                <span className="tax-field-required">{t("catalogue.tax.field.code").text} *</span>
-                <input
-                  id="tax-category-code-input"
-                  type="text"
-                  maxLength={12}
-                  required
-                  value={categoryCode}
-                  onChange={(e) => setCategoryCode(e.target.value.toUpperCase())}
-                  placeholder={t("catalogue.tax.placeholder.code").text}
-                />
-              </label>
+          <div className="tax-card">
+            <div className="tax-card__header">
+              <div className="tax-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                  <line x1="7" y1="7" x2="7.01" y2="7" />
+                </svg>
+              </div>
+              <h2 className="tax-card__title">
+                {t("catalogue.tax.define_category").text}
+              </h2>
+            </div>
+            <form onSubmit={handleDefineCategorySubmit} className="tax-form-body">
+              <div className="tax-form-fields">
+                <label className="catalogue-form-field">
+                  <span>
+                    {t("catalogue.tax.field.code").text}
+                    <span className="register-field-required">*</span>
+                  </span>
+                  <input
+                    id="tax-category-code-input"
+                    type="text"
+                    maxLength={12}
+                    required
+                    value={categoryCode}
+                    onChange={(e) => setCategoryCode(e.target.value.toUpperCase())}
+                    placeholder={t("catalogue.tax.placeholder.code").text}
+                  />
+                </label>
 
-              <label className="catalogue-form-field">
-                <span className="tax-field-required">{t("catalogue.tax.field.name_en").text} *</span>
-                <input
-                  id="tax-category-name-en-input"
-                  type="text"
-                  maxLength={80}
-                  required
-                  value={categoryNameEn}
-                  onChange={(e) => setCategoryNameEn(e.target.value)}
-                  placeholder={t("catalogue.tax.placeholder.name_en").text}
-                />
-              </label>
+                <label className="catalogue-form-field">
+                  <span>
+                    {t("catalogue.tax.field.name_en").text}
+                    <span className="register-field-required">*</span>
+                  </span>
+                  <input
+                    id="tax-category-name-en-input"
+                    type="text"
+                    maxLength={80}
+                    required
+                    value={categoryNameEn}
+                    onChange={(e) => setCategoryNameEn(e.target.value)}
+                    placeholder={t("catalogue.tax.placeholder.name_en").text}
+                  />
+                </label>
 
-              <label className="catalogue-form-field">
-                <span>{t("catalogue.tax.field.name_si").text}</span>
-                <input
-                  id="tax-category-name-si-input"
-                  type="text"
-                  maxLength={80}
-                  value={categoryNameSi}
-                  onChange={(e) => setCategoryNameSi(e.target.value)}
-                />
-              </label>
+                <label className="catalogue-form-field">
+                  <span>{t("catalogue.tax.field.name_si").text}</span>
+                  <input
+                    id="tax-category-name-si-input"
+                    type="text"
+                    maxLength={80}
+                    value={categoryNameSi}
+                    onChange={(e) => setCategoryNameSi(e.target.value)}
+                  />
+                </label>
 
-              <label className="catalogue-form-field">
-                <span>{t("catalogue.tax.field.name_ta").text}</span>
-                <input
-                  id="tax-category-name-ta-input"
-                  type="text"
-                  maxLength={80}
-                  value={categoryNameTa}
-                  onChange={(e) => setCategoryNameTa(e.target.value)}
-                />
-              </label>
+                <label className="catalogue-form-field">
+                  <span>{t("catalogue.tax.field.name_ta").text}</span>
+                  <input
+                    id="tax-category-name-ta-input"
+                    type="text"
+                    maxLength={80}
+                    value={categoryNameTa}
+                    onChange={(e) => setCategoryNameTa(e.target.value)}
+                  />
+                </label>
+              </div>
 
               <div className="tax-button-container">
                 <button
                   id="submit-tax-category-button"
                   type="submit"
+                  className="modern-btn modern-btn--primary tax-submit-btn"
                   disabled={defineCategoryMutation.isPending || !categoryCode.trim() || !categoryNameEn.trim()}
                 >
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
                   {defineCategoryMutation.isPending ? t("catalogue.loading").text : t("catalogue.tax.submit.category").text}
                 </button>
               </div>
@@ -233,57 +254,75 @@ export function TaxRatesPage() {
                 </p>
               )}
             </form>
-          </section>
+          </div>
 
           {/* Publish Tax Rate Card */}
-          <section className="modern-table-card tax-card">
-            <h2 className="tax-card-title">
-              {t("catalogue.tax.publish_rate").text}
-            </h2>
-            <form onSubmit={handlePublishRateSubmit} className="catalogue-form-row">
-              <CatalogueDropdown
-                label={t("catalogue.tax.field.category").text}
-                value={rateTaxCategoryId}
-                placeholder={t("catalogue.field.choose").text}
-                onChange={(val) => setRateTaxCategoryId(val)}
-                required
-                options={categories.map((cat: TaxCategory) => ({
-                  value: cat.taxCategoryId,
-                  label: `${cat.code} - ${cat.nameEn}`
-                }))}
-              />
-
-              <label className="catalogue-form-field">
-                <span className="tax-field-required">{t("catalogue.tax.field.rate").text} *</span>
-                <input
-                  id="publish-rate-percent-input"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
+          <div className="tax-card">
+            <div className="tax-card__header">
+              <div className="tax-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="5" x2="5" y2="19" />
+                  <circle cx="6.5" cy="6.5" r="2.5" />
+                  <circle cx="17.5" cy="17.5" r="2.5" />
+                </svg>
+              </div>
+              <h2 className="tax-card__title">
+                {t("catalogue.tax.publish_rate").text}
+              </h2>
+            </div>
+            <form onSubmit={handlePublishRateSubmit} className="tax-form-body">
+              <div className="tax-form-fields">
+                <CatalogueDropdown
+                  label={t("catalogue.tax.field.category").text}
+                  value={rateTaxCategoryId}
+                  placeholder={t("catalogue.field.choose").text}
+                  onChange={(val) => setRateTaxCategoryId(val)}
                   required
-                  value={ratePercent}
-                  onChange={(e) => setRatePercent(e.target.value)}
+                  options={categories.map((cat: TaxCategory) => ({
+                    value: cat.taxCategoryId,
+                    label: `${cat.code} - ${cat.nameEn}`
+                  }))}
                 />
-              </label>
 
-              <div className="catalogue-form-field">
-                <DatePicker
-                  id="publish-rate-apply-from-input"
-                  label={t("catalogue.tax.field.apply_from").text}
-                  required
-                  min={todayIso}
-                  value={applyFrom}
-                  onChange={setApplyFrom}
-                />
+                <label className="catalogue-form-field">
+                  <span>
+                    {t("catalogue.tax.field.rate").text}
+                    <span className="register-field-required">*</span>
+                  </span>
+                  <input
+                    id="publish-rate-percent-input"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    required
+                    value={ratePercent}
+                    onChange={(e) => setRatePercent(e.target.value)}
+                  />
+                </label>
+
+                <div className="catalogue-form-field">
+                  <DatePicker
+                    id="publish-rate-apply-from-input"
+                    label={t("catalogue.tax.field.apply_from").text}
+                    required
+                    min={todayIso}
+                    value={applyFrom}
+                    onChange={setApplyFrom}
+                  />
+                </div>
               </div>
 
               <div className="tax-button-container">
                 <button
                   id="submit-tax-rate-button"
                   type="submit"
+                  className="modern-btn modern-btn--primary tax-submit-btn"
                   disabled={publishRateMutation.isPending || !rateTaxCategoryId || !ratePercent || !applyFrom}
                 >
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                   {publishRateMutation.isPending ? t("catalogue.loading").text : t("catalogue.tax.submit.rate").text}
                 </button>
               </div>
@@ -294,7 +333,7 @@ export function TaxRatesPage() {
                 </p>
               )}
             </form>
-          </section>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
@@ -234,7 +235,7 @@ function ReverseForm({ documentId, accountId, onDone }: { documentId: string; ac
     event.preventDefault();
     reverse.mutate();
   };
-  return (
+  const modalNode = (
     <div
       className="statement-reverse-backdrop"
       onClick={(e) => {
@@ -283,4 +284,6 @@ function ReverseForm({ documentId, accountId, onDone }: { documentId: string; ac
       </form>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalNode, document.body) : modalNode;
 }

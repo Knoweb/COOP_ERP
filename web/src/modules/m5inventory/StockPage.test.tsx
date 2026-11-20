@@ -219,7 +219,7 @@ describe("StockPage", () => {
     });
   });
 
-  it("expands an SKU row to display lot breakdown", async () => {
+  it("renders SKU summary row without inline lot breakdown", async () => {
     renderPage();
 
     const selectBtn = screen.getByTestId("select-location-btn");
@@ -229,25 +229,8 @@ describe("StockPage", () => {
       expect(screen.getByText("SKU-RICE-5KG")).toBeTruthy();
     });
 
-    const expandButtons = screen.getAllByRole("button", { name: /Show Lots/i });
-    fireEvent.click(expandButtons[0]);
-
-    await waitFor(() => {
-      expect(screen.getByText("BAT-RICE-01")).toBeTruthy();
-      expect(screen.getByText("Reprice")).toBeTruthy();
-    });
-  });
-
-  it("does not offer stock repricing without inv.stock.reprice", async () => {
-    permissionState.permissions = new Set(["inv.stock.view"]);
-    renderPage();
-
-    fireEvent.click(screen.getByTestId("select-location-btn"));
-    await waitFor(() => expect(screen.getByText("SKU-RICE-5KG")).toBeTruthy());
-    fireEvent.click(screen.getAllByRole("button", { name: /Show Lots/i })[0]);
-
-    await waitFor(() => expect(screen.getByText("BAT-RICE-01")).toBeTruthy());
-    expect(screen.queryByRole("button", { name: "Reprice" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Show Lots/i })).toBeNull();
+    expect(screen.queryByText("BAT-RICE-01")).toBeNull();
   });
 
   it("opens explanation modal when clicking Explain button", async () => {

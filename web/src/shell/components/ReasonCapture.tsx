@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useT } from "../i18n/useT";
 
 /**
@@ -96,7 +97,7 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
     });
   };
 
-  return (
+  const backdropNode = (
     <div
       className="reason-capture-backdrop"
       onClick={(e) => {
@@ -259,4 +260,6 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
       </form>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(backdropNode, document.body) : backdropNode;
 }

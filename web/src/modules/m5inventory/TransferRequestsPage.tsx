@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
@@ -37,6 +37,7 @@ export function TransferRequestsPage() {
   const [shopId, setShopId] = useState("");
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [sources, setSources] = useState<Record<string, string>>({});
   const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
 
@@ -48,6 +49,56 @@ export function TransferRequestsPage() {
     enabled: canRequest && shopId !== ""
   });
   const items = [...new Set((shelf.data ?? []).map((lot) => lot.skuId))];
+
+  const summariesQuery = useQuery({
+    queryKey: ["inventory", "stock-summaries", shopId],
+    queryFn: () => (api.stockSummaries ? api.stockSummaries(shopId) : Promise.resolve([])),
+    enabled: canRequest && shopId !== ""
+  });
+
+  const summaryMap = useMemo(() => {
+    const map = new Map<string, { code: string; name: string }>();
+    for (const s of summariesQuery.data ?? []) {
+      const name = locale === "si" && s.skuNameSi ? s.skuNameSi : locale === "ta" && s.skuNameTa ? s.skuNameTa : s.skuNameEn;
+      map.set(s.skuId, { code: s.skuCode, name });
+    }
+    return map;
+  }, [summariesQuery.data, locale]);
+
+  useEffect(() => {
+    if (items.length > 0 && api.getSku) {
+      for (const skuId of items) {
+        if (!queryClient.getQueryData(["inventory", "sku", skuId])) {
+          queryClient.prefetchQuery({
+            queryKey: ["inventory", "sku", skuId],
+            queryFn: () => api.getSku(skuId),
+            staleTime: Infinity
+          });
+        }
+      }
+    }
+  }, [items, api, queryClient]);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase().trim();
+    return items.filter((skuId) => {
+      if (skuId.toLowerCase().includes(q)) return true;
+      const summary = summaryMap.get(skuId);
+      if (summary) {
+        if (summary.code?.toLowerCase().includes(q)) return true;
+        if (summary.name?.toLowerCase().includes(q)) return true;
+      }
+      const cached = queryClient.getQueryData<any>(["inventory", "sku", skuId]);
+      if (cached) {
+        if (cached.skuCode?.toLowerCase().includes(q)) return true;
+        if (cached.nameEn?.toLowerCase().includes(q)) return true;
+        if (cached.nameSi?.toLowerCase().includes(q)) return true;
+        if (cached.nameTa?.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [items, searchQuery, summaryMap, queryClient]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["inventory"] });
   const forget = (key: { next: () => void }) => (error: unknown) => {
@@ -69,6 +120,7 @@ export function TransferRequestsPage() {
       requestKey.next();
       setQuantities({});
       setReason("");
+      setSearchQuery("");
       refresh();
     },
     onError: forget(requestKey)
@@ -187,33 +239,83 @@ export function TransferRequestsPage() {
             </section>
             {shelf.data && items.length === 0 && <p style={{ padding: 'var(--space-2) 0' }}>{t("inventory.balances.empty").text}</p>}
             {items.length > 0 && (
-              <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
-                <table className="modern-table stock-table">
-                  <thead>
-                    <tr>
-                      <th>{t("inventory.column.item").text}</th>
-                      <th>{t("inventory.request.qty").text}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((skuId) => (
-                      <tr key={skuId}>
-                        <td>
-                          <SkuLabel skuId={skuId} />
-                        </td>
-                        <td>
-                          <input
-                            inputMode="decimal"
-                            aria-label={t("inventory.request.qty").text}
-                            value={quantities[skuId] ?? ""}
-                            onChange={(event) => setQuantities({ ...quantities, [skuId]: event.target.value })}
-                          />
-                        </td>
+              <>
+                <div className="transfer-request-toolbar">
+                  <div className="stock-search-wrap">
+                    <span className="modern-control modern-control--search stock-search-control">
+                      <svg
+                        className="modern-control__leading-icon"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <circle cx="11" cy="11" r="6" />
+                        <path d="m16 16 4 4" />
+                      </svg>
+                      <input
+                        type="search"
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder={t("inventory.stock.search_placeholder").text}
+                        aria-label={t("inventory.stock.search_placeholder").text}
+                        className="stock-search-input"
+                      />
+                      {searchQuery ? (
+                        <button
+                          type="button"
+                          className="stock-search-clear"
+                          onClick={() => setSearchQuery("")}
+                          aria-label={t("inventory.remove").text}
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="modern-table-scroll" style={{ marginTop: 'var(--space-2)' }}>
+                  <table className="modern-table stock-table transfer-request-table">
+                    <colgroup>
+                      <col className="transfer-col-item" />
+                      <col className="transfer-col-qty" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th className="transfer-col-item">{t("inventory.column.item").text}</th>
+                        <th className="transfer-col-qty">{t("inventory.request.qty").text}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filteredItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={2} className="empty-table-cell">
+                            {t("inventory.find.none").text}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredItems.map((skuId) => (
+                          <tr key={skuId}>
+                            <td className="transfer-col-item">
+                              <SkuLabel skuId={skuId} />
+                            </td>
+                            <td className="transfer-col-qty">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="transfer-qty-input"
+                                aria-label={t("inventory.request.qty").text}
+                                value={quantities[skuId] ?? ""}
+                                onChange={(event) => setQuantities({ ...quantities, [skuId]: event.target.value })}
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
             <label className="inventory-form-field" style={{ marginTop: 'var(--space-3)' }}>
               {t("inventory.request.reason").text}
