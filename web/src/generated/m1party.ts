@@ -376,6 +376,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/relationships/credit-limits/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set trading relationship credit limits in bulk from a sheet or rows (CAT-14)
+         * @description Sets credit limits for trading relationships in bulk from a CSV sheet or list of items (CAT-14). Enforces step-up authentication (MFA) and bil.creditlimit.change permission. All-or-none: if any item fails validation, nothing is applied.
+         */
+        post: operations["bulkSetRelationshipCreditLimits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/party/relationships": {
         parameters: {
             query?: never;
@@ -1484,6 +1504,30 @@ export interface components {
             /** Format: uuid */
             nextCursor?: string | null;
         };
+        BulkRelationshipCreditLimitsRequest: {
+            /** @description CSV sheet containing buyer and credit_limit columns */
+            sheet?: string | null;
+            limits?: components["schemas"]["RelationshipCreditLimitItem"][];
+            defaultReason?: string | null;
+        };
+        RelationshipCreditLimitItem: {
+            buyerEntityCode?: string | null;
+            /** Format: uuid */
+            buyerEntityId?: string | null;
+            creditLimit: number;
+            reason?: string | null;
+        };
+        BulkRelationshipCreditLimitReport: {
+            /** @enum {string} */
+            status: "UPDATED" | "REJECTED";
+            updatedCount: number;
+            problems: components["schemas"]["BulkRelationshipCreditLimitProblem"][];
+        };
+        BulkRelationshipCreditLimitProblem: {
+            identifier: string;
+            field: string;
+            code: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -2239,6 +2283,36 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkSetRelationshipCreditLimits: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkRelationshipCreditLimitsRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk relationship credit limits report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkRelationshipCreditLimitReport"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["RuleBroken"];
             422: components["responses"]["RuleBroken"];
         };
     };

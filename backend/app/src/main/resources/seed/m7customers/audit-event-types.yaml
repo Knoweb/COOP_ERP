@@ -204,3 +204,8 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A loyalty insurance benefit claim status was updated
+
+  - code: CUSTOMER_LIMITS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Customer credit limits were imported in bulk from a sheet
