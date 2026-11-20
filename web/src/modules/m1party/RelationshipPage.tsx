@@ -385,7 +385,7 @@ export function RelationshipPage() {
                       {h.relationshipId === r.relationshipId ? (
                         <span className="relationship-current-cell">
                           <strong>{formatDate(h.effectiveFrom)}</strong>
-                          <span className="relationship-current-badge">Current</span>
+                          <span className="relationship-current-badge">{t("party.relationship.current").text}</span>
                         </span>
                       ) : (
                         <Link to={`/party/relationships/${h.relationshipId}`}>{formatDate(h.effectiveFrom)}</Link>

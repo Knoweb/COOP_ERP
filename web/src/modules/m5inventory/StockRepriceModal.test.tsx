@@ -163,7 +163,7 @@ describe("StockRepriceModal", () => {
   });
 
   it("blocks form submission and never invokes repriceStockLot while repricing is disabled", async () => {
-    const { props, container } = renderModal();
+    const { props } = renderModal();
 
     const costInput = screen.getByLabelText(/New Unit Cost/);
     fireEvent.change(costInput, { target: { value: "70" } });
@@ -175,7 +175,7 @@ describe("StockRepriceModal", () => {
     expect(submitBtn.disabled).toBe(true);
     fireEvent.click(submitBtn);
 
-    const form = container.querySelector("form")!;
+    const form = document.body.querySelector("form")!;
     fireEvent.submit(form);
 
     await waitFor(() => {
