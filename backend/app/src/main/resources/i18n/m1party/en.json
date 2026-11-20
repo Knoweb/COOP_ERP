@@ -115,6 +115,7 @@
   "m1.relationship.credit_limit_announced": "The credit limit of this trading relationship has already been announced",
   "m1.relationship.credit_limit_none": "This trading relationship has no credit limit",
   "m1.relationship.credit_limit_permission_required": "You do not have permission to change the credit limit",
+  "m1.relationship.limit_invalid": "The credit limit must be zero or more in rupees and cents",
   "m1.relationship.effective_from_after_end": "The new terms must start before the current terms end",
   "m1.relationship.effective_from_in_past": "The new terms cannot start before today",
   "m1.relationship.effective_from_not_after": "The new terms must start after the current terms started",

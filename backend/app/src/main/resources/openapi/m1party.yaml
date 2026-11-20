@@ -52,6 +52,8 @@
 # depending on that module. The REST slice is unchanged, so its version remains 1.5.0.
 #
 # 1.6.0 (CAT-09, bulk user import): POST /v1/security/users/bulk bulk imports users with identity-provider provisioning. Additive.
+#
+# 1.7.0 (CAT-14, bulk credit limits): POST /v1/party/relationships/credit-limits/bulk bulk sets trading relationship credit limits with step-up MFA. Additive.
 openapi: 3.1.0
 
 info:
@@ -61,7 +63,8 @@ info:
   # 1.4.4 (wave 3 review) and 1.4.5 (wave 4 review) are described in the header above.
   # 1.5.0 (CAT-08) adds bulkRegisterNetwork for shops, positions, users, and devices.
   # 1.6.0 (CAT-09) adds bulkImportUsers for user sheet import with Keycloak provisioning.
-  version: 1.6.0
+  # 1.7.0 (CAT-14) adds bulkSetRelationshipCreditLimits for bulk setting relationship credit limits with MFA.
+  version: 1.7.0
   x-change-request: CR-21A-8
 
 paths:
@@ -939,6 +942,47 @@ paths:
 
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/credit-limits/bulk:
+
+    post:
+      tags: [Relationships]
+      operationId: bulkSetRelationshipCreditLimits
+      summary: Set trading relationship credit limits in bulk from a sheet or rows (CAT-14)
+      description: >
+        Sets credit limits for trading relationships in bulk from a CSV sheet or list of items (CAT-14).
+        Enforces step-up authentication (MFA) and bil.creditlimit.change permission.
+        All-or-none: if any item fails validation, nothing is applied.
+      x-permission: bil.creditlimit.change
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkRelationshipCreditLimitsRequest'
+
+      responses:
+        '200':
+          description: Bulk relationship credit limits report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkRelationshipCreditLimitReport'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '403':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
 
   /v1/party/relationships:
 
@@ -3575,6 +3619,72 @@ components:
             - string
             - 'null'
           format: uuid
+
+    BulkRelationshipCreditLimitsRequest:
+      type: object
+      properties:
+        sheet:
+          type:
+            - string
+            - 'null'
+          description: CSV sheet containing buyer and credit_limit columns
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipCreditLimitItem'
+        defaultReason:
+          type:
+            - string
+            - 'null'
+          maxLength: 200
+
+    RelationshipCreditLimitItem:
+      type: object
+      required: [creditLimit]
+      properties:
+        buyerEntityCode:
+          type:
+            - string
+            - 'null'
+        buyerEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        creditLimit:
+          type: number
+          minimum: 0
+          maximum: 999999999999.99
+        reason:
+          type:
+            - string
+            - 'null'
+          maxLength: 200
+
+    BulkRelationshipCreditLimitReport:
+      type: object
+      required: [status, updatedCount, problems]
+      properties:
+        status:
+          type: string
+          enum: [UPDATED, REJECTED]
+        updatedCount:
+          type: integer
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkRelationshipCreditLimitProblem'
+
+    BulkRelationshipCreditLimitProblem:
+      type: object
+      required: [identifier, field, code]
+      properties:
+        identifier:
+          type: string
+        field:
+          type: string
+        code:
+          type: string
 
   parameters:
 
