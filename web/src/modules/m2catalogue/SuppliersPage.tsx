@@ -295,7 +295,8 @@ export function SuppliersPage() {
 
           {!csvContent ? (
             <div
-              className={`catalogue-dropzone ${isDragOver ? "catalogue-dropzone--active" : ""}`}
+              className={`catalogue-dropzone supplier-dropzone-compact ${isDragOver ? "catalogue-dropzone--active" : ""}`}
+              style={{ maxWidth: "calc(var(--target-min) * 9.5)" }}
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
@@ -307,7 +308,7 @@ export function SuppliersPage() {
               }}
               aria-label={t("catalogue.suppliers.import.dropzone").text}
             >
-              <svg className="catalogue-dropzone__icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg className="catalogue-dropzone__icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
                 <path d="M12 12v9" />
                 <path d="m8 16 4-4 4 4" />
@@ -323,7 +324,7 @@ export function SuppliersPage() {
               />
             </div>
           ) : (
-            <div className="catalogue-file-card" style={{ marginBottom: "var(--space-4)" }}>
+            <div className="catalogue-file-card" style={{ maxWidth: "calc(var(--target-min) * 9.5)", marginBottom: "var(--space-4)" }}>
               <div className="catalogue-file-card__info">
                 <div className="catalogue-file-card__icon">
                   <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2">

@@ -56,7 +56,10 @@ function SkuStatusDropdown(props: {
   }, [open]);
 
   return (
-    <div className="custom-status-dropdown" ref={containerRef}>
+    <div
+      className={`custom-status-dropdown ${open ? "custom-status-dropdown--open" : ""}`}
+      ref={containerRef}
+    >
       <button
         type="button"
         className="custom-status-dropdown__trigger"
