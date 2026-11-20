@@ -752,7 +752,7 @@ textarea {
   border-right: none;
   display: flex;
   flex-direction: column;
-  z-index: 30;
+  z-index: 110;
   box-shadow: 4px 0 16px var(--color-polish-8);
   transition: width 0.22s ease, transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -946,7 +946,7 @@ textarea {
 .shell-topbar {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1018,6 +1018,8 @@ textarea {
   box-sizing: border-box;
   padding: var(--space-4) var(--space-6);
   overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
 
 /* ---------- Cards & Panels ------------------------------------------------------------- */
@@ -7501,60 +7503,87 @@ button[type="submit"]:not(:disabled):hover,
   gap: var(--space-3);
 }
 
+.supplier-import-section .catalogue-dropzone,
+.catalogue-dropzone.supplier-dropzone-compact,
 .catalogue-dropzone {
-  border: 1.5px dashed var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-6) var(--space-4);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  background-color: var(--color-surface);
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-  min-height: 120px;
+  border: 1.5px dashed var(--color-polish-21) !important;
+  border-radius: 14px !important;
+  padding: 22px 28px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-polish-29) 100%) !important;
+  background-color: var(--color-surface) !important;
+  cursor: pointer !important;
+  max-width: 460px !important;
+  width: 100% !important;
+  min-height: 84px !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 2px 8px var(--color-polish-14) !important;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
+.supplier-import-section .catalogue-dropzone:hover,
+.catalogue-dropzone.supplier-dropzone-compact:hover,
 .catalogue-dropzone:hover,
 .catalogue-dropzone--active {
-  border-color: var(--color-accent);
-  background-color: var(--color-surface-subtle);
+  border-color: var(--color-accent) !important;
+  background: var(--color-polish-31) !important;
+  background-color: var(--color-polish-31) !important;
+  box-shadow: 0 8px 24px var(--color-polish-14), 0 0 0 2px var(--color-polish-27) !important;
+  transform: translateY(-2px) !important;
 }
 
 .catalogue-dropzone__icon {
   color: var(--color-accent);
-  margin-bottom: var(--space-2);
+  margin-bottom: 6px;
+  width: 28px !important;
+  height: 28px !important;
+  transition: transform 0.2s ease;
+}
+
+.catalogue-dropzone:hover .catalogue-dropzone__icon {
+  transform: scale(1.1);
 }
 
 .catalogue-dropzone__prompt {
-  font-size: var(--font-size-md);
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
-  margin: 0 0 var(--space-1) 0;
+  margin: 0 0 4px 0;
+  line-height: 1.35;
 }
 
 .catalogue-dropzone__hint {
-  font-size: var(--font-size-sm);
+  font-size: 12px;
   color: var(--color-text-muted);
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .catalogue-file-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: 12px;
   background-color: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  max-width: 460px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 4px 16px var(--color-polish-22);
 }
 
 .catalogue-file-card__info {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 12px;
 }
 
 .catalogue-file-card__icon {
@@ -7562,24 +7591,49 @@ button[type="submit"]:not(:disabled):hover,
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--color-polish-29);
+  flex-shrink: 0;
+}
+
+.catalogue-file-card__icon svg {
+  width: 20px !important;
+  height: 20px !important;
 }
 
 .catalogue-file-card__name {
   margin: 0;
-  font-size: var(--font-size-md);
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .catalogue-file-card__meta {
-  font-size: var(--font-size-sm);
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
 .catalogue-file-card__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.catalogue-file-card__actions .action-button {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  border-radius: 50px;
 }
 
 .action-button {
@@ -8435,10 +8489,20 @@ button[type="submit"]:not(:disabled):hover,
   transform: translateY(-1.5px) !important;
 }
 
+.custom-status-dropdown,
 .catalogue-filter-panel .custom-status-dropdown {
+  position: relative !important;
   width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
+  z-index: 2;
+}
+
+.custom-status-dropdown.custom-status-dropdown--open,
+.custom-status-dropdown:focus-within,
+.catalogue-filter-panel .custom-status-dropdown.custom-status-dropdown--open,
+.catalogue-filter-panel .custom-status-dropdown:focus-within {
+  z-index: 15 !important;
 }
 
 .catalogue-filter-panel .custom-status-dropdown__trigger {
@@ -12877,7 +12941,6 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
     margin: 16px 0 !important;
     padding: 0 !important;
     overflow: visible !important;
-    page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
@@ -12947,7 +13010,6 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
     box-shadow: none !important;
     padding: 14px 20px !important;
     margin: 16px 0 !important;
-    page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
