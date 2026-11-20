@@ -592,6 +592,141 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
+     * Doc 32 Section 11 Case 6 (QA-03): Business-rule breach: Event applied, line flagged, ALERT
+     * raised; nothing rejected.
+     *
+     * <p>Proves that when an offline till uploads facts breaching business rules (both a duplicate
+     * receipt number breaking series uniqueness, and a runaway number jump breaking series
+     * continuity), central never rejects the facts:
+     * <ul>
+     *   <li>The gateway accepts the batch with outcome APPLIED, cursor advances, not quarantined.</li>
+     *   <li>Every receipt is applied and stored in {@code pos.receipt} with lines in {@code pos.receipt_line}.</li>
+     *   <li>The duplicate receipt is flagged {@code DUPLICATE_NUMBER} and emits {@code RECEIPT_NUMBER_DUPLICATED} ALERT.</li>
+     *   <li>The jumped receipt is flagged {@code NUMBER_JUMP} and emits {@code RECEIPT_NUMBER_JUMPED} ALERT.</li>
+     *   <li>Both receipts emit {@code RECEIPT_FLAGGED} REVIEW and {@code receipt.recorded.v1}.</li>
+     *   <li>M5 consumes each bundle, records {@code STOCK_SOLD}, and deducts inventory as a fact.</li>
+     *   <li>Tenant and location isolation hold under RLS: sibling locations and other entities see nothing.</li>
+     *   <li>Broker redelivery / replay is idempotent: neither receipts, stock movements, nor ALERTs are duplicated.</li>
+     * </ul>
+     */
+    @Test
+    void businessRuleBreachTransactionIsAppliedFlaggedAndRaisesAlertWithoutRejection() throws Exception {
+        TillSimulator first = till();
+        first.refreshSnapshot();
+        first.openSession(BigDecimal.ZERO);
+        UUID original = first.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))));
+        first.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents(DEVICE);
+
+        assertThat(onHand(rice)).isEqualByComparingTo("9");
+        assertThat(numberOf(original)).isEqualTo(1L);
+
+        // Replacement till restarts numbering from 1: breaches uniqueness (DUPLICATE_NUMBER)
+        replaceTheTill();
+        TillSimulator second = till(REPLACEMENT).numberingFrom(1);
+        second.refreshSnapshot();
+        second.openSession(BigDecimal.ZERO);
+        UUID duplicate = second.sell(List.of(new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))));
+
+        // And then issues a receipt with a runaway counter jump: breaches continuity (NUMBER_JUMP)
+        second.numberingFrom(25000L);
+        UUID jumped = second.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+
+        // Gateway accepts the batch: facts are not rejected or quarantined
+        second.drain(50, Instant.now().plusSeconds(30));
+        assertThat(second.pending()).isZero();
+
+        kernel.reset();
+        deliverTheTillsEvents(REPLACEMENT);
+
+        // 1. Transactions are applied: all receipts exist and quantities are deducted
+        assertThat(numberOf(duplicate)).isEqualTo(1L);
+        assertThat(numberOf(jumped)).isEqualTo(25000L);
+        assertThat(onHand(dhal)).as("dhal deducted for duplicate receipt").isEqualByComparingTo("9");
+        assertThat(onHand(soap)).as("soap deducted for jumped receipt").isEqualByComparingTo("9");
+
+        assertThat(inventory.movementsOf(duplicate, own(MPCS)))
+                .singleElement()
+                .satisfies(m -> assertThat(m.movementType()).isEqualTo("SALE"));
+        assertThat(inventory.movementsOf(jumped, own(MPCS))).singleElement().satisfies(m -> assertThat(m.movementType())
+                .isEqualTo("SALE"));
+
+        // 2. Receipts are flagged with their respective business rule breaches
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(duplicate))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("DUPLICATE_NUMBER"));
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(jumped))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("NUMBER_JUMP"));
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(original))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).isEmpty());
+
+        // Flagged receipts filter query in M6 returns exactly the two breached receipts
+        assertThat(pos.receipts(new PosQueries.ReceiptFilter(SHOP, null, true, null, null), own(MPCS))
+                        .items())
+                .extracting(PosQueries.ReceiptView::documentId)
+                .containsExactlyInAnyOrder(duplicate, jumped);
+
+        // 3. Required ALERTS and REVIEWS are created
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_DUPLICATED"))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.subject().id()).isEqualTo(duplicate);
+                    assertThat(String.valueOf(a.after())).contains(original.toString());
+                });
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_JUMPED"))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.subject().id()).isEqualTo(jumped);
+                    assertThat(String.valueOf(a.after())).contains("docNumber=25000");
+                });
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_FLAGGED"))
+                .extracting(a -> a.subject().id())
+                .containsExactlyInAnyOrder(duplicate, jumped);
+
+        // Domain events emitted with the flags
+        assertThat(kernel.committedEvents())
+                .filteredOn(ReceiptRecorded.class::isInstance)
+                .map(ReceiptRecorded.class::cast)
+                .extracting(ReceiptRecorded::documentId)
+                .contains(duplicate, jumped);
+
+        // 4. Tenant and location isolation remain correct under RLS
+        assertThat(receiptsAt(at(MPCS, SIBLING_LOCATION))).isEmpty();
+        assertThat(receiptsAt(own(OTHER_ENTITY))).isEmpty();
+
+        // 5. Replay / redelivery does not create duplicate records, movements or alerts
+        deliverTheTillsEvents(REPLACEMENT);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from pos.receipt where document_id in (?, ?)",
+                                Long.class,
+                                duplicate,
+                                jumped))
+                .isEqualTo(2L);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id in (?, ?)",
+                                Long.class,
+                                duplicate,
+                                jumped))
+                .isEqualTo(2L);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_DUPLICATED"))
+                .hasSize(1);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_JUMPED"))
+                .hasSize(1);
+    }
+
+    /**
      * Wave 2, M6-01 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
      * (1)): a receipt the till sent in the wrong shape (here two lines with the same line_no,
      * under a hash that matches) is quarantined at the gateway, before the outbox, so it reaches
