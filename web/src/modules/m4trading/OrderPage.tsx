@@ -259,7 +259,7 @@ export function OrderPage() {
         </div>
       </div>
 
-      <section className="trading-filter-bar">
+      <section className="trading-filter-bar trading-filter-bar--compact">
         {amendable && !amendRows && (
           <button type="button" onClick={startAmend}>
             {t("trading.order.amend").text}
@@ -267,7 +267,7 @@ export function OrderPage() {
         )}
         {amendRows && (
           <>
-            <div className="trading-form-field">
+            <div className="trading-form-field trading-form-field--date">
               <DatePicker
                 label={t("trading.order.amend.eta").text}
                 min={businessToday()}
@@ -299,7 +299,7 @@ export function OrderPage() {
         )}
         {deciding && (
           <>
-            <div className="trading-form-field">
+            <div className="trading-form-field trading-form-field--date">
               <DatePicker
                 label={t("trading.field.committed_eta").text}
                 min={businessToday()}
