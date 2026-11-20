@@ -87,7 +87,7 @@ Settings, as environment variables:
 
 With no printer, each slip lands in `<COOP_TILL_HOME>/print-preview` as a PNG (what the paper shows) and a `.bin` (the exact bytes a printer would get: `ESC @`, the raster in 128-row bands, feed, cut, drawer kick). `cat file.bin > /dev/usb/lp0`, or `nc printer 9100 < file.bin`, prints it.
 
-**Opt-in test against the stack** (never in CI by default): after `devEnrolmentCode`, `./gradlew :desktop:test -Ptill.stack=true --tests '*DesktopStackTest*'` with the same `COOP_TILL_HOME` enrols if needed, verifies the snapshot, sells two items, closes the session, prints to the preview folder, uploads, and checks that central holds the receipt with no flag the till caused.
+**Doc 32 Section 11 conformance test against the stack (QA-01):** `make test-till-stack` (or after `devEnrolmentCode`, `./gradlew :desktop:stackTest` or `./gradlew :desktop:test -Ptill.stack=true --tests '*DesktopStackTest*'`) with the same `COOP_TILL_HOME` enrols if needed, verifies the snapshot, sells two items, closes the session, prints to the preview folder, uploads, and checks that central holds the receipt with no flag the till caused. Runs in CI on every pull request in job `stack-smoke`.
 
 ## Packaging
 

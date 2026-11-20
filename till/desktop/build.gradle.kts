@@ -72,8 +72,19 @@ tasks.register<JavaExec>("devEnrolmentCode") {
     mainClass.set("lk.coopfed.knoweb.till.desktop.dev.DevEnrolmentCodeKt")
 }
 
-// Opt-in integration test against a running local stack: ./gradlew :desktop:stackTest -Ptill.stack=true
+// Opt-in integration test against a running local stack: ./gradlew :desktop:stackTest or :desktop:test -Ptill.stack=true
 tasks.test {
     useJUnitPlatform()
     systemProperty("till.stack", providers.gradleProperty("till.stack").getOrElse("false"))
+}
+
+// Conformance suite (Doc 32 Section 11, QA-01): the real KMP desktop till against central.
+tasks.register<Test>("stackTest") {
+    group = "verification"
+    description = "Runs the Doc 32 Section 11 conformance suite (DesktopStackTest) against the running local stack."
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("*DesktopStackTest*")
+    }
+    systemProperty("till.stack", "true")
 }
