@@ -2873,20 +2873,10 @@ select.pricing-select:not(.visually-hidden) option:focus {
 }
 
 .pricing-dropdown-select .custom-dropdown__item-bar,
-.pricing-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.pricing-dropdown-menu .custom-dropdown__item-bar,
 .pricing-dropdown-select .custom-dropdown__item-spacer,
 .pricing-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .pricing-dropdown-select .custom-dropdown__item-label,

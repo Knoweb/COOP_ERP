@@ -1714,6 +1714,7 @@
   overflow: hidden;
   margin-bottom: var(--space-3);
 }
+
 .finance-voucher-totals-wrapper {
   display: flex;
   justify-content: flex-end;
@@ -2687,20 +2688,10 @@
 }
 
 .reporting-dropdown-select .custom-dropdown__item-bar,
-.reporting-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.reporting-dropdown-menu .custom-dropdown__item-bar,
 .reporting-dropdown-select .custom-dropdown__item-spacer,
 .reporting-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .reporting-dropdown-select .custom-dropdown__item-label,
@@ -3520,20 +3511,10 @@
 }
 
 .targets-dropdown-select .custom-dropdown__item-bar,
-.targets-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.targets-dropdown-menu .custom-dropdown__item-bar,
 .targets-dropdown-select .custom-dropdown__item-spacer,
 .targets-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .targets-dropdown-select .custom-dropdown__item-label,
@@ -4799,20 +4780,10 @@
 }
 
 .shop-reports-dropdown-select .custom-dropdown__item-bar,
-.shop-reports-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.shop-reports-dropdown-menu .custom-dropdown__item-bar,
 .shop-reports-dropdown-select .custom-dropdown__item-spacer,
 .shop-reports-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .shop-reports-dropdown-select .custom-dropdown__item-label,
@@ -5637,20 +5608,10 @@
 }
 
 .assets-dropdown-select .custom-dropdown__item-bar,
-.assets-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.assets-dropdown-menu .custom-dropdown__item-bar,
 .assets-dropdown-select .custom-dropdown__item-spacer,
 .assets-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .assets-dropdown-select .custom-dropdown__item-label,
@@ -6968,20 +6929,10 @@
 }
 
 .pnl-dropdown-select .custom-dropdown__item-bar,
-.pnl-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.pnl-dropdown-menu .custom-dropdown__item-bar,
 .pnl-dropdown-select .custom-dropdown__item-spacer,
 .pnl-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .pnl-dropdown-select .custom-dropdown__item-label,

@@ -6476,6 +6476,13 @@ button[type="submit"]:not(:disabled):hover,
   color: var(--color-polish-25);
 }
 
+.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item-bar,
+.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item-spacer,
+.custom-dropdown__menu:not(.inventory-dropdown-menu) .custom-dropdown__item-bar,
+.custom-dropdown__menu:not(.inventory-dropdown-menu) .custom-dropdown__item-spacer {
+  display: none !important;
+}
+
 .custom-dropdown__item-label {
   flex: 1;
 }
