@@ -15,6 +15,9 @@ export type PriceListLine = components["schemas"]["PriceListLineResponse"];
 export type PriceListLineInput = components["schemas"]["PriceListLineInput"];
 export type SetLinesResponse = components["schemas"]["SetLinesResponse"];
 export type LineOutcome = components["schemas"]["LineOutcome"];
+export type PriceListImportReport = components["schemas"]["PriceListImportReportResponse"];
+export type PriceListImportProblem = components["schemas"]["PriceListImportProblem"];
+export type ImportPriceListLinesRequest = components["schemas"]["ImportPriceListLinesRequest"];
 export type ControlPrice = components["schemas"]["ControlPriceResponse"];
 export type EnterControlPriceRequest = components["schemas"]["EnterControlPriceRequest"];
 export type RescindControlPriceRequest = components["schemas"]["RescindControlPriceRequest"];
@@ -114,6 +117,19 @@ export function usePricingApi() {
         const { data } = await api.PUT("/v1/pricing/lists/{listId}/lines", {
           params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
           body: { lines }
+        });
+        return data!;
+      },
+
+      /** Bulk import price list lines from a sheet or rows into a draft list (CAT-13). */
+      async importPriceListLines(
+        listId: string,
+        request: ImportPriceListLinesRequest,
+        idempotencyKey: string
+      ): Promise<PriceListImportReport> {
+        const { data } = await api.POST("/v1/pricing/lists/{listId}/import", {
+          params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
         });
         return data!;
       },

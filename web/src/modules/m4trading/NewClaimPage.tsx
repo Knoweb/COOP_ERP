@@ -53,9 +53,22 @@ export function NewClaimPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to={grnId ? `/trading/grns/${grnId}` : "/trading"}>
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("trading.back").text}
+      <Link className="back-link back-pill-btn" to={grnId ? `/trading/grns/${grnId}` : "/trading"}>
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back").text}</span>
       </Link>
       <PageHeader icon="exceptions" title={t("trading.claim.new").text} />
       {grn.isLoading && <p>{t("trading.loading").text}</p>}
@@ -77,35 +90,39 @@ export function NewClaimPage() {
               ))}
             </select>
           </label>
-          <table>
-            <thead>
-              <tr>
-                <th>{t("trading.column.item").text}</th>
-                <th>{t("trading.column.received").text}</th>
-                <th>{t("trading.claim.claimed").text}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grn.data.lines
-                .filter((line) => line.receivedQty > 0)
-                .map((line) => (
-                  <tr key={line.lineId}>
-                    <td>
-                      <SkuLabel skuId={line.skuId} />
-                    </td>
-                    <td>{line.receivedQty}</td>
-                    <td>
-                      <input
-                        inputMode="decimal"
-                        aria-label={t("trading.claim.claimed").text}
-                        value={quantities[line.lineId] ?? ""}
-                        onChange={(event) => setQuantities({ ...quantities, [line.lineId]: event.target.value })}
-                      />
-                    </td>
+          <div className="modern-table-card trading-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table trading-table">
+                <thead>
+                  <tr>
+                    <th>{t("trading.column.item").text}</th>
+                    <th>{t("trading.column.received").text}</th>
+                    <th>{t("trading.claim.claimed").text}</th>
                   </tr>
-                ))}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {grn.data.lines
+                    .filter((line) => line.receivedQty > 0)
+                    .map((line) => (
+                      <tr key={line.lineId}>
+                        <td>
+                          <SkuLabel skuId={line.skuId} />
+                        </td>
+                        <td>{line.receivedQty}</td>
+                        <td>
+                          <input
+                            inputMode="decimal"
+                            aria-label={t("trading.claim.claimed").text}
+                            value={quantities[line.lineId] ?? ""}
+                            onChange={(event) => setQuantities({ ...quantities, [line.lineId]: event.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
           <label className="trading-form-field">
             {t("trading.claim.note").text}
             <input type="text" maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} />

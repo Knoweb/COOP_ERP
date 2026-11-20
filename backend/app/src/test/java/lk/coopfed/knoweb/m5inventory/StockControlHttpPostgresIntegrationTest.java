@@ -197,6 +197,17 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         "update kernel.document_attachment set status = 'COMPLETE' where attachment_id = ?::uuid",
                         upload.get("attachmentId").asText());
 
+        JsonNode photoView = get("/v1/inventory/write-offs/" + id + "/photos/"
+                        + upload.get("attachmentId").asText())
+                .getBody();
+        assertThat(photoView.get("url").asText())
+                .startsWith("memory://get/attachments/")
+                .endsWith(upload.get("attachmentId").asText());
+        assertThat(get("/v1/inventory/write-offs/" + Ids.next() + "/photos/"
+                                + upload.get("attachmentId").asText())
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
         // wave 2, M5-10: another person witnesses in person; the manager approves.
         JsonNode witnessed = post("/v1/inventory/write-offs/" + id + "/witness", null, WITNESS)
                 .getBody();

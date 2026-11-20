@@ -43,6 +43,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.ExecuteRepackRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.NegativeLotResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PhotoUploadRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.PhotoUploadResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.PhotoViewResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.RecipeResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.RepackResponse;
@@ -54,6 +55,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.WriteOffLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.WriteOffPhotoResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.WriteOffResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -68,6 +70,7 @@ class StockControlController implements StockControlApi {
     private final StockControlQueries queries;
     private final BatchQueries batches;
     private final CurrentScope currentScope;
+    private final Attachments attachments;
     private final Handlers handlers;
 
     /** The command handlers of the slice, one field each, so the constructor stays readable. */
@@ -91,10 +94,15 @@ class StockControlController implements StockControlApi {
             Handles<ReverseRepack, UUID> reverseRepack) {}
 
     StockControlController(
-            StockControlQueries queries, BatchQueries batches, CurrentScope currentScope, Handlers handlers) {
+            StockControlQueries queries,
+            BatchQueries batches,
+            CurrentScope currentScope,
+            Attachments attachments,
+            Handlers handlers) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
+        this.attachments = attachments;
         this.handlers = handlers;
     }
 
@@ -303,6 +311,23 @@ class StockControlController implements StockControlApi {
                         currentScope.get());
         return ResponseEntity.ok(
                 new PhotoUploadResponse(upload.attachmentId(), upload.url().toString(), upload.expiresAt()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResponseEntity<PhotoViewResponse> getWriteOffPhoto(UUID writeOffId, UUID attachmentId) {
+        ScopeContext scope = currentScope.get();
+        boolean belongsToVisibleWriteOff = queries.writeOff(writeOffId, scope)
+                .map(writeOff -> writeOff.photos().stream()
+                        .anyMatch(photo -> photo.attachmentId().equals(attachmentId)))
+                .orElse(false);
+        if (!belongsToVisibleWriteOff) {
+            return ResponseEntity.notFound().build();
+        }
+        return attachments
+                .presignDownload(attachmentId, scope)
+                .map(url -> ResponseEntity.ok(new PhotoViewResponse(url.toString())))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Override

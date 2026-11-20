@@ -9,11 +9,11 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
+import { DropdownSelect } from "../../shell/components/DropdownSelect";
 import { useAdminApi } from "./adminApi";
 import type { ExternalGrant } from "./adminApi";
 import { usePartyApi } from "./partyApi";
 import { GRANT_STATUS_LOOK, REVOKE_REASONS, refusalOf } from "./adminView";
-import { CustomSelect } from "./CustomSelect";
 import { CustomDatePicker } from "./CustomDatePicker";
 
 /**
@@ -169,13 +169,17 @@ export function GrantsPage() {
 
         <form onSubmit={submit} className="party-grant-form" aria-labelledby="party-grant-title">
           <div className="party-grant-form__grid">
-            <label className="party-form-field">
-              <span className="party-form-field__label">{t("party.grants.grantee").text}</span>
-              <CustomSelect
+            <div className="party-form-field">
+              <label htmlFor="grant-grantee-select" className="party-form-field__label">
+                {t("party.grants.grantee").text}
+              </label>
+              <DropdownSelect
+                id="grant-grantee-select"
+                aria-label={t("party.grants.grantee").text}
                 value={grantee}
                 onChange={(val) => setGrantee(val)}
-                ariaLabel={t("party.grants.grantee").text}
                 placeholder={t("party.roles.choose").text}
+                required
                 options={[
                   { value: "", label: t("party.roles.choose").text },
                   ...(externals.data?.items ?? []).map((user) => ({
@@ -184,21 +188,28 @@ export function GrantsPage() {
                   }))
                 ]}
               />
-            </label>
+            </div>
 
-            <label className="party-form-field">
-              <span className="party-form-field__label">{t("party.grants.entities").text}</span>
-              <CustomSelect
+            <div className="party-form-field">
+              <label htmlFor="grant-entity-select" className="party-form-field__label">
+                {t("party.grants.entities").text}
+              </label>
+              <DropdownSelect
+                id="grant-entity-select"
+                aria-label={t("party.grants.entities").text}
                 value={entity}
                 onChange={(val) => setEntity(val)}
-                ariaLabel={t("party.grants.entities").text}
                 placeholder={t("party.roles.choose").text}
-                options={(societies.data?.items ?? []).map((society) => ({
-                  value: society.entityId,
-                  label: `${society.entityCode} ${society.legalNameEn}`
-                }))}
+                required
+                options={[
+                  { value: "", label: t("party.roles.choose").text },
+                  ...(societies.data?.items ?? []).map((society) => ({
+                    value: society.entityId,
+                    label: `${society.entityCode} ${society.legalNameEn}`
+                  }))
+                ]}
               />
-            </label>
+            </div>
 
             <div className="party-form-field">
               <label htmlFor="grant-until-input" className="party-form-field__label">

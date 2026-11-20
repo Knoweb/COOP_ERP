@@ -625,6 +625,7 @@ jobs:
         working-directory: web
         run: |
           pnpm install --frozen-lockfile
+          sudo apt-get update
           pnpm exec playwright install --with-deps chromium
 
       - name: make up-2

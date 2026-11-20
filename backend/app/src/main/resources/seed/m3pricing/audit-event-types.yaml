@@ -14,6 +14,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Lines of a draft price list set
 
+  - code: PRICELIST_LINES_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Lines imported from a spreadsheet into a draft price list
+
   - code: PRICELIST_PUBLISHED
     severity: INFO
     offline_capturable: false

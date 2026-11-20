@@ -410,7 +410,25 @@ export function UnitsOfMeasurePage() {
       )}
 
       {/* Filter Toolbar */}
-      <div className="uom-filter-toolbar">
+      <section className="uom-filter-toolbar" aria-label={t("catalogue.filter.toggle").text}>
+        <div className="uom-filter-label-group">
+          <span className="uom-filter-icon" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+          </span>
+          <span className="uom-filter-title">{t("catalogue.filter.toggle").text}</span>
+        </div>
+
         <label className="uom-filter-toggle">
           <input
             type="checkbox"
@@ -420,7 +438,7 @@ export function UnitsOfMeasurePage() {
           />
           <span className="uom-filter-label-text">{t("catalogue.uom.filter.include_inactive").text}</span>
         </label>
-      </div>
+      </section>
 
       {/* Directory Table */}
       <section className="catalogue-section">

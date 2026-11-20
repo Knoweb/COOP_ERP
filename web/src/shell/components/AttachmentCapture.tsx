@@ -26,6 +26,8 @@ type AttachmentCaptureProps = {
   onAdd: (file: File) => void;
   /** No new file while an upload runs or once the document is past its draft. */
   disabled?: boolean;
+  /** A screen with its own preview gallery can keep only this component's capture control. */
+  showList?: boolean;
   accept?: string;
 };
 
@@ -36,6 +38,7 @@ export function AttachmentCapture({
   requiredLabel,
   onAdd,
   disabled,
+  showList = true,
   accept = "image/*"
 }: AttachmentCaptureProps) {
   const choose = (event: ChangeEvent<HTMLInputElement>) => {
@@ -49,15 +52,16 @@ export function AttachmentCapture({
   return (
     <div className="attachment-capture">
       {requiredLabel && <p className="attachment-capture__required">{requiredLabel}</p>}
-      {attachments.length === 0 ? (
-        <p>{emptyLabel}</p>
-      ) : (
-        <ol className="attachment-capture__list">
-          {attachments.map((attachment) => (
-            <li key={attachment.id}>{attachment.label}</li>
-          ))}
-        </ol>
-      )}
+      {showList &&
+        (attachments.length === 0 ? (
+          <p>{emptyLabel}</p>
+        ) : (
+          <ol className="attachment-capture__list">
+            {attachments.map((attachment) => (
+              <li key={attachment.id}>{attachment.label}</li>
+            ))}
+          </ol>
+        ))}
       <label className="attachment-capture__add">
         {addLabel}
         <input type="file" accept={accept} capture="environment" disabled={disabled} onChange={choose} />

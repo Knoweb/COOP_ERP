@@ -313,6 +313,26 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void importPriceListLinesFollowsTheSlice() {
+        ResponseEntity<JsonNode> created = send(
+                HttpMethod.POST, "/v1/pricing/lists", FEDERATION, Map.of("kind", "TRADE", "name", "Import Test List"));
+        String listId = created.getBody().get("priceListId").asText();
+
+        String csv = "sku,uom,tier,price\nM3-HTTP-RICE,EA,0,145.00\n";
+        ResponseEntity<JsonNode> imported = send(
+                HttpMethod.POST,
+                "/v1/pricing/lists/" + listId + "/import",
+                FEDERATION,
+                Map.of("sheet", csv, "replace", true));
+        assertThat(imported.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(imported.getBody().get("saved").asBoolean()).isTrue();
+        assertThat(imported.getBody().get("importedLines").asInt()).isEqualTo(1);
+
+        ResponseEntity<JsonNode> detail = send(HttpMethod.GET, "/v1/pricing/lists/" + listId, FEDERATION, null);
+        assertThat(detail.getBody().get("lines")).hasSize(1);
+    }
+
+    @Test
     void aRequestOutsideTheSchemaIsRefusedBeforeTheHandler() {
         ResponseEntity<JsonNode> response =
                 send(HttpMethod.POST, "/v1/pricing/lists", FEDERATION, Map.of("kind", "TRADE"));

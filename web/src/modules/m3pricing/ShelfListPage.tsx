@@ -16,6 +16,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { RetailPrice, SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
+import { PriceListImportModal } from "./PriceListImportModal";
 import { bindingCeiling, chipOf, errorText, incompleteLines, reasonMessageId } from "./priceListState";
 import { ShelfLabelPrintAction } from "./ShelfLabelPrintAction";
 import { PricingSelect } from "./PricingSelect";
@@ -80,6 +81,7 @@ export function ShelfListPage() {
   const incomplete = incompleteLines(rows);
   const [outcomes, setOutcomes] = useState<SetLinesResponse | null>(null);
   const [applyFrom, setApplyFrom] = useState("");
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   useEffect(() => {
     if (detail.data) {
@@ -221,6 +223,33 @@ export function ShelfListPage() {
       )}
       {list.status === "DRAFT" && sourceVersion.data?.list.status === "SUPERSEDED" && (
         <p role="alert">{t("pricing.warning.draft_from_superseded").text}</p>
+      )}
+
+      {editable && (
+        <div className="pricing-actions-row" style={{ marginBottom: "var(--space-4)" }}>
+          <button
+            type="button"
+            className="modern-btn modern-btn--secondary"
+            onClick={() => setImportModalOpen(true)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {t("pricing.import.button").text}
+          </button>
+        </div>
       )}
 
       <div className="modern-table-card">
@@ -388,6 +417,17 @@ export function ShelfListPage() {
       {effectiveRetail?.priceListId === list.priceListId && rows.length > 0 && (
         <ShelfLabelPrintAction skuIds={rows.map((row) => row.skuId)} />
       )}
+
+      <PriceListImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        listId={list.priceListId}
+        listName={list.name}
+        kind={list.kind}
+        onImportSuccess={() => {
+          refresh();
+        }}
+      />
     </main>
   );
 }

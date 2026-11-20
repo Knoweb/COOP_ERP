@@ -138,17 +138,32 @@ describe("StockRepriceModal", () => {
     expect(screen.getByRole("button", { name: "Damaged" })).toBeTruthy();
   });
 
-  it("validates empty reason and prevents submission", async () => {
-    renderModal();
+  it("disables Apply Reprice and explains the temporary restriction in en, si, and ta", () => {
+    for (const locale of ["en", "si", "ta"] as const) {
+      cleanup();
+      render(
+        <IntlProvider locale={locale} messages={messages[locale]}>
+          <StockRepriceModal
+            isOpen={true}
+            onClose={vi.fn()}
+            lot={mockLot}
+            sku={mockSku}
+            onSuccess={vi.fn()}
+          />
+        </IntlProvider>
+      );
 
-    const submitBtn = screen.getByRole("button", { name: "Apply Reprice" });
-    fireEvent.click(submitBtn);
+      const expectedNotice = (messages[locale] as Record<string, string>)["inventory.reprice.temporarily_unavailable"];
+      const submitLabel = (messages[locale] as Record<string, string>)["inventory.reprice.submit"];
+      expect(screen.getByRole("status").textContent).toContain(expectedNotice);
 
-    expect(api.repriceStockLot).not.toHaveBeenCalled();
+      const submitBtn = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
+      expect(submitBtn.disabled).toBe(true);
+    }
   });
 
-  it("successfully calls repriceStockLot on valid form submission", async () => {
-    const { props } = renderModal();
+  it("blocks form submission and never invokes repriceStockLot while repricing is disabled", async () => {
+    const { props, container } = renderModal();
 
     const costInput = screen.getByLabelText(/New Unit Cost/);
     fireEvent.change(costInput, { target: { value: "70" } });
@@ -156,37 +171,20 @@ describe("StockRepriceModal", () => {
     const reasonInput = screen.getByLabelText(/Reason/);
     fireEvent.change(reasonInput, { target: { value: "Supplier price decline" } });
 
-    const submitBtn = screen.getByRole("button", { name: "Apply Reprice" });
+    const submitBtn = screen.getByRole("button", { name: "Apply Reprice" }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
     fireEvent.click(submitBtn);
 
+    const form = container.querySelector("form")!;
+    fireEvent.submit(form);
+
     await waitFor(() => {
-      expect(api.repriceStockLot).toHaveBeenCalledWith(
-        LOT_ID,
-        {
-          qty: 10,
-          newUnitCost: 70,
-          targetCondition: "GOOD",
-          reason: "Supplier price decline"
-        },
-        expect.any(String)
+      expect(screen.getByRole("alert").textContent).toContain(
+        (messages.en as Record<string, string>)["inventory.reprice.temporarily_unavailable"]
       );
-      expect(props.onSuccess).toHaveBeenCalled();
-      expect(props.onClose).toHaveBeenCalled();
     });
-  });
-
-  it("displays server error message when api call fails", async () => {
-    api.repriceStockLot.mockRejectedValueOnce(new Error("m5.reprice.qty_exceeded"));
-    renderModal();
-
-    const reasonInput = screen.getByLabelText(/Reason/);
-    fireEvent.change(reasonInput, { target: { value: "Price adjustment" } });
-
-    const submitBtn = screen.getByRole("button", { name: "Apply Reprice" });
-    fireEvent.click(submitBtn);
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeTruthy();
-    });
+    expect(api.repriceStockLot).not.toHaveBeenCalled();
+    expect(props.onSuccess).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 });

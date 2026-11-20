@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiProblem } from "../../shell/api/client";
 import { messages } from "../../shell/i18n/messages";
 import type {
   StockTakeSessionResponse,
@@ -106,7 +107,9 @@ const state = {
 
 const api = {
   locations: vi.fn(async () => [mockLocation]),
-  getActiveStockTakeSession: vi.fn(async (): Promise<StockTakeSessionResponse | null> => mockSession),
+  getActiveStockTakeSession: vi.fn<
+    (locationId: string) => Promise<StockTakeSessionResponse | null>
+  >(async () => mockSession),
   getStockTakeSession: vi.fn(async () => mockSession),
   openStockTakeSession: vi.fn(async () => mockSession),
   recordStockTakeScan: vi.fn(async () => mockScanResult),
@@ -158,15 +161,39 @@ describe("MobileStockTakePage (M3-09)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    api.locations.mockResolvedValue([mockLocation]);
-    api.getActiveStockTakeSession.mockResolvedValue(mockSession);
-    api.recordStockTakeScan.mockResolvedValue(mockScanResult);
-    api.listStockTakeScans.mockResolvedValue([mockScanItem]);
+    window.dispatchEvent(new Event("online"));
+    api.locations.mockReset().mockResolvedValue([mockLocation]);
+    api.getActiveStockTakeSession.mockReset().mockResolvedValue(mockSession);
+    api.recordStockTakeScan.mockReset().mockResolvedValue(mockScanResult);
+    api.listStockTakeScans.mockReset().mockResolvedValue([mockScanItem]);
+    api.batchStockTakeScan.mockReset().mockResolvedValue({
+      sessionId: SESSION_ID,
+      processedCount: 1,
+      duplicateCount: 0,
+      totalScansCount: 1
+    });
   });
 
   afterEach(() => {
+    window.dispatchEvent(new Event("online"));
     cleanup();
     localStorage.clear();
+  });
+
+  it("keeps Back to counts and omits redundant inventory navigation buttons", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Mobile Stock-Taking" })).toBeTruthy();
+    });
+
+    const backLink = screen.getByRole("link", { name: "Back to counts" });
+    expect(backLink.getAttribute("href")).toBe("/inventory/counts");
+
+    expect(screen.queryByRole("link", { name: "Stock counts" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Write-offs" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Repacks" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Mobile Stock-Taking" })).toBeNull();
   });
 
   it("allows a user to input a scan and submit a count to the correct session", async () => {
@@ -374,6 +401,129 @@ describe("MobileStockTakePage (M3-09)", () => {
       },
       expect.any(String)
     );
+  });
+
+  it("disables sync while offline, shows sync API errors, and keeps queued scans for retry", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Location")).toBeTruthy();
+    });
+    fireEvent.change(screen.getByLabelText("Location"), {
+      target: { value: SHOP_ID }
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Active Session")).toBeTruthy();
+    });
+
+    // Switch browser to offline
+    fireEvent(window, new Event("offline"));
+    await waitFor(() => {
+      expect(screen.getByText(/Offline/i)).toBeTruthy();
+    });
+
+    // Queue a scan locally while offline
+    fireEvent.change(screen.getByLabelText("Barcode / SKU"), { target: { value: "BAD-SKU-999" } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record Scan" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 scan\(s\) queued offline/i)).toBeTruthy();
+    });
+
+    const syncBtn = screen.getByRole("button", { name: "Sync Queued Scans" }) as HTMLButtonElement;
+    expect(syncBtn.disabled).toBe(true);
+    expect(api.recordStockTakeScan).not.toHaveBeenCalled();
+
+    // Come back online -> Sync button becomes enabled
+    fireEvent(window, new Event("online"));
+    await waitFor(() => {
+      expect(syncBtn.disabled).toBe(false);
+    });
+
+    // Server rejects the batch with a problem response -> user sees alert and queue is preserved
+    api.batchStockTakeScan.mockRejectedValueOnce(
+      new ApiProblem({
+        code: "m5.stock_take.sku_not_found",
+        title: "Scanned barcode or SKU was not found.",
+        status: 422
+      })
+    );
+    fireEvent.click(syncBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("Scanned barcode or SKU was not found.");
+    });
+    expect(screen.getByText(/1 scan\(s\) queued offline/i)).toBeTruthy();
+    expect(localStorage.getItem(`stock_take_queue_${SESSION_ID}`)).toContain("BAD-SKU-999");
+
+    // Retrying once server accepts clears the error and removes synced scans
+    api.batchStockTakeScan.mockResolvedValueOnce({
+      sessionId: SESSION_ID,
+      processedCount: 1,
+      duplicateCount: 0,
+      totalScansCount: 1
+    });
+    fireEvent.click(syncBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Successfully synced 1 scan\(s\)/i)).toBeTruthy();
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(localStorage.getItem(`stock_take_queue_${SESSION_ID}`)).toBeNull();
+  });
+
+  it("resets the displayed offline queue when switching to another location session", async () => {
+    const SECOND_SHOP_ID = "0190f0de-0000-7000-8000-000000000133";
+    const SECOND_SESSION_ID = "0190f0de-0000-7000-8000-000000000998";
+    const secondLocation = {
+      ...mockLocation,
+      locationId: SECOND_SHOP_ID,
+      locationCode: "SHOP-02",
+      nameEn: "Second Cooperative Shop"
+    };
+    const secondSession: StockTakeSessionResponse = {
+      ...mockSession,
+      sessionId: SECOND_SESSION_ID,
+      locationId: SECOND_SHOP_ID
+    };
+
+    api.locations.mockResolvedValue([mockLocation, secondLocation]);
+    api.getActiveStockTakeSession.mockImplementation(async (locId: string) =>
+      locId === SECOND_SHOP_ID ? secondSession : mockSession
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Location")).toBeTruthy();
+    });
+    fireEvent.change(screen.getByLabelText("Location"), { target: { value: SHOP_ID } });
+    await waitFor(() => {
+      expect(screen.getByText(SESSION_ID)).toBeTruthy();
+    });
+
+    // Queue a scan while offline in session 1, then reconnect before switching locations
+    fireEvent(window, new Event("offline"));
+    fireEvent.change(screen.getByLabelText("Barcode / SKU"), { target: { value: "SKU-SESSION-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record Scan" }));
+    await waitFor(() => {
+      expect(screen.getByText(/1 scan\(s\) queued offline/i)).toBeTruthy();
+    });
+    fireEvent(window, new Event("online"));
+
+    // Switch to location 2 (session 2 has no queued scans)
+    fireEvent.change(screen.getByLabelText("Location"), { target: { value: SECOND_SHOP_ID } });
+    await waitFor(() => {
+      expect(screen.getByText(SECOND_SESSION_ID)).toBeTruthy();
+    });
+    expect(screen.queryByText(/scan\(s\) queued offline/i)).toBeNull();
+
+    // Switching back to location 1 restores session 1's queued scan
+    fireEvent.change(screen.getByLabelText("Location"), { target: { value: SHOP_ID } });
+    await waitFor(() => {
+      expect(screen.getByText(/1 scan\(s\) queued offline/i)).toBeTruthy();
+    });
   });
 });
 
