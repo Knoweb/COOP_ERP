@@ -307,20 +307,10 @@ dl.pos-totals > div {
 }
 
 .pos-dropdown-select .custom-dropdown__item-bar,
-.pos-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.pos-dropdown-menu .custom-dropdown__item-bar,
 .pos-dropdown-select .custom-dropdown__item-spacer,
 .pos-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .pos-dropdown-select .custom-dropdown__item-label,

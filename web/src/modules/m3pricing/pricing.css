@@ -366,8 +366,8 @@
   box-sizing: border-box;
 }
 
-.pricing-filter-bar > button,
-.pricing-filter-bar > .modern-btn {
+.pricing-filter-bar>button,
+.pricing-filter-bar>.modern-btn {
   min-height: var(--target-min);
   box-sizing: border-box;
 }
@@ -617,13 +617,13 @@
   border-bottom: none !important;
 }
 
-.shell-page .modern-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded):not(.pnl-total-row):not(.pnl-unallocated-row) > td:not(.stock-nested-cell),
-.modern-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded):not(.pnl-total-row):not(.pnl-unallocated-row) > td:not(.stock-nested-cell) {
+.shell-page .modern-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded):not(.pnl-total-row):not(.pnl-unallocated-row)>td:not(.stock-nested-cell),
+.modern-table tbody tr:not(.stock-nested-row):not(.stock-sku-row--expanded):not(.pnl-total-row):not(.pnl-unallocated-row)>td:not(.stock-nested-cell) {
   background-color: var(--color-surface) !important;
 }
 
-.shell-page .modern-table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover > td:not(.stock-nested-cell),
-.modern-table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover > td:not(.stock-nested-cell) {
+.shell-page .modern-table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover>td:not(.stock-nested-cell),
+.modern-table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-row):hover>td:not(.stock-nested-cell) {
   background-color: var(--color-polish-31) !important;
 }
 
@@ -687,11 +687,11 @@
   min-width: 0 !important;
 }
 
-.shell-page .modern-table td.pricing-cell-center > *,
-.shell-page .modern-table td.pricing-cell-condition > *,
-.shell-page .modern-table td.pricing-cell-days > *,
-.shell-page .modern-table td.pricing-cell-batch > *,
-.shell-page .modern-table td.pricing-cell-expiry > * {
+.shell-page .modern-table td.pricing-cell-center>*,
+.shell-page .modern-table td.pricing-cell-condition>*,
+.shell-page .modern-table td.pricing-cell-days>*,
+.shell-page .modern-table td.pricing-cell-batch>*,
+.shell-page .modern-table td.pricing-cell-expiry>* {
   margin-left: auto !important;
   margin-right: auto !important;
 }
@@ -1509,7 +1509,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: calc(var(--space-8) * 2 + var(--space-4)) !important;
 }
 
-.pricing-dropdown-select > select.visually-hidden {
+.pricing-dropdown-select>select.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;
@@ -1715,20 +1715,10 @@ select.pricing-select:not(.visually-hidden) option:focus {
 }
 
 .pricing-dropdown-select .custom-dropdown__item-bar,
-.pricing-dropdown-menu .custom-dropdown__item-bar {
-  width: var(--border-width-strong) !important;
-  height: var(--space-2) !important;
-  background-color: var(--color-polish-25) !important;
-  border-radius: var(--radius-pill) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
-}
-
+.pricing-dropdown-menu .custom-dropdown__item-bar,
 .pricing-dropdown-select .custom-dropdown__item-spacer,
 .pricing-dropdown-menu .custom-dropdown__item-spacer {
-  width: var(--border-width-strong) !important;
-  margin-right: var(--space-1) !important;
-  flex-shrink: 0 !important;
+  display: none !important;
 }
 
 .pricing-dropdown-select .custom-dropdown__item-label,
@@ -2054,6 +2044,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -2484,6 +2475,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-batch,
 .pricing-markdown-table td.pricing-cell-batch {
   white-space: nowrap !important;
@@ -2499,6 +2491,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-expiry,
 .pricing-markdown-table .pricing-cell-expiry {
   white-space: nowrap !important;
@@ -2514,6 +2507,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-days,
 .pricing-markdown-table .pricing-cell-days {
   white-space: nowrap !important;
@@ -2530,6 +2524,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   text-align: center !important;
   font-variant-numeric: tabular-nums !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-qty,
 .pricing-markdown-table td.pricing-cell-qty {
   white-space: nowrap !important;
@@ -2545,6 +2540,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-condition,
 .pricing-markdown-table td.pricing-cell-condition {
   white-space: nowrap !important;
@@ -2572,6 +2568,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-price,
 .pricing-markdown-table td.pricing-cell-price {
   white-space: nowrap !important;
@@ -2587,17 +2584,18 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-markdown-table td.pricing-cell-status,
 .pricing-markdown-table td.pricing-cell-status {
   white-space: nowrap !important;
 }
 
 /* Centering child elements for center-aligned columns */
-.pricing-markdown-table .pricing-cell-batch > *,
-.pricing-markdown-table .pricing-cell-expiry > *,
-.pricing-markdown-table .pricing-cell-days > *,
-.pricing-markdown-table .pricing-cell-qty > *,
-.pricing-markdown-table .pricing-cell-condition > * {
+.pricing-markdown-table .pricing-cell-batch>*,
+.pricing-markdown-table .pricing-cell-expiry>*,
+.pricing-markdown-table .pricing-cell-days>*,
+.pricing-markdown-table .pricing-cell-qty>*,
+.pricing-markdown-table .pricing-cell-condition>* {
   margin-left: auto !important;
   margin-right: auto !important;
 }
@@ -2857,6 +2855,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   padding-left: var(--space-1) !important;
   padding-right: var(--space-1) !important;
 }
+
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-unit,
 .pricing-gazette-table td.pricing-gazette-cell-unit {
   white-space: nowrap !important;
@@ -2873,6 +2872,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   text-align: center !important;
   font-variant-numeric: tabular-nums !important;
 }
+
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-from,
 .pricing-gazette-table td.pricing-gazette-cell-from {
   white-space: nowrap !important;
@@ -2889,6 +2889,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   text-align: center !important;
   font-variant-numeric: tabular-nums !important;
 }
+
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-to,
 .pricing-gazette-table td.pricing-gazette-cell-to {
   white-space: nowrap !important;
@@ -2918,12 +2919,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-status,
 .pricing-gazette-table td.pricing-gazette-cell-status {
   white-space: nowrap !important;
 }
 
-.pricing-gazette-cell-status > * {
+.pricing-gazette-cell-status>* {
   margin-left: auto !important;
   margin-right: auto !important;
 }
@@ -2938,6 +2940,7 @@ select.pricing-select:not(.visually-hidden) option:focus {
   min-width: 0 !important;
   text-align: center !important;
 }
+
 .shell-page .pricing-gazette-table td.pricing-gazette-cell-actions,
 .pricing-gazette-table td.pricing-gazette-cell-actions {
   white-space: nowrap !important;
@@ -3249,8 +3252,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
 }
 
 @keyframes customerSearchSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .customer-error-banner {
