@@ -374,6 +374,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/credit-limits/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set customer credit limits in bulk from a sheet or rows (CAT-14)
+         * @description Sets credit limits for customer accounts in bulk from a CSV sheet or list of items (CAT-14). Enforces step-up authentication (MFA) and cus.account.manage permission. All-or-none: if any item fails validation, nothing is applied.
+         */
+        post: operations["bulkSetCustomerCreditLimits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/{accountId}": {
         parameters: {
             query?: never;
@@ -1255,6 +1275,32 @@ export interface components {
             status: "SUBMITTED" | "ELIGIBLE_SUPPORTED" | "APPROVED" | "REJECTED" | "SETTLED_EXTERNALLY";
             rejectionReason?: string | null;
         };
+        BulkCustomerCreditLimitsRequest: {
+            /** @description CSV sheet containing account_no and credit_limit columns */
+            sheet?: string | null;
+            limits?: components["schemas"]["CustomerCreditLimitItem"][];
+            defaultReason?: string | null;
+        };
+        CustomerCreditLimitItem: {
+            accountNo?: string | null;
+            phone?: string | null;
+            nic?: string | null;
+            /** Format: uuid */
+            accountId?: string | null;
+            creditLimit: number;
+            reason?: string | null;
+        };
+        BulkCustomerCreditLimitReport: {
+            /** @enum {string} */
+            status: "UPDATED" | "REJECTED";
+            updatedCount: number;
+            problems: components["schemas"]["BulkCustomerCreditLimitProblem"][];
+        };
+        BulkCustomerCreditLimitProblem: {
+            identifier: string;
+            field: string;
+            code: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1939,6 +1985,36 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkSetCustomerCreditLimits: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCustomerCreditLimitsRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk customer credit limits report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCustomerCreditLimitReport"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["RuleBroken"];
             422: components["responses"]["RuleBroken"];
         };
     };
