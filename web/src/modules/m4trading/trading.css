@@ -13,7 +13,7 @@
 .trading-filter-bar:has(input, select) {
   width: fit-content;
   max-width: 100%;
-  padding: 14px 18px;
+  padding: calc(var(--space-2) - var(--border-width-strong)) calc(var(--space-2) + var(--space-half));
   margin-bottom: var(--space-3);
   background: var(--color-polish-22);
   border: var(--border-width) solid var(--color-polish-21);
@@ -39,15 +39,15 @@
 .trading-filter-bar .trading-form-field--date,
 .trading-filter-bar:has(input, select) .trading-form-field--date,
 .trading-filter-bar:has(input, select) .trading-form-field:has(.catalogue-datepicker-wrap) {
-  flex: 0 0 210px !important;
-  max-width: 230px !important;
-  min-width: 170px !important;
+  flex: 0 0 calc(var(--space-8) * 3 + var(--space-2)) !important;
+  max-width: calc(var(--space-8) * 3 + var(--space-4)) !important;
+  min-width: calc(var(--space-8) * 2 + var(--space-4)) !important;
 }
 
 .trading-filter-bar .trading-form-field--date .catalogue-datepicker-wrap,
 .trading-filter-bar:has(input, select) .trading-form-field:has(.catalogue-datepicker-wrap) .catalogue-datepicker-wrap {
   width: 100% !important;
-  max-width: 230px !important;
+  max-width: calc(var(--space-8) * 3 + var(--space-4)) !important;
 }
 
 .trading-form-row {
@@ -111,10 +111,10 @@
 .trading-filter-bar:has(input, select) > button {
   flex: 0 0 auto;
   box-sizing: border-box;
-  height: 46px;
-  min-height: 46px;
+  height: calc(var(--target-min) - var(--border-width-strong));
+  min-height: calc(var(--target-min) - var(--border-width-strong));
   padding: 0 var(--space-3);
-  border-radius: 10px;
+  border-radius: calc(var(--radius) * 2.5);
   border: var(--border-width) solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
@@ -132,7 +132,7 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
   background: var(--color-surface);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13);
 }
 
 .trading-filter-bar:has(input, select) > button:disabled {
@@ -1612,7 +1612,7 @@
 .exposure-kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: calc(var(--space-1) + var(--border-width-strong));
   margin-top: var(--space-2) !important;
   margin-bottom: var(--space-3) !important;
   width: 100%;
@@ -1622,12 +1622,12 @@
   position: relative;
   border-radius: calc(var(--radius) * 2.5);
   border: var(--border-width) solid var(--color-border);
-  padding: 10px 12px;
+  padding: calc(var(--space-1) + var(--border-width-strong)) calc(var(--space-1) + var(--space-half));
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 86px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  min-height: calc(var(--space-8) + var(--space-3) - var(--border-width-strong));
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-3);
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   box-sizing: border-box;
@@ -1643,16 +1643,15 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 6px;
+  gap: calc(var(--space-1) - var(--border-width-strong));
   width: 100%;
-  min-height: 26px;
+  min-height: calc(var(--space-3) + var(--border-width-strong));
 }
 
 .exposure-kpi-title {
-  font-size: 0.6875rem;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   font-weight: var(--font-weight-strong);
-  letter-spacing: 0.03em;
   line-height: 1.25;
   word-break: keep-all;
   overflow-wrap: normal;
@@ -1667,21 +1666,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
-  min-height: 22px;
+  width: calc(var(--space-3) - var(--border-width-strong));
+  height: calc(var(--space-3) - var(--border-width-strong));
+  min-width: calc(var(--space-3) - var(--border-width-strong));
+  min-height: calc(var(--space-3) - var(--border-width-strong));
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 var(--border-width) var(--color-polish-3);
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-8), 0 0 0 var(--border-width) var(--color-polish-3);
   flex-shrink: 0;
   transition: transform 0.2s ease;
 }
 
 .exposure-kpi-card__icon-badge svg {
   display: block;
-  width: 11px;
-  height: 11px;
+  width: calc(var(--space-1) + var(--space-half) - var(--border-width));
+  height: calc(var(--space-1) + var(--space-half) - var(--border-width));
 }
 
 .exposure-kpi-card:hover .exposure-kpi-card__icon-badge {
@@ -1697,38 +1696,36 @@
   width: 100%;
   min-width: 0;
   margin-top: auto;
-  padding-top: 2px;
+  padding-top: var(--border-width-strong);
 }
 
 .exposure-kpi-value {
-  font-size: 0.9375rem;
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-strong);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   margin: 0;
   padding: 0;
   width: 100%;
-  letter-spacing: -0.01em;
 }
 
 .exposure-kpi-value .money,
 .exposure-kpi-value .money--total,
 .exposure-kpi-value .money-display {
-  font-size: 0.9375rem !important;
+  font-size: var(--font-size-sm) !important;
   font-weight: var(--font-weight-strong) !important;
   color: inherit !important;
   line-height: 1.2 !important;
   white-space: nowrap !important;
   display: inline-block !important;
-  letter-spacing: -0.01em;
 }
 
 .exposure-kpi-subtitle {
-  font-size: 0.6875rem;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: var(--font-weight-normal);
   line-height: 1.15;
-  margin-top: 2px;
+  margin-top: var(--border-width-strong);
   white-space: nowrap;
 }
 
@@ -1800,30 +1797,6 @@
 .exposure-kpi-card--alert .exposure-kpi-value,
 .exposure-kpi-card--alert .exposure-kpi-card__icon-badge {
   color: var(--color-alert-text);
-}
-
-/* Responsive grid layout */
-@media (max-width: 1024px) {
-  .shell-page .exposure-kpi-grid,
-  .exposure-kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: var(--space-2) !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .shell-page .exposure-kpi-grid,
-  .exposure-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: var(--space-2) !important;
-  }
-}
-
-@media (max-width: 440px) {
-  .shell-page .exposure-kpi-grid,
-  .exposure-kpi-grid {
-    grid-template-columns: 1fr !important;
-  }
 }
 
 

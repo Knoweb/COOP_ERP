@@ -5425,7 +5425,9 @@ button[type="submit"]:not(:disabled):hover,
 
 /* 1. Large Tablet / Small Laptop Breakpoint (max-width: 1024px) */
 @media (max-width: 1024px) {
-  .stock-kpi-grid {
+  .stock-kpi-grid,
+  .shell-page .exposure-kpi-grid,
+  .exposure-kpi-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: var(--space-2) !important;
   }
@@ -5448,7 +5450,9 @@ button[type="submit"]:not(:disabled):hover,
 
 /* 2. Tablet & Mobile Landscape Breakpoint (max-width: 768px) */
 @media (max-width: 768px) {
-  .stock-kpi-grid {
+  .stock-kpi-grid,
+  .shell-page .exposure-kpi-grid,
+  .exposure-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: var(--space-2) !important;
   }
@@ -5555,6 +5559,12 @@ button[type="submit"]:not(:disabled):hover,
 @media (max-width: 480px) {
   .stock-kpi-grid {
     grid-template-columns: 1fr 1fr !important;
+    gap: var(--space-1) !important;
+  }
+
+  .shell-page .exposure-kpi-grid,
+  .exposure-kpi-grid {
+    grid-template-columns: 1fr !important;
     gap: var(--space-1) !important;
   }
 
