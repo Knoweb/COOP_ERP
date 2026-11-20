@@ -443,11 +443,9 @@ export function RepacksPage() {
           <div className="repack-form-body">
             <div className="repack-grid-2">
               <label className="inventory-form-field">
-                <span className="repack-field-label">
-                  {t("inventory.repack.recipe.name").text}
-                  <span className="register-field-required"> *</span>
-                </span>
+                <span className="repack-field-label">{t("inventory.repack.recipe.name").text}</span>
                 <input
+                  aria-label={t("inventory.repack.recipe.name").text}
                   value={draft.name}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                   placeholder={t("inventory.repack.recipe.name").text}
@@ -484,11 +482,9 @@ export function RepacksPage() {
                     onChoose={(sku) => setDraft({ ...draft, inputSkuId: sku.skuId })}
                   />
                   <label className="inventory-form-field">
-                    <span className="repack-field-label">
-                      {t("inventory.repack.recipe.input_qty").text}
-                      <span className="register-field-required"> *</span>
-                    </span>
+                    <span className="repack-field-label">{t("inventory.repack.recipe.input_qty").text}</span>
                     <input
+                      aria-label={t("inventory.repack.recipe.input_qty").text}
                       inputMode="decimal"
                       value={draft.inputQty}
                       onChange={(event) => setDraft({ ...draft, inputQty: event.target.value })}
@@ -522,11 +518,9 @@ export function RepacksPage() {
                     onChoose={(sku) => setDraft({ ...draft, outputSkuId: sku.skuId })}
                   />
                   <label className="inventory-form-field">
-                    <span className="repack-field-label">
-                      {t("inventory.repack.recipe.output_qty").text}
-                      <span className="register-field-required"> *</span>
-                    </span>
+                    <span className="repack-field-label">{t("inventory.repack.recipe.output_qty").text}</span>
                     <input
+                      aria-label={t("inventory.repack.recipe.output_qty").text}
                       inputMode="decimal"
                       value={draft.outputQty}
                       onChange={(event) => setDraft({ ...draft, outputQty: event.target.value })}
@@ -577,10 +571,7 @@ export function RepacksPage() {
           <div className="repack-form-body">
             <div className="repack-grid-2">
               <label className="inventory-form-field">
-                <span className="repack-field-label">
-                  {t("inventory.repack.recipe").text}
-                  <span className="register-field-required"> *</span>
-                </span>
+                <span className="repack-field-label">{t("inventory.repack.recipe").text}</span>
                 <CustomSelect
                   ariaLabel={t("inventory.repack.recipe").text}
                   value={run.recipeId}
@@ -595,10 +586,7 @@ export function RepacksPage() {
                 />
               </label>
               <label className="inventory-form-field">
-                <span className="repack-field-label">
-                  {t("inventory.repack.input_lot").text}
-                  <span className="register-field-required"> *</span>
-                </span>
+                <span className="repack-field-label">{t("inventory.repack.input_lot").text}</span>
                 <CustomSelect
                   ariaLabel={t("inventory.repack.input_lot").text}
                   value={run.batchId}
@@ -616,11 +604,9 @@ export function RepacksPage() {
             <div className="repack-grid-2">
               <div>
                 <label className="inventory-form-field">
-                  <span className="repack-field-label">
-                    {t("inventory.repack.input_qty").text}
-                    <span className="register-field-required"> *</span>
-                  </span>
+                  <span className="repack-field-label">{t("inventory.repack.input_qty").text}</span>
                   <input
+                    aria-label={t("inventory.repack.input_qty").text}
                     inputMode="decimal"
                     value={run.inputQty}
                     onChange={(event) => setRun({ ...run, inputQty: event.target.value })}
@@ -632,11 +618,9 @@ export function RepacksPage() {
                 )}
               </div>
               <label className="inventory-form-field">
-                <span className="repack-field-label">
-                  {t("inventory.repack.actual").text}
-                  <span className="register-field-required"> *</span>
-                </span>
+                <span className="repack-field-label">{t("inventory.repack.actual").text}</span>
                 <input
+                  aria-label={t("inventory.repack.actual").text}
                   inputMode="decimal"
                   value={run.actual}
                   onChange={(event) => setRun({ ...run, actual: event.target.value })}
