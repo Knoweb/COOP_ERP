@@ -33,10 +33,10 @@ import lk.coopfed.knoweb.till.peripherals.jvm.PreviewFolderPrinter
 import lk.coopfed.knoweb.till.render.SkiaReceiptRasteriser
 
 /**
- * The desktop till against the running local stack, end to end (opt-in; never in CI by default):
+ * The desktop till against the running local stack, end to end (Doc 32 Section 11, QA-01):
  *
  *     ./gradlew :desktop:devEnrolmentCode              # once: registers the till, issues a code
- *     ./gradlew :desktop:test -Ptill.stack=true --tests '*DesktopStackTest*'
+ *     ./gradlew :desktop:stackTest                     # or :desktop:test -Ptill.stack=true --tests '*DesktopStackTest*'
  *
  * with COOP_TILL_HOME set the same for both. It enrols (when the till is not enrolled yet), takes
  * and verifies the signed snapshot, opens a session, sells two items by barcode for cash, closes
@@ -66,7 +66,15 @@ class DesktopStackTest {
             println("snapshot v$version: ${catalogue.items.size} items, ${catalogue.operators.size} operators, shop ${catalogue.shop?.name?.en}")
             assertTrue(catalogue.items.isNotEmpty(), "the snapshot carries the shop's items")
 
-            service.signInTrialCashier()
+            if (catalogue.operators.isNotEmpty()) {
+                val operator = catalogue.operators.firstOrNull { it.permissions.contains("pos.session.manage") }
+                    ?: catalogue.operators.firstOrNull { it.pinHash != null }
+                    ?: catalogue.operators.first()
+                val pin = if (operator.displayName.contains("Supervisor", ignoreCase = true) || operator.displayName.contains("Kamal", ignoreCase = true) || operator.userId.endsWith("236")) "5678" else "1234"
+                service.signIn(operator, pin)
+            } else {
+                service.signInTrialCashier()
+            }
             service.currentSession()?.let { service.closeSession(Money.parse("0")) }
             service.openSession(Money.parse("2000.00"))
             val priced = catalogue.items.filter { it.price != null && it.barcodes.isNotEmpty() }.take(2)

@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed demo-data demo-till-sale urls build test test-int format coverage hooks lint-ci gen-clients check-generated progress new-module test-scaffold smoke e2e
+.PHONY: help image up up-2 down reset migrate seed demo-data demo-till-sale test-till-stack urls build test test-int format coverage hooks lint-ci gen-clients check-generated progress new-module test-scaffold smoke e2e
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -47,6 +47,7 @@ help:
 	@echo "make seed         load the development seed rows (safe to repeat)"
 	@echo "make demo-data    load the demo for cooperative staff (docs/DEMO.md; safe to repeat)"
 	@echo "make demo-till-sale  a till sale at the demo shop through the sync contract (after demo-data)"
+	@echo "make test-till-stack desktop till against central (Doc 32 section 11 conformance, after demo-data)"
 	@echo "make roles        apply the database users and groups to the running database (make up does this)"
 	@echo "make build        build backend, web and till on the host"
 	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
@@ -158,6 +159,14 @@ demo-data:
 # stack (make up) and the demo (make demo-data). Each run is one more sale.
 demo-till-sale:
 	cd backend && ./gradlew --no-daemon -q :app:demoTillSale
+
+# Conformance suite (Doc 32 section 11, QA-01): the real KMP desktop till against central.
+# Registers DESKTOP-TRIAL-S01, enrols, refreshes snapshot, sells items for cash, prints,
+# closes session, uploads through sync, and asserts central holds the receipt unflagged.
+# Needs the stack (make up or make up-2) and demo data (make demo-data).
+test-till-stack:
+	cd till && ./gradlew --no-daemon -q :desktop:devEnrolmentCode
+	cd till && $(if $(shell which xvfb-run 2>/dev/null),xvfb-run -a ,)./gradlew --no-daemon :desktop:stackTest
 
 urls:
 	@echo ""
