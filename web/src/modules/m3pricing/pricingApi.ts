@@ -29,6 +29,7 @@ export type BasketResult = components["schemas"]["BasketResult"];
 export type CustomerPriceLookup = components["schemas"]["CustomerPriceLookupResponse"];
 export type Rule = components["schemas"]["RuleResponse"];
 export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
+export type WithdrawDraftRequest = components["schemas"]["WithdrawDraftRequest"];
 export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
 export type ReviewItem = components["schemas"]["ReviewItem"];
 export type LabelJob = components["schemas"]["LabelJobResponse"];
@@ -137,6 +138,14 @@ export function usePricingApi() {
         const { data } = await api.POST("/v1/pricing/lists/{listId}/publish", {
           params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
           body: { applyFrom }
+        });
+        return data!;
+      },
+
+      async withdrawDraft(listId: string, body: WithdrawDraftRequest, idempotencyKey: string): Promise<PriceList> {
+        const { data } = await api.POST("/v1/pricing/lists/{listId}/withdraw", {
+          params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
         });
         return data!;
       },

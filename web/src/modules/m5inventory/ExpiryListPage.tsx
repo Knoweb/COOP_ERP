@@ -130,6 +130,7 @@ export function ExpiryListPage() {
               <div className="expiry-kpi-card__content">
                 <span className="expiry-kpi-title">{t("inventory.expiry.kpi_critical").text}</span>
                 <span className="expiry-kpi-count">{criticalCount}</span>
+                <span className="expiry-kpi-subtitle">{t("inventory.expiry.kpi_critical_sub").text}</span>
               </div>
               <div className="expiry-kpi-card__icon-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
@@ -143,6 +144,7 @@ export function ExpiryListPage() {
               <div className="expiry-kpi-card__content">
                 <span className="expiry-kpi-title">{t("inventory.expiry.kpi_warning").text}</span>
                 <span className="expiry-kpi-count">{warningCount}</span>
+                <span className="expiry-kpi-subtitle">{t("inventory.expiry.kpi_warning_sub").text}</span>
               </div>
               <div className="expiry-kpi-card__icon-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
@@ -155,6 +157,7 @@ export function ExpiryListPage() {
               <div className="expiry-kpi-card__content">
                 <span className="expiry-kpi-title">{t("inventory.expiry.kpi_slow").text}</span>
                 <span className="expiry-kpi-count">{slowCount}</span>
+                <span className="expiry-kpi-subtitle">{t("inventory.expiry.kpi_slow_sub").text}</span>
               </div>
               <div className="expiry-kpi-card__icon-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
@@ -167,6 +170,7 @@ export function ExpiryListPage() {
               <div className="expiry-kpi-card__content">
                 <span className="expiry-kpi-title">{t("inventory.expiry.kpi_expired").text}</span>
                 <span className="expiry-kpi-count">{expiredCount}</span>
+                <span className="expiry-kpi-subtitle">{t("inventory.expiry.kpi_expired_sub").text}</span>
               </div>
               <div className="expiry-kpi-card__icon-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">

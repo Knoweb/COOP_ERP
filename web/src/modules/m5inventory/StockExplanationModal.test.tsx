@@ -6,6 +6,14 @@ import { messages } from "../../shell/i18n/messages";
 import type { StockExplanation } from "./inventoryApi";
 import { StockExplanationModal } from "./StockExplanationModal";
 
+const permissionState = vi.hoisted(() => ({
+  permissions: new Set<string>(["inv.stock.reprice"])
+}));
+
+vi.mock("../../shell/auth/permissions", () => ({
+  useHasPermission: (perm: string) => permissionState.permissions.has(perm)
+}));
+
 const LOCATION_ID = "0190f0de-0000-7000-8000-000000000101";
 const SKU_ID = "0190f0de-0000-7000-8000-000000000102";
 
@@ -218,5 +226,45 @@ describe("StockExplanationModal", () => {
     fireEvent.click(closeButtons[0]);
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("renders Reprice button in Physical Lots tab when user has inv.stock.reprice", async () => {
+    permissionState.permissions = new Set(["inv.stock.reprice"]);
+    renderModal({ isOpen: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("BATCH-2026-A")).toBeTruthy();
+    });
+
+    const repriceButtons = screen.getAllByRole("button", { name: "Reprice" });
+    expect(repriceButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not render Reprice button without inv.stock.reprice", async () => {
+    permissionState.permissions = new Set();
+    renderModal({ isOpen: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("BATCH-2026-A")).toBeTruthy();
+    });
+
+    expect(screen.queryByRole("button", { name: "Reprice" })).toBeNull();
+  });
+
+  it("opens StockRepriceModal when clicking Reprice button on a lot", async () => {
+    permissionState.permissions = new Set(["inv.stock.reprice"]);
+    renderModal({ isOpen: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("BATCH-2026-A")).toBeTruthy();
+    });
+
+    const repriceButtons = screen.getAllByRole("button", { name: "Reprice" });
+    fireEvent.click(repriceButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("Reprice Stock Lot")).toBeTruthy();
+      expect(screen.getAllByText("BATCH-2026-A").length).toBeGreaterThanOrEqual(2);
+    });
   });
 });

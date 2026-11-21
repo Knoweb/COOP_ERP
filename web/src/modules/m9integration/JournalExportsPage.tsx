@@ -136,45 +136,62 @@ export function JournalExportsPage() {
           void generate();
         }}
       >
-        <div className="journal-controls__row">
-          <div className="modern-field integration-period-field">
-            <label htmlFor="integration-period-from" className="modern-field__label integration-label">
-              {t("integration.field.from").text}
+        <div className="journal-controls__body">
+          <div className="journal-controls__row">
+            <div className="modern-field integration-period-field">
+              <label htmlFor="integration-period-from" className="modern-field__label integration-label">
+                {t("integration.field.from").text}
+              </label>
+              <IntegrationDatePicker
+                id="integration-period-from"
+                ariaLabel={t("integration.field.from").text}
+                value={period.from}
+                max={period.to || undefined}
+                required
+                onChange={(from) => setPeriod({ ...period, from })}
+              />
+            </div>
+            <div className="modern-field integration-period-field">
+              <label htmlFor="integration-period-to" className="modern-field__label integration-label">
+                {t("integration.field.to").text}
+              </label>
+              <IntegrationDatePicker
+                id="integration-period-to"
+                ariaLabel={t("integration.field.to").text}
+                value={period.to}
+                min={period.from || undefined}
+                required
+                onChange={(to) => setPeriod({ ...period, to })}
+              />
+            </div>
+            <label className={`modern-field integration-check${provisional ? " integration-check--checked" : ""}`}>
+              <input
+                type="checkbox"
+                checked={provisional}
+                required={periodOpen}
+                aria-describedby="integration-provisional-hint"
+                onChange={(event) => setProvisional(event.target.checked)}
+              />
+              <span className="modern-field__label integration-label journal-check-label">
+                {t("integration.journal.provisional").text}
+              </span>
             </label>
-            <IntegrationDatePicker
-              id="integration-period-from"
-              ariaLabel={t("integration.field.from").text}
-              value={period.from}
-              max={period.to || undefined}
-              required
-              onChange={(from) => setPeriod({ ...period, from })}
-            />
           </div>
-          <div className="modern-field integration-period-field">
-            <label htmlFor="integration-period-to" className="modern-field__label integration-label">
-              {t("integration.field.to").text}
-            </label>
-            <IntegrationDatePicker
-              id="integration-period-to"
-              ariaLabel={t("integration.field.to").text}
-              value={period.to}
-              min={period.from || undefined}
-              required
-              onChange={(to) => setPeriod({ ...period, to })}
-            />
-          </div>
-          <label className={`modern-field integration-check${provisional ? " integration-check--checked" : ""}`}>
-            <input
-              type="checkbox"
-              checked={provisional}
-              required={periodOpen}
-              aria-describedby="integration-provisional-hint"
-              onChange={(event) => setProvisional(event.target.checked)}
-            />
-            <span className="modern-field__label integration-label journal-check-label">
-              {t("integration.journal.provisional").text}
+        </div>
+
+        <div className="journal-controls__footer">
+          <p id="integration-provisional-hint" className="integration-hint journal-controls__hint">
+            <svg className="journal-callout__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            <span>
+              {periodOpen
+                ? t("integration.journal.provisional.open", undefined, { to: formatDate(period.to) }).text
+                : t("integration.journal.provisional.hint").text}
             </span>
-          </label>
+          </p>
           {canExport && (
             <div className="journal-controls__submit">
               <button
@@ -192,19 +209,6 @@ export function JournalExportsPage() {
             </div>
           )}
         </div>
-
-        <p id="integration-provisional-hint" className="integration-hint journal-controls__hint">
-          <svg className="journal-callout__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 16v-4" />
-            <path d="M12 8h.01" />
-          </svg>
-          <span>
-            {periodOpen
-              ? t("integration.journal.provisional.open", undefined, { to: formatDate(period.to) }).text
-              : t("integration.journal.provisional.hint").text}
-          </span>
-        </p>
       </form>
 
       <div className="journal-callouts">
@@ -298,7 +302,14 @@ export function JournalExportsPage() {
         )}
         {exports.data && exports.data.length === 0 && (
           <div className="integration-empty-card journal-empty-card">
-            <p>{t("integration.journal.history.empty").text}</p>
+            <div className="journal-empty-card__badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+            </div>
+            <p className="journal-empty-card__title">{t("integration.journal.history.empty").text}</p>
           </div>
         )}
         {exports.data && exports.data.length > 0 && (

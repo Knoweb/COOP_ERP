@@ -29,6 +29,7 @@ export function ShelfPricesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const idempotencyKey = useIdempotencyKey();
+  const withdrawKey = useIdempotencyKey();
   const canAuthor = useHasPermission("prc.pricelist.author");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<PriceList["kind"]>("RETAIL");
@@ -43,7 +44,9 @@ export function ShelfPricesPage() {
     queryFn: () => api.listPriceLists("ADVISORY")
   });
 
-  const lists = [...(retail.data ?? []), ...(commercial.data ?? []), ...(advisory.data ?? [])];
+  const lists = [...(retail.data ?? []), ...(commercial.data ?? []), ...(advisory.data ?? [])].filter(
+    (list) => list.status !== "WITHDRAWN"
+  );
   const hasRetail = (retail.data ?? []).length > 0;
   const hasCommercial = (commercial.data ?? []).length > 0;
   const canCreate = canAuthor && (!hasRetail || !hasCommercial);
@@ -68,6 +71,20 @@ export function ShelfPricesPage() {
     }
   });
 
+  const withdraw = useMutation({
+    mutationFn: (listId: string) =>
+      api.withdrawDraft(listId, { reason: t("pricing.draft.remove_reason").text }, withdrawKey.current()),
+    onSuccess: () => {
+      withdrawKey.next();
+      queryClient.invalidateQueries({ queryKey: ["pricing", "priceLists"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        withdrawKey.next();
+      }
+    }
+  });
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     create.mutate();
@@ -80,8 +97,8 @@ export function ShelfPricesPage() {
       <p className="modern-intro-text">{t("pricing.shelf.intro").text}</p>
 
       {canCreate && (
-        <form onSubmit={submit} className="pricing-filter-bar">
-          <label className="modern-field">
+        <form onSubmit={submit} className="pricing-filter-bar pricing-shelf-create-bar">
+          <label className="modern-field pricing-shelf-kind-field">
             <span className="modern-field__label pricing-filter-label">{t("pricing.shelf.field.kind").text}</span>
             <PricingSelect
               ariaLabel={t("pricing.shelf.field.kind").text}
@@ -94,14 +111,14 @@ export function ShelfPricesPage() {
               ]}
             />
           </label>
-          <label className="modern-field">
+          <label className="modern-field pricing-shelf-name-field">
             <span className="modern-field__label pricing-filter-label">{t("pricing.field.name").text}</span>
             <input type="text" value={name} maxLength={120} required onChange={(event) => setName(event.target.value)} />
           </label>
           <button type="submit" className="modern-btn modern-btn--primary" disabled={create.isPending || !name.trim()}>
             {t("pricing.shelf.create").text}
           </button>
-          {create.isError && <p role="alert">{errorText(create.error, t("pricing.error.generic").text)}</p>}
+          {create.isError && <p role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(create.error, t("pricing.error.generic").text)}</p>}
         </form>
       )}
 
@@ -109,6 +126,11 @@ export function ShelfPricesPage() {
         {(retail.isLoading || commercial.isLoading || advisory.isLoading) && <p>{t("pricing.list.loading").text}</p>}
         {retail.isError && <p role="alert">{errorText(retail.error, t("pricing.error.generic").text)}</p>}
         {commercial.isError && <p role="alert">{errorText(commercial.error, t("pricing.error.generic").text)}</p>}
+        {withdraw.isError && (
+          <div className="pricing-alert-box pricing-alert-box--error" role="alert">
+            <p>{errorText(withdraw.error, t("pricing.error.generic").text)}</p>
+          </div>
+        )}
         {!retail.isLoading && !commercial.isLoading && lists.length === 0 && (
           <div className="modern-empty-state">{t("pricing.shelf.empty").text}</div>
         )}
@@ -129,7 +151,34 @@ export function ShelfPricesPage() {
                   {lists.map((list) => (
                     <tr key={list.priceListId}>
                       <td>
-                        <Link to={`/pricing/shelf/${list.priceListId}`}>{list.name}</Link>
+                        <div className="pricing-list-name-cell">
+                          <Link to={`/pricing/shelf/${list.priceListId}`}>{list.name}</Link>
+                          {canAuthor && list.status === "DRAFT" && (
+                            <button
+                              type="button"
+                              className="pricing-row-remove-btn"
+                              aria-label={`${t("pricing.remove").text} ${list.name}`}
+                              disabled={withdraw.isPending}
+                              onClick={() => withdraw.mutate(list.priceListId)}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="14"
+                                height="14"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                                focusable="false"
+                              >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td>{t(`pricing.kind.${list.kind.toLowerCase()}`).text}</td>
                       <td>{list.version}</td>

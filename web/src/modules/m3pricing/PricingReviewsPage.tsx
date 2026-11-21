@@ -39,11 +39,11 @@ export function PricingReviewsPage() {
     <main className="shell-page">
       <PageHeader icon="reviews" title={t("pricing.reviews.title").text} />
       <PricingTabs />
-      <p className="modern-intro-text">{t("pricing.reviews.intro").text}</p>
+      <p className="modern-intro-text pricing-reviews-intro">{t("pricing.reviews.intro").text}</p>
 
-      <section className="pricing-section">
-        <div className="pricing-filter-bar">
-          <label className="pricing-form-field">
+      <section className="pricing-section pricing-reviews-section">
+        <div className="pricing-reviews-filter-bar">
+          <label className="pricing-reviews-filter-field">
             <span className="pricing-filter-label">{t("pricing.reviews.filter_kind").text}</span>
             <PricingSelect
               aria-label={t("pricing.reviews.filter_kind").text}
@@ -59,10 +59,33 @@ export function PricingReviewsPage() {
           </label>
         </div>
 
-        {reviewsQuery.isLoading && <p>{t("pricing.list.loading").text}</p>}
-        {reviewsQuery.isError && <p role="alert">{errorText(reviewsQuery.error, t("pricing.error.generic").text)}</p>}
+        {reviewsQuery.isLoading && (
+          <div className="modern-empty-state pricing-reviews-empty">{t("pricing.list.loading").text}</div>
+        )}
+        {reviewsQuery.isError && (
+          <p className="pricing-alert-box pricing-alert-box--error" role="alert">
+            {errorText(reviewsQuery.error, t("pricing.error.generic").text)}
+          </p>
+        )}
         {reviewsQuery.data?.length === 0 && (
-          <div className="modern-empty-state">{t("pricing.reviews.empty").text}</div>
+          <div className="pricing-reviews-empty" role="status">
+            <div className="pricing-reviews-empty__badge" aria-hidden="true">
+              <svg
+                className="pricing-reviews-empty__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <p className="pricing-reviews-empty__title">{t("pricing.reviews.empty").text}</p>
+            <p className="pricing-reviews-empty__hint">{t("pricing.reviews.empty_hint").text}</p>
+          </div>
         )}
 
         {reviewsQuery.data && reviewsQuery.data.length > 0 && (
@@ -71,28 +94,28 @@ export function PricingReviewsPage() {
               <table className="modern-table">
                 <thead>
                   <tr>
-                    <th>{t("pricing.reviews.column.occurred_at").text}</th>
+                    <th className="pricing-cell-date">{t("pricing.reviews.column.occurred_at").text}</th>
                     <th>{t("pricing.reviews.column.kind").text}</th>
-                    <th>{t("pricing.reviews.column.severity").text}</th>
+                    <th className="pricing-cell-center">{t("pricing.reviews.column.severity").text}</th>
                     <th>{t("pricing.reviews.column.sku").text}</th>
                     <th>{t("pricing.reviews.column.details").text}</th>
-                    <th>{t("pricing.reviews.column.status").text}</th>
+                    <th className="pricing-cell-center">{t("pricing.reviews.column.status").text}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reviewsQuery.data.map((review) => (
                     <tr key={review.reviewId}>
-                      <td>{formatDate(review.occurredAt)}</td>
+                      <td className="pricing-cell-date">{formatDate(review.occurredAt)}</td>
                       <td>
                         <strong>{t(`pricing.reviews.kind.${review.kind}`).text}</strong>
                       </td>
-                      <td>
+                      <td className="pricing-cell-center">
                         <StateChip
                           state={review.severity === "REVIEW" ? "alert" : "void"}
                           label={review.severity}
                         />
                       </td>
-                      <td>
+                      <td className="pricing-cell-item">
                         {review.skuName || review.skuCode ? (
                           <span>
                             {review.skuCode ? `${review.skuCode} — ` : ""}
@@ -107,7 +130,7 @@ export function PricingReviewsPage() {
                       <td>
                         <ReviewDetails details={review.details} />
                       </td>
-                      <td>
+                      <td className="pricing-cell-center">
                         <StateChip
                           state={review.status === "OPEN" ? "alert" : "issued"}
                           label={t(`pricing.reviews.status.${review.status}`).text}

@@ -102,4 +102,24 @@ describe("transfer requests", () => {
     );
     expect(screen.queryByRole("button", { name: text("inventory.request.approve") })).toBeNull();
   }, 15000);
+
+  it("filters items by search query", async () => {
+    state.permissions = new Set(["shop.transfer.request"]);
+    api.locations.mockResolvedValueOnce([location(SHOP, "TOWN", "SHOP")]);
+    api.balances.mockResolvedValueOnce([
+      { skuId: SUGAR, condition: "GOOD", qtyOnHand: 4 },
+      { skuId: "0190f6ac-0000-7000-8000-000000000002", condition: "GOOD", qtyOnHand: 10 }
+    ]);
+    renderPage();
+
+    await screen.findByRole("searchbox", { name: text("inventory.stock.search_placeholder") });
+    expect(screen.getAllByRole("textbox", { name: text("inventory.request.qty") })).toHaveLength(2);
+
+    const searchInput = screen.getByRole("searchbox", { name: text("inventory.stock.search_placeholder") });
+    fireEvent.change(searchInput, { target: { value: SUGAR } });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("textbox", { name: text("inventory.request.qty") })).toHaveLength(1);
+    });
+  });
 });
