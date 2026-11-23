@@ -1583,3 +1583,225 @@ table.modern-table tbody tr:hover td {
   box-shadow: none !important;
   transform: none !important;
 }
+
+/* ---- User Card Detail Page Header, Metadata Grid & Actions -------------- */
+
+.user-card-back-wrap {
+  margin-bottom: var(--space-2) !important;
+}
+
+.shell-page .user-card-container .document-header,
+.shell-page .user-card-header .document-header {
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
+  border-top: calc(var(--border-width) * 3) solid var(--color-accent) !important;
+  border-radius: calc(var(--radius) * 3) !important;
+  padding: var(--space-3) var(--space-4) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-23), 0 var(--border-width) var(--space-1) var(--color-polish-3) !important;
+  margin-bottom: var(--space-3) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-3) !important;
+}
+
+.shell-page .user-card-container .document-header__top,
+.shell-page .user-card-header .document-header__top {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: var(--space-2) !important;
+  margin-bottom: 0 !important;
+  padding-bottom: var(--space-2) !important;
+  border-bottom: var(--border-width) solid var(--color-polish-22) !important;
+}
+
+.shell-page .user-card-container .document-header__code,
+.shell-page .user-card-header .document-header__code {
+  display: inline-block !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  letter-spacing: calc(var(--border-width) / 2) !important;
+  text-transform: uppercase !important;
+  color: var(--color-accent) !important;
+  background: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-18) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: calc(var(--space-half) / 2) var(--space-1) !important;
+  margin-bottom: var(--space-half) !important;
+}
+
+.shell-page .user-card-container .document-header__title,
+.shell-page .user-card-header .document-header__title {
+  font-size: var(--font-size-xl) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+  line-height: var(--line-height-heading) !important;
+  margin: var(--space-half) 0 !important;
+}
+
+.shell-page .user-card-container .document-header__subtitle,
+.shell-page .user-card-header .document-header__subtitle {
+  font-size: var(--font-size-sm) !important;
+  color: var(--color-text-muted) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.shell-page .user-card-container .document-header__facts,
+.shell-page .user-card-header .document-header__facts {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 3.5), 1fr)) !important;
+  max-width: calc(var(--space-8) * 10) !important;
+  gap: var(--space-2) !important;
+  margin: 0 !important;
+  padding: var(--space-2) !important;
+  background: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-14) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+  box-sizing: border-box !important;
+}
+
+.shell-page .user-card-container .document-header__fact,
+.shell-page .user-card-header .document-header__fact {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-2) !important;
+  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-polish-18) !important;
+  border-radius: calc(var(--radius) * 2) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-23) !important;
+  min-height: auto !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+  transform: none !important;
+}
+
+.shell-page .user-card-container .document-header__fact:hover,
+.shell-page .user-card-header .document-header__fact:hover {
+  background: var(--color-surface) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-14) !important;
+  transform: none !important;
+}
+
+.shell-page .user-card-container .document-header__fact dt,
+.shell-page .user-card-header .document-header__fact dt {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-brand-dark) !important;
+  text-transform: uppercase !important;
+  letter-spacing: calc(var(--border-width) / 2) !important;
+  line-height: var(--line-height) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.shell-page .user-card-container .document-header__fact dd,
+.shell-page .user-card-header .document-header__fact dd {
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  color: var(--color-text) !important;
+  line-height: var(--line-height) !important;
+  text-align: right !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  min-height: auto !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+.shell-page .user-card-container .approval-bar,
+.shell-page .user-card-header .approval-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: var(--space-2) !important;
+  margin: 0 !important;
+  padding-top: var(--space-2) !important;
+  border-top: var(--border-width) solid var(--color-border) !important;
+}
+
+.shell-page .user-card-container .approval-bar__button,
+.shell-page .user-card-header .approval-bar__button,
+.shell-page .user-card-container .approval-bar button,
+.shell-page .user-card-header .approval-bar button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--space-1) !important;
+  height: calc(var(--space-4) + var(--space-1)) !important;
+  min-height: calc(var(--space-4) + var(--space-1)) !important;
+  padding: 0 var(--space-3) !important;
+  border-radius: var(--radius-pill) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-strong) !important;
+  line-height: var(--line-height) !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  background: var(--color-polish-22) !important;
+  border: var(--border-width) solid var(--color-polish-19) !important;
+  color: var(--color-polish-25) !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
+}
+
+.shell-page .user-card-container .approval-bar__button:hover:not(:disabled),
+.shell-page .user-card-header .approval-bar__button:hover:not(:disabled),
+.shell-page .user-card-container .approval-bar button:hover:not(:disabled),
+.shell-page .user-card-header .approval-bar button:hover:not(:disabled) {
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6) !important;
+  transform: translateY(calc(var(--border-width) * -1)) !important;
+}
+
+.shell-page .user-card-container .approval-bar__button--primary,
+.shell-page .user-card-header .approval-bar__button--primary {
+  background: var(--color-accent) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 var(--border-width-strong) var(--space-1) var(--color-polish-6) !important;
+}
+
+.shell-page .user-card-container .approval-bar__button--primary:hover:not(:disabled),
+.shell-page .user-card-header .approval-bar__button--primary:hover:not(:disabled) {
+  background: var(--color-polish-25) !important;
+  border-color: var(--color-polish-25) !important;
+  color: var(--color-on-accent) !important;
+}
+
+.shell-page .user-card-container .approval-bar__button--deactivate,
+.shell-page .user-card-header .approval-bar__button--deactivate {
+  color: var(--color-polish-25) !important;
+  border-color: var(--color-polish-19) !important;
+}
+
+.shell-page .user-card-container .approval-bar__button:focus-visible,
+.shell-page .user-card-header .approval-bar__button:focus-visible,
+.shell-page .user-card-container .approval-bar button:focus-visible,
+.shell-page .user-card-header .approval-bar button:focus-visible {
+  outline: var(--border-width-strong) solid var(--color-accent) !important;
+  outline-offset: var(--border-width-strong) !important;
+}
+
+.shell-page .user-card-container .approval-bar__button:disabled,
+.shell-page .user-card-header .approval-bar__button:disabled,
+.shell-page .user-card-container .approval-bar button:disabled,
+.shell-page .user-card-header .approval-bar button:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+}

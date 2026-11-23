@@ -107,7 +107,7 @@ export function UserCardPage() {
   return (
     <main className="shell-page">
       <BackToUsers />
-      <div className="user-card-header">
+      <div className="user-card-container user-card-header">
         <DocumentHeader
           code={data.username}
           title={data.displayName}
@@ -159,7 +159,7 @@ export function UserCardPage() {
 function BackToUsers() {
   const t = useT();
   return (
-    <div>
+    <div className="user-card-back-wrap">
       <Link className="back-pill-btn" to="/party/users">
         <svg
           viewBox="0 0 24 24"

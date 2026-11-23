@@ -6531,98 +6531,7 @@ button[type="submit"]:not(:disabled):hover,
   font-weight: 500;
 }
 
-/* User details card (UserCardPage) */
-.user-card-header .document-header {
-  padding: 18px 24px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-polish-14);
-  border-top: 4px solid var(--color-accent);
-  background: var(--color-surface);
-  box-shadow: 0 2px 8px var(--color-polish-23);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.user-card-header .document-header__top {
-  gap: 12px;
-}
-
-.user-card-header .document-header__code {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.user-card-header .document-header__title {
-  font-size: 20px;
-  margin: 2px 0 4px;
-  color: var(--color-text);
-  font-weight: 700;
-}
-
-.user-card-header .document-header__subtitle {
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.user-card-header .document-header__facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 2px 0 6px;
-  max-width: 100%;
-}
-
-.user-card-header .document-header__fact {
-  flex: 0 1 auto;
-  min-width: 120px;
-  max-width: 160px;
-  padding: 6px 14px;
-  border-radius: 10px;
-  background: var(--color-polish-24);
-  border: 1px solid var(--color-polish-14);
-}
-
-.user-card-header .document-header__fact dt {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 2px;
-}
-
-.user-card-header .document-header__fact dd {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.user-card-header .approval-bar {
-  padding-top: 4px;
-  gap: 10px;
-}
-
-.user-card-header .approval-bar button {
-  min-height: 36px;
-  padding: 7px 18px;
-  font-size: 13.5px;
-  border-radius: 50px !important;
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
-  background: transparent;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.user-card-header .approval-bar button:hover:not(:disabled) {
-  background: var(--color-polish-4);
-  border-color: var(--color-accent);
-  box-shadow: 0 2px 8px var(--color-polish-13);
-  transform: translateY(-1px);
-}
+/* User details card (UserCardPage) - styled with tokens in m1party.css */
 
 /* ---- External Access Grants Page Enhancement ------------------------------------------- */
 
@@ -11741,8 +11650,8 @@ button[type="submit"]:not(:disabled):hover,
 /* ====
    Document Header & Metadata Fact Boxes — Form-Style Stacked Card Layout
    ==== */
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__facts,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__facts:not(.exposure-kpi-grid) {
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__facts,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__facts:not(.exposure-kpi-grid) {
   display: grid !important;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
   gap: 12px 14px !important;
@@ -11752,8 +11661,8 @@ button[type="submit"]:not(:disabled):hover,
   background: transparent !important;
 }
 
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card),
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card),
 .batch-detail-item {
   background: var(--color-polish-29) !important;
   border: 1px solid var(--color-polish-22) !important;
@@ -11770,8 +11679,8 @@ button[type="submit"]:not(:disabled):hover,
   min-width: 0 !important;
 }
 
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact:hover,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card):hover,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact:hover,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card):hover,
 .batch-detail-item:hover {
   background: var(--color-polish-31) !important;
   border-color: var(--color-accent) !important;
@@ -11779,8 +11688,8 @@ button[type="submit"]:not(:disabled):hover,
   box-shadow: 0 4px 12px var(--color-polish-13) !important;
 }
 
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact dt,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card) dt,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact dt,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card) dt,
 .batch-detail-label {
   font-size: 11px !important;
   font-weight: 700 !important;
@@ -11794,8 +11703,8 @@ button[type="submit"]:not(:disabled):hover,
   text-overflow: ellipsis !important;
 }
 
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact dd,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card) dd,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact dd,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card) dd,
 .batch-detail-value {
   background: var(--color-surface) !important;
   border: 1px solid var(--color-polish-21) !important;
@@ -11816,17 +11725,17 @@ button[type="submit"]:not(:disabled):hover,
   transition: border-color 0.2s ease !important;
 }
 
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact:hover dd,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card):hover dd {
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact:hover dd,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card):hover dd {
   border-color: var(--color-accent) !important;
 }
 
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact dd .money--total,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact dd .money,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header .document-header__fact dd .money-display,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card) dd .money--total,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card) dd .money,
-.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)) .document-header__fact:not(.exposure-kpi-card) dd .money-display {
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact dd .money--total,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact dd .money,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header .document-header__fact dd .money-display,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card) dd .money--total,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card) dd .money,
+.shell-page:not(.relationship-page):not(:has(.relationship-header-wrap)):not(:has(.society-card-container)):not(:has(.user-card-container)):not(:has(.user-card-header)) .document-header__fact:not(.exposure-kpi-card) dd .money-display {
   color: var(--color-accent) !important;
   font-weight: 700 !important;
   white-space: normal !important;
