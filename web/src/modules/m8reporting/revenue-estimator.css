@@ -993,14 +993,9 @@
 .sales-estimator-dropdown-select .custom-dropdown__item--selected:hover,
 .sales-estimator-dropdown-menu .custom-dropdown__item--selected,
 .sales-estimator-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
-  color: var(--color-polish-25) !important;
-  font-weight: var(--font-weight-strong) !important;
-}
-
-.sales-estimator-dropdown-select .custom-dropdown__item--selected:hover,
-.sales-estimator-dropdown-menu .custom-dropdown__item--selected:hover {
   background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
 }
 
 .sales-estimator-dropdown-select .custom-dropdown__item-bar,

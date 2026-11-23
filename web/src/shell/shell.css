@@ -6477,21 +6477,23 @@ button[type="submit"]:not(:disabled):hover,
 }
 
 .custom-dropdown__item--selected {
-  background-color: var(--color-polish-31);
-  color: var(--color-polish-25);
-  font-weight: 600;
-  border-left: 3px solid var(--color-polish-25);
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: 600 !important;
+  border-left: none !important;
 }
 
 .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31);
-  color: var(--color-polish-25);
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
 }
 
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item-bar,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item-spacer,
-.custom-dropdown__menu:not(.inventory-dropdown-menu) .custom-dropdown__item-bar,
-.custom-dropdown__menu:not(.inventory-dropdown-menu) .custom-dropdown__item-spacer {
+.custom-dropdown__item-bar,
+.custom-dropdown__item-spacer,
+.custom-dropdown .custom-dropdown__item-bar,
+.custom-dropdown .custom-dropdown__item-spacer,
+.custom-dropdown__menu .custom-dropdown__item-bar,
+.custom-dropdown__menu .custom-dropdown__item-spacer {
   display: none !important;
 }
 
@@ -11965,14 +11967,18 @@ button[type="submit"]:not(:disabled):hover,
   padding: 0 !important;
 }
 
-.custom-status-dropdown__menu li::before,
 .custom-status-dropdown__menu li::marker,
-.register-dropdown-menu li::before,
 .register-dropdown-menu li::marker,
-.reason-capture .register-dropdown-menu li::before,
 .reason-capture .register-dropdown-menu li::marker,
-.dropdown-select__menu li::before,
-.dropdown-select__menu li::marker {
+.dropdown-select__menu li::marker,
+.custom-dropdown__menu li::marker,
+.integration-dropdown-menu li::marker,
+.custom-status-dropdown__menu li::before,
+.register-dropdown-menu li::before,
+.reason-capture .register-dropdown-menu li::before,
+.dropdown-select__menu li:not(.dropdown-select__item--selected)::before,
+.custom-dropdown__menu li:not(.custom-dropdown__item--selected)::before,
+.integration-dropdown-menu li:not(.integration-dropdown-item--selected)::before {
   content: none !important;
   display: none !important;
 }
@@ -11980,14 +11986,16 @@ button[type="submit"]:not(:disabled):hover,
 .custom-status-dropdown__option,
 .register-dropdown-option,
 .reason-capture .register-dropdown-option,
-.dropdown-select__item {
+.dropdown-select__item,
+.custom-dropdown__item,
+.integration-dropdown-item {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   width: 100% !important;
   height: 38px !important;
   min-height: 38px !important;
-  padding: 0 14px !important;
+  padding: 0 14px 0 28px !important;
   margin: 0 !important;
   border: none !important;
   border-radius: 8px !important;
@@ -12006,7 +12014,9 @@ button[type="submit"]:not(:disabled):hover,
 .custom-status-dropdown__option:hover,
 .register-dropdown-option:hover,
 .reason-capture .register-dropdown-option:hover,
-.dropdown-select__item:hover {
+.dropdown-select__item:hover,
+.custom-dropdown__item:hover,
+.integration-dropdown-item:hover {
   background: var(--color-polish-29) !important;
   color: var(--color-accent) !important;
   border: none !important;
@@ -12016,7 +12026,9 @@ button[type="submit"]:not(:disabled):hover,
 .custom-status-dropdown__option--selected,
 .register-dropdown-option--selected,
 .reason-capture .register-dropdown-option--selected,
-.dropdown-select__item--selected {
+.dropdown-select__item--selected,
+.custom-dropdown__item--selected,
+.integration-dropdown-item--selected {
   background: var(--color-polish-29) !important;
   color: var(--color-accent) !important;
   font-weight: 600 !important;
@@ -12041,27 +12053,8 @@ button[type="submit"]:not(:disabled):hover,
   color: inherit !important;
 }
 
+/* Hide inline indicator since ::before provides the unified accent bar across all dropdowns */
 .dropdown-select__indicator {
-  width: 3.5px !important;
-  height: 16px !important;
-  background-color: var(--color-accent) !important;
-  border-radius: 2px !important;
-  margin-right: 8px !important;
-  display: none !important;
-  flex-shrink: 0 !important;
-  opacity: 0 !important;
-  transition: opacity 0.15s ease !important;
-}
-
-/* Accent indicator: displays ONLY on the selected option, never on hover */
-.dropdown-select__item--selected .dropdown-select__indicator {
-  opacity: 1 !important;
-  background-color: var(--color-accent) !important;
-  display: inline-block !important;
-}
-
-.dropdown-select__item:not(.dropdown-select__item--selected) .dropdown-select__indicator {
-  opacity: 0 !important;
   display: none !important;
 }
 
@@ -12081,13 +12074,19 @@ button[type="submit"]:not(:disabled):hover,
 }
 
 .custom-status-dropdown__option,
-.register-dropdown-option {
+.register-dropdown-option,
+.custom-dropdown__item,
+.dropdown-select__item,
+.integration-dropdown-item {
   position: relative !important;
   padding: 0 14px 0 28px !important;
 }
 
 .custom-status-dropdown__option--selected::before,
-.register-dropdown-option--selected::before {
+.register-dropdown-option--selected::before,
+.custom-dropdown__item--selected::before,
+.dropdown-select__item--selected::before,
+.integration-dropdown-item--selected::before {
   content: "" !important;
   position: absolute !important;
   left: 10px !important;
@@ -12098,10 +12097,14 @@ button[type="submit"]:not(:disabled):hover,
   background-color: var(--color-accent) !important;
   border-radius: 2px !important;
   display: block !important;
+  z-index: 1 !important;
 }
 
 .custom-status-dropdown__option:not(.custom-status-dropdown__option--selected)::before,
-.register-dropdown-option:not(.register-dropdown-option--selected)::before {
+.register-dropdown-option:not(.register-dropdown-option--selected)::before,
+.custom-dropdown__item:not(.custom-dropdown__item--selected)::before,
+.dropdown-select__item:not(.dropdown-select__item--selected)::before,
+.integration-dropdown-item:not(.integration-dropdown-item--selected)::before {
   display: none !important;
   content: none !important;
 }
@@ -12783,8 +12786,6 @@ button[type="submit"]:not(:disabled):hover,
   transition: all 0.15s ease !important;
 }
 
-.catalogue-form-field .register-dropdown-option--selected::before,
-.register-dropdown-menu .register-dropdown-option--selected::before,
 .catalogue-form-field .register-dropdown-option:not(.register-dropdown-option--selected)::before,
 .register-dropdown-menu .register-dropdown-option:not(.register-dropdown-option--selected)::before {
   display: none !important;

@@ -233,33 +233,33 @@
   min-height: auto !important;
   min-width: auto !important;
   height: auto !important;
-  padding: calc(var(--space-half) + var(--border-width-strong)) calc(var(--space-1) + var(--border-width-strong)) !important;
+  padding: calc(var(--space-half) + var(--border-width-strong)) calc(var(--space-1) + var(--border-width-strong)) calc(var(--space-half) + var(--border-width-strong)) calc(var(--space-2) + var(--space-half)) !important;
   background: none !important;
   border: none !important;
-  border-left: calc(var(--border-width-strong) + var(--border-width)) solid transparent !important;
-  border-radius: 0 !important;
+  border-radius: var(--radius) !important;
   font-family: inherit;
   font-size: var(--font-size-sm);
   line-height: var(--line-height);
   color: var(--color-text);
   cursor: pointer;
   text-align: left;
+  position: relative !important;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .integration-dropdown-item:hover,
 .integration-dropdown-item:focus-visible {
   background-color: var(--color-polish-29) !important;
-  color: var(--color-polish-25) !important;
+  color: var(--color-accent) !important;
   outline: none;
 }
 
 .integration-dropdown-item--selected,
 .integration-dropdown-item--selected:hover {
-  background-color: var(--color-polish-31) !important;
-  color: var(--color-polish-25) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
   font-weight: var(--font-weight-strong);
-  border-left: calc(var(--border-width-strong) + var(--border-width)) solid var(--color-polish-25) !important;
+  border-left: none !important;
 }
 
 .integration-dropdown-item__label {
@@ -519,6 +519,7 @@
   width: 1%;
   min-width: 0 !important;
 }
+
 .shell-page .notification-rules-table td:nth-child(4),
 .notification-rules-table td:nth-child(4) {
   white-space: nowrap !important;
@@ -532,6 +533,7 @@
   min-width: 0 !important;
   text-align: center;
 }
+
 .shell-page .notification-rules-table td:nth-child(5),
 .notification-rules-table td:nth-child(5) {
   white-space: nowrap !important;
@@ -697,6 +699,7 @@
   padding-right: var(--space-1) !important;
   text-align: left !important;
 }
+
 .notification-log-table td.log-col-when,
 .shell-page .notification-log-table td:nth-child(1) {
   white-space: nowrap !important;
@@ -725,6 +728,7 @@
   min-width: 0 !important;
   text-align: left;
 }
+
 .notification-log-table td.log-col-channel,
 .shell-page .notification-log-table td:nth-child(3) {
   white-space: nowrap !important;
@@ -753,6 +757,7 @@
   min-width: 0 !important;
   text-align: left;
 }
+
 .notification-log-table td.log-col-language,
 .shell-page .notification-log-table td:nth-child(5) {
   white-space: nowrap !important;
@@ -768,6 +773,7 @@
   min-width: 0 !important;
   text-align: center;
 }
+
 .notification-log-table td.log-col-status,
 .shell-page .notification-log-table td:nth-child(6) {
   white-space: nowrap !important;
@@ -785,6 +791,7 @@
   padding-left: var(--space-half) !important;
   padding-right: var(--space-half) !important;
 }
+
 .notification-log-table td.log-col-attempts,
 .shell-page .notification-log-table td:nth-child(7) {
   white-space: nowrap !important;
@@ -802,6 +809,7 @@
   word-break: normal;
   overflow-wrap: break-word;
 }
+
 .integration-empty-card {
   padding: var(--space-4);
   text-align: center;
@@ -809,7 +817,7 @@
 }
 
 /* Custom Date Picker (`.cdp`) alignment & button overrides inside Journal Exports filter bar */
-.integration-bar .cdp > input.visually-hidden {
+.integration-bar .cdp>input.visually-hidden {
   position: absolute !important;
   width: var(--border-width) !important;
   height: var(--border-width) !important;

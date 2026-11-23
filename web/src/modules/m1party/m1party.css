@@ -133,7 +133,7 @@
 .users-filter-panel .custom-dropdown__item,
 .register-field-group .custom-dropdown__item,
 .roles-filter-bar .custom-dropdown__item,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item {
+.custom-dropdown .custom-dropdown__item {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -158,7 +158,7 @@
 .users-filter-panel .custom-dropdown__item:hover,
 .register-field-group .custom-dropdown__item:hover,
 .roles-filter-bar .custom-dropdown__item:hover,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item:hover {
+.custom-dropdown .custom-dropdown__item:hover {
   background-color: var(--color-polish-29) !important;
   color: var(--color-accent) !important;
 }
@@ -167,7 +167,7 @@
 .users-filter-panel .custom-dropdown__item--selected,
 .register-field-group .custom-dropdown__item--selected,
 .roles-filter-bar .custom-dropdown__item--selected,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item--selected {
+.custom-dropdown .custom-dropdown__item--selected {
   background-color: var(--color-polish-29) !important;
   color: var(--color-accent) !important;
   font-weight: var(--font-weight-strong) !important;
@@ -177,7 +177,7 @@
 .users-filter-panel .custom-dropdown__item--selected::before,
 .register-field-group .custom-dropdown__item--selected::before,
 .roles-filter-bar .custom-dropdown__item--selected::before,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item--selected::before {
+.custom-dropdown .custom-dropdown__item--selected::before {
   content: "" !important;
   position: absolute !important;
   left: var(--space-1) !important;
@@ -194,7 +194,7 @@
 .users-filter-panel .custom-dropdown__item:not(.custom-dropdown__item--selected)::before,
 .register-field-group .custom-dropdown__item:not(.custom-dropdown__item--selected)::before,
 .roles-filter-bar .custom-dropdown__item:not(.custom-dropdown__item--selected)::before,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item:not(.custom-dropdown__item--selected)::before {
+.custom-dropdown .custom-dropdown__item:not(.custom-dropdown__item--selected)::before {
   display: none !important;
   content: none !important;
 }
@@ -251,7 +251,7 @@
 .users-filter-panel .custom-dropdown__item-label,
 .register-field-group .custom-dropdown__item-label,
 .roles-filter-bar .custom-dropdown__item-label,
-.custom-dropdown:not(.inventory-dropdown-select) .custom-dropdown__item-label {
+.custom-dropdown .custom-dropdown__item-label {
   flex: 1 !important;
   text-align: left !important;
   white-space: nowrap !important;

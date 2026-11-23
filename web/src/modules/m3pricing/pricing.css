@@ -1516,8 +1516,8 @@ span.pricing-version-text {
   box-sizing: border-box;
 }
 
-.pricing-gazette-entry-header > .pricing-sku-picker-card,
-.pricing-gazette-entry-card > .pricing-sku-picker-card {
+.pricing-gazette-entry-header>.pricing-sku-picker-card,
+.pricing-gazette-entry-card>.pricing-sku-picker-card {
   background: transparent;
   border: none;
   border-radius: 0;
@@ -2862,14 +2862,9 @@ select.pricing-select:not(.visually-hidden) option:focus {
 .pricing-dropdown-select .custom-dropdown__item--selected:hover,
 .pricing-dropdown-menu .custom-dropdown__item--selected,
 .pricing-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31) !important;
-  color: var(--color-polish-25) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
   font-weight: var(--font-weight-strong) !important;
-}
-
-.pricing-dropdown-select .custom-dropdown__item--selected:hover,
-.pricing-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31) !important;
 }
 
 .pricing-dropdown-select .custom-dropdown__item-bar,
@@ -4114,13 +4109,13 @@ select.pricing-select:not(.visually-hidden) option:focus {
 }
 
 /* Gazette expandable inline rescind panel row */
-.shell-page .pricing-gazette-table tbody tr.pricing-gazette-row--active > td {
+.shell-page .pricing-gazette-table tbody tr.pricing-gazette-row--active>td {
   background-color: var(--color-polish-31) !important;
   border-bottom-color: var(--color-polish-18) !important;
 }
 
-.shell-page .pricing-gazette-table tbody tr.pricing-gazette-rescind-row > td.pricing-gazette-rescind-cell,
-.shell-page .pricing-gazette-table tbody tr.pricing-gazette-rescind-row:hover > td.pricing-gazette-rescind-cell {
+.shell-page .pricing-gazette-table tbody tr.pricing-gazette-rescind-row>td.pricing-gazette-rescind-cell,
+.shell-page .pricing-gazette-table tbody tr.pricing-gazette-rescind-row:hover>td.pricing-gazette-rescind-cell {
   background-color: var(--color-polish-22) !important;
   border-left: calc(var(--border-width) * 3) solid var(--color-accent) !important;
   padding: var(--space-2) var(--space-3) !important;
