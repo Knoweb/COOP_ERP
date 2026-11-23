@@ -70,23 +70,42 @@ input {
   font-family: inherit;
 }
 
-html, body.auth-page {
+html {
+  min-height: 100%;
+}
+
+body.auth-page {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
   font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0F172A url('../img/login.png') center/cover no-repeat;
   color: var(--text-main);
+  background-color: #0F172A;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* GPU-accelerated fixed full background: rock-solid on iOS Safari, Android, and all desktops */
+body.auth-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #0F172A url('../img/login.png') center/cover no-repeat;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .auth-layout {
   display: flex;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
   background: linear-gradient(
     90deg,
     rgba(15, 23, 42, 0.02) 0%,
@@ -102,7 +121,10 @@ html, body.auth-page {
 
 .showcase-side {
   flex: 1 1 56%;
+  min-width: 0;
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
   background: transparent;
@@ -113,10 +135,10 @@ html, body.auth-page {
   inset: 0;
   background: linear-gradient(
     to top,
-    rgba(10, 16, 32, 0.88) 0%,
-    rgba(15, 23, 42, 0.55) 24%,
-    rgba(15, 23, 42, 0.12) 48%,
-    transparent 68%
+    rgba(10, 16, 32, 0.90) 0%,
+    rgba(15, 23, 42, 0.58) 26%,
+    rgba(15, 23, 42, 0.15) 50%,
+    transparent 72%
   );
   pointer-events: none;
 }
@@ -125,10 +147,12 @@ html, body.auth-page {
   position: relative;
   z-index: 2;
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: clamp(28px, 3.5vw, 44px) clamp(32px, 4.5vw, 56px);
+  padding: clamp(24px, 3.5vw, 44px) clamp(28px, 4.5vw, 56px);
   box-sizing: border-box;
 }
 
@@ -163,11 +187,11 @@ html, body.auth-page {
 }
 
 .showcase-title {
-  font-size: clamp(24px, 2.2vw, 34px);
+  font-size: clamp(22px, 2.2vw, 34px);
   font-weight: 800;
   color: #FFFFFF;
   margin: 0 0 8px;
-  line-height: 1.22;
+  line-height: 1.24;
   letter-spacing: -0.5px;
   text-shadow: 0 3px 14px rgba(0, 0, 0, 0.85), 0 1px 4px rgba(0, 0, 0, 0.6);
 }
@@ -184,9 +208,9 @@ html, body.auth-page {
 .showcase-metrics {
   display: inline-flex;
   align-items: center;
-  gap: 22px;
-  margin: 16px 0 18px;
-  padding: 6px 0;
+  gap: clamp(14px, 2vw, 24px);
+  margin: 14px 0 16px;
+  padding: 4px 0;
 }
 
 .metric-item {
@@ -196,7 +220,7 @@ html, body.auth-page {
 }
 
 .metric-val {
-  font-size: clamp(22px, 1.8vw, 28px);
+  font-size: clamp(20px, 1.8vw, 28px);
   font-weight: 800;
   color: #FFFFFF;
   letter-spacing: -0.5px;
@@ -205,7 +229,7 @@ html, body.auth-page {
 }
 
 .metric-lbl {
-  font-size: clamp(10px, 0.75vw, 11px);
+  font-size: clamp(9.5px, 0.75vw, 11px);
   color: rgba(255, 255, 255, 0.85);
   font-weight: 700;
   text-transform: uppercase;
@@ -248,22 +272,41 @@ html, body.auth-page {
    ========================================================= */
 
 .portal-side {
-  flex: 0 0 44%;
-  min-width: 440px;
+  flex: 0 0 clamp(400px, 42vw, 540px);
+  width: clamp(400px, 42vw, 540px);
+  min-width: 380px;
   max-width: 560px;
-  height: 100%;
-  background: rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-left: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 28px 40px;
+  padding: clamp(16px, 2.5vh, 28px) clamp(20px, 2.8vw, 40px);
   box-sizing: border-box;
   position: relative;
   z-index: 10;
   box-shadow: -25px 0 60px rgba(0, 0, 0, 0.35);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom modern scrollbar for desktop */
+.portal-side::-webkit-scrollbar {
+  width: 6px;
+}
+.portal-side::-webkit-scrollbar-track {
+  background: transparent;
+}
+.portal-side::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+}
+.portal-side::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
 }
 
 .portal-topbar {
@@ -272,11 +315,14 @@ html, body.auth-page {
   justify-content: space-between;
   width: 100%;
   margin-bottom: 6px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
 }
 
 .mobile-brand-pill {
   display: none;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -332,6 +378,7 @@ summary.language-selector::-webkit-details-marker {
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
+  user-select: none;
 }
 
 .language-selector:hover {
@@ -357,11 +404,12 @@ summary.language-selector::-webkit-details-marker {
   top: calc(100% + 6px);
   right: 0;
   width: 140px;
+  max-width: calc(100vw - 32px);
   padding: 6px;
   background: #FFFFFF;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.15), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.2), 0 4px 8px -2px rgba(15, 23, 42, 0.08);
   z-index: 1000;
 }
 
@@ -388,14 +436,15 @@ summary.language-selector::-webkit-details-marker {
   font-weight: 700;
 }
 
-/* Portal Main Content */
+/* Portal Main Content: expands to center card, but never causes top-overflow on small screens */
 
 .portal-main {
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  margin: auto 0;
+  padding: 8px 0;
 }
 
 /* Frosted Glass Form Card */
@@ -403,33 +452,34 @@ summary.language-selector::-webkit-details-marker {
 .portal-card {
   width: 100%;
   max-width: 410px;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 24px;
   box-shadow:
     0 25px 60px -10px rgba(0, 0, 0, 0.35),
     0 8px 24px -4px rgba(0, 0, 0, 0.18),
     inset 0 1px 2px rgba(255, 255, 255, 0.95);
-  padding: 30px 34px;
+  padding: clamp(20px, 3.2vh, 30px) clamp(20px, 3vw, 34px);
+  box-sizing: border-box;
 }
 
 /* Brand */
 
 .brand {
   text-align: center;
-  margin-bottom: 18px;
+  margin-bottom: clamp(10px, 2vh, 18px);
 }
 
 .logo-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: 10px;
+  margin-bottom: clamp(6px, 1.2vh, 10px);
 }
 
 .coopfed-logo {
-  height: 64px;
+  height: clamp(48px, 6.5vh, 64px);
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
@@ -441,11 +491,11 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .brand h1 {
-  margin: 0 0 4px;
-  font-size: 26px;
+  margin: 0 0 3px;
+  font-size: clamp(22px, 2.6vh, 26px);
   font-weight: 800;
   letter-spacing: -0.5px;
-  line-height: 1.2;
+  line-height: 1.22;
 }
 
 .coopfed {
@@ -458,7 +508,7 @@ summary.language-selector::-webkit-details-marker {
 
 .tagline {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: clamp(11.5px, 1.3vh, 13px);
   margin: 0;
   font-weight: 500;
   line-height: 1.4;
@@ -468,33 +518,35 @@ summary.language-selector::-webkit-details-marker {
 
 .welcome {
   text-align: center;
-  margin-bottom: 20px;
-  padding-top: 12px;
+  margin-bottom: clamp(12px, 2vh, 18px);
+  padding-top: clamp(8px, 1.2vh, 12px);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .welcome h2 {
-  font-size: 22px;
+  font-size: clamp(18px, 2.2vh, 22px);
   font-weight: 800;
   color: var(--text-main);
-  margin: 0 0 4px;
+  margin: 0 0 3px;
   letter-spacing: -0.3px;
+  line-height: 1.25;
 }
 
 .welcome p {
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: clamp(12.5px, 1.4vh, 13.5px);
   margin: 0;
+  line-height: 1.35;
 }
 
 /* Alerts */
 
 .alert {
-  padding: 9px 13px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   font-size: 12.5px;
   font-weight: 500;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   line-height: 1.4;
 }
 
@@ -519,26 +571,26 @@ summary.language-selector::-webkit-details-marker {
 /* Form Fields */
 
 .form-field {
-  margin-bottom: 12px;
+  margin-bottom: clamp(9px, 1.4vh, 12px);
 }
 
 .field-label {
   display: block;
-  font-size: 13px;
+  font-size: clamp(12px, 1.35vh, 13px);
   font-weight: 700;
   color: #334155;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .field-label-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .forgot-link {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--secondary);
   font-weight: 600;
   text-decoration: none;
@@ -553,13 +605,13 @@ summary.language-selector::-webkit-details-marker {
 /* Colored Fill Boxes (Inputs) */
 
 .input-group {
-  height: 46px;
+  height: clamp(40px, 4.8vh, 46px);
   width: 100%;
   display: flex;
   align-items: center;
   border: 1.5px solid rgba(142, 14, 91, 0.4);
   border-radius: 11px;
-  padding: 0 13px;
+  padding: 0 12px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
   transition: all 0.2s ease;
@@ -577,8 +629,8 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .input-icon {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   color: var(--primary);
   flex-shrink: 0;
 }
@@ -603,8 +655,8 @@ summary.language-selector::-webkit-details-marker {
 /* Eye button */
 
 .eye-button {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -613,6 +665,7 @@ summary.language-selector::-webkit-details-marker {
   justify-content: center;
   color: #94A3B8;
   transition: color 0.15s ease;
+  flex-shrink: 0;
 }
 
 .eye-button:hover {
@@ -627,7 +680,7 @@ summary.language-selector::-webkit-details-marker {
 /* Remember me */
 
 .login-options {
-  margin: 8px 0 16px;
+  margin: clamp(6px, 1vh, 8px) 0 clamp(10px, 1.6vh, 15px);
 }
 
 .remember {
@@ -651,12 +704,12 @@ summary.language-selector::-webkit-details-marker {
 
 .sign-in-button {
   width: 100%;
-  height: 48px;
+  height: clamp(42px, 5vh, 48px);
   border: none;
   border-radius: 11px;
   background: linear-gradient(135deg, #8E0E5B 0%, #A31068 50%, #2E3192 100%);
   color: #FFFFFF;
-  font-size: 16px;
+  font-size: clamp(14.5px, 1.8vh, 16px);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -690,7 +743,8 @@ summary.language-selector::-webkit-details-marker {
 
 .portal-footer {
   text-align: center;
-  margin-top: 8px;
+  margin-top: 6px;
+  flex-shrink: 0;
 }
 
 .portal-footer p {
@@ -702,61 +756,237 @@ summary.language-selector::-webkit-details-marker {
 }
 
 /* =========================================================
-   RESPONSIVE BREAKPOINTS
+   COMPREHENSIVE RESPONSIVE ADAPTATIONS
+   (Covers: 4:3, 5:4, 1366x768, 1024x768, Laptops, Mobile, Tablet)
    ========================================================= */
 
-@media (max-width: 992px) {
+/* Medium desktop / 1024x768 / Small laptops */
+@media (max-width: 1140px) and (min-width: 901px) {
+  .portal-side {
+    flex: 0 0 400px;
+    width: 400px;
+    min-width: 360px;
+    padding: 16px 24px;
+  }
+  .portal-card {
+    padding: 22px 24px;
+  }
+  .showcase-content {
+    padding: 24px 32px;
+  }
+  .showcase-metrics {
+    gap: 14px;
+  }
+  .metric-val {
+    font-size: 22px;
+  }
+}
+
+/* Short height screens (e.g. 1366x768 laptops, 1024x768 desktops, taskbar + browser chrome) */
+@media (max-height: 750px) and (min-width: 901px) {
+  .portal-side {
+    padding: 12px 24px;
+  }
+  .portal-card {
+    padding: 18px 22px;
+    border-radius: 20px;
+  }
+  .coopfed-logo {
+    height: 48px;
+  }
+  .brand {
+    margin-bottom: 10px;
+  }
+  .welcome {
+    margin-bottom: 12px;
+    padding-top: 8px;
+  }
+  .tagline {
+    font-size: 12px;
+  }
+  .form-field {
+    margin-bottom: 9px;
+  }
+  .input-group {
+    height: 40px;
+  }
+  .login-options {
+    margin: 6px 0 10px;
+  }
+  .sign-in-button {
+    height: 42px;
+    font-size: 15px;
+  }
+  .showcase-content {
+    padding: 20px 32px;
+  }
+  .showcase-metrics {
+    margin: 8px 0 10px;
+    gap: 14px;
+  }
+  .metric-val {
+    font-size: 22px;
+  }
+}
+
+/* Extreme short height screens (<= 640px height: low-res monitors or zoomed laptops) */
+@media (max-height: 640px) {
+  .portal-side {
+    padding: 8px 16px;
+  }
+  .portal-card {
+    padding: 14px 18px;
+    border-radius: 16px;
+  }
+  .coopfed-logo {
+    height: 40px;
+  }
+  .brand h1 {
+    font-size: 20px;
+  }
+  .tagline {
+    display: none; /* Hide tagline on ultra-short viewports to prevent overflow */
+  }
+  .welcome {
+    margin-bottom: 8px;
+    padding-top: 6px;
+  }
+  .welcome h2 {
+    font-size: 17px;
+  }
+  .welcome p {
+    font-size: 11.5px;
+  }
+  .form-field {
+    margin-bottom: 7px;
+  }
+  .input-group {
+    height: 38px;
+  }
+  .sign-in-button {
+    height: 40px;
+    font-size: 14px;
+  }
+  .showcase-title {
+    font-size: 22px;
+  }
+  .showcase-desc {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .showcase-badge {
+    margin-bottom: 6px;
+    padding: 3px 10px;
+  }
+}
+
+/* Tablets and Mobile (< 900px) */
+@media (max-width: 900px) {
   .showcase-side {
     display: none;
   }
 
   .auth-layout {
-    justify-content: center;
+    flex-direction: column;
+    justify-content: flex-start;
     align-items: center;
-    background: rgba(15, 23, 42, 0.65);
-    padding: 20px;
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.42) 0%,
+      rgba(15, 23, 42, 0.68) 50%,
+      rgba(15, 23, 42, 0.88) 100%
+    );
+    padding: 16px 16px 24px;
+    box-sizing: border-box;
   }
 
   .portal-side {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    width: 100%;
     max-width: 440px;
+    min-width: 0;
     height: auto;
-    max-height: calc(100vh - 40px);
-    border-radius: var(--radius-lg);
+    min-height: auto;
     background: transparent;
-    border-left: none;
+    border: none;
     box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     padding: 0;
+    overflow: visible;
   }
 
-  .portal-card {
-    padding: 26px 24px;
-    border-radius: 20px;
+  .portal-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 14px;
   }
 
   .mobile-brand-pill {
-    display: block;
-    color: #FFFFFF;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
 
   .mobile-brand-pill .coopfed-text {
-    color: #FF80AB;
+    color: #FFFFFF;
   }
 
   .mobile-brand-pill .erp-text {
-    color: #82B1FF;
+    color: #F472B6;
   }
-}
 
-@media (max-width: 480px) {
-  .auth-layout {
-    padding: 12px;
+  .portal-main {
+    flex: 1 1 auto;
+    width: 100%;
+    padding: 0;
+    margin-bottom: 16px;
   }
 
   .portal-card {
-    padding: 20px 18px;
-    border-radius: 16px;
+    width: 100%;
+    max-width: 440px;
+    padding: 24px 22px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.90);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+      0 20px 45px -10px rgba(0, 0, 0, 0.45),
+      0 8px 20px -4px rgba(0, 0, 0, 0.25);
+  }
+
+  .portal-footer {
+    margin-top: auto;
+    padding: 10px 0 6px;
+  }
+
+  .input-group input {
+    font-size: 16px; /* Prevents auto-zoom on iOS */
+  }
+}
+
+/* Small mobile phones (<= 440px) */
+@media (max-width: 440px) {
+  .auth-layout {
+    padding: 12px 12px 20px;
+  }
+
+  .portal-card {
+    padding: 20px 16px;
+    border-radius: 18px;
   }
 
   .brand h1 {
@@ -764,10 +994,51 @@ summary.language-selector::-webkit-details-marker {
   }
 
   .coopfed-logo {
-    height: 52px;
+    height: 50px;
   }
 
   .welcome h2 {
     font-size: 19px;
+  }
+
+  .welcome p {
+    font-size: 12.5px;
+  }
+
+  .input-group {
+    height: 44px;
+  }
+
+  .sign-in-button {
+    height: 46px;
+    font-size: 15px;
+  }
+}
+
+/* Ultra small phones (<= 360px) */
+@media (max-width: 360px) {
+  .auth-layout {
+    padding: 8px 8px 14px;
+  }
+
+  .portal-card {
+    padding: 16px 12px;
+    border-radius: 14px;
+  }
+
+  .coopfed-logo {
+    height: 42px;
+  }
+
+  .brand h1 {
+    font-size: 20px;
+  }
+
+  .welcome h2 {
+    font-size: 17px;
+  }
+
+  .tagline {
+    font-size: 11px;
   }
 }
