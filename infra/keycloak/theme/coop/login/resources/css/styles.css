@@ -266,24 +266,24 @@ body.auth-page::before {
 }
 
 /* =========================================================
-   RIGHT PORTAL / AUTH FORM PANEL (COMPACT, SLEEK & NEAT)
+   RIGHT PORTAL / AUTH FORM PANEL (BALANCED & PROPORTIONAL)
    ========================================================= */
 
 .portal-side {
-  flex: 0 0 380px;
-  width: 380px;
-  min-width: 340px;
-  max-width: 410px;
+  flex: 0 0 440px;
+  width: 440px;
+  min-width: 390px;
+  max-width: 490px;
   min-height: 100vh;
   min-height: 100dvh;
-  background: rgba(15, 23, 42, 0.32);
+  background: rgba(15, 23, 42, 0.30);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-left: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px 28px;
+  padding: 26px 36px;
   box-sizing: border-box;
   position: relative;
   z-index: 10;
@@ -360,18 +360,18 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .language-selector {
-  height: 34px;
-  padding: 0 13px;
+  height: 35px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   background: rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 20px;
   color: #FFFFFF;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -385,14 +385,14 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .globe-icon {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   color: #FFFFFF;
 }
 
 .arrow-icon {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   color: rgba(255, 255, 255, 0.85);
   transition: transform 0.2s ease;
 }
@@ -414,10 +414,10 @@ summary.language-selector::-webkit-details-marker {
 .language-dropdown a {
   display: block;
   width: 100%;
-  padding: 7px 11px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   color: var(--text-main);
-  font-size: 12.5px;
+  font-size: 13px;
   text-decoration: none;
   font-weight: 500;
   transition: background 0.15s ease;
@@ -445,21 +445,21 @@ summary.language-selector::-webkit-details-marker {
   padding: 10px 0;
 }
 
-/* Frosted Glass Form Card: Tailored compact width, neat & elegant */
+/* Frosted Glass Form Card: Proportional, prominent & elegant */
 
 .portal-card {
   width: 100%;
-  max-width: 340px;
+  max-width: 390px;
   background: rgba(255, 255, 255, 0.90);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
   border: 1px solid rgba(255, 255, 255, 0.85);
-  border-radius: 20px;
+  border-radius: 22px;
   box-shadow:
-    0 20px 45px -8px rgba(0, 0, 0, 0.35),
-    0 8px 18px -4px rgba(0, 0, 0, 0.15),
+    0 22px 50px -10px rgba(0, 0, 0, 0.35),
+    0 8px 20px -4px rgba(0, 0, 0, 0.15),
     inset 0 1px 2px rgba(255, 255, 255, 0.95);
-  padding: 24px 26px;
+  padding: 26px 30px;
   box-sizing: border-box;
 }
 
@@ -477,7 +477,7 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .coopfed-logo {
-  height: 54px;
+  height: 60px;
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
@@ -489,8 +489,8 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .brand h1 {
-  margin: 0 0 2px;
-  font-size: 22px;
+  margin: 0 0 3px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.22;
@@ -506,33 +506,33 @@ summary.language-selector::-webkit-details-marker {
 
 .tagline {
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
   margin: 0;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.38;
 }
 
 /* Welcome */
 
 .welcome {
   text-align: center;
-  margin-bottom: 14px;
-  padding-top: 10px;
+  margin-bottom: 16px;
+  padding-top: 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .welcome h2 {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--text-main);
-  margin: 0 0 2px;
+  margin: 0 0 3px;
   letter-spacing: -0.3px;
   line-height: 1.25;
 }
 
 .welcome p {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   margin: 0;
   line-height: 1.35;
 }
@@ -540,11 +540,11 @@ summary.language-selector::-webkit-details-marker {
 /* Alerts */
 
 .alert {
-  padding: 7px 11px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
-  margin-bottom: 10px;
+  margin-bottom: 11px;
   line-height: 1.4;
 }
 
@@ -569,12 +569,12 @@ summary.language-selector::-webkit-details-marker {
 /* Form Fields */
 
 .form-field {
-  margin-bottom: 10px;
+  margin-bottom: 11px;
 }
 
 .field-label {
   display: block;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #334155;
   margin-bottom: 4px;
@@ -588,7 +588,7 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .forgot-link {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--secondary);
   font-weight: 600;
   text-decoration: none;
@@ -603,13 +603,13 @@ summary.language-selector::-webkit-details-marker {
 /* Input Group with Single Clean Border */
 
 .input-group {
-  height: 42px;
+  height: 46px;
   width: 100%;
   display: flex;
   align-items: center;
   border: 1.5px solid rgba(142, 14, 91, 0.35);
-  border-radius: 10px;
-  padding: 0 12px;
+  border-radius: 11px;
+  padding: 0 13px;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
   transition: all 0.2s ease;
@@ -627,8 +627,8 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .input-icon {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   color: var(--primary);
   flex-shrink: 0;
 }
@@ -640,8 +640,8 @@ summary.language-selector::-webkit-details-marker {
   outline: none !important;
   box-shadow: none !important;
   background: transparent;
-  padding: 0 8px;
-  font-size: 14px;
+  padding: 0 9px;
+  font-size: 14.5px;
   color: var(--text-main);
   font-weight: 500;
 }
@@ -669,8 +669,8 @@ summary.language-selector::-webkit-details-marker {
 /* Eye button */
 
 .eye-button {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -687,23 +687,23 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .eye-button svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
 }
 
 /* Remember me */
 
 .login-options {
-  margin: 6px 0 12px;
+  margin: 7px 0 14px;
 }
 
 .remember {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   cursor: pointer;
   color: #475569;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
@@ -718,25 +718,25 @@ summary.language-selector::-webkit-details-marker {
 
 .sign-in-button {
   width: 100%;
-  height: 46px;
+  height: 48px;
   border: none;
-  border-radius: 10px;
+  border-radius: 11px;
   background: linear-gradient(135deg, #8E0E5B 0%, #A31068 50%, #2E3192 100%);
   color: #FFFFFF;
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
-  box-shadow: 0 5px 16px rgba(142, 14, 91, 0.35);
+  box-shadow: 0 6px 18px rgba(142, 14, 91, 0.38);
   transition: all 0.2s ease;
 }
 
 .sign-in-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 7px 20px rgba(142, 14, 91, 0.45);
+  box-shadow: 0 8px 22px rgba(142, 14, 91, 0.46);
 }
 
 .sign-in-button:active {
@@ -744,8 +744,8 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .btn-arrow {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   transition: transform 0.2s ease;
 }
 
