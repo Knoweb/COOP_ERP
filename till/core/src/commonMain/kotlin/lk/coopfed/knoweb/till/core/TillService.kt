@@ -31,6 +31,8 @@ import lk.coopfed.knoweb.till.core.model.ClockReading
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
+import lk.coopfed.knoweb.till.core.model.ParkedSaleLine
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.model.TenderRecord
@@ -54,6 +56,7 @@ import lk.coopfed.knoweb.till.core.session.SessionRules
 import lk.coopfed.knoweb.till.core.session.ZReport
 import lk.coopfed.knoweb.till.core.snapshot.Catalogue
 import lk.coopfed.knoweb.till.core.snapshot.Language
+import lk.coopfed.knoweb.till.core.snapshot.Item
 import lk.coopfed.knoweb.till.core.snapshot.Operator
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotDelta
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotNotContinuous
@@ -611,6 +614,139 @@ class TillService(
 
     suspend fun currentSession(): SessionRecord? = lock.withLock { store.openSession() }
 
+    /**
+     * Saves the unfinished basket locally without allocating a receipt or device sequence. A
+     * basket resumed earlier replaces its old parked copy atomically, so restart recovery always
+     * has exactly one copy.
+     */
+    suspend fun parkSale(basket: Basket, resumedParkedSaleId: String? = null): ParkedSaleRecord = lock.withLock {
+        requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val cashier = requireSalesOperator()
+        val session = store.openSession() ?: throw TillRefusal("Open a session first")
+        if (basket.isEmpty) throw TillRefusal("The basket is empty")
+        if (resumedParkedSaleId != null) {
+            val previous = store.parkedSale(resumedParkedSaleId)
+                ?: throw TillRefusal("The parked sale no longer exists")
+            if (previous.sessionId != session.sessionId) throw TillRefusal("A parked sale belongs to its original session")
+        }
+        val parked = ParkedSaleRecord(
+            id = ids.next(),
+            sessionId = session.sessionId,
+            lines = basket.lines.map { line ->
+                ParkedSaleLine(
+                    skuId = line.item.skuId,
+                    skuCode = line.item.skuCode,
+                    nameEn = line.item.name.en,
+                    nameSi = line.item.name.si,
+                    nameTa = line.item.name.ta,
+                    baseUom = line.item.baseUom,
+                    soldByWeight = line.item.soldByWeight,
+                    barcodes = line.item.barcodes,
+                    qty = line.qty,
+                    unitPrice = line.unitPrice,
+                )
+            },
+            parkedAt = Times.wholeSecond(now()).epochSeconds,
+            operatorUserId = cashier.userId,
+            customerClass = basket.customerClass,
+            beneficiaryIdentifier = basket.beneficiaryIdentifier,
+        )
+        store.transaction {
+            if (resumedParkedSaleId != null) store.deleteParkedSale(resumedParkedSaleId)
+            store.saveParkedSale(parked)
+        }
+        basket.clear()
+        parked
+    }
+
+    /** Active parked baskets for the open session, oldest first. Expired baskets become REVIEW facts. */
+    suspend fun parkedSales(): List<ParkedSaleRecord> = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        requireSalesOperator()
+        val session = store.openSession() ?: throw TillRefusal("Open a session first")
+        val reading = clockReading()
+        val all = store.parkedSalesOfSession(session.sessionId)
+        val expired = all.filter { isParkedSaleExpired(it, reading.occurredAt.epochSeconds) }
+        if (expired.isNotEmpty()) {
+            store.transaction {
+                expired.forEach { abandonParkedSale(identity, it, reading, "MAX_AGE") }
+            }
+            publishStatus()
+        }
+        all - expired.toSet()
+    }
+
+    /**
+     * Loads a basket from this till's current session. The row remains until that resumed basket is
+     * completed or parked again, so a power loss immediately after Resume does not lose the sale.
+     */
+    suspend fun resumeParkedSale(id: String): Pair<ParkedSaleRecord, Basket> = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        requireSalesOperator()
+        val session = store.openSession() ?: throw TillRefusal("Open a session first")
+        val parked = store.parkedSale(id) ?: throw TillRefusal("The parked sale no longer exists")
+        if (parked.sessionId != session.sessionId) throw TillRefusal("A parked sale belongs to its original session")
+        val reading = clockReading()
+        if (isParkedSaleExpired(parked, reading.occurredAt.epochSeconds)) {
+            store.transaction { abandonParkedSale(identity, parked, reading, "MAX_AGE") }
+            publishStatus()
+            throw TillRefusal("This parked sale is older than ${policy.parkedSaleMaxAge.inWholeMinutes} minutes and was abandoned")
+        }
+        val basket = Basket()
+        parked.lines.forEach { line ->
+            basket.add(
+                Item(
+                    skuId = line.skuId,
+                    skuCode = line.skuCode,
+                    name = lk.coopfed.knoweb.till.core.snapshot.Trilingual(line.nameEn, line.nameSi, line.nameTa),
+                    baseUom = line.baseUom,
+                    soldByWeight = line.soldByWeight,
+                    barcodes = line.barcodes,
+                    price = line.unitPrice,
+                ),
+                line.unitPrice,
+                line.qty,
+            )
+        }
+        basket.setBeneficiary(parked.customerClass, parked.beneficiaryIdentifier)
+        parked to basket
+    }
+
+    private fun isParkedSaleExpired(sale: ParkedSaleRecord, nowEpochSeconds: Long): Boolean =
+        nowEpochSeconds - sale.parkedAt >= policy.parkedSaleMaxAge.inWholeSeconds
+
+    private fun requireSalesOperator(): Operator {
+        val cashier = operator ?: throw TillRefusal("Sign in first")
+        if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
+            TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
+            throw TillRefusal("${cashier.displayName} may not sell (${TillPolicy.RECEIPT_ISSUE_PERMISSION})")
+        }
+        return cashier
+    }
+
+    private fun abandonParkedSale(
+        identity: DeviceIdentity,
+        sale: ParkedSaleRecord,
+        reading: ClockReading,
+        reason: String,
+    ) {
+        record(
+            Facts.PARKED_SALE_ABANDONED_EVENT,
+            reading,
+            operator?.userId ?: sale.operatorUserId,
+            Facts.parkedSaleAbandoned(identity, sale.id, sale.sessionId, sale.parkedAt, sale.lines.size, reason),
+            aggregateType = "parked_sale",
+            aggregateId = sale.id,
+        )
+        store.deleteParkedSale(sale.id)
+    }
+
     /** The business date a session opens on now, for the screen (null before the first session). */
     suspend fun currentBusinessDate(): LocalDate? = lock.withLock { store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) } }
 
@@ -678,7 +814,11 @@ class TillService(
      * Refuses digital tenders (CARD, WALLET, QR) when offline (FR-POS-040) or when the approval
      * reference is missing.
      */
-    suspend fun sell(basket: Basket, tenders: List<TenderInput>): IssuedReceipt = lock.withLock {
+    suspend fun sell(
+        basket: Basket,
+        tenders: List<TenderInput>,
+        resumedParkedSaleId: String? = null,
+    ): IssuedReceipt = lock.withLock {
         val identity = requireDevice()
         requireNotRevoked()
         requireNotLocked()
@@ -690,6 +830,11 @@ class TillService(
         val session = store.openSession() ?: throw TillRefusal("Open a session first")
         if (basket.isEmpty) throw TillRefusal("The basket is empty")
         if (tenders.isEmpty()) throw TillRefusal("At least one tender is required")
+        if (resumedParkedSaleId != null) {
+            val parked = store.parkedSale(resumedParkedSaleId)
+                ?: throw TillRefusal("The parked sale no longer exists")
+            if (parked.sessionId != session.sessionId) throw TillRefusal("A parked sale belongs to its original session")
+        }
 
         val gross = basket.total
         val isOnline = _status.value.online == true
@@ -808,6 +953,7 @@ class TillService(
                     clockOffsetMs = reading.clockOffsetMs,
                 ),
             )
+            if (resumedParkedSaleId != null) store.deleteParkedSale(resumedParkedSaleId)
             receipt
         }
         basket.clear()
@@ -820,39 +966,43 @@ class TillService(
      * its bundle to the outbox in one transaction, and returns it for printing. The basket is
      * emptied only when the receipt is safely written.
      */
-    suspend fun sellForCash(basket: Basket, tendered: Money): IssuedReceipt {
+    suspend fun sellForCash(basket: Basket, tendered: Money, resumedParkedSaleId: String? = null): IssuedReceipt {
         val gross = basket.total
         if (tendered < gross) throw TenderTooSmall(gross, tendered)
         return sell(
             basket,
             listOf(TenderInput(kind = "CASH", amount = gross, reference = null, tendered = tendered)),
+            resumedParkedSaleId,
         )
     }
 
     /** Sells the basket using an external standalone card terminal, recording its approval reference. */
-    suspend fun sellForCard(basket: Basket, reference: String): IssuedReceipt {
+    suspend fun sellForCard(basket: Basket, reference: String, resumedParkedSaleId: String? = null): IssuedReceipt {
         val gross = basket.total
         return sell(
             basket,
             listOf(TenderInput(kind = "CARD", amount = gross, reference = reference)),
+            resumedParkedSaleId,
         )
     }
 
     /** Sells the basket using an external mobile wallet, recording its approval reference. */
-    suspend fun sellForWallet(basket: Basket, reference: String): IssuedReceipt {
+    suspend fun sellForWallet(basket: Basket, reference: String, resumedParkedSaleId: String? = null): IssuedReceipt {
         val gross = basket.total
         return sell(
             basket,
             listOf(TenderInput(kind = "WALLET", amount = gross, reference = reference)),
+            resumedParkedSaleId,
         )
     }
 
     /** Sells the basket using a dynamic/merchant QR payment, recording its transaction reference. */
-    suspend fun sellForQr(basket: Basket, reference: String): IssuedReceipt {
+    suspend fun sellForQr(basket: Basket, reference: String, resumedParkedSaleId: String? = null): IssuedReceipt {
         val gross = basket.total
         return sell(
             basket,
             listOf(TenderInput(kind = "QR", amount = gross, reference = reference)),
+            resumedParkedSaleId,
         )
     }
 
@@ -937,6 +1087,9 @@ class TillService(
             expectedCash = SessionRules.expectedCash(session, open.cashSales, open.drops, open.payouts),
         )
         val closed = store.transaction {
+            store.parkedSalesOfSession(session.sessionId).forEach {
+                abandonParkedSale(identity, it, reading, "SESSION_CLOSED")
+            }
             val fact = record(
                 "till_session.closed.v1",
                 reading,

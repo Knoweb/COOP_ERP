@@ -339,6 +339,9 @@ INSERT INTO parked_sales(
 selectParkedSalesBySession:
 SELECT * FROM parked_sales WHERE session_id = ? ORDER BY parked_at;
 
+selectParkedSale:
+SELECT * FROM parked_sales WHERE id = ?;
+
 deleteParkedSale:
 DELETE FROM parked_sales WHERE id = ?;
 

@@ -21,6 +21,7 @@ import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.money.Qty
@@ -117,6 +118,10 @@ class TillScanIntegrationTest {
             override fun saveReceipt(receipt: IssuedReceipt) {}
             override fun receiptsOfSession(sessionId: String): List<IssuedReceipt> = emptyList()
             override fun maxReceiptNumber(): Long? = null
+            override fun saveParkedSale(sale: ParkedSaleRecord) {}
+            override fun parkedSale(id: String): ParkedSaleRecord? = null
+            override fun parkedSalesOfSession(sessionId: String): List<ParkedSaleRecord> = emptyList()
+            override fun deleteParkedSale(id: String) {}
             override fun addAnomaly(anomaly: Anomaly) {}
             override fun anomalies(limit: Int): List<Anomaly> = emptyList()
             override fun unseenAnomalyCount(): Long = 0L

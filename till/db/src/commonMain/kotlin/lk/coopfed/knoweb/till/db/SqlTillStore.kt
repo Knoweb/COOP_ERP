@@ -8,6 +8,8 @@ import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
+import lk.coopfed.knoweb.till.core.model.ParkedSaleLine
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.port.TillStore
@@ -134,6 +136,28 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
 
     override fun maxReceiptNumber(): Long? = q.maxReceiptNumber().executeAsOne().number
 
+    override fun saveParkedSale(sale: ParkedSaleRecord) {
+        q.insertParkedSale(
+            id = sale.id,
+            session_id = sale.sessionId,
+            lines_json = json.encodeToString(sale.lines),
+            parked_at = sale.parkedAt,
+            operator_user_id = sale.operatorUserId,
+            customer_id = sale.beneficiaryIdentifier,
+            notes = sale.customerClass,
+        )
+    }
+
+    override fun parkedSale(id: String): ParkedSaleRecord? =
+        q.selectParkedSale(id).executeAsOneOrNull()?.toParkedSale()
+
+    override fun parkedSalesOfSession(sessionId: String): List<ParkedSaleRecord> =
+        q.selectParkedSalesBySession(sessionId).executeAsList().map { it.toParkedSale() }
+
+    override fun deleteParkedSale(id: String) {
+        q.deleteParkedSale(id)
+    }
+
     override fun addAnomaly(anomaly: Anomaly) {
         q.insertAnomaly(
             anomaly.kind, anomaly.deviceSeq, anomaly.eventId, anomaly.reason, anomaly.detail, anomaly.notedAt,
@@ -157,4 +181,14 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
     private companion object {
         const val SNAPSHOT_VERSION = "snapshot_version"
     }
+
+    private fun Parked_sales.toParkedSale() = ParkedSaleRecord(
+        id = id,
+        sessionId = requireNotNull(session_id),
+        lines = json.decodeFromString<List<ParkedSaleLine>>(lines_json),
+        parkedAt = parked_at,
+        operatorUserId = operator_user_id,
+        beneficiaryIdentifier = customer_id,
+        customerClass = notes,
+    )
 }

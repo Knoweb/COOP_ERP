@@ -4,6 +4,7 @@ import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
 
@@ -53,6 +54,11 @@ interface TillStore {
     fun receiptsOfSession(sessionId: String): List<IssuedReceipt>
     /** The highest receipt number issued, or null when none is. */
     fun maxReceiptNumber(): Long?
+
+    fun saveParkedSale(sale: ParkedSaleRecord)
+    fun parkedSale(id: String): ParkedSaleRecord?
+    fun parkedSalesOfSession(sessionId: String): List<ParkedSaleRecord>
+    fun deleteParkedSale(id: String)
 
     /** Records a problem; the same [Anomaly.kind] for the same device sequence is recorded once. */
     fun addAnomaly(anomaly: Anomaly)

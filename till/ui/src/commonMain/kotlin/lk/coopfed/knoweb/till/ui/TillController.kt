@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlin.time.Clock
 import kotlin.time.Duration
 import lk.coopfed.knoweb.till.core.TillPolicy
 import lk.coopfed.knoweb.till.core.TillRefusal
@@ -20,6 +21,7 @@ import lk.coopfed.knoweb.till.core.TillService
 import lk.coopfed.knoweb.till.core.TillStatus
 import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.money.Qty
@@ -99,6 +101,9 @@ class TillController(
         private set
     var beneficiaryIdentifier by mutableStateOf<String?>(null)
         private set
+
+    val parkedSales = mutableStateListOf<ParkedSaleRecord>()
+    private var resumedParkedSaleId: String? = null
 
     fun selectBeneficiaryMode(mode: BeneficiaryMode) {
         recordActivity()
@@ -466,13 +471,61 @@ class TillController(
     fun clearSale() {
         recordActivity()
         basket.clear()
+        resumedParkedSaleId = null
+        beneficiaryMode = BeneficiaryMode.NONE
+        customerClass = null
+        beneficiaryIdentifier = null
         refreshBasket()
+    }
+
+    fun parkedAgeMinutes(sale: ParkedSaleRecord): Long =
+        ((Clock.System.now().epochSeconds - sale.parkedAt).coerceAtLeast(0)) / 60
+
+    fun parkSale(onDone: () -> Unit = {}) = act {
+        recordActivity()
+        service.parkSale(basket, resumedParkedSaleId)
+        resumedParkedSaleId = null
+        beneficiaryMode = BeneficiaryMode.NONE
+        customerClass = null
+        beneficiaryIdentifier = null
+        refreshBasket()
+        reloadParkedSales()
+        onDone()
+        say("Sale parked without using a receipt number")
+    }
+
+    fun refreshParkedSales(onDone: () -> Unit = {}) = act {
+        recordActivity()
+        reloadParkedSales()
+        onDone()
+    }
+
+    private suspend fun reloadParkedSales() {
+        parkedSales.clear()
+        parkedSales.addAll(service.parkedSales())
+    }
+
+    fun resumeParkedSale(id: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        if (lines.isNotEmpty()) throw TillRefusal("Park or clear the current sale first")
+        val (parked, restored) = service.resumeParkedSale(id)
+        basket.clear()
+        restored.lines.forEach { basket.add(it.item, it.unitPrice, it.qty) }
+        basket.setBeneficiary(restored.customerClass, restored.beneficiaryIdentifier)
+        customerClass = restored.customerClass
+        beneficiaryIdentifier = restored.beneficiaryIdentifier
+        beneficiaryMode = BeneficiaryMode.NONE
+        resumedParkedSaleId = parked.id
+        refreshBasket()
+        onDone()
+        say("Parked sale resumed")
     }
 
     /** Cash tendered; the receipt is numbered, stored, printed, and the drawer opens. */
     fun payCash(tendered: String, onDone: () -> Unit = {}) = act {
         recordActivity()
-        val receipt = service.sellForCash(basket, parseMoney(tendered))
+        val receipt = service.sellForCash(basket, parseMoney(tendered), resumedParkedSaleId)
+        resumedParkedSaleId = null
         refreshBasket()
         lastReceipt = receipt
         onDone()
@@ -484,7 +537,8 @@ class TillController(
     /** Card tendered on standalone terminal; receipt printed, drawer does NOT open. */
     fun payCard(reference: String, onDone: () -> Unit = {}) = act {
         recordActivity()
-        val receipt = service.sellForCard(basket, reference)
+        val receipt = service.sellForCard(basket, reference, resumedParkedSaleId)
+        resumedParkedSaleId = null
         refreshBasket()
         lastReceipt = receipt
         onDone()
@@ -496,7 +550,8 @@ class TillController(
     /** Mobile wallet payment on standalone terminal / app; receipt printed, drawer does NOT open. */
     fun payWallet(reference: String, onDone: () -> Unit = {}) = act {
         recordActivity()
-        val receipt = service.sellForWallet(basket, reference)
+        val receipt = service.sellForWallet(basket, reference, resumedParkedSaleId)
+        resumedParkedSaleId = null
         refreshBasket()
         lastReceipt = receipt
         onDone()
@@ -508,7 +563,8 @@ class TillController(
     /** QR payment on terminal / dynamic QR; receipt printed, drawer does NOT open. */
     fun payQr(reference: String, onDone: () -> Unit = {}) = act {
         recordActivity()
-        val receipt = service.sellForQr(basket, reference)
+        val receipt = service.sellForQr(basket, reference, resumedParkedSaleId)
+        resumedParkedSaleId = null
         refreshBasket()
         lastReceipt = receipt
         onDone()

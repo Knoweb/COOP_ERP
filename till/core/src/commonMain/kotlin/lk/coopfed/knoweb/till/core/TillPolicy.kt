@@ -20,6 +20,8 @@ data class TillPolicy(
     val outboxRetention: Duration = 7.days,
     /** Doc 32 section 5.2: warn after 3 days without a verified snapshot (config pos.snapshot_staleness_days). */
     val snapshotStaleness: Duration = 3.days,
+    /** Doc 26 DR-5: a parked basket may be resumed for at most 120 minutes. */
+    val parkedSaleMaxAge: Duration = 120.minutes,
     /** D-4: an offset central reports beyond this is refused, the PC's clock is kept. */
     val maxClockOffset: Duration = 7.days,
     /** D-4: the PC's clock moved by more than this beside real time: it was set by hand. */
@@ -34,6 +36,8 @@ data class TillPolicy(
         outboxRetention = config["sync.outbox.retention_days"]?.toLongOrNull()?.takeIf { it >= 1 }?.days ?: outboxRetention,
         snapshotStaleness = config["pos.snapshot_staleness_days"]?.toLongOrNull()?.takeIf { it >= 1 }?.days ?: snapshotStaleness,
         idleLock = config["till.idle_lock"]?.let { parseDuration(it) }?.takeIf { it.isPositive() } ?: idleLock,
+        parkedSaleMaxAge = config["pos.parked_sale_max_age"]?.let { parseDuration(it) }
+            ?.takeIf { it.isPositive() } ?: parkedSaleMaxAge,
     )
 
     companion object {
