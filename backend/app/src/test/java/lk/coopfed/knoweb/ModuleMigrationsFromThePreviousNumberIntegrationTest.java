@@ -43,7 +43,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // TILL-DATA-11: kernel V0095 (device sequence gaps) from V0094.
         streams.put("kernel", "94");
         streams.put("hello", null);
-        // Wave 4, TD-03: m1party V0017 (party.change_log_shops) from V0014 as well.
+        // CAT-14: m1party V0018 (party.resolve_counterparty_entity) from V0014 as well.
         streams.put("m1party", "14");
         // Wave 2, PR 17 (m1security V0020, user_has_any_assignment tests the class): from V0019,
         // where the demo server stands after PR 11.
@@ -196,7 +196,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
         assertThat(after)
                 .containsEntry("kernel", 95)
-                .containsEntry("m1party", 17)
+                .containsEntry("m1party", 18)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 14)
                 .containsEntry("m3pricing", 11)
