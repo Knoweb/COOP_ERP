@@ -10,6 +10,7 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m7customers.api.AmendAccountLimits;
 import lk.coopfed.knoweb.m7customers.api.ApproveAdjustment;
+import lk.coopfed.knoweb.m7customers.api.BulkSetCustomerCreditLimits;
 import lk.coopfed.knoweb.m7customers.api.ChangeAccountStatus;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
@@ -23,6 +24,9 @@ import lk.coopfed.knoweb.m7customers.web.generated.AccountsApi;
 import lk.coopfed.knoweb.m7customers.web.generated.Adjustment;
 import lk.coopfed.knoweb.m7customers.web.generated.AdjustmentRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.AmendLimitsRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerCreditLimitProblem;
+import lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerCreditLimitReport;
+import lk.coopfed.knoweb.m7customers.web.generated.BulkCustomerCreditLimitsRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerPayment;
 import lk.coopfed.knoweb.m7customers.web.generated.OpenAccountRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.ReasonRequest;
@@ -41,6 +45,8 @@ class AccountController implements AccountsApi {
     private final Handles<OpenAccount, UUID> open;
     private final Handles<RecordCustomerPayment, UUID> recordPayment;
     private final Handles<AmendAccountLimits, UUID> amendLimits;
+    private final Handles<BulkSetCustomerCreditLimits, lk.coopfed.knoweb.m7customers.api.BulkCustomerCreditLimitReport>
+            bulkSetCustomerCreditLimits;
     private final Handles<ChangeAccountStatus, UUID> changeStatus;
     private final Handles<RequestAdjustment, UUID> requestAdjustment;
     private final Handles<ApproveAdjustment, UUID> approveAdjustment;
@@ -53,6 +59,8 @@ class AccountController implements AccountsApi {
             Handles<OpenAccount, UUID> open,
             Handles<RecordCustomerPayment, UUID> recordPayment,
             Handles<AmendAccountLimits, UUID> amendLimits,
+            Handles<BulkSetCustomerCreditLimits, lk.coopfed.knoweb.m7customers.api.BulkCustomerCreditLimitReport>
+                    bulkSetCustomerCreditLimits,
             Handles<ChangeAccountStatus, UUID> changeStatus,
             Handles<RequestAdjustment, UUID> requestAdjustment,
             Handles<ApproveAdjustment, UUID> approveAdjustment,
@@ -62,12 +70,48 @@ class AccountController implements AccountsApi {
         this.open = open;
         this.recordPayment = recordPayment;
         this.amendLimits = amendLimits;
+        this.bulkSetCustomerCreditLimits = bulkSetCustomerCreditLimits;
         this.changeStatus = changeStatus;
         this.requestAdjustment = requestAdjustment;
         this.approveAdjustment = approveAdjustment;
         this.reverse = reverse;
         this.accounts = accounts;
         this.currentScope = currentScope;
+    }
+
+    @Override
+    public ResponseEntity<BulkCustomerCreditLimitReport> bulkSetCustomerCreditLimits(
+            String idempotencyKey, BulkCustomerCreditLimitsRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<BulkSetCustomerCreditLimits.CustomerLimitRow> rows = request.getLimits() == null
+                ? List.of()
+                : request.getLimits().stream()
+                        .map(item -> new BulkSetCustomerCreditLimits.CustomerLimitRow(
+                                item.getAccountNo(),
+                                item.getPhone(),
+                                item.getNic(),
+                                item.getAccountId(),
+                                item.getCreditLimit(),
+                                item.getReason()))
+                        .toList();
+
+        lk.coopfed.knoweb.m7customers.api.BulkCustomerCreditLimitReport report = bulkSetCustomerCreditLimits.handle(
+                new BulkSetCustomerCreditLimits(request.getSheet(), rows, request.getDefaultReason()), scope);
+
+        BulkCustomerCreditLimitReport response = new BulkCustomerCreditLimitReport();
+        response.setStatus(BulkCustomerCreditLimitReport.StatusEnum.fromValue(report.status()));
+        response.setUpdatedCount(report.updatedCount());
+        response.setProblems(report.problems().stream()
+                .map(p -> {
+                    BulkCustomerCreditLimitProblem prob = new BulkCustomerCreditLimitProblem();
+                    prob.setIdentifier(p.identifier());
+                    prob.setField(p.field());
+                    prob.setCode(p.code());
+                    return prob;
+                })
+                .toList());
+
+        return ResponseEntity.ok(response);
     }
 
     @Override
