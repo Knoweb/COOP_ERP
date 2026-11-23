@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
@@ -480,9 +481,10 @@ export function AssetRegisterPage() {
       )}
 
       {/* Modal Dialog for Registration */}
-      {modalOpen && (
-        <div
-          className="assets-modal-backdrop"
+      {modalOpen && (() => {
+        const modalNode = (
+          <div
+            className="assets-modal-backdrop"
           role="dialog"
           aria-modal="true"
           aria-labelledby="assets-modal-title"
@@ -628,7 +630,9 @@ export function AssetRegisterPage() {
             </form>
           </div>
         </div>
-      )}
+        );
+        return typeof document !== "undefined" ? createPortal(modalNode, document.body) : modalNode;
+      })()}
     </main>
   );
 }

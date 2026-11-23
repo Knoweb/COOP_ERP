@@ -428,7 +428,7 @@ export function RepacksPage() {
       </section>
 
       {canManage && (
-        <section className="modern-table-card inventory-form-card" style={{ marginBottom: 'var(--space-4)' }}>
+        <section className="modern-table-card inventory-form-card repack-card" style={{ marginBottom: 'var(--space-4)' }}>
           <div className="inventory-card-header">
             <span className="inventory-card-header__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
@@ -436,41 +436,105 @@ export function RepacksPage() {
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </span>
-            <h2 className="inventory-card-header__title">{t("inventory.repack.recipe.new").text}</h2>
+            <div>
+              <h2 className="inventory-card-header__title">{t("inventory.repack.recipe.new").text}</h2>
+            </div>
           </div>
           <div className="repack-form-body">
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.recipe.name").text}</span>
-              <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
-            </label>
-            <SkuFinder
-              label={t("inventory.repack.find_input").text}
-              buttonLabel={t("inventory.repack.find_input_button").text}
-              chosenId={draft.inputSkuId}
-              onChoose={(sku) => setDraft({ ...draft, inputSkuId: sku.skuId })}
-            />
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.recipe.input_qty").text}</span>
-              <input inputMode="decimal" value={draft.inputQty} onChange={(event) => setDraft({ ...draft, inputQty: event.target.value })} />
-            </label>
-            <SkuFinder
-              label={t("inventory.repack.find_output").text}
-              buttonLabel={t("inventory.repack.find_output_button").text}
-              chosenId={draft.outputSkuId}
-              onChoose={(sku) => setDraft({ ...draft, outputSkuId: sku.skuId })}
-            />
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.recipe.output_qty").text}</span>
-              <input inputMode="decimal" value={draft.outputQty} onChange={(event) => setDraft({ ...draft, outputQty: event.target.value })} />
-            </label>
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.recipe.loss").text}</span>
-              <input inputMode="decimal" value={draft.loss} onChange={(event) => setDraft({ ...draft, loss: event.target.value })} />
-            </label>
+            <div className="repack-grid-2">
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.recipe.name").text}</span>
+                <input
+                  aria-label={t("inventory.repack.recipe.name").text}
+                  value={draft.name}
+                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                  placeholder={t("inventory.repack.recipe.name").text}
+                />
+              </label>
+              <label className="inventory-form-field">
+                <span className="repack-field-label">
+                  {t("inventory.repack.recipe.loss").text}
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={draft.loss}
+                  onChange={(event) => setDraft({ ...draft, loss: event.target.value })}
+                  placeholder="0.00"
+                />
+              </label>
+            </div>
+
+            <div className="repack-conversion-flow">
+              <div className="repack-conversion-card repack-conversion-card--input">
+                <div className="repack-conversion-card__header">
+                  <span className="repack-conversion-card__badge repack-conversion-card__badge--input">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
+                    </svg>
+                    {t("inventory.repack.recipe.input").text}
+                  </span>
+                </div>
+                <div className="repack-conversion-card__body">
+                  <SkuFinder
+                    label={t("inventory.repack.find_input").text}
+                    buttonLabel={t("inventory.repack.find_input_button").text}
+                    chosenId={draft.inputSkuId}
+                    onChoose={(sku) => setDraft({ ...draft, inputSkuId: sku.skuId })}
+                  />
+                  <label className="inventory-form-field">
+                    <span className="repack-field-label">{t("inventory.repack.recipe.input_qty").text}</span>
+                    <input
+                      aria-label={t("inventory.repack.recipe.input_qty").text}
+                      inputMode="decimal"
+                      value={draft.inputQty}
+                      onChange={(event) => setDraft({ ...draft, inputQty: event.target.value })}
+                      placeholder="1.000"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="repack-conversion-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </div>
+
+              <div className="repack-conversion-card repack-conversion-card--output">
+                <div className="repack-conversion-card__header">
+                  <span className="repack-conversion-card__badge repack-conversion-card__badge--output">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 15V3M8 7l4-4 4 4M4 21h16" />
+                    </svg>
+                    {t("inventory.repack.recipe.output").text}
+                  </span>
+                </div>
+                <div className="repack-conversion-card__body">
+                  <SkuFinder
+                    label={t("inventory.repack.find_output").text}
+                    buttonLabel={t("inventory.repack.find_output_button").text}
+                    chosenId={draft.outputSkuId}
+                    onChoose={(sku) => setDraft({ ...draft, outputSkuId: sku.skuId })}
+                  />
+                  <label className="inventory-form-field">
+                    <span className="repack-field-label">{t("inventory.repack.recipe.output_qty").text}</span>
+                    <input
+                      aria-label={t("inventory.repack.recipe.output_qty").text}
+                      inputMode="decimal"
+                      value={draft.outputQty}
+                      onChange={(event) => setDraft({ ...draft, outputQty: event.target.value })}
+                      placeholder="1.000"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div className="inventory-action-bar">
               <button
                 type="button"
-                className="inventory-submit-btn"
+                className="inventory-submit-btn modern-btn modern-btn--primary"
                 disabled={!draftReady || define.isPending}
                 onClick={() => define.mutate()}
               >
@@ -480,7 +544,7 @@ export function RepacksPage() {
                 <span>{t("inventory.repack.recipe.define").text}</span>
               </button>
             </div>
-            {define.isError && <p role="alert">{errorText(define.error, t("inventory.error.generic").text)}</p>}
+            {define.isError && <p role="alert" className="inventory-form-error">{errorText(define.error, t("inventory.error.generic").text)}</p>}
           </div>
         </section>
       )}
@@ -492,7 +556,7 @@ export function RepacksPage() {
       </section>
 
       {canExecute && locationId !== "" && (
-        <section className="modern-table-card inventory-form-card" style={{ marginTop: 'var(--space-4)' }}>
+        <section className="modern-table-card inventory-form-card repack-card" style={{ marginTop: 'var(--space-4)' }}>
           <div className="inventory-card-header">
             <span className="inventory-card-header__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
@@ -505,55 +569,77 @@ export function RepacksPage() {
             <h2 className="inventory-card-header__title">{t("inventory.repack.execute_section").text}</h2>
           </div>
           <div className="repack-form-body">
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.recipe").text}</span>
-              <CustomSelect
-                ariaLabel={t("inventory.repack.recipe").text}
-                value={run.recipeId}
-                onChange={(val) => setRun({ ...run, recipeId: val, batchId: "" })}
-                options={[
-                  { value: "", label: "" },
-                  ...active.map((r) => ({
-                    value: r.recipeId,
-                    label: r.name
-                  }))
-                ]}
-              />
-            </label>
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.input_lot").text}</span>
-              <CustomSelect
-                ariaLabel={t("inventory.repack.input_lot").text}
-                value={run.batchId}
-                onChange={(val) => setRun({ ...run, batchId: val })}
-                options={[
-                  { value: "", label: "" },
-                  ...inputLots.map((lot) => ({
-                    value: lot.batchId,
-                    label: `${isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")} · ${lot.qtyOnHand}`
-                  }))
-                ]}
-              />
-            </label>
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.input_qty").text}</span>
-              <input inputMode="decimal" value={run.inputQty} onChange={(event) => setRun({ ...run, inputQty: event.target.value })} />
-            </label>
-            {recipe && inputQty !== null && (
-              <p className="repack-yield-hint">{t("inventory.repack.expected", undefined, { qty: expectedOutputOf(recipe, inputQty) }).text}</p>
-            )}
-            <label className="inventory-form-field">
-              <span className="repack-field-label">{t("inventory.repack.actual").text}</span>
-              <input inputMode="decimal" value={run.actual} onChange={(event) => setRun({ ...run, actual: event.target.value })} />
-            </label>
+            <div className="repack-grid-2">
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.recipe").text}</span>
+                <CustomSelect
+                  ariaLabel={t("inventory.repack.recipe").text}
+                  value={run.recipeId}
+                  onChange={(val) => setRun({ ...run, recipeId: val, batchId: "" })}
+                  options={[
+                    { value: "", label: "" },
+                    ...active.map((r) => ({
+                      value: r.recipeId,
+                      label: r.name
+                    }))
+                  ]}
+                />
+              </label>
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.input_lot").text}</span>
+                <CustomSelect
+                  ariaLabel={t("inventory.repack.input_lot").text}
+                  value={run.batchId}
+                  onChange={(val) => setRun({ ...run, batchId: val })}
+                  options={[
+                    { value: "", label: "" },
+                    ...inputLots.map((lot) => ({
+                      value: lot.batchId,
+                      label: `${isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")} · ${lot.qtyOnHand}`
+                    }))
+                  ]}
+                />
+              </label>
+            </div>
+            <div className="repack-grid-2">
+              <div>
+                <label className="inventory-form-field">
+                  <span className="repack-field-label">{t("inventory.repack.input_qty").text}</span>
+                  <input
+                    aria-label={t("inventory.repack.input_qty").text}
+                    inputMode="decimal"
+                    value={run.inputQty}
+                    onChange={(event) => setRun({ ...run, inputQty: event.target.value })}
+                    placeholder="0.000"
+                  />
+                </label>
+                {recipe && inputQty !== null && (
+                  <p className="repack-yield-hint">{t("inventory.repack.expected", undefined, { qty: expectedOutputOf(recipe, inputQty) }).text}</p>
+                )}
+              </div>
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.actual").text}</span>
+                <input
+                  aria-label={t("inventory.repack.actual").text}
+                  inputMode="decimal"
+                  value={run.actual}
+                  onChange={(event) => setRun({ ...run, actual: event.target.value })}
+                  placeholder="0.000"
+                />
+              </label>
+            </div>
             <label className="inventory-form-field">
               <span className="repack-field-label">{t("inventory.repack.variance_reason").text}</span>
-              <input value={run.reason} onChange={(event) => setRun({ ...run, reason: event.target.value })} />
+              <input
+                value={run.reason}
+                onChange={(event) => setRun({ ...run, reason: event.target.value })}
+                placeholder={t("inventory.repack.variance_reason").text}
+              />
             </label>
             <div className="inventory-action-bar">
               <button
                 type="button"
-                className="inventory-submit-btn"
+                className="inventory-submit-btn modern-btn modern-btn--primary"
                 disabled={!runReady || execute.isPending}
                 onClick={() => execute.mutate()}
               >
@@ -566,7 +652,7 @@ export function RepacksPage() {
                 <span>{t("inventory.repack.execute").text}</span>
               </button>
             </div>
-            {execute.isError && <p role="alert">{errorText(execute.error, t("inventory.error.generic").text)}</p>}
+            {execute.isError && <p role="alert" className="inventory-form-error">{errorText(execute.error, t("inventory.error.generic").text)}</p>}
           </div>
         </section>
       )}

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
@@ -470,125 +471,128 @@ export function ShopTargetsPage() {
       )}
 
       {/* Create / Edit Modal */}
-      {modalOpen && (
-        <div
-          className="sales-targets-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="sales-targets-modal-title"
-        >
-          <div className="sales-targets-modal">
-            <div className="sales-targets-modal__header">
-              <div className="sales-targets-modal__title-group">
-                <span className="sales-targets-section__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="6" />
-                    <circle cx="12" cy="12" r="2" />
-                  </svg>
-                </span>
-                <h2 id="sales-targets-modal-title">
-                  {editingItem ? t("reporting.targets.edit").text : t("reporting.targets.create").text}
-                </h2>
-              </div>
-              <button
-                type="button"
-                className="sales-targets-modal__close"
-                aria-label={t("reporting.targets.form.cancel").text}
-                onClick={() => {
-                  setModalOpen(false);
-                  resetForm();
-                }}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {formError && (
-              <p role="alert" className="sales-targets-form-error">
-                {formError}
-              </p>
-            )}
-
-            <form onSubmit={handleSubmit} className="sales-targets-modal__form">
-              {!editingItem && (
-                <div className="sales-targets-form-group">
-                  <label htmlFor="target-location">{t("reporting.targets.form.shop").text}</label>
-                  <TargetsSelect
-                    id="target-location"
-                    aria-label={t("reporting.targets.form.shop").text}
-                    value={formLocationId}
-                    options={modalLocationOptions}
-                    onChange={setFormLocationId}
-                    portal
-                    required
-                  />
+      {modalOpen && (() => {
+        const modalNode = (
+          <div
+            className="sales-targets-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sales-targets-modal-title"
+          >
+            <div className="sales-targets-modal">
+              <div className="sales-targets-modal__header">
+                <div className="sales-targets-modal__title-group">
+                  <span className="sales-targets-section__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="6" />
+                      <circle cx="12" cy="12" r="2" />
+                    </svg>
+                  </span>
+                  <h2 id="sales-targets-modal-title">
+                    {editingItem ? t("reporting.targets.edit").text : t("reporting.targets.create").text}
+                  </h2>
                 </div>
-              )}
-
-              <div className="sales-targets-form-row">
-                <div className="sales-targets-form-group">
-                  <label htmlFor="target-start">{t("reporting.targets.form.period_start").text}</label>
-                  <TargetsDatePicker
-                    id="target-start"
-                    label={t("reporting.targets.form.period_start").text}
-                    value={formPeriodStart}
-                    onChange={setFormPeriodStart}
-                    portal
-                  />
-                </div>
-
-                <div className="sales-targets-form-group">
-                  <label htmlFor="target-end">{t("reporting.targets.form.period_end").text}</label>
-                  <TargetsDatePicker
-                    id="target-end"
-                    label={t("reporting.targets.form.period_end").text}
-                    value={formPeriodEnd}
-                    onChange={setFormPeriodEnd}
-                    portal
-                  />
-                </div>
-              </div>
-
-              <div className="sales-targets-form-group">
-                <label htmlFor="target-amount">{t("reporting.targets.form.target_amount").text}</label>
-                <input
-                  id="target-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="form-control"
-                  value={formTargetAmount}
-                  onChange={(e) => setFormTargetAmount(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="sales-targets-form-actions">
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="sales-targets-modal__close"
+                  aria-label={t("reporting.targets.form.cancel").text}
                   onClick={() => {
                     setModalOpen(false);
                     resetForm();
                   }}
                 >
-                  {t("reporting.targets.form.cancel").text}
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                >
-                  {t("reporting.targets.form.save").text}
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            </form>
+
+              {formError && (
+                <p role="alert" className="sales-targets-form-error">
+                  {formError}
+                </p>
+              )}
+
+              <form onSubmit={handleSubmit} className="sales-targets-modal__form">
+                {!editingItem && (
+                  <div className="sales-targets-form-group">
+                    <label htmlFor="target-location">{t("reporting.targets.form.shop").text}</label>
+                    <TargetsSelect
+                      id="target-location"
+                      aria-label={t("reporting.targets.form.shop").text}
+                      value={formLocationId}
+                      options={modalLocationOptions}
+                      onChange={setFormLocationId}
+                      portal
+                      required
+                    />
+                  </div>
+                )}
+
+                <div className="sales-targets-form-row">
+                  <div className="sales-targets-form-group">
+                    <label htmlFor="target-start">{t("reporting.targets.form.period_start").text}</label>
+                    <TargetsDatePicker
+                      id="target-start"
+                      label={t("reporting.targets.form.period_start").text}
+                      value={formPeriodStart}
+                      onChange={setFormPeriodStart}
+                      portal
+                    />
+                  </div>
+
+                  <div className="sales-targets-form-group">
+                    <label htmlFor="target-end">{t("reporting.targets.form.period_end").text}</label>
+                    <TargetsDatePicker
+                      id="target-end"
+                      label={t("reporting.targets.form.period_end").text}
+                      value={formPeriodEnd}
+                      onChange={setFormPeriodEnd}
+                      portal
+                    />
+                  </div>
+                </div>
+
+                <div className="sales-targets-form-group">
+                  <label htmlFor="target-amount">{t("reporting.targets.form.target_amount").text}</label>
+                  <input
+                    id="target-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="form-control"
+                    value={formTargetAmount}
+                    onChange={(e) => setFormTargetAmount(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="sales-targets-form-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setModalOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    {t("reporting.targets.form.cancel").text}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  >
+                    {t("reporting.targets.form.save").text}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+        return typeof document !== "undefined" ? createPortal(modalNode, document.body) : modalNode;
+      })()}
     </main>
   );
 }

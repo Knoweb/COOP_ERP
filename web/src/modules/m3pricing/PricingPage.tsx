@@ -26,6 +26,7 @@ export function PricingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const idempotencyKey = useIdempotencyKey();
+  const withdrawKey = useIdempotencyKey();
   const canAuthor = useHasPermission("prc.pricelist.author");
   const [name, setName] = useState("");
 
@@ -33,6 +34,8 @@ export function PricingPage() {
     queryKey: ["pricing", "priceLists"],
     queryFn: () => api.listPriceLists("TRADE")
   });
+
+  const visibleLists = (priceLists.data ?? []).filter((list) => list.status !== "WITHDRAWN");
 
   const create = useMutation({
     mutationFn: () => api.createPriceList(name.trim(), idempotencyKey.current()),
@@ -44,6 +47,20 @@ export function PricingPage() {
     onError: (error) => {
       if (error instanceof ApiProblem) {
         idempotencyKey.next();
+      }
+    }
+  });
+
+  const withdraw = useMutation({
+    mutationFn: (listId: string) =>
+      api.withdrawDraft(listId, { reason: t("pricing.draft.remove_reason").text }, withdrawKey.current()),
+    onSuccess: () => {
+      withdrawKey.next();
+      queryClient.invalidateQueries({ queryKey: ["pricing", "priceLists"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        withdrawKey.next();
       }
     }
   });
@@ -96,12 +113,17 @@ export function PricingPage() {
             <p>{errorText(priceLists.error, t("pricing.error.generic").text)}</p>
           </div>
         )}
-        {priceLists.data?.length === 0 && (
+        {withdraw.isError && (
+          <div className="pricing-alert-box pricing-alert-box--error" role="alert">
+            <p>{errorText(withdraw.error, t("pricing.error.generic").text)}</p>
+          </div>
+        )}
+        {priceLists.isSuccess && visibleLists.length === 0 && (
           <div className="pricing-card pricing-empty-card">
             <p className="pricing-muted">{t("pricing.list.empty").text}</p>
           </div>
         )}
-        {priceLists.data && priceLists.data.length > 0 && (
+        {visibleLists.length > 0 && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">
               <table className="modern-table">
@@ -114,12 +136,39 @@ export function PricingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {priceLists.data.map((list) => (
+                  {visibleLists.map((list) => (
                     <tr key={list.priceListId}>
                       <td className="pricing-cell-item">
-                        <Link to={`/pricing/lists/${list.priceListId}`} className="pricing-list-link">
-                          {list.name}
-                        </Link>
+                        <div className="pricing-list-name-cell">
+                          <Link to={`/pricing/lists/${list.priceListId}`} className="pricing-list-link">
+                            {list.name}
+                          </Link>
+                          {canAuthor && list.status === "DRAFT" && (
+                            <button
+                              type="button"
+                              className="pricing-row-remove-btn"
+                              aria-label={`${t("pricing.remove").text} ${list.name}`}
+                              disabled={withdraw.isPending}
+                              onClick={() => withdraw.mutate(list.priceListId)}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="14"
+                                height="14"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                                focusable="false"
+                              >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="pricing-cell-center pricing-version-text">{list.version}</td>
                       <td>

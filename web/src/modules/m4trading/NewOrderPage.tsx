@@ -139,7 +139,6 @@ export function NewOrderPage() {
                 required
               />
             </div>
-            {sellers.data?.length === 0 && <p className="trading-empty-hint">{t("trading.sellers.none").text}</p>}
             <div className="trading-form-field">
               <label htmlFor="trading-deliver-select" className="trading-form-field__label">
                 {t("trading.field.deliver_to").text}
@@ -155,6 +154,27 @@ export function NewOrderPage() {
               />
             </div>
           </div>
+          {sellers.data?.length === 0 && (
+            <p className="trading-order-notice">
+              <svg
+                className="trading-order-notice__icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>{t("trading.sellers.none").text}</span>
+            </p>
+          )}
           {selectedLocation && selectedLocation.connectivitySpecMet === false && (
             <aside className="trading-on-behalf-notice" role="status">
               <strong>{t("trading.order.on_behalf.badge").text}: </strong>
@@ -355,12 +375,12 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
                       </div>
                       <button
                         type="button"
-                        className="button button--secondary trading-add-sku-btn"
+                        className="trading-add-sku-btn"
                         onClick={() => onPick(sku)}
                         aria-label={addLabel}
                       >
                         <span className="trading-add-icon" aria-hidden="true">+</span>
-                        <span>{addLabel}</span>
+                        <span>{t("trading.add").text}</span>
                       </button>
                     </li>
                   );

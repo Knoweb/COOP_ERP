@@ -156,18 +156,33 @@
 .targets-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--color-polish-3);
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  background: var(--color-polish-8);
+  backdrop-filter: blur(var(--space-half));
+  -webkit-backdrop-filter: blur(var(--space-half));
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 10000;
   padding: var(--space-2);
 }
 
 .targets-modal {
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius);
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface);
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19);
+  border-radius: calc(var(--radius) * 3);
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31);
   padding: var(--space-4);
   width: 100%;
   max-width: var(--reporting-key-column-max);
@@ -3169,19 +3184,33 @@
 .sales-targets-modal-backdrop {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
   background: var(--color-polish-8);
+  backdrop-filter: blur(var(--space-half));
+  -webkit-backdrop-filter: blur(var(--space-half));
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   padding: var(--space-3);
 }
 
 .sales-targets-modal {
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-polish-22);
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface);
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19);
   border-radius: calc(var(--radius) * 3);
-  box-shadow: 0 var(--space-2) var(--space-4) var(--color-polish-8);
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31);
   padding: var(--space-3);
   width: 100%;
   max-width: min(calc(var(--space-8) * 7), 100%);
@@ -5252,19 +5281,33 @@
 .assets-modal-backdrop {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
   background: var(--color-polish-8);
+  backdrop-filter: blur(var(--space-half));
+  -webkit-backdrop-filter: blur(var(--space-half));
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   padding: var(--space-3);
 }
 
 .assets-modal {
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-polish-22);
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface);
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19);
   border-radius: calc(var(--radius) * 3);
-  box-shadow: 0 var(--space-2) var(--space-4) var(--color-polish-8);
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31);
   padding: var(--space-3);
   width: 100%;
   max-width: min(calc(var(--space-8) * 7), 100%);
@@ -6552,19 +6595,33 @@
 .pnl-modal-backdrop {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
   background: var(--color-polish-8);
+  backdrop-filter: blur(var(--space-half));
+  -webkit-backdrop-filter: blur(var(--space-half));
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   padding: var(--space-3);
 }
 
 .pnl-modal {
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-polish-22);
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface);
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19);
   border-radius: calc(var(--radius) * 3);
-  box-shadow: 0 var(--space-2) var(--space-4) var(--color-polish-8);
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31);
   padding: var(--space-3);
   width: 100%;
   max-width: min(calc(var(--space-8) * 7), 100%);

@@ -337,60 +337,62 @@ export function ShelfListPage() {
 
       {editable && (
         <section className="pricing-section">
-          <SkuPicker
-            onPick={(sku) =>
-              setRows((current) =>
-                current.some((row) => row.skuId === sku.skuId)
-                  ? current
-                  : [...current, { skuId: sku.skuId, uomCode: sku.baseUomCode, price: "" }]
-              )
-            }
-          />
-          <div className="pricing-card pricing-actions-card">
-            <div className="pricing-actions-row">
-              <button
-                type="button"
-                className="modern-btn modern-btn--primary"
-                disabled={save.isPending || incomplete.length > 0}
-                onClick={() => save.mutate()}
-              >
-                {t("pricing.save").text}
-              </button>
-              {incomplete.length > 0 && (
-                <span role="alert" className="pricing-alert-box pricing-alert-box--error">
-                  {t("pricing.shelf.incomplete", undefined, { rows: incomplete.join(", ") }).text}
-                </span>
-              )}
-              {outcomes?.saved && <span role="status" className="pricing-alert-box pricing-alert-box--success">{t("pricing.saved").text}</span>}
-              {outcomes && !outcomes.saved && (
-                <span role="alert" className="pricing-alert-box pricing-alert-box--error">
-                  {t("pricing.shelf.not_saved", undefined, { count: refusedLines }).text}
-                </span>
-              )}
-              {save.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(save.error, t("pricing.error.generic").text)}</span>}
-            </div>
-
-            {canPublish && (
-              <form onSubmit={submitPublish} className="pricing-publish-form">
-                <div className="modern-field">
-                  <DatePicker
-                    label={t("pricing.field.apply_from").text}
-                    required
-                    value={applyFrom}
-                    onChange={setApplyFrom}
-                  />
-                </div>
+          <div className="pricing-card pricing-unified-editor-card">
+            <SkuPicker
+              onPick={(sku) =>
+                setRows((current) =>
+                  current.some((row) => row.skuId === sku.skuId)
+                    ? current
+                    : [...current, { skuId: sku.skuId, uomCode: sku.baseUomCode, price: "" }]
+                )
+              }
+            />
+            <div className="pricing-actions-card">
+              <div className="pricing-actions-row">
                 <button
-                  type="submit"
+                  type="button"
                   className="modern-btn modern-btn--primary"
-                  disabled={publish.isPending || !applyFrom || rows.length === 0 || refusedLines > 0}
+                  disabled={save.isPending || incomplete.length > 0}
+                  onClick={() => save.mutate()}
                 >
-                  {t("pricing.publish").text}
+                  {t("pricing.save").text}
                 </button>
-                {refusedLines > 0 && <span className="pricing-muted">{t("pricing.shelf.fix_to_publish").text}</span>}
-                {publish.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(publish.error, t("pricing.error.generic").text)}</span>}
-              </form>
-            )}
+                {incomplete.length > 0 && (
+                  <span role="alert" className="pricing-alert-box pricing-alert-box--error">
+                    {t("pricing.shelf.incomplete", undefined, { rows: incomplete.join(", ") }).text}
+                  </span>
+                )}
+                {outcomes?.saved && <span role="status" className="pricing-alert-box pricing-alert-box--success">{t("pricing.saved").text}</span>}
+                {outcomes && !outcomes.saved && (
+                  <span role="alert" className="pricing-alert-box pricing-alert-box--error">
+                    {t("pricing.shelf.not_saved", undefined, { count: refusedLines }).text}
+                  </span>
+                )}
+                {save.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(save.error, t("pricing.error.generic").text)}</span>}
+              </div>
+
+              {canPublish && (
+                <form onSubmit={submitPublish} className="pricing-publish-form">
+                  <div className="modern-field">
+                    <DatePicker
+                      label={t("pricing.field.apply_from").text}
+                      required
+                      value={applyFrom}
+                      onChange={setApplyFrom}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="modern-btn modern-btn--primary"
+                    disabled={publish.isPending || !applyFrom || rows.length === 0 || refusedLines > 0}
+                  >
+                    {t("pricing.publish").text}
+                  </button>
+                  {refusedLines > 0 && <span className="pricing-muted">{t("pricing.shelf.fix_to_publish").text}</span>}
+                  {publish.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(publish.error, t("pricing.error.generic").text)}</span>}
+                </form>
+              )}
+            </div>
           </div>
         </section>
       )}

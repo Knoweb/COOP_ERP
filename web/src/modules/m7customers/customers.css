@@ -1871,12 +1871,19 @@
 .statement-reverse-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-3);
-  background: var(--color-polish-3);
+  background: var(--color-polish-8);
+  backdrop-filter: blur(var(--space-half));
+  -webkit-backdrop-filter: blur(var(--space-half));
   animation: statement-fade-in 0.18s ease-out;
 }
 
@@ -1893,11 +1900,18 @@
   width: 100%;
   max-width: min(100%, calc(var(--space-8) * 7));
   margin: 0;
-  background: var(--color-surface);
-  border: var(--border-width-strong) solid var(--color-alert-text);
+  background: radial-gradient(circle at top right, var(--color-polish-31) 0%, transparent 28%),
+    radial-gradient(circle at top left, var(--color-polish-31) 0%, transparent 20%),
+    var(--color-surface);
+  border: calc(var(--border-width) * 1.5) solid var(--color-polish-19);
   border-radius: calc(var(--radius) * 3);
   padding: var(--space-3);
-  box-shadow: 0 var(--space-1) var(--space-4) var(--color-polish-8), 0 var(--border-width) var(--space-1) var(--color-polish-13);
+  box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-polish-21),
+    0 0 calc(var(--space-1) + var(--space-half)) var(--color-polish-18),
+    0 0 var(--space-3) var(--color-polish-13),
+    0 var(--space-1) var(--space-3) var(--color-polish-18),
+    0 var(--space-3) calc(var(--space-8) * 1.5) var(--color-polish-14),
+    inset 0 var(--border-width-strong) var(--space-half) var(--color-polish-31);
   box-sizing: border-box;
   animation: statement-scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }

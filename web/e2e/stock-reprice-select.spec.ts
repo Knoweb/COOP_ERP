@@ -9,8 +9,9 @@ async function openFirstStockLot(page: Page, user: DevUser): Promise<void> {
   const firstSku = page.locator("tr.stock-sku-row").first();
   await expect(firstSku).toBeVisible();
   await firstSku
-    .getByRole("button", { name: textOf(user, "inventory.stock.action.expand_lots") })
+    .getByRole("button", { name: textOf(user, "inventory.stock.action.explain") })
     .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
 }
 
 test("the stock reprice condition list stays in the viewport and supports mouse and keyboard", async ({ page }) => {

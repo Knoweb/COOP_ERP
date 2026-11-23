@@ -434,42 +434,44 @@ export function TradePriceListPage() {
 
       {editable && (
         <section className="pricing-section">
-          <SkuPicker onPick={(sku) => setRows((current) => [...current, { skuId: sku.skuId, uomCode: sku.baseUomCode, tierFromQty: "0", price: "" }])} />
-          <div className="pricing-card pricing-actions-card">
-            <div className="pricing-actions-row">
-              <button
-                type="button"
-                className="modern-btn modern-btn--primary"
-                disabled={save.isPending}
-                onClick={() => save.mutate()}
-              >
-                {t("pricing.save").text}
-              </button>
-              {outcomes?.saved && <span role="status" className="pricing-alert-box pricing-alert-box--success">{t("pricing.saved").text}</span>}
-              {outcomes && !outcomes.saved && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{t("pricing.not_saved").text}</span>}
-              {save.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(save.error, t("pricing.error.generic").text)}</span>}
-            </div>
-
-            {canPublish && (
-              <form onSubmit={submitPublish} className="pricing-publish-form">
-                <div className="modern-field">
-                  <DatePicker
-                    label={t("pricing.field.apply_from").text}
-                    required
-                    value={applyFrom}
-                    onChange={setApplyFrom}
-                  />
-                </div>
+          <div className="pricing-card pricing-unified-editor-card">
+            <SkuPicker onPick={(sku) => setRows((current) => [...current, { skuId: sku.skuId, uomCode: sku.baseUomCode, tierFromQty: "0", price: "" }])} />
+            <div className="pricing-actions-card">
+              <div className="pricing-actions-row">
                 <button
-                  type="submit"
+                  type="button"
                   className="modern-btn modern-btn--primary"
-                  disabled={publish.isPending || !applyFrom || rows.length === 0}
+                  disabled={save.isPending}
+                  onClick={() => save.mutate()}
                 >
-                  {t("pricing.publish").text}
+                  {t("pricing.save").text}
                 </button>
-                {publish.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(publish.error, t("pricing.error.generic").text)}</span>}
-              </form>
-            )}
+                {outcomes?.saved && <span role="status" className="pricing-alert-box pricing-alert-box--success">{t("pricing.saved").text}</span>}
+                {outcomes && !outcomes.saved && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{t("pricing.not_saved").text}</span>}
+                {save.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(save.error, t("pricing.error.generic").text)}</span>}
+              </div>
+
+              {canPublish && (
+                <form onSubmit={submitPublish} className="pricing-publish-form">
+                  <div className="modern-field">
+                    <DatePicker
+                      label={t("pricing.field.apply_from").text}
+                      required
+                      value={applyFrom}
+                      onChange={setApplyFrom}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="modern-btn modern-btn--primary"
+                    disabled={publish.isPending || !applyFrom || rows.length === 0}
+                  >
+                    {t("pricing.publish").text}
+                  </button>
+                  {publish.isError && <span role="alert" className="pricing-alert-box pricing-alert-box--error">{errorText(publish.error, t("pricing.error.generic").text)}</span>}
+                </form>
+              )}
+            </div>
           </div>
         </section>
       )}
