@@ -39,9 +39,7 @@ export const reportingModule: ModuleDefinition = {
     { path: "reporting/targets", element: guardTargets(<ShopTargetsPage />) },
     { path: "reporting/shop-reports", element: guard(<ShopReportsPage />) },
     { path: "reporting/profit-centers", element: guardProfitCenters(<ProfitCentersPnlPage />) },
-    { path: "reporting/assets", element: guardAssets(<AssetRegisterPage />) },
     { path: "reporting/revenue-estimator", element: guardTargets(<RevenueEstimatorPage />) },
-    { path: "reporting/finance", element: guard(<FinancePage />) },
     { path: "reporting/reports/:reportId", element: guard(<ReportPage />) }
   ],
 
@@ -50,10 +48,8 @@ export const reportingModule: ModuleDefinition = {
     { labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT },
     { labelId: "reporting.shop_reports.nav", to: "/reporting/shop-reports", requiredPermissions: REPORT },
     { labelId: "reporting.profit_centers.nav", to: "/reporting/profit-centers", requiredPermissions: PROFIT_CENTERS },
-    { labelId: "reporting.assets.nav", to: "/reporting/assets", requiredPermissions: ASSETS },
     { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS },
-    { labelId: "reporting.estimator.nav", to: "/reporting/revenue-estimator", requiredPermissions: TARGETS },
-    { labelId: "reporting.finance.nav", to: "/reporting/finance", requiredPermissions: REPORT }
+    { labelId: "reporting.estimator.nav", to: "/reporting/revenue-estimator", requiredPermissions: TARGETS }
   ],
 
   // x-permissions of openapi/m8reporting.yaml, read from the session's resolved set (PR #144).
@@ -63,7 +59,25 @@ export const reportingModule: ModuleDefinition = {
     "rpt.target.view",
     "rpt.target.manage",
     "rpt.profit_center.view",
-    "rpt.profit_center.manage",
+    "rpt.profit_center.manage"
+  ]
+};
+
+export const financeModule: ModuleDefinition = {
+  id: "finance",
+
+  routes: [
+    { path: "reporting/finance", element: guard(<FinancePage />) },
+    { path: "reporting/assets", element: guardAssets(<AssetRegisterPage />) }
+  ],
+
+  navItems: [
+    { labelId: "reporting.finance.nav", to: "/reporting/finance", requiredPermissions: REPORT },
+    { labelId: "reporting.assets.nav", to: "/reporting/assets", requiredPermissions: ASSETS }
+  ],
+
+  requiredPermissions: [
+    "rpt.report.run",
     "rpt.asset.view",
     "rpt.asset.manage"
   ]

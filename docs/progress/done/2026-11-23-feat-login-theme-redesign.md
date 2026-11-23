@@ -1,0 +1,1 @@
+- **Login theme and navigation polish (branch `feat/login-theme-redesign`):** modernized Keycloak login theme with glassmorphic card styling, responsive split layout, floating hero badge, trilingual i18n messages (`en`, `si`, `ta`), and separated reporting and finance navigation module entries with full Vitest test coverage and zero lint errors.
