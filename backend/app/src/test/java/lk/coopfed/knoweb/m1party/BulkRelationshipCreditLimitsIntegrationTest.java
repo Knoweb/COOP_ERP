@@ -90,29 +90,27 @@ class BulkRelationshipCreditLimitsIntegrationTest extends PostgresIntegrationTes
                 """
                 insert into party.entity_relationship (
                     relationship_id, seller_entity_id, buyer_entity_id, status, price_list_id, credit_limit,
-                    payment_terms_days, discrepancy_window_days, effective_from, owner_entity_id
-                ) values (?, ?, ?, 'ACTIVE', ?, 10000.00, 30, 7, ?, ?)
+                    payment_terms_days, discrepancy_window_days, effective_from
+                ) values (?, ?, ?, 'ACTIVE', ?, 10000.00, 30, 7, ?)
                 """,
                 relAId,
                 SELLER,
                 BUYER_A,
                 PRICE_LIST,
-                today.minusDays(10),
-                SELLER);
+                today.minusDays(10));
 
         admin.update(
                 """
                 insert into party.entity_relationship (
                     relationship_id, seller_entity_id, buyer_entity_id, status, price_list_id, credit_limit,
-                    payment_terms_days, discrepancy_window_days, effective_from, owner_entity_id
-                ) values (?, ?, ?, 'DRAFT', ?, 20000.00, 30, 7, ?, ?)
+                    payment_terms_days, discrepancy_window_days, effective_from
+                ) values (?, ?, ?, 'DRAFT', ?, 20000.00, 30, 7, ?)
                 """,
                 relBId,
                 SELLER,
                 BUYER_B,
                 PRICE_LIST,
-                today.plusDays(5),
-                SELLER);
+                today.plusDays(5));
 
         kernel.reset();
     }
@@ -128,6 +126,7 @@ class BulkRelationshipCreditLimitsIntegrationTest extends PostgresIntegrationTes
         admin.update("delete from security.role where role_id = ?", ROLE);
         admin.update("delete from security.app_user where user_id = ?", USER);
         admin.update("delete from party.entity_relationship where seller_entity_id = ?", SELLER);
+        admin.update("delete from party.entity_party_directory where entity_id in (?, ?, ?)", SELLER, BUYER_A, BUYER_B);
         admin.update("delete from party.entity where entity_id in (?, ?, ?)", SELLER, BUYER_A, BUYER_B);
     }
 

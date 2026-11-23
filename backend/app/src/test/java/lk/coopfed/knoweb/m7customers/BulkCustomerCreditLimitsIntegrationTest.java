@@ -156,7 +156,7 @@ class BulkCustomerCreditLimitsIntegrationTest extends PostgresIntegrationTest {
                     assertThat(after.get("count")).isEqualTo(2);
                     assertThat(after.get("totalCreditLimit")).isEqualTo("40000.00");
                 })
-                .anySatisfy(a -> assertThat(a.eventType()).isEqualTo("LIMITS_AMENDED"));
+                .anySatisfy(a -> assertThat(a.eventType()).isEqualTo("ACCOUNT_LIMIT_AMENDED"));
 
         // Assert Events
         assertThat(kernel.committedEvents())
