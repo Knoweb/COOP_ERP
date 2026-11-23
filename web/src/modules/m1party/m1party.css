@@ -1648,9 +1648,8 @@ table.modern-table tbody tr:hover td {
 
 .shell-page .user-card-container .document-header__facts,
 .shell-page .user-card-header .document-header__facts {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 3.5), 1fr)) !important;
-  max-width: calc(var(--space-8) * 10) !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
   gap: var(--space-2) !important;
   margin: 0 !important;
   padding: var(--space-2) !important;
@@ -1658,22 +1657,24 @@ table.modern-table tbody tr:hover td {
   border: var(--border-width) solid var(--color-polish-14) !important;
   border-radius: calc(var(--radius) * 2.5) !important;
   box-sizing: border-box !important;
+  width: fit-content !important;
+  max-width: 100% !important;
 }
 
 .shell-page .user-card-container .document-header__fact,
 .shell-page .user-card-header .document-header__fact {
   display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: var(--space-2) !important;
-  padding: calc(var(--space-1) + var(--space-half)) var(--space-2) !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: var(--space-half) !important;
+  padding: var(--space-1) var(--space-3) !important;
+  min-width: calc(var(--space-8) * 3) !important;
   background: var(--color-surface) !important;
   border: var(--border-width) solid var(--color-polish-18) !important;
   border-radius: calc(var(--radius) * 2) !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-23) !important;
   min-height: auto !important;
-  min-width: 0 !important;
   box-sizing: border-box !important;
   transition: all 0.2s ease !important;
   transform: none !important;
@@ -1698,8 +1699,8 @@ table.modern-table tbody tr:hover td {
   margin: 0 !important;
   padding: 0 !important;
   white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
 .shell-page .user-card-container .document-header__fact dd,
@@ -1708,15 +1709,18 @@ table.modern-table tbody tr:hover td {
   font-weight: var(--font-weight-strong) !important;
   color: var(--color-text) !important;
   line-height: var(--line-height) !important;
-  text-align: right !important;
+  text-align: left !important;
   margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   min-height: auto !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
   word-break: normal !important;
-  overflow-wrap: break-word !important;
+  overflow-wrap: normal !important;
 }
 
 .shell-page .user-card-container .approval-bar,
