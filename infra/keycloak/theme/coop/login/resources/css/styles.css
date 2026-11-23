@@ -109,19 +109,18 @@ body.auth-page::before {
   background: linear-gradient(
     90deg,
     rgba(15, 23, 42, 0.02) 0%,
-    rgba(20, 37, 76, 0.10) 50%,
-    rgba(15, 23, 42, 0.45) 75%,
-    rgba(15, 23, 42, 0.72) 100%
+    rgba(20, 37, 76, 0.14) 45%,
+    rgba(15, 23, 42, 0.52) 75%,
+    rgba(15, 23, 42, 0.76) 100%
   );
 }
 
 /* =========================================================
-   LEFT SHOWCASE PANEL (CLEAN NATURAL TEXT, NO SHAPES/BOXES)
+   LEFT SHOWCASE PANEL (BORDERLESS CINEMATIC TYPOGRAPHY)
    ========================================================= */
 
 .showcase-side {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 56%;
   height: 100%;
   min-height: 100vh;
   min-height: 100dvh;
@@ -135,10 +134,10 @@ body.auth-page::before {
   inset: 0;
   background: linear-gradient(
     to top,
-    rgba(10, 16, 32, 0.85) 0%,
-    rgba(15, 23, 42, 0.45) 28%,
-    rgba(15, 23, 42, 0.08) 55%,
-    transparent 72%
+    rgba(10, 16, 32, 0.88) 0%,
+    rgba(15, 23, 42, 0.55) 24%,
+    rgba(15, 23, 42, 0.12) 48%,
+    transparent 68%
   );
   pointer-events: none;
 }
@@ -152,7 +151,7 @@ body.auth-page::before {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: clamp(32px, 4vw, 48px) clamp(36px, 5vw, 64px);
+  padding: clamp(28px, 3.5vw, 44px) clamp(32px, 4.5vw, 56px);
   box-sizing: border-box;
 }
 
@@ -160,101 +159,103 @@ body.auth-page::before {
   max-width: 620px;
 }
 
-/* Clean text badge without background shape or border */
 .showcase-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  padding: 5px 14px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 30px;
   color: #FFFFFF;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
+  letter-spacing: 1.2px;
   margin-bottom: 12px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .badge-dot {
-  width: 7.5px;
-  height: 7.5px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #00E676;
   box-shadow: 0 0 10px #00E676;
 }
 
 .showcase-title {
-  font-size: clamp(26px, 2.4vw, 36px);
+  font-size: clamp(24px, 2.2vw, 34px);
   font-weight: 800;
   color: #FFFFFF;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   line-height: 1.22;
   letter-spacing: -0.5px;
-  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.9), 0 1px 4px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.85), 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 .showcase-desc {
-  font-size: clamp(14px, 1.1vw, 15.5px);
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.58;
-  margin: 0 0 20px;
+  font-size: clamp(13px, 1.05vw, 15px);
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.55;
+  margin: 0 0 16px;
   max-width: 520px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
-/* Natural inline statistics without shape boxes or backgrounds */
 .showcase-metrics {
   display: inline-flex;
   align-items: center;
-  gap: 26px;
-  margin-bottom: 18px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  gap: 22px;
+  margin: 16px 0 18px;
+  padding: 6px 0;
 }
 
 .metric-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .metric-val {
-  font-size: 26px;
+  font-size: clamp(22px, 1.8vw, 28px);
   font-weight: 800;
   color: #FFFFFF;
   letter-spacing: -0.5px;
-  line-height: 1.1;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 .metric-lbl {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(10px, 0.75vw, 11px);
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 .metric-divider {
   width: 1px;
   height: 28px;
-  background: rgba(255, 255, 255, 0.35);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.35) 30%,
+    rgba(255, 255, 255, 0.35) 70%,
+    transparent
+  );
 }
 
 .showcase-trust {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
   font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
 .shield-icon {
@@ -266,35 +267,34 @@ body.auth-page::before {
 }
 
 /* =========================================================
-   RIGHT PORTAL / AUTH FORM PANEL (BALANCED & PROPORTIONAL)
+   RIGHT PORTAL / AUTH FORM PANEL (BLENDED GLASSMORPHISM)
    ========================================================= */
 
 .portal-side {
-  flex: 0 0 440px;
-  width: 440px;
-  min-width: 390px;
-  max-width: 490px;
+  flex: 0 0 44%;
+  min-width: 440px;
+  max-width: 560px;
   min-height: 100vh;
   min-height: 100dvh;
-  background: rgba(15, 23, 42, 0.30);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-left: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 26px 36px;
+  padding: 28px 40px;
   box-sizing: border-box;
   position: relative;
   z-index: 10;
-  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.3);
+  box-shadow: -25px 0 60px rgba(0, 0, 0, 0.35);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* Sleek modern scrollbar */
+/* Custom modern scrollbar */
 .portal-side::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
 }
 .portal-side::-webkit-scrollbar-track {
   background: transparent;
@@ -312,7 +312,7 @@ body.auth-page::before {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   flex-shrink: 0;
   position: relative;
   z-index: 100;
@@ -320,7 +320,7 @@ body.auth-page::before {
 
 .mobile-brand-pill {
   display: none;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 800;
 }
 
@@ -360,7 +360,7 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .language-selector {
-  height: 35px;
+  height: 36px;
   padding: 0 14px;
   display: flex;
   align-items: center;
@@ -445,21 +445,21 @@ summary.language-selector::-webkit-details-marker {
   padding: 10px 0;
 }
 
-/* Frosted Glass Form Card: Proportional, prominent & elegant */
+/* Frosted Glass Form Card */
 
 .portal-card {
   width: 100%;
-  max-width: 390px;
-  background: rgba(255, 255, 255, 0.90);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  border-radius: 22px;
+  max-width: 410px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
   box-shadow:
-    0 22px 50px -10px rgba(0, 0, 0, 0.35),
-    0 8px 20px -4px rgba(0, 0, 0, 0.15),
+    0 25px 60px -10px rgba(0, 0, 0, 0.35),
+    0 8px 24px -4px rgba(0, 0, 0, 0.18),
     inset 0 1px 2px rgba(255, 255, 255, 0.95);
-  padding: 26px 30px;
+  padding: 30px 34px;
   box-sizing: border-box;
 }
 
@@ -467,17 +467,17 @@ summary.language-selector::-webkit-details-marker {
 
 .brand {
   text-align: center;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .logo-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .coopfed-logo {
-  height: 60px;
+  height: 64px;
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
@@ -489,11 +489,11 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .brand h1 {
-  margin: 0 0 3px;
-  font-size: 24px;
+  margin: 0 0 4px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.4px;
-  line-height: 1.22;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
 }
 
 .coopfed {
@@ -506,45 +506,43 @@ summary.language-selector::-webkit-details-marker {
 
 .tagline {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   margin: 0;
   font-weight: 500;
-  line-height: 1.38;
+  line-height: 1.4;
 }
 
 /* Welcome */
 
 .welcome {
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   padding-top: 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .welcome h2 {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--text-main);
-  margin: 0 0 3px;
+  margin: 0 0 4px;
   letter-spacing: -0.3px;
-  line-height: 1.25;
 }
 
 .welcome p {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 13.5px;
   margin: 0;
-  line-height: 1.35;
 }
 
 /* Alerts */
 
 .alert {
-  padding: 8px 12px;
+  padding: 9px 13px;
   border-radius: var(--radius-sm);
   font-size: 12.5px;
   font-weight: 500;
-  margin-bottom: 11px;
+  margin-bottom: 14px;
   line-height: 1.4;
 }
 
@@ -569,26 +567,26 @@ summary.language-selector::-webkit-details-marker {
 /* Form Fields */
 
 .form-field {
-  margin-bottom: 11px;
+  margin-bottom: 12px;
 }
 
 .field-label {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: #334155;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .field-label-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .forgot-link {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--secondary);
   font-weight: 600;
   text-decoration: none;
@@ -607,7 +605,7 @@ summary.language-selector::-webkit-details-marker {
   width: 100%;
   display: flex;
   align-items: center;
-  border: 1.5px solid rgba(142, 14, 91, 0.35);
+  border: 1.5px solid rgba(142, 14, 91, 0.4);
   border-radius: 11px;
   padding: 0 13px;
   background: rgba(255, 255, 255, 0.95);
@@ -623,12 +621,12 @@ summary.language-selector::-webkit-details-marker {
 .input-group:focus-within {
   border-color: var(--primary);
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(142, 14, 91, 0.16);
+  box-shadow: 0 0 0 3.5px rgba(142, 14, 91, 0.18);
 }
 
 .input-icon {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   color: var(--primary);
   flex-shrink: 0;
 }
@@ -640,7 +638,7 @@ summary.language-selector::-webkit-details-marker {
   outline: none !important;
   box-shadow: none !important;
   background: transparent;
-  padding: 0 9px;
+  padding: 0 10px;
   font-size: 14.5px;
   color: var(--text-main);
   font-weight: 500;
@@ -669,8 +667,8 @@ summary.language-selector::-webkit-details-marker {
 /* Eye button */
 
 .eye-button {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -679,7 +677,6 @@ summary.language-selector::-webkit-details-marker {
   justify-content: center;
   color: #94A3B8;
   transition: color 0.15s ease;
-  flex-shrink: 0;
 }
 
 .eye-button:hover {
@@ -687,14 +684,14 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .eye-button svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
 }
 
 /* Remember me */
 
 .login-options {
-  margin: 7px 0 14px;
+  margin: 8px 0 16px;
 }
 
 .remember {
@@ -703,13 +700,13 @@ summary.language-selector::-webkit-details-marker {
   gap: 8px;
   cursor: pointer;
   color: #475569;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .remember input {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   accent-color: var(--primary);
   cursor: pointer;
 }
@@ -723,20 +720,20 @@ summary.language-selector::-webkit-details-marker {
   border-radius: 11px;
   background: linear-gradient(135deg, #8E0E5B 0%, #A31068 50%, #2E3192 100%);
   color: #FFFFFF;
-  font-size: 15.5px;
+  font-size: 16px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(142, 14, 91, 0.38);
+  box-shadow: 0 6px 20px rgba(142, 14, 91, 0.4);
   transition: all 0.2s ease;
 }
 
 .sign-in-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(142, 14, 91, 0.46);
+  box-shadow: 0 8px 24px rgba(142, 14, 91, 0.48);
 }
 
 .sign-in-button:active {
@@ -744,8 +741,8 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .btn-arrow {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   transition: transform 0.2s ease;
 }
 
@@ -758,220 +755,84 @@ summary.language-selector::-webkit-details-marker {
 .portal-footer {
   text-align: center;
   margin-top: 8px;
-  flex-shrink: 0;
 }
 
 .portal-footer p {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 11.5px;
+  font-size: 12px;
   margin: 0;
   font-weight: 500;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
 }
 
 /* =========================================================
-   COMPREHENSIVE RESPONSIVE ADAPTATIONS
+   RESPONSIVE BREAKPOINTS (TABLETS & MOBILE)
    ========================================================= */
 
-/* Very short height screens (< 640px height) */
-@media (max-height: 640px) {
-  .portal-side {
-    padding: 10px 18px;
-  }
-  .portal-card {
-    padding: 16px 20px;
-    border-radius: 16px;
-  }
-  .coopfed-logo {
-    height: 44px;
-  }
-  .brand h1 {
-    font-size: 20px;
-  }
-  .tagline {
-    display: none;
-  }
-  .welcome {
-    margin-bottom: 8px;
-    padding-top: 6px;
-  }
-  .welcome h2 {
-    font-size: 17px;
-  }
-  .welcome p {
-    font-size: 11.5px;
-  }
-  .form-field {
-    margin-bottom: 7px;
-  }
-  .input-group {
-    height: 38px;
-  }
-  .sign-in-button {
-    height: 40px;
-    font-size: 14px;
-  }
-}
-
-/* Tablets and Mobile (< 900px) */
-@media (max-width: 900px) {
+@media (max-width: 992px) {
   .showcase-side {
     display: none;
   }
 
   .auth-layout {
-    flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: center;
-    background: linear-gradient(
-      180deg,
-      rgba(15, 23, 42, 0.42) 0%,
-      rgba(15, 23, 42, 0.68) 50%,
-      rgba(15, 23, 42, 0.88) 100%
-    );
-    padding: 16px 16px 24px;
-    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.65);
+    padding: 20px;
   }
 
   .portal-side {
-    flex: 1 1 auto;
-    width: 100%;
-    max-width: 360px;
-    min-width: 0;
+    flex: 1 1 100%;
+    max-width: 440px;
     height: auto;
-    min-height: auto;
+    max-height: none;
+    border-radius: var(--radius-lg);
     background: transparent;
-    border: none;
+    border-left: none;
     box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
     padding: 0;
     overflow: visible;
   }
 
-  .portal-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    margin-bottom: 14px;
+  .portal-card {
+    padding: 26px 24px;
+    border-radius: 20px;
   }
 
   .mobile-brand-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: block;
+    color: #FFFFFF;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   }
 
   .mobile-brand-pill .coopfed-text {
-    color: #FFFFFF;
+    color: #FF80AB;
   }
 
   .mobile-brand-pill .erp-text {
-    color: #F472B6;
-  }
-
-  .portal-main {
-    flex: 1 1 auto;
-    width: 100%;
-    padding: 0;
-    margin-bottom: 16px;
-  }
-
-  .portal-card {
-    width: 100%;
-    max-width: 360px;
-    padding: 24px 22px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.90);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow:
-      0 20px 45px -10px rgba(0, 0, 0, 0.45),
-      0 8px 20px -4px rgba(0, 0, 0, 0.25);
-  }
-
-  .portal-footer {
-    margin-top: auto;
-    padding: 10px 0 6px;
-  }
-
-  .input-group input {
-    font-size: 16px; /* Prevents auto-zoom on iOS */
+    color: #82B1FF;
   }
 }
 
-/* Small mobile phones (<= 440px) */
-@media (max-width: 440px) {
+@media (max-width: 480px) {
   .auth-layout {
-    padding: 12px 12px 20px;
+    padding: 12px;
   }
 
   .portal-card {
-    padding: 20px 16px;
-    border-radius: 18px;
+    padding: 20px 18px;
+    border-radius: 16px;
   }
 
   .brand h1 {
-    font-size: 21px;
+    font-size: 22px;
   }
 
   .coopfed-logo {
-    height: 48px;
+    height: 52px;
   }
 
   .welcome h2 {
-    font-size: 17px;
-  }
-
-  .welcome p {
-    font-size: 12px;
-  }
-
-  .input-group {
-    height: 42px;
-  }
-
-  .sign-in-button {
-    height: 44px;
-    font-size: 14.5px;
-  }
-}
-
-/* Ultra small phones (<= 360px) */
-@media (max-width: 360px) {
-  .auth-layout {
-    padding: 8px 8px 14px;
-  }
-
-  .portal-card {
-    padding: 16px 12px;
-    border-radius: 14px;
-  }
-
-  .coopfed-logo {
-    height: 40px;
-  }
-
-  .brand h1 {
     font-size: 19px;
-  }
-
-  .welcome h2 {
-    font-size: 16px;
-  }
-
-  .tagline {
-    font-size: 10.5px;
   }
 }

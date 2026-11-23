@@ -15,7 +15,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${msg("loginTitle",(realm.displayName!''))}</title>
-    <link href="${url.resourcesPath}/css/styles.css?v=16" rel="stylesheet" />
+    <link href="${url.resourcesPath}/css/styles.css?v=17" rel="stylesheet" />
 </head>
 <body class="auth-page">
 
