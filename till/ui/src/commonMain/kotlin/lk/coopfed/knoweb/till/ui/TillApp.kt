@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -401,6 +402,7 @@ private fun SellScreen(c: TillController) {
     var results by remember { mutableStateOf<List<Item>>(emptyList()) }
     var payingMode by remember { mutableStateOf<String?>(null) }
     var cashMovementMode by remember { mutableStateOf<String?>(null) }
+    var showParked by remember { mutableStateOf(false) }
     val scanFocus = remember { FocusRequester() }
     LaunchedEffect(payingMode, cashMovementMode, c.needsPrice) {
         if (payingMode == null && cashMovementMode == null && c.needsPrice == null) scanFocus.requestFocus()
@@ -520,6 +522,18 @@ private fun SellScreen(c: TillController) {
                 }
             }
             OutlinedButton(onClick = { c.clearSale() }, enabled = c.lines.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Clear the sale") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { c.parkSale() },
+                    enabled = c.lines.isNotEmpty() && !c.busy,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Park sale") }
+                OutlinedButton(
+                    onClick = { c.refreshParkedSales { showParked = true } },
+                    enabled = !c.busy,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Parked sales") }
+            }
             OutlinedButton(onClick = { c.reprintLast() }, enabled = c.lastReceipt != null, modifier = Modifier.fillMaxWidth()) {
                 Text("Reprint ${c.lastReceipt?.numberDisplay ?: "last receipt"}")
             }
@@ -537,7 +551,50 @@ private fun SellScreen(c: TillController) {
     cashMovementMode?.let { mode ->
         CashMovementDialog(c, mode) { cashMovementMode = null }
     }
+    if (showParked) {
+        ParkedSalesDialog(c) { showParked = false }
+    }
     c.needsPrice?.let { PriceDialog(c, it) }
+}
+
+@Composable
+private fun ParkedSalesDialog(c: TillController, close: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Parked sales") },
+        text = {
+            if (c.parkedSales.isEmpty()) {
+                Text("No sales are parked in this session.", color = TillColors.textMuted)
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(c.parkedSales, key = { it.id }) { sale ->
+                        Surface(Modifier.fillMaxWidth(), tonalElevation = 1.dp) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("${sale.lines.size} line${if (sale.lines.size == 1) "" else "s"}", fontWeight = FontWeight.Bold)
+                                    val total = sale.lines.fold(lk.coopfed.knoweb.till.core.money.Money.ZERO) { sum, line ->
+                                        sum + line.qty.times(line.unitPrice)
+                                    }
+                                    Text("LKR ${total.display()}", color = TillColors.textMuted)
+                                    Text(
+                                        "Parked ${c.parkedAgeMinutes(sale)} min ago by ${sale.operatorUserId.takeLast(8)}",
+                                        color = TillColors.textMuted,
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                                Button(onClick = { c.resumeParkedSale(sale.id, close) }, enabled = !c.busy) { Text("Resume") }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+    )
 }
 
 @Composable

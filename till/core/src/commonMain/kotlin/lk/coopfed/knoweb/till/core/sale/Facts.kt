@@ -194,6 +194,31 @@ object Facts {
         put("after_state", buildJsonObject { put("operator_user_id", toOperatorId) })
     }
 
+    /** A parked basket was discarded at its age limit or when its till session closed (doc 26 DR-5). */
+    const val PARKED_SALE_ABANDONED_AUDIT = "TILL_PARKED_SALE_ABANDONED"
+    const val PARKED_SALE_ABANDONED_EVENT = "audit.till_parked_sale_abandoned.v1"
+
+    fun parkedSaleAbandoned(
+        device: DeviceIdentity,
+        parkedSaleId: String,
+        sessionId: String,
+        parkedAt: Long,
+        lineCount: Int,
+        reason: String,
+    ): JsonObject = buildJsonObject {
+        put("event_type_code", PARKED_SALE_ABANDONED_AUDIT)
+        put("subject_table", "parked_sale")
+        put("subject_id", parkedSaleId)
+        put("till_position_id", device.tillPositionId)
+        put("reason_code", reason)
+        put("before_state", buildJsonObject {
+            put("session_id", sessionId)
+            put("parked_at", parkedAt)
+            put("line_count", lineCount)
+        })
+        put("after_state", buildJsonObject { put("status", "ABANDONED") })
+    }
+
     /** The TillEvent envelope (sync.yaml TillEvent) around a payload. */
     fun event(
         eventId: String,

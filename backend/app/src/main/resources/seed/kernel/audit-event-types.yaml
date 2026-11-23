@@ -160,6 +160,11 @@ audit_event_types:
     severity: INFO
     offline_capturable: true
     description_en: Operators switched on a till
+  # TILL-SELL-05 (doc 26 DR-5): session close or the configured age abandons a local parked basket.
+  - code: TILL_PARKED_SALE_ABANDONED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: An unfinished sale parked on a till was abandoned
   # doc 31 section 4 (TILL-PLAT-07): release registry and rollout control.
   - code: RELEASE_PUBLISHED
     severity: INFO

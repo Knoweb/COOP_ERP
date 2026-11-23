@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.port.Central
 import lk.coopfed.knoweb.till.core.port.CentralRefused
@@ -51,10 +52,11 @@ class InMemoryStore : TillStore {
         val receipts: MutableList<IssuedReceipt> = mutableListOf(),
         val anomalies: MutableList<Anomaly> = mutableListOf(),
         val cashMovements: MutableList<CashMovementRecord> = mutableListOf(),
+        val parkedSales: MutableMap<String, ParkedSaleRecord> = linkedMapOf(),
     ) {
         fun copy() = Data(
             settings.toMutableMap(), snapshot, outbox.toMutableMap(), acked.toMutableMap(), sessions.toMutableMap(),
-            receipts.toMutableList(), anomalies.toMutableList(), cashMovements.toMutableList(),
+            receipts.toMutableList(), anomalies.toMutableList(), cashMovements.toMutableList(), parkedSales.toMutableMap(),
         )
     }
 
@@ -114,6 +116,14 @@ class InMemoryStore : TillStore {
     }
     override fun receiptsOfSession(sessionId: String) = data.receipts.filter { it.sessionId == sessionId }
     override fun maxReceiptNumber() = data.receipts.maxOfOrNull { it.number }
+    override fun saveParkedSale(sale: ParkedSaleRecord) {
+        check(sale.id !in data.parkedSales) { "parked sale ${sale.id} already exists" }
+        data.parkedSales[sale.id] = sale
+    }
+    override fun parkedSale(id: String) = data.parkedSales[id]
+    override fun parkedSalesOfSession(sessionId: String) =
+        data.parkedSales.values.filter { it.sessionId == sessionId }.sortedBy { it.parkedAt }
+    override fun deleteParkedSale(id: String) { data.parkedSales.remove(id) }
     override fun addAnomaly(anomaly: Anomaly) {
         if (anomaly.deviceSeq != null && data.anomalies.any { it.kind == anomaly.kind && it.deviceSeq == anomaly.deviceSeq }) return
         data.anomalies += anomaly

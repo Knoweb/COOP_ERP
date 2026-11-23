@@ -175,6 +175,16 @@ config_items:
     scope_kind: LOCATION
     change_permission: sys.config.manage
     till_visible: true
+  - key: pos.parked_sale_max_age
+    value_type: DURATION
+    schema: { minimum: "PT1M", maximum: "PT24H" }
+    description_en: Maximum time an unfinished sale may remain parked on a till
+    description_si: මුදල් යන්ත්‍රයක නිම නොකළ විකිණීමක් නවතා තැබිය හැකි උපරිම කාලය
+    description_ta: பணப்பெட்டியில் முடிக்கப்படாத விற்பனையை நிறுத்தி வைக்கக்கூடிய அதிகபட்ச நேரம்
+    default: "PT2H"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    till_visible: true
   - key: notification.sms.quiet_hours
     value_type: STRING
     schema: { pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$|^$", window_max_hours: 15 }

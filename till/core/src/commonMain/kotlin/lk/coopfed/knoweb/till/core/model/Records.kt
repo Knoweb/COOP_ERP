@@ -164,3 +164,33 @@ data class CashMovementRecord(
     val reason: String,
     val deviceSeq: Long? = null,
 )
+
+/** A priced basket line kept locally while a sale is parked (FR-POS-020). */
+@Serializable
+data class ParkedSaleLine(
+    val skuId: String,
+    val skuCode: String,
+    val nameEn: String,
+    val nameSi: String?,
+    val nameTa: String?,
+    val baseUom: String,
+    val soldByWeight: Boolean,
+    val barcodes: List<String>,
+    val qty: Qty,
+    val unitPrice: Money,
+)
+
+/**
+ * A sale set aside on this till. It is local working state, not an issued document, and therefore
+ * has no receipt number or device sequence (doc 26 section 3.3; FR-BIL-080).
+ */
+data class ParkedSaleRecord(
+    val id: String,
+    val sessionId: String,
+    val lines: List<ParkedSaleLine>,
+    /** Epoch seconds from the till's corrected clock. */
+    val parkedAt: Long,
+    val operatorUserId: String,
+    val customerClass: String? = null,
+    val beneficiaryIdentifier: String? = null,
+)
