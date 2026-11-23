@@ -105,10 +105,10 @@ public class BulkSetRelationshipCreditLimitsHandler
             UUID buyerId = row.buyerEntityId();
             if (buyerId == null && row.buyerCode() != null && !row.buyerCode().isBlank()) {
                 List<UUID> matching = jdbc.query(
-                        "select entity_id from party.entity where entity_code = ?",
-                        (rs, n) -> rs.getObject("entity_id", UUID.class),
+                        "select party.resolve_counterparty_entity(?)",
+                        (rs, n) -> rs.getObject(1, UUID.class),
                         row.buyerCode().trim());
-                if (!matching.isEmpty()) {
+                if (!matching.isEmpty() && matching.get(0) != null) {
                     buyerId = matching.get(0);
                 }
             }
@@ -134,7 +134,7 @@ public class BulkSetRelationshipCreditLimitsHandler
                     """
                     select relationship_id from party.entity_relationship
                      where seller_entity_id = ? and buyer_entity_id = ? and status in ('ACTIVE', 'DRAFT')
-                     order by (status = 'ACTIVE') desc, created_at desc
+                     order by (status = 'ACTIVE') desc, effective_from desc
                      limit 1
                     """,
                     (rs, n) -> rs.getObject("relationship_id", UUID.class),
