@@ -177,3 +177,7 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Users bulk imported with identity-provider provisioning
+  - code: CREDIT_LIMITS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship credit limits imported in bulk from a sheet

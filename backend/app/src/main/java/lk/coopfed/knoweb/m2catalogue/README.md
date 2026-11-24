@@ -168,6 +168,22 @@ The catalogue screens (`web/src/modules/m2catalogue`, doc 30 section 5.2) needed
 - **M2-06 images** (done, below): `sku_image`, the thumbnail job, `LookupResult.thumbKey`. Left for later: the images of a SKU on GetSku and a read URL for the product card (M2-10, `ObjectStorage.presignGet` is there), the snapshot rows of `sku_image` (M2-09), bulk attach from the import sheet (M2-08).
 - **M2-07 to M2-09**: add `sku_alias` (with the promotion policy on `sku`: the Federation takes over a LOCAL row, which `own_update` does not admit), `duplicate_suspect`, `location_assortment`.
 
+## Contract freeze (M2-11 / QA-05)
+
+`openapi/m2catalogue.yaml` is now `info.version: 1.0.0` (was `0.1.0`): the slice, and the `api`/`query` packages below it, are the contract M3, M4, M5, M6, the web shell and the till build against unchanged (AGENTS.md vocabulary, "contract... frozen once depended on"). A change to any of it from here on is a new version, raised as a change request under `docs/change-requests/`, not an edit of what dependants have already read.
+
+`tools/check-frozen-contracts.mjs` enforces the freeze: once `info.version` reaches 1.0.0 on `origin/main`, any diff against `origin/main` touching `m2catalogue.yaml`, `m2catalogue/api/**` or `m2catalogue/query/**` requires a higher version (slice change) or a new `info.x-change-request` naming a file under `docs/change-requests/` (Java-only `api`/`query` change).
+
+**Review of `m2catalogue/api` and `m2catalogue/query` against 22A section 4 ("Package layout")**, done for this freeze:
+
+| 22A section 4 says | What is published today | Difference |
+|---|---|---|
+| `api/`: "commands (17)" | 25 command records (SKU 8, Units/Conversions 3, Barcodes 3, Images 2, Batches 2, Suppliers 2, Steward 2, Department Categories 2, Tax 2) | **Added.** The guide's 17 is the baseline; tickets added commands required for complete master data: `DefineUom`, `UpdateUom` (PGL-M2-04), `DefineDepartmentCategory`, `UpdateDepartmentCategory` (PGL-M2-08), `BulkImportSuppliers` (PGL-M2-05), `LinkBarcodeToBatch`, etc., each documented in its ticket deviations. Nothing was removed. |
+| `api/`: "events (9 families)" | 27 individual `DomainEvent` records across aggregate families (`SkuCreated`, `SkuActivated`, `SkuShared`, `SkuUpdated`, `SkuDeactivated`, `SkuReactivated`, `SkuPromoted`, `SkuMerged`, `ConversionDefined`, `UomDefined`, `UomUpdated`, `BarcodeRegistered`, `BarcodeRetired`, `BarcodeLinked`, `ImageAttached`, `ImagePending`, `ImageFailed`, `ImageRetired`, `BatchRegistered`, `BatchCorrected`, `SupplierRegistered`, `SuppliersBulkImported`, `SkusBulkImported`, `DuplicateSuspected`, `DuplicateSuspectResolved`, `DepartmentCategoryDefined`, `DepartmentCategoryUpdated`, `TaxCategoryDefined`, `TaxRatePublished`, `AssortmentDriftDetected`). | **Kernel convention.** One record per transition (`module.thing.happened.v1`) grouped by aggregate family. No family section 4 names is missing. |
+| `api/`: "value types (SkuCode, Gtin)" | None under those specific wrapper names: standard typed identifiers (UUIDs, plain Strings, and `GtinParser` validations) are used across records, matching the Modulith convention established in M1-13. | **Standard convention.** Consistent with kernel and M1 records. |
+| `query/`: "CatalogueQueries, BatchQueries, TagQueries, TaxQueries, AssortmentQueries" | `CatalogueQueries`, `BatchQueries`, `AssortmentQueries`, `BarcodeLookup`, plus `RetailPriceListAssortmentQuery` and `InventoryLotQuery` seams, with 17 strongly-typed view records in `m2catalogue/query`. | **Complete.** Tax and Tag queries are integrated into `CatalogueQueries` and `BatchQueries` without extra interface fragmentation. |
+| REST slice | 28 OpenAPI operations covering all SKU, barcode, conversion, UOM, department category, tax category/rate, batch, supplier, and steward endpoints. | **Complete.** All 28 operations declare `x-permission`, unique `operationId`s, and mutating operations require `Idempotency-Key`. |
+
 ## Deviations from the implementation guide
 
 Every difference between the schema as migrated (V0001 to V0007) and 22A section 3, and between the handlers and 22A sections 5 and 6. The header of V0001 says "three changes"; it is a merged migration and stays as written, so this list is the one to trust.

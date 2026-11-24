@@ -9,12 +9,16 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.ActivateRelationship;
 import lk.coopfed.knoweb.m1party.api.AmendRelationshipTerms;
+import lk.coopfed.knoweb.m1party.api.BulkSetRelationshipCreditLimits;
 import lk.coopfed.knoweb.m1party.api.OpenTradingRelationship;
 import lk.coopfed.knoweb.m1party.api.SuspendRelationship;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipSide;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.m1party.web.generated.AmendTermsRequest;
+import lk.coopfed.knoweb.m1party.web.generated.BulkRelationshipCreditLimitProblem;
+import lk.coopfed.knoweb.m1party.web.generated.BulkRelationshipCreditLimitReport;
+import lk.coopfed.knoweb.m1party.web.generated.BulkRelationshipCreditLimitsRequest;
 import lk.coopfed.knoweb.m1party.web.generated.OpenRelationshipRequest;
 import lk.coopfed.knoweb.m1party.web.generated.RelationshipReasonRequest;
 import lk.coopfed.knoweb.m1party.web.generated.RelationshipResponse;
@@ -29,6 +33,9 @@ class RelationshipsController implements RelationshipsApi {
     private final Handles<ActivateRelationship, UUID> activate;
     private final Handles<AmendRelationshipTerms, UUID> amend;
     private final Handles<SuspendRelationship, UUID> suspend;
+    private final Handles<
+                    BulkSetRelationshipCreditLimits, lk.coopfed.knoweb.m1party.api.BulkRelationshipCreditLimitReport>
+            bulkSetCreditLimits;
     private final RelationshipQueries queries;
     private final CurrentScope currentScope;
 
@@ -37,12 +44,15 @@ class RelationshipsController implements RelationshipsApi {
             Handles<ActivateRelationship, UUID> activate,
             Handles<AmendRelationshipTerms, UUID> amend,
             Handles<SuspendRelationship, UUID> suspend,
+            Handles<BulkSetRelationshipCreditLimits, lk.coopfed.knoweb.m1party.api.BulkRelationshipCreditLimitReport>
+                    bulkSetCreditLimits,
             RelationshipQueries queries,
             CurrentScope currentScope) {
         this.open = open;
         this.activate = activate;
         this.amend = amend;
         this.suspend = suspend;
+        this.bulkSetCreditLimits = bulkSetCreditLimits;
         this.queries = queries;
         this.currentScope = currentScope;
     }
@@ -111,6 +121,39 @@ class RelationshipsController implements RelationshipsApi {
                 .map(RelationshipsController::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<BulkRelationshipCreditLimitReport> bulkSetRelationshipCreditLimits(
+            String idempotencyKey, BulkRelationshipCreditLimitsRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<BulkSetRelationshipCreditLimits.RelationshipLimitRow> rows = request.getLimits() == null
+                ? List.of()
+                : request.getLimits().stream()
+                        .map(item -> new BulkSetRelationshipCreditLimits.RelationshipLimitRow(
+                                item.getBuyerEntityCode(),
+                                item.getBuyerEntityId(),
+                                item.getCreditLimit(),
+                                item.getReason()))
+                        .toList();
+
+        lk.coopfed.knoweb.m1party.api.BulkRelationshipCreditLimitReport report = bulkSetCreditLimits.handle(
+                new BulkSetRelationshipCreditLimits(request.getSheet(), rows, request.getDefaultReason()), scope);
+
+        BulkRelationshipCreditLimitReport response = new BulkRelationshipCreditLimitReport();
+        response.setStatus(BulkRelationshipCreditLimitReport.StatusEnum.fromValue(report.status()));
+        response.setUpdatedCount(report.updatedCount());
+        response.setProblems(report.problems().stream()
+                .map(p -> {
+                    BulkRelationshipCreditLimitProblem prob = new BulkRelationshipCreditLimitProblem();
+                    prob.setIdentifier(p.identifier());
+                    prob.setField(p.field());
+                    prob.setCode(p.code());
+                    return prob;
+                })
+                .toList());
+
+        return ResponseEntity.ok(response);
     }
 
     @Override
