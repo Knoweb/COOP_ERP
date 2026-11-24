@@ -3,7 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import { IntlProvider } from "react-intl";
 import { describe, expect, it, vi } from "vitest";
 import { ShellHome } from "./ShellHome";
-import { PermissionsContext } from "../auth/PermissionsContext";
+import { PermissionsContext, type PermissionsState } from "../auth/PermissionsContext";
 import { messages } from "../i18n/messages";
 import { MODULES } from "../../modules/registry";
 
@@ -36,15 +36,16 @@ vi.mock("../scope/useScope", () => ({
 
 describe("ShellHome portal landing page", () => {
   it("renders the welcome banner and quick access modules", () => {
-    const mockPermissions = {
+    const mockPermissions: PermissionsState = {
+      policyClass: "OWN",
       permissions: ["pty.society.read", "cat.sku.read", "inv.stock.read"],
-      failed: false
+      failed: false,
     };
 
     render(
       <IntlProvider locale="en" messages={messages.en}>
         <BrowserRouter>
-          <PermissionsContext.Provider value={mockPermissions as any}>
+          <PermissionsContext.Provider value={mockPermissions}>
             <ShellHome modules={MODULES} />
           </PermissionsContext.Provider>
         </BrowserRouter>
