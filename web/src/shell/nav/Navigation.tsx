@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { usePermissions } from "../auth/PermissionsContext";
 import { useT } from "../i18n/useT";
 import { navItemsFor } from "../modules/assemble";
@@ -18,6 +18,7 @@ import { NavIcon } from "./NavIcon";
 export function Navigation({ modules }: { modules: ModuleDefinition[] }) {
   const permissions = usePermissions();
   const t = useT();
+  const location = useLocation();
 
   if (permissions === null) {
     // The set is on its way: an empty bar that says so, not one that claims "no permission".
@@ -29,6 +30,15 @@ export function Navigation({ modules }: { modules: ModuleDefinition[] }) {
   }
 
   const items = navItemsFor(modules, permissions);
+  const currentPath = location.pathname.length > 1 && location.pathname.endsWith("/")
+    ? location.pathname.slice(0, -1)
+    : location.pathname;
+
+  // Single active item by longest matching prefix so parent items like /catalogue or /reporting
+  // do not stay simultaneously selected when visiting sub-routes like /catalogue/departments
+  const activeItem = items
+    .filter((item) => currentPath === item.to || currentPath.startsWith(item.to + "/"))
+    .sort((a, b) => b.to.length - a.to.length)[0];
 
   return (
     <nav className="shell-nav" aria-label={t("shell.nav.label").text}>
@@ -42,6 +52,7 @@ export function Navigation({ modules }: { modules: ModuleDefinition[] }) {
               {/* NavLink marks the current page with aria-current="page". */}
               <NavLink
                 to={item.to}
+                end={item.to !== activeItem?.to}
                 title={t(item.labelId).text}
                 aria-label={t(item.labelId).text}
               >
