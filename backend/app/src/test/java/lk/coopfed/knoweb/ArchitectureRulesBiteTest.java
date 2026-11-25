@@ -155,6 +155,11 @@ class ArchitectureRulesBiteTest {
                 ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "ControllerReachingAnInternalCommand");
     }
 
+    @Test
+    void stubPackageRuleCatchesAClassInAStubPackage() {
+        assertViolation(ArchitectureTests.noProductionClassesInStubPackageRule(), "ProductionClassInStub");
+    }
+
     private static void assertViolation(ArchRule rule, String offendingClass) {
 
         EvaluationResult result = rule.evaluate(FIXTURES);

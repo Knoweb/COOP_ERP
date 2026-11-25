@@ -199,8 +199,6 @@ not listed as current gaps.
 
 ## Deliberately deferred or incomplete kernel work
 
-- **QA-15:** production request/idempotency/problem classes still live in
-  `kernel.internal.stub`; renaming that package is a separate roadmap task.
 - **K-08-F2:** full snapshots are not yet pre-built resumable objects, as recorded above.
 - **K-06b follow-ups:** rendered-report retention/ledger, a web render queue and pixel-golden
   proof are deferred. Worker-image packaging is implemented.
