@@ -70,29 +70,47 @@ input {
   font-family: inherit;
 }
 
-html, body.auth-page {
+html {
+  min-height: 100%;
+}
+
+body.auth-page {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
   font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0F172A url('../img/login.png') center/cover no-repeat;
   color: var(--text-main);
+  background-color: #0F172A;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* GPU-accelerated fixed full background: rock-solid across all browsers & devices */
+body.auth-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #0F172A url('../img/login.png') center/cover no-repeat;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .auth-layout {
   display: flex;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
   background: linear-gradient(
     90deg,
-    rgba(15, 23, 42, 0.02) 0%,
-    rgba(20, 37, 76, 0.14) 45%,
-    rgba(15, 23, 42, 0.52) 75%,
-    rgba(15, 23, 42, 0.76) 100%
+    transparent 0%,
+    rgba(15, 23, 42, 0.04) 40%,
+    rgba(15, 23, 42, 0.20) 100%
   );
 }
 
@@ -103,6 +121,8 @@ html, body.auth-page {
 .showcase-side {
   flex: 1 1 56%;
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
   background: transparent;
@@ -125,6 +145,8 @@ html, body.auth-page {
   position: relative;
   z-index: 2;
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -251,11 +273,12 @@ html, body.auth-page {
   flex: 0 0 44%;
   min-width: 440px;
   max-width: 560px;
-  height: 100%;
-  background: rgba(15, 23, 42, 0.22);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: rgba(15, 23, 42, 0.25);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border-left: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -263,7 +286,24 @@ html, body.auth-page {
   box-sizing: border-box;
   position: relative;
   z-index: 10;
-  box-shadow: -25px 0 60px rgba(0, 0, 0, 0.35);
+  box-shadow: -15px 0 40px rgba(0, 0, 0, 0.20);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom modern scrollbar */
+.portal-side::-webkit-scrollbar {
+  width: 6px;
+}
+.portal-side::-webkit-scrollbar-track {
+  background: transparent;
+}
+.portal-side::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+}
+.portal-side::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
 }
 
 .portal-topbar {
@@ -272,6 +312,9 @@ html, body.auth-page {
   justify-content: space-between;
   width: 100%;
   margin-bottom: 6px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
 }
 
 .mobile-brand-pill {
@@ -321,22 +364,24 @@ summary.language-selector::-webkit-details-marker {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 20px;
   color: #FFFFFF;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
   transition: all 0.2s ease;
+  user-select: none;
 }
 
 .language-selector:hover {
-  background: rgba(255, 255, 255, 0.32);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .globe-icon {
@@ -357,11 +402,12 @@ summary.language-selector::-webkit-details-marker {
   top: calc(100% + 6px);
   right: 0;
   width: 140px;
+  max-width: calc(100vw - 32px);
   padding: 6px;
   background: #FFFFFF;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.15), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.2), 0 4px 8px -2px rgba(15, 23, 42, 0.08);
   z-index: 1000;
 }
 
@@ -391,11 +437,12 @@ summary.language-selector::-webkit-details-marker {
 /* Portal Main Content */
 
 .portal-main {
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  margin: auto 0;
+  padding: 10px 0;
 }
 
 /* Frosted Glass Form Card */
@@ -403,16 +450,22 @@ summary.language-selector::-webkit-details-marker {
 .portal-card {
   width: 100%;
   max-width: 410px;
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 252, 254, 0.86) 50%,
+    rgba(250, 252, 255, 0.90) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   border-radius: 24px;
   box-shadow:
-    0 25px 60px -10px rgba(0, 0, 0, 0.35),
-    0 8px 24px -4px rgba(0, 0, 0, 0.18),
+    0 20px 45px -10px rgba(15, 23, 42, 0.22),
+    0 8px 20px -4px rgba(142, 14, 91, 0.12),
     inset 0 1px 2px rgba(255, 255, 255, 0.95);
   padding: 30px 34px;
+  box-sizing: border-box;
 }
 
 /* Brand */
@@ -550,18 +603,18 @@ summary.language-selector::-webkit-details-marker {
   color: var(--primary);
 }
 
-/* Colored Fill Boxes (Inputs) */
+/* Input Group with Single Clean Border */
 
 .input-group {
   height: 46px;
   width: 100%;
   display: flex;
   align-items: center;
-  border: 1.5px solid rgba(142, 14, 91, 0.4);
+  border: 1.5px solid rgba(142, 14, 91, 0.28);
   border-radius: 11px;
   padding: 0 13px;
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease;
 }
 
@@ -573,7 +626,7 @@ summary.language-selector::-webkit-details-marker {
 .input-group:focus-within {
   border-color: var(--primary);
   background: #FFFFFF;
-  box-shadow: 0 0 0 3.5px rgba(142, 14, 91, 0.18);
+  box-shadow: 0 0 0 3.5px rgba(142, 14, 91, 0.14);
 }
 
 .input-icon {
@@ -586,13 +639,29 @@ summary.language-selector::-webkit-details-marker {
 .input-group input {
   width: 100%;
   height: 100%;
-  border: none;
-  outline: none;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   background: transparent;
   padding: 0 10px;
   font-size: 14.5px;
   color: var(--text-main);
   font-weight: 500;
+}
+
+.input-group input:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Clean webkit autofill styling */
+.input-group input:-webkit-autofill,
+.input-group input:-webkit-autofill:hover,
+.input-group input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+  -webkit-text-fill-color: var(--text-main) !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 .input-group input::placeholder {
@@ -694,15 +763,15 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .portal-footer p {
-  color: rgba(255, 255, 255, 0.9);
+  color: #FFFFFF;
   font-size: 12px;
   margin: 0;
-  font-weight: 500;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
 }
 
 /* =========================================================
-   RESPONSIVE BREAKPOINTS
+   RESPONSIVE BREAKPOINTS (TABLETS & MOBILE)
    ========================================================= */
 
 @media (max-width: 992px) {
@@ -721,12 +790,13 @@ summary.language-selector::-webkit-details-marker {
     flex: 1 1 100%;
     max-width: 440px;
     height: auto;
-    max-height: calc(100vh - 40px);
+    max-height: none;
     border-radius: var(--radius-lg);
     background: transparent;
     border-left: none;
     box-shadow: none;
     padding: 0;
+    overflow: visible;
   }
 
   .portal-card {

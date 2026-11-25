@@ -14,10 +14,11 @@ import { useT } from "./shell/i18n/useT";
 import { routesOf } from "./shell/modules/assemble";
 import type { ModuleDefinition } from "./shell/modules/ModuleDefinition";
 import { Navigation } from "./shell/nav/Navigation";
+import { ShellHome } from "./shell/home/ShellHome";
 import { ScopeBanner } from "./shell/scope/ScopeBanner";
 import { ScopeProvider } from "./shell/scope/ScopeContext";
 
-import coopLogo from "./shell/logo.jpg";
+import coopLogo from "./shell/logo.png";
 
 import { useSession } from "./shell/auth/session";
 
@@ -105,39 +106,44 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
               <span className="brand-logo">
                 <img src={coopLogo} alt="" aria-hidden="true" />
               </span>
-              <span className="brand-text">COOPFED ERP</span>
-              <button
-                type="button"
-                className="shell-sidebar-toggle"
-                onClick={() => {
-                  if (mobileNavOpen) {
-                    closeMobileNav();
-                  } else {
-                    toggleSidebar();
-                  }
-                }}
-                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                aria-expanded={!sidebarCollapsed}
-                aria-controls="coop-sidebar-navigation"
-                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <line x1="9" y1="4" x2="9" y2="20" />
-                  <path d={sidebarCollapsed ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"} />
-                </svg>
-              </button>
+              <span className="brand-text">
+                <span className="brand-name">COOPFED</span>
+                <span className="brand-badge">ERP</span>
+              </span>
             </div>
+            <button
+              type="button"
+              className="shell-sidebar-toggle"
+              onClick={() => {
+                if (mobileNavOpen) {
+                  closeMobileNav();
+                } else {
+                  toggleSidebar();
+                }
+              }}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="coop-sidebar-navigation"
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {sidebarCollapsed ? (
+                  <path d="m9 18 6-6-6-6" />
+                ) : (
+                  <path d="m15 18-6-6 6-6" />
+                )}
+              </svg>
+            </button>
             <div id="coop-sidebar-navigation" className="shell-sidebar-nav">
               <Navigation modules={modules} />
             </div>
@@ -211,7 +217,7 @@ export function shellRoutes(modules: ModuleDefinition[]): RouteObject[] {
       path: "/",
       element: <RootLayout modules={modules} />,
       children: [
-        { index: true, element: <ShellMessage titleId="shell.home.title" textId="shell.home.text" /> },
+        { index: true, element: <ShellHome modules={modules} /> },
         ...routesOf(modules),
         // The design reference: a page of the shell, not a module. It is in no navigation, shows
         // no data and calls no API, so it needs no permission; like everything here it is behind
