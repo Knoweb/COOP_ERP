@@ -1,4 +1,4 @@
-package lk.coopfed.knoweb.kernel.internal.stub;
+package lk.coopfed.knoweb.kernel.internal.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lk.coopfed.knoweb.kernel.api.ProblemException;

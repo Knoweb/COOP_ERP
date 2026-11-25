@@ -1,4 +1,4 @@
-package lk.coopfed.knoweb.kernel.internal.stub;
+package lk.coopfed.knoweb.kernel.internal.web;
 
 import java.util.List;
 import lk.coopfed.knoweb.kernel.internal.security.TokenCurrentScope;

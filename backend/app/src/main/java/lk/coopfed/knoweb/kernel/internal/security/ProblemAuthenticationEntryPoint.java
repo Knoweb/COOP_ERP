@@ -6,7 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
-import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
+import lk.coopfed.knoweb.kernel.internal.web.ProblemResponses;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;

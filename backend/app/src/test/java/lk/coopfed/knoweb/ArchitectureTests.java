@@ -142,6 +142,11 @@ class ArchitectureTests {
     }
 
     @Test
+    void noProductionClassesLiveInAStubPackage() { // QA-15: "No production class lives in a package called stub."
+        noProductionClassesInStubPackageRule().check(CLASSES);
+    }
+
+    @Test
     void commandHandlersCarryPermissions() { // R7
         handlersCarryPermissionRule().check(CLASSES);
     }
@@ -955,5 +960,15 @@ class ArchitectureTests {
                     }
                 })
                 .allowEmptyShould(true);
+    }
+
+    /**
+     * Acceptance criterion of QA-15: "No production class lives in a package called stub."
+     */
+    static ArchRule noProductionClassesInStubPackageRule() {
+        return noClasses()
+                .should()
+                .resideInAPackage("..stub..")
+                .because("no production class lives in a package called stub (QA-15)");
     }
 }
