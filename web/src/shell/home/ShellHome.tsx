@@ -15,7 +15,11 @@ export function ShellHome({ modules }: { modules: ModuleDefinition[] }) {
 
   const items = permissions ? navItemsFor(modules, permissions) : [];
   const userName = session?.displayName || "";
-  const entityName = scope?.entityName || scope?.entityShortId || "";
+  const entityName = scope?.entityName || scope?.entityShortId || t("shell.home.default_entity").text;
+
+  const welcomeTitle = userName
+    ? t("shell.home.welcome_user", undefined, { entity: entityName, user: userName }).text
+    : t("shell.home.welcome", undefined, { entity: entityName }).text;
 
   return (
     <main className="shell-home">
@@ -26,23 +30,9 @@ export function ShellHome({ modules }: { modules: ModuleDefinition[] }) {
             <span>{t("shell.home.badge").text}</span>
           </div>
           <h1 className="shell-home-hero__title">
-            {userName ? `${t("shell.home.welcome").text}, ${userName}` : t("shell.home.welcome").text}
+            {welcomeTitle}
           </h1>
           <p className="shell-home-hero__subtitle">{t("shell.home.welcome_sub").text}</p>
-          {entityName && (
-            <div className="shell-home-hero__entity">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 21h18" />
-                <path d="M5 21V7l8-4v18" />
-                <path d="M19 21V11l-6-4" />
-                <path d="M9 9v.01" />
-                <path d="M9 12v.01" />
-                <path d="M9 15v.01" />
-                <path d="M9 18v.01" />
-              </svg>
-              <span>{entityName}</span>
-            </div>
-          )}
         </div>
       </section>
 

@@ -52,11 +52,10 @@ describe("ShellHome portal landing page", () => {
       </IntlProvider>
     );
 
-    // Welcome title contains user name
+    // Welcome title contains entity name and user name
     const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toContain("Cooperative Federation (development)");
     expect(heading.textContent).toContain("Nirmala Perera");
-    // Entity name is displayed
-    expect(screen.getByText("Cooperative Federation (development)")).toBeDefined();
     // System status / badge is displayed
     expect(screen.getByText(/COOPFED ERP/i)).toBeDefined();
     // Quick access section header is present
