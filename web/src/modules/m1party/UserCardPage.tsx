@@ -107,7 +107,7 @@ export function UserCardPage() {
   return (
     <main className="shell-page">
       <BackToUsers />
-      <div className="user-card-header">
+      <div className="user-card-container user-card-header">
         <DocumentHeader
           code={data.username}
           title={data.displayName}
@@ -126,6 +126,7 @@ export function UserCardPage() {
         <ReasonCapture
           title={t("party.user.deactivate.question").text}
           codes={DEACTIVATE_REASONS.map((code) => ({ code, label: t(`party.user.reason.${code}`).text }))}
+          defaultCode={DEACTIVATE_REASONS[0]}
           onConfirm={(reasonCode, reasonText) => deactivate.mutate({ reasonCode, reasonText })}
           onCancel={() => setDeactivating(false)}
           pending={deactivate.isPending}
@@ -159,7 +160,7 @@ export function UserCardPage() {
 function BackToUsers() {
   const t = useT();
   return (
-    <div>
+    <div className="user-card-back-wrap">
       <Link className="back-pill-btn" to="/party/users">
         <svg
           viewBox="0 0 24 24"
@@ -307,6 +308,7 @@ function UserRoles({ userId, deactivated }: { userId: string; deactivated: boole
         <ReasonCapture
           title={t("party.roles.revoke.question").text}
           codes={REVOKE_REASONS.map((code) => ({ code, label: t(`party.revoke.reason.${code}`).text }))}
+          defaultCode={REVOKE_REASONS[0]}
           onConfirm={(reasonCode, reasonText) => revoke.mutate({ assignment: revoking, reason: reasonText ? `${reasonCode}: ${reasonText}` : reasonCode })}
           onCancel={() => setRevoking(null)}
           pending={revoke.isPending}

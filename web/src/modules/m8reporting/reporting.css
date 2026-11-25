@@ -2677,14 +2677,9 @@
 .reporting-dropdown-select .custom-dropdown__item--selected:hover,
 .reporting-dropdown-menu .custom-dropdown__item--selected,
 .reporting-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
-  color: var(--color-polish-25) !important;
-  font-weight: var(--font-weight-strong) !important;
-}
-
-.reporting-dropdown-select .custom-dropdown__item--selected:hover,
-.reporting-dropdown-menu .custom-dropdown__item--selected:hover {
   background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
 }
 
 .reporting-dropdown-select .custom-dropdown__item-bar,
@@ -3500,14 +3495,9 @@
 .targets-dropdown-select .custom-dropdown__item--selected:hover,
 .targets-dropdown-menu .custom-dropdown__item--selected,
 .targets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31) !important;
-  color: var(--color-polish-25) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
   font-weight: var(--font-weight-strong) !important;
-}
-
-.targets-dropdown-select .custom-dropdown__item--selected:hover,
-.targets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31) !important;
 }
 
 .targets-dropdown-select .custom-dropdown__item-bar,
@@ -4769,14 +4759,9 @@
 .shop-reports-dropdown-select .custom-dropdown__item--selected:hover,
 .shop-reports-dropdown-menu .custom-dropdown__item--selected,
 .shop-reports-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
-  color: var(--color-polish-25) !important;
-  font-weight: var(--font-weight-strong) !important;
-}
-
-.shop-reports-dropdown-select .custom-dropdown__item--selected:hover,
-.shop-reports-dropdown-menu .custom-dropdown__item--selected:hover {
   background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
 }
 
 .shop-reports-dropdown-select .custom-dropdown__item-bar,
@@ -5597,14 +5582,9 @@
 .assets-dropdown-select .custom-dropdown__item--selected:hover,
 .assets-dropdown-menu .custom-dropdown__item--selected,
 .assets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31) !important;
-  color: var(--color-polish-25) !important;
+  background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
   font-weight: var(--font-weight-strong) !important;
-}
-
-.assets-dropdown-select .custom-dropdown__item--selected:hover,
-.assets-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-polish-31) !important;
 }
 
 .assets-dropdown-select .custom-dropdown__item-bar,
@@ -6918,14 +6898,9 @@
 .pnl-dropdown-select .custom-dropdown__item--selected:hover,
 .pnl-dropdown-menu .custom-dropdown__item--selected,
 .pnl-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
-  color: var(--color-polish-25) !important;
-  font-weight: var(--font-weight-strong) !important;
-}
-
-.pnl-dropdown-select .custom-dropdown__item--selected:hover,
-.pnl-dropdown-menu .custom-dropdown__item--selected:hover {
   background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
 }
 
 .pnl-dropdown-select .custom-dropdown__item-bar,

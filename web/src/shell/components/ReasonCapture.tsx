@@ -25,14 +25,15 @@ type ReasonCaptureProps = {
   onConfirm: (reasonCode: string, reasonText: string | null) => void;
   onCancel: () => void;
   pending?: boolean;
+  defaultCode?: string;
 };
 
-export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: ReasonCaptureProps) {
+export function ReasonCapture({ title, codes, onConfirm, onCancel, pending, defaultCode }: ReasonCaptureProps) {
   const t = useT();
-  // Nothing is chosen until the person chooses: a reason that goes into the audit record must
-  // be the clerk's, not the first one on the list (the review of 26 September). `required`
-  // and the empty-code check below stop a Confirm without a choice.
-  const [code, setCode] = useState("");
+  // Nothing is chosen until the person chooses (unless an explicit defaultCode is passed):
+  // a reason that goes into the audit record must be the clerk's, not the first one on the list
+  // (the review of 26 September). `required` and the empty-code check below stop a Confirm without a choice.
+  const [code, setCode] = useState(defaultCode ?? "");
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

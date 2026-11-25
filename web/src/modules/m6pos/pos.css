@@ -296,14 +296,9 @@ dl.pos-totals > div {
 .pos-dropdown-select .custom-dropdown__item--selected:hover,
 .pos-dropdown-menu .custom-dropdown__item--selected,
 .pos-dropdown-menu .custom-dropdown__item--selected:hover {
-  background-color: var(--color-surface) !important;
-  color: var(--color-polish-25) !important;
-  font-weight: var(--font-weight-strong) !important;
-}
-
-.pos-dropdown-select .custom-dropdown__item--selected:hover,
-.pos-dropdown-menu .custom-dropdown__item--selected:hover {
   background-color: var(--color-polish-29) !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-strong) !important;
 }
 
 .pos-dropdown-select .custom-dropdown__item-bar,
