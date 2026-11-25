@@ -57,7 +57,7 @@ describe("ShellHome portal landing page", () => {
     expect(heading.textContent).toContain("Cooperative Federation (development)");
     expect(heading.textContent).toContain("Nirmala Perera");
     // System status / badge is displayed
-    expect(screen.getByText(/COOPFED ERP/i)).toBeDefined();
+    expect(screen.getByText(/Co-op ERP/i)).toBeDefined();
     // Quick access section header is present
     expect(screen.getByRole("heading", { level: 2 })).toBeDefined();
   });
