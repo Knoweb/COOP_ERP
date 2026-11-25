@@ -12,7 +12,13 @@ import lk.coopfed.knoweb.till.core.model.ParkedSaleLine
 import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
+import lk.coopfed.knoweb.till.core.money.Qty
 import lk.coopfed.knoweb.till.core.port.TillStore
+import lk.coopfed.knoweb.till.core.shop.ShopAuditEvent
+import lk.coopfed.knoweb.till.core.shop.ShopDocumentLine
+import lk.coopfed.knoweb.till.core.shop.ShopOperationBundle
+import lk.coopfed.knoweb.till.core.shop.ShopStateHistory
+import lk.coopfed.knoweb.till.core.shop.ShopStockMovement
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRow
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
 
@@ -177,6 +183,171 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
 
     override fun quarantinedAmong(deviceSeqs: Collection<Long>): Long =
         if (deviceSeqs.isEmpty()) 0 else q.countQuarantinedAmong(deviceSeqs).executeAsOne()
+
+    override fun saveShopOperation(bundle: ShopOperationBundle) {
+        transaction {
+            appendOutbox(bundle.outboxEntry)
+            for (line in bundle.lines) {
+            q.insertDocumentLine(
+                line_id = line.lineId,
+                document_id = bundle.document.documentId,
+                line_no = line.lineNo.toLong(),
+                sku_id = line.skuId,
+                batch_id = line.batchId,
+                uom_code = line.uomCode,
+                qty = line.qty.plain(),
+                unit_price = line.unitPrice.plain(),
+                mrp_applied = null,
+                control_price_applied = null,
+                cap_reason = null,
+                discount_rule_id = null,
+                discount_amount = "0.00",
+                tax_rate_percent = "0.00",
+                tax_amount = "0.00",
+                line_total = line.lineTotal.plain(),
+                unit_cost_at_issue = line.unitCostAtIssue?.plain(),
+                loss_category = line.lossCategory,
+                reference_line_id = line.referenceLineId,
+                negative_ack = 0L,
+                picked = 0L,
+                weight_kg = null,
+            )
+        }
+        for (h in bundle.stateHistory) {
+            q.insertStateHistory(
+                history_id = h.historyId,
+                document_id = h.documentId,
+                from_status = h.fromStatus,
+                to_status = h.toStatus,
+                occurred_at = h.occurredAt,
+                occurred_local = h.occurredLocal,
+                actor_user_id = h.actorUserId,
+                reason_code = h.reasonCode,
+                reason_text = h.reasonText,
+            )
+        }
+        for (m in bundle.stockMovements) {
+            q.insertStockMovement(
+                movement_id = m.movementId,
+                movement_seq = m.movementSeq,
+                location_id = m.locationId,
+                sku_id = m.skuId,
+                batch_id = m.batchId,
+                lot_id = m.lotId,
+                condition = m.condition,
+                qty_delta = m.qtyDelta,
+                movement_type = m.movementType,
+                unit_cost_at_movement = m.unitCostAtMovement?.plain(),
+                document_id = m.documentId,
+                document_line_id = m.documentLineId,
+                occurred_at = m.occurredAt,
+                occurred_local = m.occurredLocal,
+                operator_user_id = m.operatorUserId,
+                device_id = m.deviceId,
+            )
+        }
+        for (a in bundle.auditEvents) {
+            q.insertAuditEvent(
+                audit_id = a.auditId,
+                event_type_code = a.eventTypeCode,
+                occurred_at = a.occurredAt,
+                occurred_local = a.occurredLocal,
+                owner_entity_id = a.ownerEntityId,
+                location_id = a.locationId,
+                actor_user_id = a.actorUserId,
+                device_id = a.deviceId,
+                till_position_id = a.tillPositionId,
+                subject_table = a.subjectTable,
+                subject_id = a.subjectId,
+                document_id = a.documentId,
+                before_state = a.beforeState,
+                after_state = a.afterState,
+                reason_code = a.reasonCode,
+                reason_text = a.reasonText,
+                device_seq = a.deviceSeq,
+                correlation_id = a.correlationId,
+            )
+        }
+    }
+    }
+
+    override fun documentLines(documentId: String): List<ShopDocumentLine> =
+        q.selectDocumentLinesByDocument(documentId).executeAsList().map { row ->
+            ShopDocumentLine(
+                lineNo = row.line_no.toInt(),
+                lineId = row.line_id,
+                skuId = row.sku_id,
+                batchId = row.batch_id,
+                uomCode = row.uom_code,
+                qty = Qty.parse(row.qty),
+                unitPrice = Money.parse(row.unit_price),
+                lineTotal = Money.parse(row.line_total),
+                unitCostAtIssue = row.unit_cost_at_issue?.let { Money.parse(it) },
+                lossCategory = row.loss_category,
+                referenceLineId = row.reference_line_id,
+            )
+        }
+
+    override fun stateHistoryOf(documentId: String): List<ShopStateHistory> =
+        q.selectStateHistoryByDocument(documentId).executeAsList().map { row ->
+            ShopStateHistory(
+                historyId = row.history_id,
+                documentId = row.document_id,
+                fromStatus = row.from_status,
+                toStatus = row.to_status,
+                occurredAt = row.occurred_at,
+                occurredLocal = row.occurred_local.orEmpty(),
+                actorUserId = row.actor_user_id,
+                reasonCode = row.reason_code,
+                reasonText = row.reason_text,
+            )
+        }
+
+    override fun stockMovementsOf(documentId: String): List<ShopStockMovement> =
+        q.selectStockMovementsByDocument(documentId).executeAsList().map { row ->
+            ShopStockMovement(
+                movementId = row.movement_id,
+                movementSeq = row.movement_seq,
+                locationId = row.location_id,
+                skuId = row.sku_id,
+                batchId = row.batch_id,
+                lotId = row.lot_id,
+                condition = row.condition,
+                qtyDelta = row.qty_delta,
+                movementType = row.movement_type,
+                unitCostAtMovement = row.unit_cost_at_movement?.let { Money.parse(it) },
+                documentId = row.document_id,
+                documentLineId = row.document_line_id,
+                occurredAt = row.occurred_at,
+                occurredLocal = row.occurred_local.orEmpty(),
+                operatorUserId = row.operator_user_id,
+                deviceId = row.device_id,
+            )
+        }
+
+    override fun auditEventsOf(documentId: String): List<ShopAuditEvent> =
+        q.selectAuditByDocument(documentId).executeAsList().map { row ->
+            ShopAuditEvent(
+                auditId = row.audit_id,
+                eventTypeCode = row.event_type_code,
+                occurredAt = row.occurred_at,
+                occurredLocal = row.occurred_local.orEmpty(),
+                ownerEntityId = row.owner_entity_id,
+                locationId = row.location_id,
+                actorUserId = row.actor_user_id,
+                deviceId = row.device_id,
+                tillPositionId = row.till_position_id,
+                subjectTable = row.subject_table,
+                subjectId = row.subject_id,
+                documentId = row.document_id,
+                beforeState = row.before_state,
+                afterState = row.after_state,
+                reasonCode = row.reason_code,
+                reasonText = row.reason_text,
+                deviceSeq = row.device_seq,
+                correlationId = row.correlation_id,
+            )
+        }
 
     private companion object {
         const val SNAPSHOT_VERSION = "snapshot_version"

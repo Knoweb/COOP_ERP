@@ -6,6 +6,11 @@ import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.shop.ShopAuditEvent
+import lk.coopfed.knoweb.till.core.shop.ShopDocumentLine
+import lk.coopfed.knoweb.till.core.shop.ShopOperationBundle
+import lk.coopfed.knoweb.till.core.shop.ShopStateHistory
+import lk.coopfed.knoweb.till.core.shop.ShopStockMovement
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
 
 /**
@@ -67,6 +72,13 @@ interface TillStore {
     fun markAnomaliesSeen()
     /** How many facts with these device sequences central quarantined. */
     fun quarantinedAmong(deviceSeqs: Collection<Long>): Long
+
+    /** Atomically persists an offline shop-operation bundle (GRN, count, write-off, repack, transfer). */
+    fun saveShopOperation(bundle: ShopOperationBundle)
+    fun documentLines(documentId: String): List<ShopDocumentLine>
+    fun stateHistoryOf(documentId: String): List<ShopStateHistory>
+    fun stockMovementsOf(documentId: String): List<ShopStockMovement>
+    fun auditEventsOf(documentId: String): List<ShopAuditEvent>
 }
 
 /** Keys of the settings the till keeps. */
@@ -74,6 +86,7 @@ object Settings {
     const val DEVICE = "device"
     const val NEXT_DEVICE_SEQ = "next_device_seq"
     const val NEXT_RECEIPT_NUMBER = "next_receipt_number"
+    fun docNumberKey(docTypeCode: String): String = "next_doc_number:$docTypeCode"
     const val BUSINESS_DATE = "business_date"
     /** The batch id of the batch in flight, with its range: the same id on a retry (sync.yaml SyncBatch.batch_id). */
     const val BATCH_IN_FLIGHT = "batch_in_flight"

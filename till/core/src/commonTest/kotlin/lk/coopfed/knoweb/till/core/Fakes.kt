@@ -35,6 +35,11 @@ import lk.coopfed.knoweb.till.core.port.SignatureVerifier
 import lk.coopfed.knoweb.till.core.port.TillClock
 import lk.coopfed.knoweb.till.core.port.TillStore
 import lk.coopfed.knoweb.till.core.port.UploadAnswer
+import lk.coopfed.knoweb.till.core.shop.ShopAuditEvent
+import lk.coopfed.knoweb.till.core.shop.ShopDocumentLine
+import lk.coopfed.knoweb.till.core.shop.ShopOperationBundle
+import lk.coopfed.knoweb.till.core.shop.ShopStateHistory
+import lk.coopfed.knoweb.till.core.shop.ShopStockMovement
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRow
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotTableDelta
@@ -53,10 +58,20 @@ class InMemoryStore : TillStore {
         val anomalies: MutableList<Anomaly> = mutableListOf(),
         val cashMovements: MutableList<CashMovementRecord> = mutableListOf(),
         val parkedSales: MutableMap<String, ParkedSaleRecord> = linkedMapOf(),
+        val shopBundles: MutableMap<String, ShopOperationBundle> = linkedMapOf(),
+        val documentLines: MutableMap<String, MutableList<ShopDocumentLine>> = mutableMapOf(),
+        val stateHistory: MutableMap<String, MutableList<ShopStateHistory>> = mutableMapOf(),
+        val stockMovements: MutableMap<String, MutableList<ShopStockMovement>> = mutableMapOf(),
+        val auditEvents: MutableMap<String, MutableList<ShopAuditEvent>> = mutableMapOf(),
     ) {
         fun copy() = Data(
             settings.toMutableMap(), snapshot, outbox.toMutableMap(), acked.toMutableMap(), sessions.toMutableMap(),
             receipts.toMutableList(), anomalies.toMutableList(), cashMovements.toMutableList(), parkedSales.toMutableMap(),
+            shopBundles.toMutableMap(),
+            documentLines.mapValues { it.value.toMutableList() }.toMutableMap(),
+            stateHistory.mapValues { it.value.toMutableList() }.toMutableMap(),
+            stockMovements.mapValues { it.value.toMutableList() }.toMutableMap(),
+            auditEvents.mapValues { it.value.toMutableList() }.toMutableMap(),
         )
     }
 
@@ -133,6 +148,27 @@ class InMemoryStore : TillStore {
     override fun markAnomaliesSeen() { data.anomalies.replaceAll { it.copy(seen = true) } }
     override fun quarantinedAmong(deviceSeqs: Collection<Long>) =
         data.anomalies.count { it.kind == Anomaly.QUARANTINED && it.deviceSeq in deviceSeqs }.toLong()
+
+    override fun saveShopOperation(bundle: ShopOperationBundle) {
+        appendOutbox(bundle.outboxEntry)
+        data.shopBundles[bundle.document.documentId] = bundle
+        data.documentLines.getOrPut(bundle.document.documentId) { mutableListOf() }.addAll(bundle.lines)
+        data.stateHistory.getOrPut(bundle.document.documentId) { mutableListOf() }.addAll(bundle.stateHistory)
+        data.stockMovements.getOrPut(bundle.document.documentId) { mutableListOf() }.addAll(bundle.stockMovements)
+        data.auditEvents.getOrPut(bundle.document.documentId) { mutableListOf() }.addAll(bundle.auditEvents)
+    }
+
+    override fun documentLines(documentId: String): List<ShopDocumentLine> =
+        data.documentLines[documentId].orEmpty()
+
+    override fun stateHistoryOf(documentId: String): List<ShopStateHistory> =
+        data.stateHistory[documentId].orEmpty()
+
+    override fun stockMovementsOf(documentId: String): List<ShopStockMovement> =
+        data.stockMovements[documentId].orEmpty()
+
+    override fun auditEventsOf(documentId: String): List<ShopAuditEvent> =
+        data.auditEvents[documentId].orEmpty()
 
     /** Every outbox row, acknowledged or not, for the tests. */
     fun outboxSeqs(): List<Long> = data.outbox.keys.sorted()

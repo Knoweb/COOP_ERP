@@ -127,6 +127,11 @@ class TillScanIntegrationTest {
             override fun unseenAnomalyCount(): Long = 0L
             override fun markAnomaliesSeen() {}
             override fun quarantinedAmong(deviceSeqs: Collection<Long>): Long = 0L
+            override fun saveShopOperation(bundle: lk.coopfed.knoweb.till.core.shop.ShopOperationBundle) {}
+            override fun documentLines(documentId: String): List<lk.coopfed.knoweb.till.core.shop.ShopDocumentLine> = emptyList()
+            override fun stateHistoryOf(documentId: String): List<lk.coopfed.knoweb.till.core.shop.ShopStateHistory> = emptyList()
+            override fun stockMovementsOf(documentId: String): List<lk.coopfed.knoweb.till.core.shop.ShopStockMovement> = emptyList()
+            override fun auditEventsOf(documentId: String): List<lk.coopfed.knoweb.till.core.shop.ShopAuditEvent> = emptyList()
         }
 
         val dummyCentral = object : Central {

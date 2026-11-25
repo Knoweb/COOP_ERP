@@ -38,6 +38,13 @@ import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.port.Central
+import lk.coopfed.knoweb.till.core.shop.GrnOperationInput
+import lk.coopfed.knoweb.till.core.shop.RepackOperationInput
+import lk.coopfed.knoweb.till.core.shop.ShopBundleBuilder
+import lk.coopfed.knoweb.till.core.shop.ShopOperationBundle
+import lk.coopfed.knoweb.till.core.shop.StockCountOperationInput
+import lk.coopfed.knoweb.till.core.shop.StockTransferOperationInput
+import lk.coopfed.knoweb.till.core.shop.WriteOffOperationInput
 import lk.coopfed.knoweb.till.core.port.CentralRefused
 import lk.coopfed.knoweb.till.core.port.CentralUnreachable
 import lk.coopfed.knoweb.till.core.port.EventOutcome
@@ -748,7 +755,9 @@ class TillService(
     }
 
     /** The business date a session opens on now, for the screen (null before the first session). */
-    suspend fun currentBusinessDate(): LocalDate? = lock.withLock { store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) } }
+    suspend fun currentBusinessDate(): LocalDate? = lock.withLock { storedBusinessDate() }
+
+    private fun storedBusinessDate(): LocalDate? = store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) }
 
     /** Today's date at the shop by the till's corrected clock. */
     suspend fun clockDate(): LocalDate = lock.withLock { Times.date(now(), clock.zone) }
@@ -1069,6 +1078,160 @@ class TillService(
 
     suspend fun recordPayout(amount: Money, reason: String): CashMovementRecord =
         recordCashMovement(CashMovementKind.PAYOUT, amount, reason)
+
+    // =========================================================================
+    // Shop Operations (doc 32 §3.1, doc 24A §7.4, doc 25A §7.4, TILL-SHOP-04)
+    // =========================================================================
+
+    suspend fun recordGrn(input: GrnOperationInput, operationId: String? = null): ShopOperationBundle = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val op = operator ?: throw TillRefusal("Sign in first")
+        if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
+            throw TillRefusal("Operation $operationId was already recorded")
+        }
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
+        val reading = clockReading()
+        store.transaction {
+            val docNumber = next(Settings.docNumberKey("GRN"))
+            val seq = next(Settings.NEXT_DEVICE_SEQ)
+            val bundle = ShopBundleBuilder.buildGrnBundle(
+                device = identity,
+                operatorUserId = op.userId,
+                businessDate = date,
+                clockReading = reading,
+                zone = clock.zone,
+                input = input,
+                docNumber = docNumber,
+                deviceSeq = seq,
+                documentId = operationId ?: ids.next(),
+                ids = ids,
+            )
+            store.saveShopOperation(bundle)
+            bundle
+        }
+    }
+
+    suspend fun recordStockCount(input: StockCountOperationInput, operationId: String? = null): ShopOperationBundle = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val op = operator ?: throw TillRefusal("Sign in first")
+        if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
+            throw TillRefusal("Operation $operationId was already recorded")
+        }
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
+        val reading = clockReading()
+        store.transaction {
+            val docNumber = next(Settings.docNumberKey("CNT"))
+            val seq = next(Settings.NEXT_DEVICE_SEQ)
+            val bundle = ShopBundleBuilder.buildStockCountBundle(
+                device = identity,
+                operatorUserId = op.userId,
+                businessDate = date,
+                clockReading = reading,
+                zone = clock.zone,
+                input = input,
+                docNumber = docNumber,
+                deviceSeq = seq,
+                documentId = operationId ?: ids.next(),
+                ids = ids,
+            )
+            store.saveShopOperation(bundle)
+            bundle
+        }
+    }
+
+    suspend fun recordWriteOff(input: WriteOffOperationInput, operationId: String? = null): ShopOperationBundle = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val op = operator ?: throw TillRefusal("Sign in first")
+        if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
+            throw TillRefusal("Operation $operationId was already recorded")
+        }
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
+        val reading = clockReading()
+        store.transaction {
+            val docNumber = next(Settings.docNumberKey("WOF"))
+            val seq = next(Settings.NEXT_DEVICE_SEQ)
+            val bundle = ShopBundleBuilder.buildWriteOffBundle(
+                device = identity,
+                operatorUserId = op.userId,
+                businessDate = date,
+                clockReading = reading,
+                zone = clock.zone,
+                input = input,
+                docNumber = docNumber,
+                deviceSeq = seq,
+                documentId = operationId ?: ids.next(),
+                ids = ids,
+            )
+            store.saveShopOperation(bundle)
+            bundle
+        }
+    }
+
+    suspend fun recordRepack(input: RepackOperationInput, operationId: String? = null): ShopOperationBundle = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val op = operator ?: throw TillRefusal("Sign in first")
+        if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
+            throw TillRefusal("Operation $operationId was already recorded")
+        }
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
+        val reading = clockReading()
+        store.transaction {
+            val docNumber = next(Settings.docNumberKey("RPK"))
+            val seq = next(Settings.NEXT_DEVICE_SEQ)
+            val bundle = ShopBundleBuilder.buildRepackBundle(
+                device = identity,
+                operatorUserId = op.userId,
+                businessDate = date,
+                clockReading = reading,
+                zone = clock.zone,
+                input = input,
+                docNumber = docNumber,
+                deviceSeq = seq,
+                documentId = operationId ?: ids.next(),
+                ids = ids,
+            )
+            store.saveShopOperation(bundle)
+            bundle
+        }
+    }
+
+    suspend fun recordStockTransfer(input: StockTransferOperationInput, operationId: String? = null): ShopOperationBundle = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val op = operator ?: throw TillRefusal("Sign in first")
+        if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
+            throw TillRefusal("Operation $operationId was already recorded")
+        }
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
+        val reading = clockReading()
+        store.transaction {
+            val docNumber = next(Settings.docNumberKey("XFR"))
+            val seq = next(Settings.NEXT_DEVICE_SEQ)
+            val bundle = ShopBundleBuilder.buildTransferBundle(
+                device = identity,
+                operatorUserId = op.userId,
+                businessDate = date,
+                clockReading = reading,
+                zone = clock.zone,
+                input = input,
+                docNumber = docNumber,
+                deviceSeq = seq,
+                documentId = operationId ?: ids.next(),
+                ids = ids,
+            )
+            store.saveShopOperation(bundle)
+            bundle
+        }
+    }
 
     /** The cashier's blind count closes the session; the till works out expected cash and the variance. */
     suspend fun closeSession(counted: Money): ZReport = lock.withLock {
