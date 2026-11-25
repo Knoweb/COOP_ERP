@@ -17,7 +17,7 @@
     <title>${msg("loginTitle",(realm.displayName!''))}</title>
     <link rel="icon" type="image/png" href="${url.resourcesPath}/img/favicon.png" />
     <link rel="shortcut icon" href="${url.resourcesPath}/img/favicon.ico" />
-    <link href="${url.resourcesPath}/css/styles.css?v=20" rel="stylesheet" />
+    <link href="${url.resourcesPath}/css/styles.css?v=23" rel="stylesheet" />
 </head>
 <body class="auth-page">
 
