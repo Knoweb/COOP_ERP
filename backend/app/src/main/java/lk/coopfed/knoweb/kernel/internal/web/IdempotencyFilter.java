@@ -1,4 +1,4 @@
-package lk.coopfed.knoweb.kernel.internal.stub;
+package lk.coopfed.knoweb.kernel.internal.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
