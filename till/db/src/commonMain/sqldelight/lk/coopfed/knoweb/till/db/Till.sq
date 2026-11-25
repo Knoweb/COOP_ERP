@@ -323,6 +323,9 @@ INSERT INTO audit(
 selectAuditEvents:
 SELECT * FROM audit ORDER BY occurred_at DESC LIMIT ?;
 
+selectAuditByDocument:
+SELECT * FROM audit WHERE document_id = ? ORDER BY occurred_at;
+
 insertCashMovement:
 INSERT INTO cash_movements(
     id, session_id, kind, amount, at, operator_user_id, reason

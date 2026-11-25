@@ -69,6 +69,8 @@ object Decimals {
 data class Money(val cents: Long) : Comparable<Money> {
     operator fun plus(other: Money) = Money(cents + other.cents)
     operator fun minus(other: Money) = Money(cents - other.cents)
+    operator fun unaryMinus() = Money(-cents)
+    operator fun times(qty: Qty): Money = qty.times(this)
     override fun compareTo(other: Money) = cents.compareTo(other.cents)
 
     /** "1250.00" */
@@ -93,18 +95,22 @@ data class Money(val cents: Long) : Comparable<Money> {
 
 /** A quantity in thousandths of its unit (1 each = 1000). */
 @kotlinx.serialization.Serializable
-data class Qty(val milli: Long) {
+data class Qty(val milli: Long) : Comparable<Qty> {
     fun plain(): String = Decimals.plain(milli, 3)
 
     /** "2" for 2000, "0.25" for 250: the short form for the screen and the paper. */
     fun display(): String = Decimals.canonical(milli, 3)
 
     operator fun plus(other: Qty) = Qty(milli + other.milli)
+    operator fun minus(other: Qty) = Qty(milli - other.milli)
+    operator fun unaryMinus() = Qty(-milli)
+    override fun compareTo(other: Qty) = milli.compareTo(other.milli)
 
     /** qty × unit price, rounded to the cent. */
     fun times(price: Money): Money = Money(Decimals.multiply(milli, price.cents, 3))
 
     companion object {
+        val ZERO = Qty(0)
         val ONE = Qty(1000)
         fun parse(text: String) = Qty(Decimals.parse(text, 3))
         fun of(units: Int) = Qty(units * 1000L)
