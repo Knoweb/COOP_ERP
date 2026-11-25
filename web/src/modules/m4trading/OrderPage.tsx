@@ -7,6 +7,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
+import { DatePicker } from "../../shell/components/DatePicker";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
@@ -146,9 +147,22 @@ export function OrderPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/trading">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("trading.back").text}
+      <Link className="back-link back-pill-btn" to="/trading">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back").text}</span>
       </Link>
       <DocumentHeader
         code={o.docNumber ?? t("trading.order.draft_number").text}
@@ -158,6 +172,7 @@ export function OrderPage() {
           { label: t("trading.column.buyer").text, value: <EntityName entityId={o.buyerEntityId} /> },
           { label: t("trading.column.seller").text, value: <EntityName entityId={o.sellerEntityId} /> },
           { label: t("trading.field.deliver_to").text, value: o.deliverToLocationId && <LocationName locationId={o.deliverToLocationId} own={isBuyer} known={o.deliverTo} /> },
+          { label: t("trading.order.acting_user").text, value: o.operatorUserId },
           { label: t("trading.field.committed_eta").text, value: o.committedEta && formatDate(o.committedEta) },
           { label: t("trading.column.amount").text, value: <MoneyDisplay amount={o.netAmount} /> },
           { label: t("trading.field.reject_reason").text, value: o.rejectReasonCode },
@@ -171,61 +186,80 @@ export function OrderPage() {
             value: o.amendedByOrderId && <Link to={`/trading/orders/${o.amendedByOrderId}`}>{t("trading.order.next_version").text}</Link>
           }
         ]}
-      />
+      >
+        <div className="trading-header-actions">
+          <button
+            type="button"
+            className="trading-print-btn"
+            onClick={() => window.print()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>{t("trading.invoice.print").text}</span>
+          </button>
+        </div>
+      </DocumentHeader>
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("trading.column.item").text}</th>
-            <th>{t("trading.column.unit").text}</th>
-            <th>{t("trading.column.qty").text}</th>
-            <th>{t("trading.column.indicative_price").text}</th>
-            {deciding && <th>{t("trading.column.available").text}</th>}
-            {accepted && <th>{t("trading.column.allocated").text}</th>}
-            {accepted && <th>{t("trading.column.tier_price").text}</th>}
-            {accepted && <th>{t("trading.column.delivered").text}</th>}
-            {accepted && <th>{t("trading.column.back_order").text}</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {o.lines.map((line, index) => (
-            <tr key={line.lineId}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{line.uomCode}</td>
-              <td>
-                {amendRows ? (
-                  <input
-                    type="number"
-                    min={0}
-                    step="any"
-                    aria-label={t("trading.order.amend.qty", undefined, { line: line.lineNo }).text}
-                    value={amendRows[index]?.qty ?? ""}
-                    onChange={(event) => setAmendQty(index, event.target.value)}
-                  />
-                ) : (
-                  line.requestedQty
-                )}
-              </td>
-              <td>
-                <MoneyDisplay amount={line.indicativePrice} />
-              </td>
-              {deciding && <td>{availability.data?.[line.skuId] ?? ""}</td>}
-              {accepted && <td>{line.allocatedQty}</td>}
-              {accepted && (
-                <td>
-                  <MoneyDisplay amount={line.tierPrice} />
-                </td>
-              )}
-              {accepted && <td>{line.fulfilledQty}</td>}
-              {accepted && <td>{line.backOrderQty}</td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="modern-table-card trading-table-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table trading-table">
+            <thead>
+              <tr>
+                <th>{t("trading.column.item").text}</th>
+                <th>{t("trading.column.unit").text}</th>
+                <th>{t("trading.column.qty").text}</th>
+                <th className="trading-cell-numeric">{t("trading.column.indicative_price").text}</th>
+                {deciding && <th>{t("trading.column.available").text}</th>}
+                {accepted && <th>{t("trading.column.allocated").text}</th>}
+                {accepted && <th className="trading-cell-numeric">{t("trading.column.tier_price").text}</th>}
+                {accepted && <th>{t("trading.column.delivered").text}</th>}
+                {accepted && <th>{t("trading.column.back_order").text}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {o.lines.map((line, index) => (
+                <tr key={line.lineId}>
+                  <td>
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>{line.uomCode}</td>
+                  <td>
+                    {amendRows ? (
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        aria-label={t("trading.order.amend.qty", undefined, { line: line.lineNo }).text}
+                        value={amendRows[index]?.qty ?? ""}
+                        onChange={(event) => setAmendQty(index, event.target.value)}
+                      />
+                    ) : (
+                      line.requestedQty
+                    )}
+                  </td>
+                  <td className="trading-cell-numeric">
+                    <MoneyDisplay amount={line.indicativePrice} />
+                  </td>
+                  {deciding && <td>{availability.data?.[line.skuId] ?? ""}</td>}
+                  {accepted && <td>{line.allocatedQty}</td>}
+                  {accepted && (
+                    <td className="trading-cell-numeric">
+                      <MoneyDisplay amount={line.tierPrice} />
+                    </td>
+                  )}
+                  {accepted && <td>{line.fulfilledQty}</td>}
+                  {accepted && <td>{line.backOrderQty}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      <section className="trading-filter-bar">
+      <section className="trading-filter-bar trading-filter-bar--compact">
         {amendable && !amendRows && (
           <button type="button" onClick={startAmend}>
             {t("trading.order.amend").text}
@@ -233,10 +267,14 @@ export function OrderPage() {
         )}
         {amendRows && (
           <>
-            <label className="trading-form-field">
-              {t("trading.order.amend.eta").text}
-              <input type="date" min={businessToday()} value={amendEta} onChange={(event) => setAmendEta(event.target.value)} />
-            </label>
+            <div className="trading-form-field trading-form-field--date">
+              <DatePicker
+                label={t("trading.order.amend.eta").text}
+                min={businessToday()}
+                value={amendEta}
+                onChange={setAmendEta}
+              />
+            </div>
             <label className="trading-form-field">
               {t("trading.order.amend.reason").text ?? "Reason"}
               <input type="text" value={amendReason} onChange={(event) => setAmendReason(event.target.value)} required />
@@ -261,10 +299,14 @@ export function OrderPage() {
         )}
         {deciding && (
           <>
-            <label className="trading-form-field">
-              {t("trading.field.committed_eta").text}
-              <input type="date" min={businessToday()} value={eta} onChange={(event) => setEta(event.target.value)} />
-            </label>
+            <div className="trading-form-field trading-form-field--date">
+              <DatePicker
+                label={t("trading.field.committed_eta").text}
+                min={businessToday()}
+                value={eta}
+                onChange={setEta}
+              />
+            </div>
             <button type="button" disabled={accept.isPending || !eta || relationship.isLoading} onClick={() => accept.mutate()}>
               {t("trading.order.accept").text}
             </button>

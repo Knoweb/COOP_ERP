@@ -41,6 +41,13 @@ public interface IdentityProviderClient {
      */
     TemporaryPassword setTemporaryPassword(ScopeContext ctx, String subjectId);
 
+    /**
+     * Sets a user's password at the provider. If {@code temporary} is false, the password is
+     * permanent and any pending UPDATE_PASSWORD required action is cleared so the account
+     * can immediately sign in.
+     */
+    void setPassword(ScopeContext ctx, String subjectId, String password, boolean temporary);
+
     /** Removes the second factor; the user enrols a new one at the next sign-in. */
     void resetTotp(ScopeContext ctx, String subjectId);
 

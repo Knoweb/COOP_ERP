@@ -14,10 +14,14 @@ data class TillPolicy(
     /** 26A section 8: "5 failures -> 15-min lockout (local + audit)". */
     val pinFailuresBeforeLock: Int = 5,
     val pinLockFor: Duration = 15.minutes,
+    /** Default 2 minutes idle before screen lock (kernel seed till.idle_lock default PT2M; FR-SEC-070, T-09). */
+    val idleLock: Duration = 2.minutes,
     /** S8, DR-3: acknowledged facts are kept 7 days (config sync.outbox.retention_days). */
     val outboxRetention: Duration = 7.days,
     /** Doc 32 section 5.2: warn after 3 days without a verified snapshot (config pos.snapshot_staleness_days). */
     val snapshotStaleness: Duration = 3.days,
+    /** Doc 26 DR-5: a parked basket may be resumed for at most 120 minutes. */
+    val parkedSaleMaxAge: Duration = 120.minutes,
     /** D-4: an offset central reports beyond this is refused, the PC's clock is kept. */
     val maxClockOffset: Duration = 7.days,
     /** D-4: the PC's clock moved by more than this beside real time: it was set by hand. */
@@ -31,10 +35,26 @@ data class TillPolicy(
     fun withConfig(config: Map<String, String>): TillPolicy = copy(
         outboxRetention = config["sync.outbox.retention_days"]?.toLongOrNull()?.takeIf { it >= 1 }?.days ?: outboxRetention,
         snapshotStaleness = config["pos.snapshot_staleness_days"]?.toLongOrNull()?.takeIf { it >= 1 }?.days ?: snapshotStaleness,
+        idleLock = config["till.idle_lock"]?.let { parseDuration(it) }?.takeIf { it.isPositive() } ?: idleLock,
+        parkedSaleMaxAge = config["pos.parked_sale_max_age"]?.let { parseDuration(it) }
+            ?.takeIf { it.isPositive() } ?: parkedSaleMaxAge,
     )
 
     companion object {
         /** The permission (21A, shop-in-charge) that lets a supervisor correct the till's business date. */
         const val SUPERVISOR_PERMISSION = "pos.session.manage"
+        /** The permission (Cashier, Supervisor) required to open a session and issue sale receipts. */
+        const val RECEIPT_ISSUE_PERMISSION = "pos.receipt.issue"
+
+        /**
+         * Parses a duration string, supporting ISO-8601 (e.g. "PT2M", "PT30S"), standard duration text
+         * (e.g. "2m", "30s"), or plain numbers of minutes.
+         */
+        fun parseDuration(value: String): Duration? {
+            val trimmed = value.trim()
+            return Duration.parseIsoStringOrNull(trimmed)
+                ?: Duration.parseOrNull(trimmed)
+                ?: trimmed.toLongOrNull()?.minutes
+        }
     }
 }

@@ -21,7 +21,7 @@ import java.util.zip.ZipException;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
+import lk.coopfed.knoweb.kernel.internal.web.ProblemResponses;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.core.annotation.Order;

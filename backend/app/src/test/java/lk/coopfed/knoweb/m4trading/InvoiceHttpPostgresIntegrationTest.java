@@ -20,6 +20,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.internal.attachment.MemoryObjectStore;
 import lk.coopfed.knoweb.m4trading.api.CaptureGrn;
 import lk.coopfed.knoweb.m4trading.api.ConfirmGrn;
+import lk.coopfed.knoweb.m4trading.api.JournalPostingsReady;
 import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.ConfirmGrnHandler;
 import lk.coopfed.knoweb.m4trading.query.DeliveryQueries;
@@ -249,6 +250,23 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         .get("amountDue")
                         .decimalValue())
                 .isEqualByComparingTo("1452.80"); // 1372.80 + 80.00
+
+        // ACC-02: the journal event must contain seller and buyer postings.
+        JournalPostingsReady debitJournal = kernel.committedEvents().stream()
+                .filter(JournalPostingsReady.class::isInstance)
+                .map(JournalPostingsReady.class::cast)
+                .filter(event -> event.documentId().equals(UUID.fromString(debitNoteId)))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(debitJournal.counterpartyEntityId()).isEqualTo(BUYER);
+
+        assertThat(debitJournal.postings())
+                .extracting(posting -> posting.side() + " "
+                        + posting.debitRole() + ">"
+                        + posting.creditRole() + " "
+                        + posting.amount().toPlainString())
+                .containsExactlyInAnyOrder("SELLER RECEIVABLE>OTHER_INCOME 80.00", "BUYER OTHER_EXPENSE>PAYABLE 80.00");
 
         // The buyer disputes, the seller resolves.
         assertThat(post("/v1/trading/invoices/" + invoiceId + "/dispute", Map.of("reason", "Short"), BUYER_USER, BUYER)

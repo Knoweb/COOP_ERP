@@ -43,4 +43,21 @@ class LotQuestionsForCatalogue implements InventoryLotQuery {
         return Boolean.TRUE.equals(
                 jdbc.queryForObject("select inventory.caller_holds_lot_of(?)", Boolean.class, batchId));
     }
+
+    @Override
+    public java.util.List<UUID> skusWithLots(UUID locationId, ScopeContext scope) {
+        return jdbc.queryForList(
+                "select distinct sku_id from inventory.stock_lot where location_id = ? and qty_on_hand > 0 order by sku_id",
+                UUID.class,
+                locationId);
+    }
+
+    @Override
+    public boolean hasPositiveLotAt(UUID locationId, UUID skuId, ScopeContext scope) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists(select 1 from inventory.stock_lot where location_id = ? and sku_id = ? and qty_on_hand > 0)",
+                Boolean.class,
+                locationId,
+                skuId));
+    }
 }

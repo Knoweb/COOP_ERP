@@ -66,18 +66,30 @@ class BatchIngestor {
     private final IngestTransactions transactions;
     private final SyncSettings settings;
     private final AppVersionFloor floors;
+    private final FloorAlerts floorAlerts;
     private final Clock clock;
+    private final ClockOffset clockOffset;
 
-    BatchIngestor(IngestTransactions transactions, SyncSettings settings, AppVersionFloor floors, Clock clock) {
+    BatchIngestor(
+            IngestTransactions transactions,
+            SyncSettings settings,
+            AppVersionFloor floors,
+            FloorAlerts floorAlerts,
+            Clock clock,
+            ClockOffset clockOffset) {
         this.transactions = transactions;
         this.settings = settings;
         this.floors = floors;
+        this.floorAlerts = floorAlerts;
         this.clock = clock;
+        this.clockOffset = clockOffset;
     }
 
     Ack ingest(ScopeContext device, DeviceRecord record, BatchInput batch) {
         checkShape(device, batch);
         AppVersionFloor.Standing floor = checkFloor(device, batch);
+        Instant now = clock.instant();
+        Long currentOffsetMs = clockOffset.resolveCurrentOffset(device, batch.deviceClock(), now);
 
         Claim claim;
         try {
@@ -96,9 +108,9 @@ class BatchIngestor {
 
         return switch (claim) {
             case StoredAck stored -> {
-                Completed now = transactions.current(device);
+                Completed state = transactions.current(device);
                 yield ack(
-                        batch, stored.stored().lastAppliedSeq(), stored.stored().outcomes(), now, floor);
+                        batch, stored.stored().lastAppliedSeq(), stored.stored().outcomes(), state, floor);
             }
             case InFlight inFlight -> throw inFlight(inFlight.batchId());
             case Gap gap -> throw new ProblemException("sync.sequence_gap", Map.of("expected_seq", gap.expectedSeq()));
@@ -106,7 +118,8 @@ class BatchIngestor {
                 List<Ack.Outcome> outcomes = transactions.fromState(device, batch.firstSeq(), batch.lastSeq());
                 yield ack(batch, replay.lastAppliedSeq(), outcomes, transactions.current(device), floor);
             }
-            case Claimed claimed -> applyNewEvents(device, record, batch, claimed.lastAppliedSeq(), floor);
+            case Claimed claimed ->
+                applyNewEvents(device, record, batch, claimed.lastAppliedSeq(), floor, currentOffsetMs);
         };
     }
 
@@ -115,12 +128,16 @@ class BatchIngestor {
             DeviceRecord record,
             BatchInput batch,
             long lastApplied,
-            AppVersionFloor.Standing floor) {
+            AppVersionFloor.Standing floor,
+            Long currentOffsetMs) {
         List<Ack.Outcome> outcomes = new ArrayList<>(batch.events().size());
         int duplicates = 0;
         int applied = 0;
         int quarantined = 0;
         try {
+            // After the claim, so a batch refused with 409 or answered from a stored acknowledgement
+            // raises nothing; once per device and floor (doc 31 section 6; K4-01).
+            floorAlerts.raiseOnce(device, batch.appVersion(), floor);
             // The overlap with what is already at central: answered from state, not applied again.
             if (batch.firstSeq() <= lastApplied) {
                 List<Ack.Outcome> known = transactions.fromState(device, batch.firstSeq(), lastApplied);
@@ -135,7 +152,14 @@ class BatchIngestor {
                 List<JsonNode> chunk = batch.events()
                         .subList(from, Math.min(from + chunkSize, batch.events().size()));
                 IngestTransactions.ChunkResult result = transactions.applyChunk(
-                        device, record, batch.batchId(), batch.firstSeq() + from, chunk, chunkIndex++, maxEventBytes);
+                        device,
+                        record,
+                        batch.batchId(),
+                        batch.firstSeq() + from,
+                        chunk,
+                        chunkIndex++,
+                        maxEventBytes,
+                        currentOffsetMs);
                 for (Ack.Outcome outcome : result.outcomes()) {
                     outcomes.add(outcome);
                     if (Ack.QUARANTINED.equals(outcome.outcome())) {

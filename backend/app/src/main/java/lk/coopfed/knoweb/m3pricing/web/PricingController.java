@@ -3,32 +3,51 @@ package lk.coopfed.knoweb.m3pricing.web;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.engine.Basket;
+import lk.coopfed.knoweb.engine.TenderKind;
+import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
 import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.CreatePriceList;
 import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.EnterControlPrice;
+import lk.coopfed.knoweb.m3pricing.api.EvaluateExpirySlowMovingDiscounts;
+import lk.coopfed.knoweb.m3pricing.api.ExpirySlowMovingEvaluationResult;
+import lk.coopfed.knoweb.m3pricing.api.ImportPriceListLines;
+import lk.coopfed.knoweb.m3pricing.api.PriceListImportReport;
+import lk.coopfed.knoweb.m3pricing.api.PrintShelfLabels;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.RescindControlPrice;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
 import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
 import lk.coopfed.knoweb.m3pricing.api.SetMrpPolicy;
+import lk.coopfed.knoweb.m3pricing.api.WithdrawDraft;
 import lk.coopfed.knoweb.m3pricing.api.WithdrawRule;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.EnterControlPriceHandler;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.RescindControlPriceHandler;
+import lk.coopfed.knoweb.m3pricing.internal.label.PrintShelfLabelsHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.CreatePriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
+import lk.coopfed.knoweb.m3pricing.internal.list.ImportPriceListLinesHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
+import lk.coopfed.knoweb.m3pricing.internal.list.WithdrawDraftHandler;
+import lk.coopfed.knoweb.m3pricing.internal.markdown.EvaluateExpirySlowMovingDiscountsHandler;
 import lk.coopfed.knoweb.m3pricing.internal.policy.SetMrpPolicyHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.CustomerPriceLookupView;
+import lk.coopfed.knoweb.m3pricing.query.ExpirySlowMovingDiscountView;
+import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
@@ -36,18 +55,33 @@ import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import lk.coopfed.knoweb.m3pricing.web.generated.AuthorRuleRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.BasketResult;
+import lk.coopfed.knoweb.m3pricing.web.generated.BatchCandidate;
 import lk.coopfed.knoweb.m3pricing.web.generated.ControlPriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.CustomerPriceLookupResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.EvaluateExpirySlowMovingDiscountsRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingDiscountResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ExpirySlowMovingEvaluationResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ImportPriceListLinesRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.LabelJobResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
+import lk.coopfed.knoweb.m3pricing.web.generated.LineResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.MrpPolicyResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListDetailResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.PriceListImportProblem;
+import lk.coopfed.knoweb.m3pricing.web.generated.PriceListImportReportResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListLineResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PricingApi;
+import lk.coopfed.knoweb.m3pricing.web.generated.PrintShelfLabelsRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.PublishPriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RescindControlPriceRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketLineRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RetailPriceResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ReviewItem;
 import lk.coopfed.knoweb.m3pricing.web.generated.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.web.generated.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.web.generated.RuleResponse;
@@ -55,7 +89,10 @@ import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetMrpPolicyRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.TradePriceResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.WithdrawDraftRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.WithdrawRuleRequest;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -70,42 +107,101 @@ class PricingController implements PricingApi {
     private final CreatePriceListHandler create;
     private final DraftNewVersionHandler draftNewVersion;
     private final SetLinesHandler setLines;
+    private final ImportPriceListLinesHandler importPriceListLines;
     private final PublishPriceListHandler publish;
+    private final WithdrawDraftHandler withdrawDraft;
     private final AuthorRuleHandler authorRule;
     private final ActivateRuleHandler activateRule;
     private final WithdrawRuleHandler withdrawRule;
     private final EnterControlPriceHandler enterControlPrice;
     private final RescindControlPriceHandler rescindControlPrice;
     private final SetMrpPolicyHandler setMrpPolicy;
+    private final PrintShelfLabelsHandler printShelfLabels;
+    private final EvaluateExpirySlowMovingDiscountsHandler evaluateExpirySlowMovingDiscounts;
     private final PricingQueries queries;
     private final CurrentScope currentScope;
+    private final ObjectProvider<A4Renderer> renderer;
 
     @SuppressWarnings("java:S107") // one handler per operation of the slice; a controller only translates
     PricingController(
             CreatePriceListHandler create,
             DraftNewVersionHandler draftNewVersion,
             SetLinesHandler setLines,
+            ImportPriceListLinesHandler importPriceListLines,
             PublishPriceListHandler publish,
+            WithdrawDraftHandler withdrawDraft,
             AuthorRuleHandler authorRule,
             ActivateRuleHandler activateRule,
             WithdrawRuleHandler withdrawRule,
             EnterControlPriceHandler enterControlPrice,
             RescindControlPriceHandler rescindControlPrice,
             SetMrpPolicyHandler setMrpPolicy,
+            PrintShelfLabelsHandler printShelfLabels,
+            EvaluateExpirySlowMovingDiscountsHandler evaluateExpirySlowMovingDiscounts,
             PricingQueries queries,
-            CurrentScope currentScope) {
+            CurrentScope currentScope,
+            ObjectProvider<A4Renderer> renderer) {
         this.enterControlPrice = enterControlPrice;
         this.rescindControlPrice = rescindControlPrice;
         this.setMrpPolicy = setMrpPolicy;
+        this.printShelfLabels = printShelfLabels;
+        this.evaluateExpirySlowMovingDiscounts = evaluateExpirySlowMovingDiscounts;
         this.create = create;
         this.draftNewVersion = draftNewVersion;
         this.setLines = setLines;
+        this.importPriceListLines = importPriceListLines;
         this.publish = publish;
+        this.withdrawDraft = withdrawDraft;
         this.authorRule = authorRule;
         this.activateRule = activateRule;
         this.withdrawRule = withdrawRule;
         this.queries = queries;
         this.currentScope = currentScope;
+        this.renderer = renderer;
+    }
+
+    // ---- shelf-label printing (M3-09) ----------------------------------------------------------
+
+    @Override
+    public ResponseEntity<LabelJobResponse> printShelfLabels(String idempotencyKey, PrintShelfLabelsRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID jobId = printShelfLabels.handle(
+                new PrintShelfLabels(request.getLocationId(), List.copyOf(request.getSkuIds())), scope);
+        LabelJobView job = queries.labelJob(jobId, scope).orElseThrow();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(toResponse(job, scope));
+    }
+
+    @Override
+    public ResponseEntity<LabelJobResponse> getLabelJob(UUID jobId) {
+        ScopeContext scope = currentScope.get();
+        return queries.labelJob(jobId, scope)
+                .map(job -> ResponseEntity.ok(toResponse(job, scope)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private LabelJobResponse toResponse(LabelJobView job, ScopeContext scope) {
+        LabelJobResponse response = new LabelJobResponse(
+                job.jobId(),
+                job.locationId(),
+                LabelJobResponse.StatusEnum.fromValue(job.status()),
+                job.requestedCount(),
+                job.renderedCount(),
+                job.refused().stream()
+                        .map(refusal -> new lk.coopfed.knoweb.m3pricing.web.generated.LabelRefusal(
+                                        refusal.skuId(),
+                                        refusal.skuCode(),
+                                        lk.coopfed.knoweb.m3pricing.web.generated.LabelRefusal.ReasonEnum.fromValue(
+                                                refusal.reason()),
+                                        refusal.listPrice(),
+                                        refusal.ceilingPrice())
+                                .ceilingReference(refusal.ceilingReference()))
+                        .toList(),
+                job.createdAt());
+        A4Renderer pdf = renderer.getIfAvailable();
+        if (job.objectKey() != null && pdf != null) {
+            response.setDownloadUrl(pdf.presignGet(job.objectKey(), scope));
+        }
+        return response;
     }
 
     // ---- control prices (M3-06) ----------------------------------------------------------------
@@ -235,6 +331,67 @@ class PricingController implements PricingApi {
     }
 
     @Override
+    public ResponseEntity<RetailPriceResponse> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uom, BigDecimal qty, LocalDate date) {
+        return queries.resolveCommercialPrice(locationId, skuId, uom, qty, date, currentScope.get())
+                .map(price -> new RetailPriceResponse(
+                                price.locationId(),
+                                price.skuId(),
+                                price.uomCode(),
+                                price.sellable(),
+                                RetailPriceResponse.CapReasonEnum.fromValue(price.capReason()),
+                                RetailPriceResponse.PolicyEnum.fromValue(price.policy()),
+                                price.engineVersion())
+                        .reason(price.reason())
+                        .priceListId(price.priceListId())
+                        .listPrice(price.listPrice())
+                        .unitPrice(price.unitPrice())
+                        .mrpApplied(price.mrpApplied())
+                        .controlPrice(price.controlPrice())
+                        .batchId(price.batchId()))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // ---- customer price lookup (M3-08) ---------------------------------------------------------
+
+    @Override
+    public ResponseEntity<CustomerPriceLookupResponse> lookupCustomerPrice(
+            UUID locationId, UUID skuId, String barcode, String skuCode, String query, String uom, LocalDate date) {
+        return queries.lookupCustomerPrice(locationId, skuId, barcode, skuCode, query, uom, date, currentScope.get())
+                .map(this::toCustomerResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<List<CustomerPriceLookupResponse>> searchCustomerPrices(
+            UUID locationId, String query, LocalDate date, Integer limit) {
+        int max = limit != null ? limit : 20;
+        List<CustomerPriceLookupResponse> list =
+                queries.searchCustomerPrices(locationId, query, date, max, currentScope.get()).stream()
+                        .map(this::toCustomerResponse)
+                        .toList();
+        return ResponseEntity.ok(list);
+    }
+
+    private CustomerPriceLookupResponse toCustomerResponse(CustomerPriceLookupView view) {
+        return new CustomerPriceLookupResponse(
+                        view.skuId(),
+                        view.skuCode(),
+                        view.productName(),
+                        view.uom(),
+                        view.publicPrice(),
+                        view.currency(),
+                        view.isAvailable(),
+                        view.isPriceControlled(),
+                        view.locationId())
+                .controlPrice(view.controlPrice())
+                .locationName(view.locationName())
+                .effectiveDate(view.effectiveDate());
+    }
+
+    @Override
     public ResponseEntity<List<PriceListLineResponse>> listAdvisoryLines(LocalDate date) {
         return ResponseEntity.ok(queries.advisoryLines(date, currentScope.get()).stream()
                 .map(PricingController::toResponse)
@@ -273,7 +430,11 @@ class PricingController implements PricingApi {
                                         p.getUomCode(),
                                         p.getMinQty(),
                                         p.getDaysToExpiry(),
-                                        p.getBillTotalFrom()),
+                                        p.getBillTotalFrom(),
+                                        p.getCustomerClass() == null
+                                                ? null
+                                                : p.getCustomerClass().getValue(),
+                                        p.getLocationId()),
                         new lk.coopfed.knoweb.m3pricing.api.RuleBenefit(
                                 request.getBenefit().getKind().getValue(),
                                 request.getBenefit().getValue()),
@@ -311,7 +472,12 @@ class PricingController implements PricingApi {
                                 .uomCode(p.uomCode())
                                 .minQty(p.minQty())
                                 .daysToExpiry(p.daysToExpiry())
-                                .billTotalFrom(p.billTotalFrom()),
+                                .billTotalFrom(p.billTotalFrom())
+                                .customerClass(
+                                        p.customerClass() == null
+                                                ? null
+                                                : RulePredicate.CustomerClassEnum.fromValue(p.customerClass()))
+                                .locationId(p.locationId()),
                         new RuleBenefit(
                                 RuleBenefit.KindEnum.fromValue(rule.benefit().kind()),
                                 rule.benefit().value()),
@@ -380,10 +546,59 @@ class PricingController implements PricingApi {
     }
 
     @Override
+    public ResponseEntity<PriceListImportReportResponse> importPriceListLines(
+            String idempotencyKey, UUID listId, ImportPriceListLinesRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<ImportPriceListLines.ImportLineRow> rows = null;
+        if (request.getLines() != null) {
+            rows = request.getLines().stream()
+                    .map(l -> new ImportPriceListLines.ImportLineRow(
+                            l.getSku(), l.getSkuId(), l.getUomCode(), l.getTierFromQty(), l.getPrice()))
+                    .toList();
+        }
+        boolean replace = request.getReplace() == null || Boolean.TRUE.equals(request.getReplace());
+        ImportPriceListLines command = new ImportPriceListLines(listId, request.getSheet(), rows, replace);
+        PriceListImportReport report = importPriceListLines.handle(command, scope);
+
+        List<LineOutcome> outcomes = report.outcomes().stream()
+                .map(outcome -> new LineOutcome(outcome.skuId(), outcome.uomCode(), outcome.tierFromQty(), outcome.ok())
+                        .reason(outcome.reason())
+                        .review(outcome.review())
+                        .ceilingKind(outcome.ceilingKind())
+                        .ceilingValue(outcome.ceilingValue())
+                        .ceilingRef(outcome.ceilingRef()))
+                .toList();
+
+        List<PriceListImportProblem> problems = report.problems().stream()
+                .map(p -> new PriceListImportProblem(p.line(), p.message())
+                        .sku(p.sku())
+                        .field(p.field()))
+                .toList();
+
+        PriceListImportReportResponse response = new PriceListImportReportResponse(
+                report.priceListId(),
+                report.saved(),
+                report.totalRows(),
+                report.importedLines(),
+                report.errorRows(),
+                problems,
+                outcomes);
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
     public ResponseEntity<PriceListResponse> publishPriceList(
             String idempotencyKey, UUID listId, PublishPriceListRequest request) {
         ScopeContext scope = currentScope.get();
         UUID id = publish.handle(new PublishPriceList(listId, request.getApplyFrom()), scope);
+        return ResponseEntity.ok(toResponse(queries.getPriceList(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<PriceListResponse> withdrawDraft(
+            String idempotencyKey, UUID listId, WithdrawDraftRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID id = withdrawDraft.handle(new WithdrawDraft(listId, request.getReason()), scope);
         return ResponseEntity.ok(toResponse(queries.getPriceList(id, scope).orElseThrow()));
     }
 
@@ -437,5 +652,182 @@ class PricingController implements PricingApi {
                 price.tierFromQty(),
                 price.unitPrice(),
                 price.engineVersion());
+    }
+
+    // ---- basket resolution and reviews (M3-08) ---------------------------------------------------
+
+    /**
+     * The tenders of the slice the engine prices (M3R-02). Doc 23 section 3.5 (FR-PRC-100, G-10):
+     * cash rounds the receipt to the rupee, card and account are exact, and "other tenders exact".
+     * KHATA is the member's credit account, the engine's ACCOUNT; a CHEQUE is exact, priced as a
+     * card. A VOUCHER is out of scope for M3 (doc 23 section 1: coupons and vouchers are later
+     * phases), so it is refused with a 400, not priced as something it is not.
+     */
+    static TenderKind engineTender(ResolveBasketRequest.TenderKindEnum tender) {
+        return switch (tender) {
+            case CASH -> TenderKind.CASH;
+            case CARD, CHEQUE -> TenderKind.CARD;
+            case KHATA -> TenderKind.ACCOUNT;
+            default ->
+                throw new ProblemException("m3.basket.tender_not_priced", Map.of("tenderKind", tender.getValue()));
+        };
+    }
+
+    @Override
+    public ResponseEntity<BasketResult> resolveBasket(String idempotencyKey, ResolveBasketRequest request) {
+        ScopeContext scope = currentScope.get();
+        TenderKind tender = engineTender(request.getTenderKind());
+
+        List<lk.coopfed.knoweb.engine.LineInput> engineLines = new ArrayList<>();
+        for (ResolveBasketLineRequest l : request.getLines()) {
+            lk.coopfed.knoweb.engine.Quantity qty;
+            try {
+                qty = lk.coopfed.knoweb.engine.Quantity.of(l.getQty());
+            } catch (ArithmeticException moreThanThreeDecimals) {
+                // doc 18: a quantity is numeric(14,3); the engine refuses a fourth decimal (M3R-02).
+                throw new ProblemException("m3.basket.qty_precision", Map.of("skuId", l.getSkuId()));
+            }
+            engineLines.add(new lk.coopfed.knoweb.engine.LineInput(
+                    l.getSkuId(), l.getUom(), qty, l.getBatchId(), l.getPickedBatchId()));
+        }
+
+        lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass beneficiaryClass = null;
+        if (request.getBeneficiaryClass() != null) {
+            beneficiaryClass = lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass.valueOf(
+                    request.getBeneficiaryClass().getValue());
+        }
+
+        return queries.resolveBasket(
+                        request.getLocationId(),
+                        request.getBusinessDate(),
+                        tender,
+                        new Basket(engineLines),
+                        beneficiaryClass,
+                        request.getBeneficiaryIdentifier(),
+                        scope)
+                .map(result -> ResponseEntity.ok(toResponse(result)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private static BasketResult toResponse(lk.coopfed.knoweb.engine.BasketResult result) {
+        BasketResult br = new BasketResult();
+        br.setTotal(result.getTotal().getAmount());
+        br.setSubtotal(result.getSubtotal().getAmount());
+        br.setRounding(result.getRounding().getAmount());
+        br.setBillDiscount(result.getBillDiscount().getAmount());
+        br.setBillRuleId(result.getBillRuleId());
+        br.setEngineVersion(result.getEngineVersion());
+        // Central reads the tables, not a snapshot: there is no snapshot version to report (M3R-03).
+        br.setSnapshotVersion(null);
+        List<LineResult> lines = new ArrayList<>();
+        for (lk.coopfed.knoweb.engine.LineResult l : result.getLines()) {
+            lines.add(toResponse(l));
+        }
+        br.setLines(lines);
+        return br;
+    }
+
+    private static LineResult toResponse(lk.coopfed.knoweb.engine.LineResult l) {
+        LineResult lr = new LineResult();
+        lr.setSkuId(l.getSkuId());
+        lr.setUom(l.getInput().getUom());
+        lr.setQty(l.getInput().getQty().getValue());
+        lr.setUnitPrice(l.getUnitPrice().getAmount());
+        lr.setLineTotal(l.getLineTotal().getAmount());
+        lr.setDiscountAmount(l.getDiscountAmount().getAmount());
+        lr.setBatchId(l.getBatch() != null ? l.getBatch().getBatchId() : null);
+        lr.setRuleId(l.getRuleId());
+        lr.setTaxRatePercent(l.getTaxRatePercent());
+        lr.setTaxAmount(l.getTaxAmount().getAmount());
+        lr.setMrpApplied(l.getMrpApplied() != null ? l.getMrpApplied().getAmount() : null);
+        lr.setControlPriceApplied(
+                l.getControlPriceApplied() != null ? l.getControlPriceApplied().getAmount() : null);
+        // The engine's own names, as RetailPriceResponse reports them (M3R-03).
+        lr.setCapReason(LineResult.CapReasonEnum.fromValue(l.getCapReason().name()));
+        // 23A section 5: "candidates only for PICKER"; the engine fills them when the till must pick.
+        List<BatchCandidate> candidates = new ArrayList<>();
+        for (lk.coopfed.knoweb.engine.BatchCandidate c : l.getCandidates()) {
+            BatchCandidate candidate = new BatchCandidate();
+            candidate.setBatchId(c.getBatchId());
+            candidate.setBatchNo(c.getBatchNo());
+            candidate.setPrintedMrp(
+                    c.getPrintedMrp() != null ? c.getPrintedMrp().getAmount() : null);
+            candidate.setExpiry(c.getExpiry());
+            candidates.add(candidate);
+        }
+        lr.setCandidates(candidates);
+        return lr;
+    }
+
+    @Override
+    public ResponseEntity<List<ReviewItem>> listReviews(String kind, String status) {
+        ScopeContext scope = currentScope.get();
+
+        List<ReviewItem> result = new ArrayList<>();
+        for (lk.coopfed.knoweb.m3pricing.query.ReviewItem r : queries.listReviews(kind, status, scope)) {
+            ReviewItem item = new ReviewItem();
+            item.setReviewId(r.reviewId());
+            item.setKind(r.kind());
+            item.setSeverity(r.severity());
+            item.setStatus(ReviewItem.StatusEnum.fromValue(r.status()));
+            item.setOccurredAt(r.occurredAt().toInstant());
+            item.setOwnerEntityId(r.ownerEntityId());
+            item.setSkuId(r.skuId());
+            item.setSkuName(r.skuName());
+            item.setSkuCode(r.skuCode());
+            item.setDetails(r.details());
+            result.add(item);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    // ---- PGL-M1-07: Expiry / Slow-Moving Discounts ---------------------------------------------
+
+    @Override
+    public ResponseEntity<ExpirySlowMovingEvaluationResponse> evaluateExpirySlowMovingDiscounts(
+            String idempotencyKey, EvaluateExpirySlowMovingDiscountsRequest request) {
+        ScopeContext scope = currentScope.get();
+        ExpirySlowMovingEvaluationResult result = evaluateExpirySlowMovingDiscounts.handle(
+                new EvaluateExpirySlowMovingDiscounts(request.getLocationId()), scope);
+        return ResponseEntity.ok(new ExpirySlowMovingEvaluationResponse(
+                result.locationId(),
+                result.totalEvaluated(),
+                result.markdownsActive(),
+                result.nearExpiryCount(),
+                result.slowMovingCount(),
+                result.evaluatedAt()));
+    }
+
+    @Override
+    public ResponseEntity<List<ExpirySlowMovingDiscountResponse>> listExpirySlowMovingDiscounts(
+            UUID locationId, String reason, String status) {
+        ScopeContext scope = currentScope.get();
+        List<ExpirySlowMovingDiscountResponse> responses =
+                queries.listExpirySlowMovingDiscounts(locationId, reason, status, scope).stream()
+                        .map(PricingController::toResponse)
+                        .toList();
+        return ResponseEntity.ok(responses);
+    }
+
+    private static ExpirySlowMovingDiscountResponse toResponse(ExpirySlowMovingDiscountView view) {
+        ExpirySlowMovingDiscountResponse res = new ExpirySlowMovingDiscountResponse(
+                view.skuId(),
+                view.skuCode(),
+                view.locationId(),
+                ExpirySlowMovingDiscountResponse.ReasonEnum.fromValue(view.reason()),
+                view.tierOrClassification(),
+                view.basePrice(),
+                view.markdownPercent(),
+                view.discountedPrice(),
+                view.qtyOnHand(),
+                ExpirySlowMovingDiscountResponse.StatusEnum.fromValue(view.status()));
+        res.setStockLotId(view.stockLotId());
+        res.setBatchId(view.batchId());
+        res.setBatchNo(view.batchNo());
+        res.setExpiryDate(view.expiryDate());
+        res.setDaysToExpiry(view.daysToExpiry());
+        res.setValidFrom(view.validFrom());
+        res.setValidTo(view.validTo());
+        return res;
     }
 }

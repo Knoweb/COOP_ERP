@@ -42,3 +42,9 @@ fresh its data is. Written by `ReportPrintModel` (m8reporting); every value arri
 | `rows` | list of rows, each a list of texts in column order |
 | `totals` | list of texts in column order (the word "Total" in the first free cell); absent when nothing sums or there are no rows |
 | `empty` | text shown instead of the table when there are no rows |
+
+## default
+
+M3's default shelf-label sheet (PRC-03): three labels across an A4 page. `LabelPrintModel`
+supplies `labels`, each with `code`, all three names, `price`, `unit` and `mrpNote`, plus the
+translated `priceLabel`, `unitLabel` and `empty` text. An all-refused job prints only `empty`.

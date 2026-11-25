@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m3pricing.internal.list;
 
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -19,7 +21,10 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m3pricing.api.PriceListPublished;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
+import lk.coopfed.knoweb.m3pricing.api.ReviewRaised;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
+import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
+import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,11 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
  * delegation). Mutation: the lines are dated apply_from, the draft becomes PUBLISHED and the
  * previous published version SUPERSEDED. Event: price_list.published.v1.
  *
- * <p>Deferred for the demo (M3-04): closing the previous version's lines at apply_from - 1. The
- * trade price lookup and the retail price resolution read the newest version in force on
- * the date (PriceListStore.versionInForce), so the previous version stops answering at the new
- * one's apply_from without its lines being closed. The previous version is marked SUPERSEDED at
- * publication rather than at apply_from; it still answers for dates before apply_from.
+ * <p>Publication also closes the previous version's line dates at apply_from minus one
+ * day, preserving historical pricing. A successor must start strictly after its predecessor.
+ * The previous version remains available for historical queries.
  */
 @Service
 @CommandHandler(permission = "prc.pricelist.publish", requiresMfa = true)
@@ -52,6 +55,7 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
     private final JdbcTemplate jdbc;
     private final PriceListStore store;
     private final AuthoringValidator validator;
+    private final ConfigRegistry config;
     private final AuditFacade audit;
     private final EventPublisher events;
     private final Clock clock;
@@ -61,6 +65,7 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
             JdbcTemplate jdbc,
             PriceListStore store,
             AuthoringValidator validator,
+            ConfigRegistry config,
             AuditFacade audit,
             EventPublisher events,
             Clock clock,
@@ -68,6 +73,7 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         this.jdbc = jdbc;
         this.store = store;
         this.validator = validator;
+        this.config = config;
         this.audit = audit;
         this.events = events;
         this.clock = clock;
@@ -99,12 +105,20 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         List<SetLines.Line> asAuthored = lines.stream()
                 .map(line -> new SetLines.Line(line.skuId(), line.uomCode(), line.tierFromQty(), line.price()))
                 .toList();
-        if (validator.check(list.kind(), asAuthored, command.applyFrom(), scope).stream()
-                .anyMatch(outcome -> !outcome.ok())) {
+        List<SetLinesResult.Outcome> outcomes = validator.check(list.kind(), asAuthored, command.applyFrom(), scope);
+        if (outcomes.stream().anyMatch(outcome -> !outcome.ok())) {
             throw new ProblemException("m3.price_list.lines_invalid");
         }
 
+        List<AboveMrp> aboveMrp = PriceListStore.TRADE.equals(list.kind())
+                        && config.getBoolean("pricing.trade_above_mrp_review", scope, true)
+                ? aboveMrp(asAuthored, outcomes)
+                : List.of();
+
         Optional<PriceListView> previous = store.published(list.rootPriceListId());
+        if (previous.isPresent() && !command.applyFrom().isAfter(previous.get().applyFrom())) {
+            throw new ProblemException("m3.price_list.apply_from_not_after_previous");
+        }
         jdbc.update(
                 "update pricing.price_list_line set effective_from = ? where price_list_id = ?",
                 Date.valueOf(command.applyFrom()),
@@ -119,6 +133,14 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
                 Timestamp.from(clock.instant()),
                 list.priceListId());
 
+        // The successor is now PUBLISHED and its predecessor SUPERSEDED.
+        // V0011 permits only this effective_to change on old lines.
+        previous.ifPresent(old -> jdbc.update(
+                "update pricing.price_list_line set effective_to = ?"
+                        + " where price_list_id = ? and effective_to is null",
+                Date.valueOf(command.applyFrom().minusDays(1)),
+                old.priceListId()));
+
         List<UUID> skuIds =
                 lines.stream().map(PriceListLineView::skuId).distinct().toList();
         Map<String, Object> before = new LinkedHashMap<>();
@@ -130,6 +152,15 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         after.put("version", list.version());
         after.put("lines", lines.size());
         audit.record(AUDIT_PUBLISHED, Subject.of("price_list", list.priceListId()), before, after, scope);
+        for (AboveMrp review : aboveMrp) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("priceListId", list.priceListId());
+            details.put("uomCode", review.uomCode());
+            details.put("tierFromQty", review.tierFromQty());
+            details.put("price", review.price());
+            details.put("mrp", review.mrp());
+            audit.record(PricingReviews.TRADE_ABOVE_MRP, Subject.of("sku", review.skuId()), null, details, scope);
+        }
 
         events.publish(new PriceListPublished(
                 list.priceListId(),
@@ -139,6 +170,39 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
                 list.version(),
                 command.applyFrom(),
                 skuIds));
+        for (AboveMrp review : aboveMrp) {
+            events.publish(new ReviewRaised(
+                    PricingReviews.TRADE_ABOVE_MRP,
+                    review.skuId(),
+                    scope.entityId(),
+                    list.priceListId().toString()));
+        }
         return list.priceListId();
+    }
+
+    /** A TRADE line above the SKU's lowest printed MRP: the review of doc 23 section 3.4. */
+    private record AboveMrp(UUID skuId, String uomCode, BigDecimal tierFromQty, BigDecimal price, BigDecimal mrp) {}
+
+    /**
+     * One review per SKU and unit (M3R-06), not one per tier: the highest offending line of the
+     * pair, read from the line the outcome belongs to (the validator answers one outcome per line,
+     * in the order given).
+     */
+    private static List<AboveMrp> aboveMrp(List<SetLines.Line> lines, List<SetLinesResult.Outcome> outcomes) {
+        Map<String, AboveMrp> highest = new LinkedHashMap<>();
+        for (int i = 0; i < outcomes.size() && i < lines.size(); i++) {
+            SetLinesResult.Outcome outcome = outcomes.get(i);
+            if (!AuthoringValidator.REVIEW_ABOVE_MRP.equals(outcome.review())) {
+                continue;
+            }
+            SetLines.Line line = lines.get(i);
+            AboveMrp candidate = new AboveMrp(
+                    line.skuId(), line.uomCode(), line.tierFromQty(), line.price(), outcome.ceilingValue());
+            highest.merge(
+                    line.skuId() + "|" + line.uomCode(),
+                    candidate,
+                    (kept, next) -> next.price().compareTo(kept.price()) > 0 ? next : kept);
+        }
+        return List.copyOf(highest.values());
     }
 }

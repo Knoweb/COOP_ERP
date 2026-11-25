@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { LocationName, SkuLabel } from "./labels";
 import { useTradingApi, type DeliveryNote } from "./tradingApi";
 import { countReady, errorText, grnRequest, isShort, type CountRow } from "./tradingView";
@@ -156,42 +157,55 @@ export function NewGrnPage() {
 
   return (
     <main className="shell-page">
-      <Link to={`/trading/delivery-notes/${deliveryNoteId}`}>{t("trading.back_to_note").text}</Link>
-      <h1>{t("trading.grn.new.title", undefined, { number: note.data?.docNumber ?? "" }).text}</h1>
+      <Link className="back-link back-pill-btn" to={`/trading/delivery-notes/${deliveryNoteId}`}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back_to_note").text}</span>
+      </Link>
+      <PageHeader
+        icon="stock"
+        title={t("trading.grn.new.title", undefined, { number: note.data?.docNumber ?? "" }).text}
+      />
       <p>
         {t("trading.field.receive_at").text}: <LocationName locationId={drop.shipToLocationId} />
       </p>
       <form onSubmit={send} className="trading-form-row">
-        <table>
-          <thead>
-            <tr>
-              <th>{t("trading.column.item").text}</th>
-              <th>{t("trading.column.expected").text}</th>
-              <th>{t("trading.column.received").text}</th>
-              <th>{t("trading.column.damaged").text}</th>
-              <th>{t("trading.column.batch").text}</th>
-              <th>{t("trading.column.expiry").text}</th>
-              <th>{t("trading.column.mrp").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.skuId}>
-                <td>
-                  <SkuLabel skuId={row.skuId} />
-                </td>
-                <td>{row.expected}</td>
-                {cell(index, "received", "number", "trading.column.received")}
-                {cell(index, "damaged", "number", "trading.column.damaged")}
-                {cell(index, "batchNo", "text", "trading.column.batch")}
-                {cell(index, "expiryDate", "date", "trading.column.expiry")}
-                {cell(index, "printedMrp", "number", "trading.column.mrp")}
-                <td>{isShort(row) && <strong>{t("trading.grn.short").text}</strong>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="modern-table-card trading-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table trading-table">
+              <thead>
+                <tr>
+                  <th>{t("trading.column.item").text}</th>
+                  <th>{t("trading.column.expected").text}</th>
+                  <th>{t("trading.column.received").text}</th>
+                  <th>{t("trading.column.damaged").text}</th>
+                  <th>{t("trading.column.batch").text}</th>
+                  <th>{t("trading.column.expiry").text}</th>
+                  <th className="trading-cell-numeric">{t("trading.column.mrp").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={row.skuId}>
+                    <td>
+                      <SkuLabel skuId={row.skuId} />
+                    </td>
+                    <td>{row.expected}</td>
+                    {cell(index, "received", "number", "trading.column.received")}
+                    {cell(index, "damaged", "number", "trading.column.damaged")}
+                    {cell(index, "batchNo", "text", "trading.column.batch")}
+                    {cell(index, "expiryDate", "date", "trading.column.expiry")}
+                    {cell(index, "printedMrp", "number", "trading.column.mrp")}
+                    <td>{isShort(row) && <strong>{t("trading.grn.short").text}</strong>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div>
           <button type="submit" disabled={capture.isPending || rows.length === 0 || !countReady(rows)}>
             {t("trading.grn.capture").text}

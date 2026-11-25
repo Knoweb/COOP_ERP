@@ -18,8 +18,23 @@ import java.util.UUID;
 public interface DayClose {
 
     /**
+     * Closes the day unconditionally or at the cut-off.
+     *
      * @param locationId the location; its business date is the caller's scope entity's to close
      * @return the business date the location trades on from now
      */
-    LocalDate close(UUID locationId, ScopeContext ctx);
+    default LocalDate close(UUID locationId, ScopeContext ctx) {
+        return closeForDate(locationId, null, ctx);
+    }
+
+    /**
+     * Atomically closes the location's day if and only if its current business date under lock
+     * matches {@code expectedDate} (or unconditionally if {@code expectedDate} is null).
+     *
+     * @param locationId the location
+     * @param expectedDate the expected business date, or null if unconditional
+     * @param ctx the caller's scope
+     * @return the business date the location trades on from now
+     */
+    LocalDate closeForDate(UUID locationId, LocalDate expectedDate, ScopeContext ctx);
 }

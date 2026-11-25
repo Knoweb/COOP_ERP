@@ -31,7 +31,8 @@ object EncryptedJvmDatabase {
         // below FULL may lose the last commits, and with them a receipt already printed, whose
         // number and device sequence would then be issued again. A sale is a few rows; FULL costs
         // nothing a cashier notices.
-        properties["synchronous"] = "FULL"
-        return JdbcSqliteDriver("jdbc:sqlite:${file.toAbsolutePath()}", properties, TillDatabase.Schema)
+        val driver = JdbcSqliteDriver("jdbc:sqlite:${file.toAbsolutePath()}", properties)
+        TillDatabaseMigrator.migrate(driver)
+        return driver
     }
 }

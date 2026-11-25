@@ -10,6 +10,13 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M3 Pricing & Rules",
-        allowedDependencies = {"kernel", "kernel::api", "engine", "m1party::api", "m1party::query", "m2catalogue::query"
+        allowedDependencies = {
+            "kernel",
+            "kernel::api",
+            "engine",
+            "m1party::api",
+            "m1party::query",
+            "m2catalogue::query",
+            "m2catalogue::api"
         })
 package lk.coopfed.knoweb.m3pricing;

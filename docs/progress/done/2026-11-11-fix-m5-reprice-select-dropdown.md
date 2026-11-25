@@ -1,0 +1,1 @@
+- fix(m5inventory): keep portalled inventory selects within the viewport and add mouse, keyboard, focus, permission, and browser regressions for stock repricing on branch `fix/m5-reprice-select-dropdown`.

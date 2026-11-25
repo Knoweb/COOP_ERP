@@ -1,0 +1,1 @@
+- Improved PGL-M2-01 browser usability by linking Stock Position to Reorder Controls for authorized inventory users and replacing the internal SKU UUID field with the existing authorized M2 catalogue search, localized code/name results, keyboard selection flow, edit-state resolution, and focused frontend regressions; reorder APIs and business rules remain unchanged.

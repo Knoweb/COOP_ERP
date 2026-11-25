@@ -1,0 +1,164 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
+import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
+import { StateChip } from "../../shell/components/StateChip";
+import { usePricingApi } from "./pricingApi";
+import type { ReviewItem } from "./pricingApi";
+import { SkuName } from "./SkuPicker";
+import { errorText } from "./priceListState";
+import { PricingSelect } from "./PricingSelect";
+import { PricingTabs } from "./PricingTabs";
+import "./pricing.css";
+
+/**
+ * Exceptions and reviews screen (/pricing/reviews; doc 23 section 4.3; PRC-01).
+ * Shows audit-recorded pricing review events (BATCH_MRP_BELOW_LIST, TRADE_ABOVE_MRP, LIST_ABOVE_CEILING_AT_GAZETTE)
+ * in the caller's entity scope.
+ */
+export function PricingReviewsPage() {
+  const t = useT();
+  const formatDate = useFormatDate();
+  const api = usePricingApi();
+  const canView = useHasPermission("prc.review.view");
+
+  const [kindFilter, setKindFilter] = useState<string>("ALL");
+
+  const reviewsQuery = useQuery({
+    queryKey: ["pricing", "reviews", kindFilter],
+    queryFn: () =>
+      api.listReviews(
+        kindFilter !== "ALL" ? (kindFilter as ReviewItem["kind"]) : undefined
+      ),
+    enabled: canView
+  });
+
+  return (
+    <main className="shell-page">
+      <PageHeader icon="reviews" title={t("pricing.reviews.title").text} />
+      <PricingTabs />
+      <p className="modern-intro-text pricing-reviews-intro">{t("pricing.reviews.intro").text}</p>
+
+      <section className="pricing-section pricing-reviews-section">
+        <div className="pricing-reviews-filter-bar">
+          <label className="pricing-reviews-filter-field">
+            <span className="pricing-filter-label">{t("pricing.reviews.filter_kind").text}</span>
+            <PricingSelect
+              aria-label={t("pricing.reviews.filter_kind").text}
+              value={kindFilter}
+              onChange={setKindFilter}
+              options={[
+                { value: "ALL", label: t("pricing.reviews.kind.ALL").text },
+                { value: "BATCH_MRP_BELOW_LIST", label: t("pricing.reviews.kind.BATCH_MRP_BELOW_LIST").text },
+                { value: "TRADE_ABOVE_MRP", label: t("pricing.reviews.kind.TRADE_ABOVE_MRP").text },
+                { value: "LIST_ABOVE_CEILING_AT_GAZETTE", label: t("pricing.reviews.kind.LIST_ABOVE_CEILING_AT_GAZETTE").text }
+              ]}
+            />
+          </label>
+        </div>
+
+        {reviewsQuery.isLoading && (
+          <div className="modern-empty-state pricing-reviews-empty">{t("pricing.list.loading").text}</div>
+        )}
+        {reviewsQuery.isError && (
+          <p className="pricing-alert-box pricing-alert-box--error" role="alert">
+            {errorText(reviewsQuery.error, t("pricing.error.generic").text)}
+          </p>
+        )}
+        {reviewsQuery.data?.length === 0 && (
+          <div className="pricing-reviews-empty" role="status">
+            <div className="pricing-reviews-empty__badge" aria-hidden="true">
+              <svg
+                className="pricing-reviews-empty__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <p className="pricing-reviews-empty__title">{t("pricing.reviews.empty").text}</p>
+            <p className="pricing-reviews-empty__hint">{t("pricing.reviews.empty_hint").text}</p>
+          </div>
+        )}
+
+        {reviewsQuery.data && reviewsQuery.data.length > 0 && (
+          <div className="modern-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th className="pricing-cell-date">{t("pricing.reviews.column.occurred_at").text}</th>
+                    <th>{t("pricing.reviews.column.kind").text}</th>
+                    <th className="pricing-cell-center">{t("pricing.reviews.column.severity").text}</th>
+                    <th>{t("pricing.reviews.column.sku").text}</th>
+                    <th>{t("pricing.reviews.column.details").text}</th>
+                    <th className="pricing-cell-center">{t("pricing.reviews.column.status").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviewsQuery.data.map((review) => (
+                    <tr key={review.reviewId}>
+                      <td className="pricing-cell-date">{formatDate(review.occurredAt)}</td>
+                      <td>
+                        <strong>{t(`pricing.reviews.kind.${review.kind}`).text}</strong>
+                      </td>
+                      <td className="pricing-cell-center">
+                        <StateChip
+                          state={review.severity === "REVIEW" ? "alert" : "void"}
+                          label={review.severity}
+                        />
+                      </td>
+                      <td className="pricing-cell-item">
+                        {review.skuName || review.skuCode ? (
+                          <span>
+                            {review.skuCode ? `${review.skuCode} — ` : ""}
+                            {review.skuName ?? ""}
+                          </span>
+                        ) : review.skuId ? (
+                          <SkuName skuId={review.skuId} />
+                        ) : (
+                          <span className="pricing-muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <ReviewDetails details={review.details} />
+                      </td>
+                      <td className="pricing-cell-center">
+                        <StateChip
+                          state={review.status === "OPEN" ? "alert" : "issued"}
+                          label={t(`pricing.reviews.status.${review.status}`).text}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function ReviewDetails({ details }: { details: Record<string, unknown> | null | undefined }) {
+  if (!details || Object.keys(details).length === 0) {
+    return <span className="pricing-muted">—</span>;
+  }
+  return (
+    <div className="pricing-review-details">
+      {Object.entries(details).map(([k, v]) => (
+        <span key={k} className="pricing-detail-pill">
+          <strong>{k}:</strong> {String(v)}
+        </span>
+      ))}
+    </div>
+  );
+}

@@ -96,6 +96,11 @@ public class LocationBusinessDates implements BusinessDate, DayClose {
 
     @Override
     public LocalDate close(UUID locationId, ScopeContext ctx) {
+        return closeForDate(locationId, null, ctx);
+    }
+
+    @Override
+    public LocalDate closeForDate(UUID locationId, LocalDate expectedDate, ScopeContext ctx) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("DayClose.close was called outside a transaction");
         }
@@ -114,6 +119,13 @@ public class LocationBusinessDates implements BusinessDate, DayClose {
         register(locationId, ctx.entityId(), today);
 
         State state = lockedFind(locationId).orElseThrow(() -> new ProblemException("location.not_in_scope"));
+
+        // If a specific business date was expected, verify atomically under the lock.
+        // If the location's business date is not the expected one (e.g. stale event, delayed
+        // upload, future date, or another concurrent close already advanced it), do not advance.
+        if (expectedDate != null && !state.businessDate().isEqual(expectedDate)) {
+            return state.businessDate();
+        }
 
         // Already closed today: the business date moved past the calendar date. Keyed on the
         // business date, not on when the last close ran, so a cut-off after midnight does not

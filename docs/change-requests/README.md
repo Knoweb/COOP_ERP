@@ -38,6 +38,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-19A-10` — `kernel.api.SyncStatus` (a device's outbox state and `drained`) is a kernel contract (also 21A §6.1).
 - `CR-19A-12` — §10: quiet hours defer a notification to the window's end in the recipient's entity's window; they never suppress (docs 19 §7 and 29 §6.4 govern). Wave 2, 6 Oct 2026.
 - `CR-19A-13` — §5 (also doc 19 §5): counterparty delivery, a consumer registered with `party = COUNTERPARTY` runs in the OWN scope of the payload's counterparty for a central event whose document names that counterparty; the buyer's INV and CN postings travel this way. Wave 2, 6 Oct 2026.
+- `CR-19A-14` — §4 (audit) and §12 (jobs): `kernel.api.AuditReviewReader` reads a module's REVIEW audit records through two definer functions owned by `kernel_audit_reader`, the event codes passed by the caller; a module scope-minting API (`ScopedExecution`) is rejected in favour of CR-19A-7's job pattern. Wave 4, 13 Oct 2026.
 
 ### 21A (M1 Party, Tenancy and Security Implementation Guide)
 
@@ -57,6 +58,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 ### 23A (M3 Pricing Implementation Guide)
 
 - `CR-23A-1` — §3, §6, §7: `FIXED_PRICE > 0`, `PERCENT_OFF < 100`, a RETAIL line price `> 0`; a control price backdated by at most `pricing.control_price_backdate_days` with a REVIEW audit; the expiry markdown on the identified or FEFO-first in-date batch, never at days < 0, zero-benefit rules dropped, engine 0.2.0; `control_price` written by the Federation only in SQL, `advisory_read` the Federation's lists only, `buyer_read` ACTIVE relationships only. Wave 2, 6 Oct 2026.
+- `CR-23A-2` — §6–§7: a queued shelf-label job publishes `label_job.requested.v1`; successful rendering alone publishes `label_job.rendered.v1`; terminal failure publishes `label_job.failed.v1`, so each lifecycle handler obeys the audit/event rule without announcing a render before a PDF exists. PRC-03, 21 Oct 2026.
 
 ### 24A (M4 Trading Documents Implementation Guide)
 
@@ -87,3 +89,4 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 ### 32 (Sync Contract)
 
 - `CR-32-1` — §3.3, §7, §8, §9 (also doc 31 §6, doc 26 §3.5): facts are accepted below the version floor, snapshots withheld (CR-30-1 point 4); a quarantined FORBIDDEN_FIELD event stores `[removed]` for the offending values; a quarantine row is resolved (REPAIRED or DISCARDED) by an audited command, never purged by time; a revoked till keeps its outbox and resumes on reinstatement; the till's business date may be moved back by a supervisor with no session open. Wave 2, 6 Oct 2026.
+- `CR-32-2` — §4: an attachment's upload URL lasts `attachment.upload_url_minutes` (default 15) and is renewed only inside that window; after it the till requests a new attachment for the same document (KRN-16, CR-19A-8); a decision waits only on the live (non-FAILED) attachments. Wave 4, 13 Oct 2026.

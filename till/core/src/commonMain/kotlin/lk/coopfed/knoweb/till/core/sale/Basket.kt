@@ -16,6 +16,21 @@ data class BasketLine(val item: Item, val qty: Qty, val unitPrice: Money) {
 class Basket {
     private val entries = mutableListOf<BasketLine>()
 
+    var customerClass: String? = null
+        private set
+    var beneficiaryIdentifier: String? = null
+        private set
+
+    fun setBeneficiary(customerClass: String?, identifier: String? = null) {
+        this.customerClass = customerClass
+        this.beneficiaryIdentifier = identifier
+    }
+
+    fun clearBeneficiary() {
+        this.customerClass = null
+        this.beneficiaryIdentifier = null
+    }
+
     val lines: List<BasketLine> get() = entries.toList()
     val total: Money get() = entries.fold(Money.ZERO) { sum, line -> sum + line.total }
     val isEmpty: Boolean get() = entries.isEmpty()
@@ -40,7 +55,11 @@ class Basket {
         entries.removeAt(index)
     }
 
-    fun clear() = entries.clear()
+    fun clear() {
+        entries.clear()
+        customerClass = null
+        beneficiaryIdentifier = null
+    }
 }
 
 /** The cash the customer handed over must cover the total. */

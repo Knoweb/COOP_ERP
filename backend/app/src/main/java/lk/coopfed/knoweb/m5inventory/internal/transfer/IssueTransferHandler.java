@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m5inventory.internal.transfer;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -8,13 +9,21 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.DocumentIssuance;
+import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
+import lk.coopfed.knoweb.kernel.api.DocumentOrigin;
+import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.NumberingService;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.SeriesRegistration;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m1party.query.EntityView;
+import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
@@ -33,9 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * IssueTransfer (25A section 6.3, "same entity; availability at source; issuance; TRANSFER_OUT at
- * cost"; doc 25 flow 6.6), at demo scope: issue and dispatch in one step. The stock leaves the
- * source as TRANSFER_OUT at the entity average and is in transit, still the entity's, until the
- * destination receives it ({@link ReceiveTransferHandler}).
+ * cost"; doc 25 flow 6.6). The stock leaves the source as TRANSFER_OUT at the entity average. A
+ * separate {@link DispatchTransferHandler} records when it enters transit, still the entity's,
+ * before the destination receives it ({@link ReceiveTransferHandler}).
  *
  * <p>Guards, in order: an OWN scope ({@code m5.scope.own_required}); the source one of the scope
  * entity's locations that the scope reads ({@code m5.location.not_in_scope}); the destination
@@ -51,8 +60,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Mutation: the transfer and its lines, all at the source location (the source's rows); the
  * ledger's TRANSFER_OUT movements there, citing the transfer. Audit {@code TRANSFER_ISSUED}, and
  * {@code TRANSFER_REQUEST_SHORT} (REVIEW) for a request sent short (M5-03); event
- * {@code transfer.issued.v1}. The XFR document of 25A is deferred for the demo: the movements cite
- * the transfer's id (README, deviation 13).
+ * {@code transfer.issued.v1}. The transfer id is also the kernel XFR document id. Its document
+ * lines share the transfer line ids and freeze the costs returned by the TRANSFER_OUT movements.
  */
 @Service
 @CommandHandler(permission = "inv.transfer.issue")
@@ -66,6 +75,8 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
     private final PartyQueries party;
     private final BatchQueries batches;
     private final StockLedger ledger;
+    private final NumberingService numbering;
+    private final DocumentIssuance documents;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -76,6 +87,8 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
             PartyQueries party,
             BatchQueries batches,
             StockLedger ledger,
+            NumberingService numbering,
+            DocumentIssuance documents,
             JdbcTemplate jdbc,
             AuditFacade audit,
             EventPublisher events) {
@@ -84,6 +97,8 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
         this.party = party;
         this.batches = batches;
         this.ledger = ledger;
+        this.numbering = numbering;
+        this.documents = documents;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -97,13 +112,14 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
         }
         UUID from = command.fromLocationId();
         UUID to = command.toLocationId();
-        if (!entityLocation(from, scope)) {
+        LocationView source = entityLocation(from, scope);
+        if (source == null) {
             throw new ProblemException("m5.location.not_in_scope", Map.of("locationId", String.valueOf(from)));
         }
         if (from.equals(to)) {
             throw new ProblemException("m5.transfer.same_location");
         }
-        if (!entityLocation(to, scope)) {
+        if (entityLocation(to, scope) == null) {
             throw new ProblemException("m5.transfer.destination_invalid", Map.of("locationId", String.valueOf(to)));
         }
         if (command.lines() == null || command.lines().isEmpty()) {
@@ -145,6 +161,8 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
             }
         });
 
+        registerSeries(source, scope);
+
         UUID id = Ids.next();
         jdbc.update(
                 "insert into inventory.transfer (transfer_id, owner_entity_id, location_id, to_location_id, issued_by,"
@@ -170,8 +188,10 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
                     lineId));
         }
         List<PostedMovement> posted = ledger.post(new PostMovements(id, null, null, movements), scope);
+        List<DocumentLineRecord> documentLines = new ArrayList<>();
         for (int i = 0; i < command.lines().size(); i++) {
             IssueTransfer.Line line = command.lines().get(i);
+            BigDecimal unitCost = posted.get(i).unitCostAtMovement();
             jdbc.update(
                     """
                     insert into inventory.transfer_line
@@ -188,10 +208,13 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
                     line.batchId(),
                     skus.get(i),
                     line.qty(),
-                    posted.get(i).unitCostAtMovement());
+                    unitCost);
+            documentLines.add(
+                    documentLine(lineIds.get(i), id, i + 1, skus.get(i), line.batchId(), line.qty(), unitCost));
         }
+        DocumentRecord issued = documents.issue(draft(id, from, scope), documentLines, scope);
 
-        audit.record(AUDIT_ISSUED, Subject.of("transfer", id), null, auditAfter(from, to, command), scope);
+        audit.record(AUDIT_ISSUED, Subject.of("transfer", id), null, auditAfter(from, to, command, issued), scope);
         if (!command.shortfalls().isEmpty()) {
             // wave 2, M5-03: the request is filled once; what could not be sent is on the exception
             // report and the shop raises a new request for it, as an indent book works.
@@ -222,12 +245,82 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
         return id;
     }
 
-    private static Map<String, Object> auditAfter(UUID from, UUID to, IssueTransfer command) {
+    private void registerSeries(LocationView source, ScopeContext scope) {
+        String entityCode = party.getEntity(scope.entityId(), scope)
+                .map(EntityView::entityCode)
+                .orElseThrow(() -> new ProblemException("m5.transfer.entity_unknown"));
+        SeriesRegistration registration = "SHOP".equals(source.locationType())
+                ? SeriesRegistration.forLocation(
+                        TransferDocumentType.XFR,
+                        scope.entityId(),
+                        source.locationId(),
+                        entityCode,
+                        source.locationCode(),
+                        null)
+                : SeriesRegistration.forEntity(TransferDocumentType.XFR, scope.entityId(), entityCode);
+        numbering.registerSeries(registration, scope);
+    }
+
+    private static DocumentRecord draft(UUID id, UUID sourceLocationId, ScopeContext scope) {
+        return new DocumentRecord(
+                id,
+                TransferDocumentType.XFR,
+                null,
+                null,
+                null,
+                scope.entityId(),
+                null,
+                sourceLocationId,
+                null,
+                null,
+                "DRAFT",
+                null,
+                null,
+                null,
+                scope.userId(),
+                "LKR",
+                null,
+                null,
+                null,
+                null,
+                null,
+                DocumentOrigin.ONLINE,
+                null,
+                null);
+    }
+
+    private static DocumentLineRecord documentLine(
+            UUID lineId, UUID documentId, int lineNo, UUID skuId, UUID batchId, BigDecimal qty, BigDecimal unitCost) {
+        return new DocumentLineRecord(
+                lineId,
+                documentId,
+                lineNo,
+                skuId,
+                batchId,
+                null,
+                qty,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                qty.multiply(unitCost).setScale(2, RoundingMode.HALF_UP),
+                unitCost,
+                null,
+                null);
+    }
+
+    private static Map<String, Object> auditAfter(UUID from, UUID to, IssueTransfer command, DocumentRecord document) {
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("fromLocationId", from);
         after.put("toLocationId", to);
-        after.put("status", "IN_TRANSIT");
+        after.put("status", "ISSUED");
         after.put("lines", command.lines().size());
+        after.put("documentId", document.id());
+        after.put("document", document.docNumberDisplay());
         if (command.transferRequestId() != null) {
             after.put("transferRequestId", command.transferRequestId());
         }
@@ -235,11 +328,13 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
     }
 
     /** A location of the scope entity that the scope reads (M1). */
-    private boolean entityLocation(UUID location, ScopeContext scope) {
-        return location != null
-                && party.getLocation(location, scope)
-                        .filter(l -> scope.entityId().equals(l.ownerEntityId()))
-                        .isPresent();
+    private LocationView entityLocation(UUID location, ScopeContext scope) {
+        if (location == null) {
+            return null;
+        }
+        return party.getLocation(location, scope)
+                .filter(candidate -> scope.entityId().equals(candidate.ownerEntityId()))
+                .orElse(null);
     }
 
     private static void requireLine(IssueTransfer.Line line) {

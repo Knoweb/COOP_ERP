@@ -46,6 +46,12 @@ public class ControlPolicy {
     static final String AUTOPOST_VALUE_CAP = "inventory.count_autopost_value_cap";
     static final String DISPATCH_MIN_SHELF_LIFE_DAYS = "inventory.dispatch_min_shelf_life_days";
     static final String REPACK_YIELD_TOLERANCE_PCT = "inventory.repack_yield_tolerance_pct";
+    static final String EXPIRY_WARNING_DAYS = "inventory.expiry_warning_days";
+    static final String NEAR_EXPIRY_CRITICAL_DAYS = "inventory.near_expiry_critical_days";
+    static final String SLOW_MOVING_DAYS = "inventory.slow_moving_days";
+    static final String SLOW_MOVING_THRESHOLD_DOS = "inventory.slow_moving_threshold_dos";
+    static final String NEGATIVE_LOT_ESCALATION_DAYS = "inventory.negative_lot_escalation_days";
+    static final String TRANSFER_RECEIPT_DAYS = "inventory.transfer_receipt_days";
 
     private static final BigDecimal ONE_CENT = new BigDecimal("0.01");
 
@@ -178,6 +184,39 @@ public class ControlPolicy {
      */
     public int dispatchMinShelfLifeDays(ScopeContext scope) {
         return config.getInt(DISPATCH_MIN_SHELF_LIFE_DAYS, scope, 0);
+    }
+
+    /**
+     * The warning window, in days, before a batch expires when an expiry task and count task are
+     * opened ({@code inventory.expiry_warning_days}, 30 by default).
+     */
+    public int expiryWarningDays(ScopeContext scope) {
+        return config.getInt(EXPIRY_WARNING_DAYS, scope, 30);
+    }
+
+    public int nearExpiryCriticalDays(ScopeContext scope) {
+        return config.getInt(NEAR_EXPIRY_CRITICAL_DAYS, scope, 7);
+    }
+
+    public int slowMovingDays(ScopeContext scope) {
+        return config.getInt(SLOW_MOVING_DAYS, scope, 30);
+    }
+
+    public int slowMovingThresholdDos(ScopeContext scope) {
+        return config.getInt(SLOW_MOVING_THRESHOLD_DOS, scope, 90);
+    }
+
+    /**
+     * Days an oversold stock lot may remain unacknowledged before escalating ({@code
+     * inventory.negative_lot_escalation_days}, 7 by default).
+     */
+    public int negativeLotEscalationDays(ScopeContext scope) {
+        return config.getInt(NEGATIVE_LOT_ESCALATION_DAYS, scope, 7);
+    }
+
+    /** Calendar days a dispatched transfer may remain unreceived before a review is raised. */
+    public int transferReceiptDays(ScopeContext scope) {
+        return config.getInt(TRANSFER_RECEIPT_DAYS, scope, 3);
     }
 
     /** How far, in per cent, a repack's output may stray from the recipe's ({@code inventory.repack_yield_tolerance_pct}, 2). */

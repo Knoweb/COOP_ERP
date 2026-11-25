@@ -1,0 +1,450 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useT } from "../../shell/i18n/useT";
+import { useHasPermission } from "../../shell/auth/permissions";
+import { DatePicker } from "../../shell/components/DatePicker";
+import { PageHeader } from "../../shell/components/PageHeader";
+import { StateChip, type ChipState } from "../../shell/components/StateChip";
+import { ApiProblem } from "../../shell/api/client";
+import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { businessToday, useFormatDate } from "../../shell/i18n/formats";
+import { useCatalogueApi, type TaxCategory, type TaxRate } from "./catalogueApi";
+import { errorText } from "./skuView";
+import { CatalogueDropdown } from "./CatalogueDropdown";
+
+
+export function TaxRatesPage() {
+  const t = useT();
+  const api = useCatalogueApi();
+  const queryClient = useQueryClient();
+  const canPublish = useHasPermission("cat.tax.publish");
+  const formatDate = useFormatDate();
+
+  const categoryIdempotency = useIdempotencyKey();
+  const rateIdempotency = useIdempotencyKey();
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
+
+  // Define Category Form State
+  const [categoryCode, setCategoryCode] = useState<string>("");
+  const [categoryNameEn, setCategoryNameEn] = useState<string>("");
+  const [categoryNameSi, setCategoryNameSi] = useState<string>("");
+  const [categoryNameTa, setCategoryNameTa] = useState<string>("");
+
+  // Publish Rate Form State
+  const [rateTaxCategoryId, setRateTaxCategoryId] = useState<string>("");
+  const [ratePercent, setRatePercent] = useState<string>("18.00");
+  const todayIso = businessToday();
+  const [applyFrom, setApplyFrom] = useState<string>(todayIso);
+
+  const categoriesQuery = useQuery({
+    queryKey: ["catalogue", "tax", "categories"],
+    queryFn: () => api.listTaxCategories()
+  });
+
+  const ratesQuery = useQuery({
+    queryKey: ["catalogue", "tax", "rates", selectedCategoryId],
+    queryFn: () => api.listTaxRates(selectedCategoryId || undefined)
+  });
+
+  const defineCategoryMutation = useMutation({
+    mutationFn: () =>
+      api.defineTaxCategory(
+        {
+          code: categoryCode.trim().toUpperCase(),
+          nameEn: categoryNameEn.trim(),
+          nameSi: categoryNameSi.trim() || undefined,
+          nameTa: categoryNameTa.trim() || undefined
+        },
+        categoryIdempotency.current()
+      ),
+    onSuccess: (newCategory) => {
+      categoryIdempotency.next();
+      setCategoryCode("");
+      setCategoryNameEn("");
+      setCategoryNameSi("");
+      setCategoryNameTa("");
+      setSuccessMessage(t("catalogue.tax.success.category").text);
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "tax", "categories"] });
+      if (!rateTaxCategoryId && newCategory.taxCategoryId) {
+        setRateTaxCategoryId(newCategory.taxCategoryId);
+      }
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        categoryIdempotency.next();
+      }
+    }
+  });
+
+  const publishRateMutation = useMutation({
+    mutationFn: () =>
+      api.publishTaxRate(
+        {
+          taxCategoryId: rateTaxCategoryId,
+          ratePercent: parseFloat(ratePercent),
+          applyFrom
+        },
+        rateIdempotency.current()
+      ),
+    onSuccess: () => {
+      rateIdempotency.next();
+      setSuccessMessage(t("catalogue.tax.success.rate").text);
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "tax", "rates"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        rateIdempotency.next();
+      }
+    }
+  });
+
+  const handleDefineCategorySubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setSuccessMessage("");
+    defineCategoryMutation.mutate();
+  };
+
+  const handlePublishRateSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setSuccessMessage("");
+    publishRateMutation.mutate();
+  };
+
+  const getRateStatus = (rate: TaxRate): { state: ChipState; label: string } => {
+    if (rate.effectiveFrom > todayIso) {
+      return { state: "draft", label: t("catalogue.tax.status.scheduled").text };
+    }
+    if (rate.effectiveTo && rate.effectiveTo < todayIso) {
+      return { state: "void", label: t("catalogue.tax.status.past").text };
+    }
+    return { state: "issued", label: t("catalogue.tax.status.in_force").text };
+  };
+
+  const categories = categoriesQuery.data ?? [];
+  const rates = ratesQuery.data ?? [];
+
+  return (
+    <main className="shell-page" id="tax-rates-page">
+      <div style={{ marginBottom: "var(--space-2)" }}>
+        <Link className="back-pill-btn" to="/catalogue">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("catalogue.back").text}
+        </Link>
+      </div>
+
+      <PageHeader
+        icon="tax-rates"
+        title={t("catalogue.tax.title").text}
+      />
+
+      {successMessage && (
+        <div className="tax-success-banner" role="status">
+          {successMessage}
+        </div>
+      )}
+
+      {/* Forms Section for Authorized Users */}
+      {canPublish && (
+        <div className="tax-forms-grid">
+          {/* Define Category Card */}
+          <div className="tax-card">
+            <div className="tax-card__header">
+              <div className="tax-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                  <line x1="7" y1="7" x2="7.01" y2="7" />
+                </svg>
+              </div>
+              <h2 className="tax-card__title">
+                {t("catalogue.tax.define_category").text}
+              </h2>
+            </div>
+            <form onSubmit={handleDefineCategorySubmit} className="tax-form-body">
+              <div className="tax-form-fields">
+                <label className="catalogue-form-field">
+                  <span>
+                    {t("catalogue.tax.field.code").text}
+                    <span className="register-field-required">*</span>
+                  </span>
+                  <input
+                    id="tax-category-code-input"
+                    type="text"
+                    maxLength={12}
+                    required
+                    value={categoryCode}
+                    onChange={(e) => setCategoryCode(e.target.value.toUpperCase())}
+                    placeholder={t("catalogue.tax.placeholder.code").text}
+                  />
+                </label>
+
+                <label className="catalogue-form-field">
+                  <span>
+                    {t("catalogue.tax.field.name_en").text}
+                    <span className="register-field-required">*</span>
+                  </span>
+                  <input
+                    id="tax-category-name-en-input"
+                    type="text"
+                    maxLength={80}
+                    required
+                    value={categoryNameEn}
+                    onChange={(e) => setCategoryNameEn(e.target.value)}
+                    placeholder={t("catalogue.tax.placeholder.name_en").text}
+                  />
+                </label>
+
+                <label className="catalogue-form-field">
+                  <span>{t("catalogue.tax.field.name_si").text}</span>
+                  <input
+                    id="tax-category-name-si-input"
+                    type="text"
+                    maxLength={80}
+                    value={categoryNameSi}
+                    onChange={(e) => setCategoryNameSi(e.target.value)}
+                  />
+                </label>
+
+                <label className="catalogue-form-field">
+                  <span>{t("catalogue.tax.field.name_ta").text}</span>
+                  <input
+                    id="tax-category-name-ta-input"
+                    type="text"
+                    maxLength={80}
+                    value={categoryNameTa}
+                    onChange={(e) => setCategoryNameTa(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="tax-button-container">
+                <button
+                  id="submit-tax-category-button"
+                  type="submit"
+                  className="modern-btn modern-btn--primary tax-submit-btn"
+                  disabled={defineCategoryMutation.isPending || !categoryCode.trim() || !categoryNameEn.trim()}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  {defineCategoryMutation.isPending ? t("catalogue.loading").text : t("catalogue.tax.submit.category").text}
+                </button>
+              </div>
+
+              {defineCategoryMutation.isError && (
+                <p role="alert" className="tax-error-text">
+                  {errorText(defineCategoryMutation.error, t("catalogue.error.generic").text)}
+                </p>
+              )}
+            </form>
+          </div>
+
+          {/* Publish Tax Rate Card */}
+          <div className="tax-card">
+            <div className="tax-card__header">
+              <div className="tax-card__icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="5" x2="5" y2="19" />
+                  <circle cx="6.5" cy="6.5" r="2.5" />
+                  <circle cx="17.5" cy="17.5" r="2.5" />
+                </svg>
+              </div>
+              <h2 className="tax-card__title">
+                {t("catalogue.tax.publish_rate").text}
+              </h2>
+            </div>
+            <form onSubmit={handlePublishRateSubmit} className="tax-form-body">
+              <div className="tax-form-fields">
+                <CatalogueDropdown
+                  label={t("catalogue.tax.field.category").text}
+                  value={rateTaxCategoryId}
+                  placeholder={t("catalogue.field.choose").text}
+                  onChange={(val) => setRateTaxCategoryId(val)}
+                  required
+                  options={categories.map((cat: TaxCategory) => ({
+                    value: cat.taxCategoryId,
+                    label: `${cat.code} - ${cat.nameEn}`
+                  }))}
+                />
+
+                <label className="catalogue-form-field">
+                  <span>
+                    {t("catalogue.tax.field.rate").text}
+                    <span className="register-field-required">*</span>
+                  </span>
+                  <input
+                    id="publish-rate-percent-input"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    required
+                    value={ratePercent}
+                    onChange={(e) => setRatePercent(e.target.value)}
+                  />
+                </label>
+
+                <div className="catalogue-form-field">
+                  <DatePicker
+                    id="publish-rate-apply-from-input"
+                    label={t("catalogue.tax.field.apply_from").text}
+                    required
+                    min={todayIso}
+                    value={applyFrom}
+                    onChange={setApplyFrom}
+                  />
+                </div>
+              </div>
+
+              <div className="tax-button-container">
+                <button
+                  id="submit-tax-rate-button"
+                  type="submit"
+                  className="modern-btn modern-btn--primary tax-submit-btn"
+                  disabled={publishRateMutation.isPending || !rateTaxCategoryId || !ratePercent || !applyFrom}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  {publishRateMutation.isPending ? t("catalogue.loading").text : t("catalogue.tax.submit.rate").text}
+                </button>
+              </div>
+
+              {publishRateMutation.isError && (
+                <p role="alert" className="tax-error-text">
+                  {errorText(publishRateMutation.error, t("catalogue.error.generic").text)}
+                </p>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tax Categories Table */}
+      <section className="catalogue-section">
+        <h2>{t("catalogue.tax.categories").text}</h2>
+        <p className="tax-muted-text">
+          {t("catalogue.tax.categories.description").text}
+        </p>
+
+        {categoriesQuery.isLoading && <p>{t("catalogue.loading").text}</p>}
+
+        {categories.length === 0 && !categoriesQuery.isLoading && (
+          <p>{t("catalogue.tax.no_categories").text}</p>
+        )}
+
+        {categories.length > 0 && (
+          <div className="modern-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>{t("catalogue.tax.column.code").text}</th>
+                    <th>{t("catalogue.tax.column.name").text}</th>
+                    <th>{t("catalogue.tax.column.name_si").text}</th>
+                    <th>{t("catalogue.tax.column.name_ta").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.map((cat: TaxCategory) => (
+                    <tr
+                      key={cat.taxCategoryId}
+                      onClick={() => setSelectedCategoryId(selectedCategoryId === cat.taxCategoryId ? "" : cat.taxCategoryId)}
+                      className={selectedCategoryId === cat.taxCategoryId ? "tax-category-row tax-category-row--selected" : "tax-category-row"}
+                    >
+                      <td className="tax-code-cell">{cat.code}</td>
+                      <td>{cat.nameEn}</td>
+                      <td>{cat.nameSi ?? "—"}</td>
+                      <td>{cat.nameTa ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Tax Rates Table */}
+      <section className="catalogue-section">
+        <div className="tax-filter-header">
+          <div>
+            <h2>{t("catalogue.tax.rates").text}</h2>
+            <p className="tax-muted-text">
+              {t("catalogue.tax.rates.description").text}
+            </p>
+          </div>
+
+          <div className="tax-filter-dropdown-wrap">
+            <CatalogueDropdown
+              value={selectedCategoryId}
+              placeholder={t("catalogue.tax.filter.all_categories").text}
+              onChange={(val) => setSelectedCategoryId(val)}
+              options={categories.map((cat: TaxCategory) => ({
+                value: cat.taxCategoryId,
+                label: `${cat.code} - ${cat.nameEn}`
+              }))}
+            />
+          </div>
+        </div>
+
+        {ratesQuery.isLoading && <p>{t("catalogue.loading").text}</p>}
+
+        {rates.length === 0 && !ratesQuery.isLoading && (
+          <p>{t("catalogue.tax.no_rates").text}</p>
+        )}
+
+        {rates.length > 0 && (
+          <div className="modern-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>{t("catalogue.tax.column.code").text}</th>
+                    <th>{t("catalogue.tax.column.rate").text}</th>
+                    <th>{t("catalogue.tax.column.effective_from").text}</th>
+                    <th>{t("catalogue.tax.column.effective_to").text}</th>
+                    <th>{t("catalogue.tax.column.status").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rates.map((rate: TaxRate, index: number) => {
+                    const status = getRateStatus(rate);
+                    return (
+                      <tr key={`${rate.taxCategoryId}-${rate.effectiveFrom}-${index}`}>
+                        <td className="tax-code-cell">{rate.taxCategoryCode ?? rate.taxCategoryId}</td>
+                        <td className="tax-rate-cell">{Number(rate.ratePercent).toFixed(2)} %</td>
+                        <td>{formatDate(rate.effectiveFrom)}</td>
+                        <td>{rate.effectiveTo ? formatDate(rate.effectiveTo) : t("catalogue.tax.open_ended").text}</td>
+                        <td>
+                          <StateChip state={status.state} label={status.label} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}

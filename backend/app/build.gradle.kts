@@ -94,6 +94,7 @@ openApiSlices.forEach { slice ->
 }
 
 tasks.compileJava { dependsOn(generateOpenApi) }
+tasks.processResources { dependsOn(generateOpenApi) }
 
 // Security patches ahead of Spring Boot: the property names are Spring Boot's own
 // (spring-boot-dependencies), the versions and the reasons are in the catalogue.
@@ -258,6 +259,7 @@ jib {
 
 // `make test`: fast tests only. Anything tagged "integration" needs Docker and is left out.
 tasks.test {
+    maxHeapSize = "768m"
     useJUnitPlatform {
         excludeTags("integration")
     }
@@ -360,6 +362,7 @@ tasks.register<Sync>("demoToolsDist") {
 val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"
+    maxHeapSize = "2g"
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     useJUnitPlatform {

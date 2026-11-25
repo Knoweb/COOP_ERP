@@ -210,6 +210,62 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                         line.lineId()));
             }
         }
+
+        // Attach un-invoiced order adjustments (SPECIAL_DISCOUNT, DELIVERY_FEE) for these orders (PRC-10)
+        List<UUID> dropIds = received.stream()
+                .map(Grn::dropId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        List<UUID> appliedAdjustmentIds = new ArrayList<>();
+        if (!dropIds.isEmpty()) {
+            List<UUID> orderIds = jdbc.query(
+                    """
+                    select order_id from (
+                        select distinct unnest(order_ids) as order_id from trading.doc_delivery_drop where drop_id = any(?::uuid[])
+                        union
+                        select distinct order_id from trading.doc_delivery_line where drop_id = any(?::uuid[])
+                    ) u where order_id is not null
+                    """,
+                    (rs, rowNum) -> rs.getObject("order_id", UUID.class),
+                    dropIds.toArray(new UUID[0]),
+                    dropIds.toArray(new UUID[0]));
+            if (!orderIds.isEmpty()) {
+                List<Map<String, Object>> adjustments = jdbc.queryForList(
+                        """
+                        select adjustment_id, order_id, adjustment_type, kind, amount, description
+                          from trading.doc_order_adjustment
+                         where order_id = any(?::uuid[])
+                           and invoice_document_id is null
+                         order by recorded_at
+                           for update
+                        """,
+                        (Object) orderIds.toArray(new UUID[0]));
+                for (Map<String, Object> adj : adjustments) {
+                    UUID adjId = (UUID) adj.get("adjustment_id");
+                    String kind = (String) adj.get("kind");
+                    BigDecimal amount = (BigDecimal) adj.get("amount");
+                    lineNo++;
+                    BigDecimal signedAmount = "SPECIAL_DISCOUNT".equals(kind) ? amount.negate() : amount;
+                    lines.add(TradingDocuments.line(
+                            Ids.next(),
+                            invoiceId,
+                            lineNo,
+                            null,
+                            null,
+                            null,
+                            BigDecimal.ONE,
+                            signedAmount,
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
+                            signedAmount,
+                            null,
+                            null));
+                    appliedAdjustmentIds.add(adjId);
+                }
+            }
+        }
+
         if (lines.isEmpty()) {
             throw new ProblemException("m4.invoice.nothing_received");
         }
@@ -235,6 +291,13 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 buyerVat,
                 taxPoint,
                 dueDate);
+
+        if (!appliedAdjustmentIds.isEmpty()) {
+            jdbc.update(
+                    "update trading.doc_order_adjustment set invoice_document_id = ? where adjustment_id = any(?::uuid[])",
+                    invoiceId,
+                    appliedAdjustmentIds.toArray(new UUID[0]));
+        }
 
         // Both sides of the invoice (wave 2, CR-24A-3 item 5): the seller's receivable and the
         // buyer's payable travel on one event; M9 files each under its own party (CR-19A-13).

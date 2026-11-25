@@ -73,6 +73,32 @@ paths:
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '404':
           description: No such receipt, or the caller's scope may not see it
+  /v1/pos/receipts/{documentId}/profit:
+    get:
+      tags: [Pos]
+      operationId: getReceiptProfit
+      summary: The authoritative cost, gross profit and margin of one receipt
+      description: >
+        Available only to authorized management and accounting staff (pos.receipt.margin).
+        Computes line-level and receipt-level gross profit based on authoritative net sales revenue
+        and authoritative inventory cost allocated from M5 stock movements at the moment of sale.
+        If any line has pending cost (e.g. oversold before inventory intake), costPending is true
+        and overall profit is not calculated as fake zero cost.
+      x-permission: pos.receipt.margin
+      parameters:
+        - in: path
+          name: documentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The receipt profit breakdown
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReceiptProfitResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: No such receipt, or the caller's scope may not see it
   /v1/pos/sessions:
     get:
       tags: [Pos]
@@ -124,6 +150,28 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: No such session, or the caller's scope may not see it
+  /v1/pos/sessions/{sessionId}/cash-movements:
+    get:
+      tags: [Pos]
+      operationId: listSessionCashMovements
+      summary: The cash drops and pay-outs recorded during a till session
+      x-permission: pos.receipt.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Cash movements recorded during the session
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CashMovementResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '404':
           description: No such session, or the caller's scope may not see it
@@ -185,6 +233,7 @@ components:
         seq: { type: integer }
         kind: { type: string, description: 'CASH, CARD ... as the till reported it' }
         amount: { type: number }
+        reference: { type: string, nullable: true, description: 'Approval reference from the terminal' }
     ReceiptLineResponse:
       type: object
       required: [lineNo, qty]
@@ -213,3 +262,52 @@ components:
         countedCash: { type: number }
         expectedCash: { type: number }
         variance: { type: number }
+    CashMovementResponse:
+      type: object
+      required: [movementId, sessionId, locationId, kind, amount, occurredAt, reason]
+      properties:
+        movementId: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        tillPositionId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        kind: { type: string, enum: [DROP, PAYOUT] }
+        amount: { type: number }
+        occurredAt: { type: string, format: date-time }
+        operatorUserId: { type: string, format: uuid }
+        reason: { type: string }
+        deviceSeq: { type: integer, format: int64 }
+        flags:
+          type: array
+          description: What central found odd (e.g. LOCATION_MISMATCH, SESSION_UNKNOWN, SESSION_CLOSED)
+          items: { type: string }
+    ReceiptProfitResponse:
+      type: object
+      required: [documentId, locationId, netSales, costPending, currency, lines]
+      properties:
+        documentId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        netSales: { type: number }
+        totalCost: { type: number, nullable: true }
+        grossProfit: { type: number, nullable: true }
+        marginPercent: { type: number, nullable: true }
+        costPending: { type: boolean }
+        currency: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/ReceiptLineProfitResponse' }
+    ReceiptLineProfitResponse:
+      type: object
+      required: [lineNo, skuId, qty, unitPrice, lineTotal, lineNet, costPending]
+      properties:
+        lineNo: { type: integer }
+        skuId: { type: string, format: uuid }
+        qty: { type: number }
+        unitPrice: { type: number }
+        lineTotal: { type: number }
+        lineNet: { type: number }
+        unitCost: { type: number, nullable: true }
+        lineCost: { type: number, nullable: true }
+        lineProfit: { type: number, nullable: true }
+        marginPercent: { type: number, nullable: true }
+        costPending: { type: boolean }

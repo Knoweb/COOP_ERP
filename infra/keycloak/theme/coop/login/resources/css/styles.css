@@ -48,6 +48,19 @@
   src: url('../fonts/noto-sans-tamil-tamil-600-normal.woff2') format('woff2');
 }
 
+:root {
+  --primary: #8E0E5B;
+  --primary-hover: #730B4A;
+  --secondary: #2E3192;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --border: #E2E8F0;
+  --bg-input: #F8FAFC;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -57,481 +70,275 @@ input {
   font-family: inherit;
 }
 
-body.login-pf-page {
+html {
+  min-height: 100%;
+}
+
+body.auth-page {
   margin: 0;
-  width: 100%;
+  padding: 0;
   min-height: 100vh;
-  font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', Arial, sans-serif;
-  
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-
-  padding: 50px 7%;
-
-  background:
-    linear-gradient(
-      135deg,
-      rgba(142, 14, 91, 0.25) 0%,
-      rgba(20, 37, 76, 0.5) 100%
-    ),
-    url('../img/login.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-@media (max-width: 900px) {
-  body.login-pf-page {
-    justify-content: center;
-    padding: 30px 15px;
-  }
-}
-
-.login-card {
+  min-height: 100dvh;
   width: 100%;
-  max-width: 440px; /* Reduced from 570px */
-  
-  /* Glassmorphism Effect - Reduced whiteness */
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-
-  border-radius: 24px; /* Reduced from 28px */
-
-  padding: 40px 40px; /* Reduced from 48px 50px */
-
+  font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text-main);
+  background-color: #0F172A;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
-  overflow: hidden;
-
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
-/* ========================
-   BRAND
-======================== */
-
-.brand {
-  text-align: center;
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: 28px; /* Reduced from 32px */
-  font-weight: 800;
-  letter-spacing: -1px;
-}
-
-.coopfed {
-  color: #8E0E5B; /* Primary */
-}
-
-.erp {
-  color: #2E3192; /* Secondary Brand */
-}
-
-.brand p {
-  color: #64748B;
-  font-size: 13px; /* Reduced from 14px */
-  margin: 6px 0 0;
-}
-
-/* ========================
-   LOGO IMAGE
-======================== */
-
-.coopfed-logo {
-  height: 90px; /* Made larger to stand alone */
-  width: auto;
-  object-fit: contain;
-  margin-bottom: 12px; /* Space between logo and text */
-}
-
-/* ========================
-   WELCOME
-======================== */
-
-.welcome {
-  margin-top: 35px; /* Reduced from 48px */
-  margin-bottom: 25px; /* Reduced from 38px */
-  text-align: left;
-}
-
-.welcome h2 {
-  margin: 0 0 6px;
-  color: #1F2937; /* Dark Text */
-
-  font-size: 26px; /* Reduced from 31px */
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-
-.welcome p {
-  margin: 0;
-  color: #64748B;
-  font-size: 15px; /* Reduced from 17px */
-}
-
-/* ========================
-   INPUTS
-======================== */
-
-.input-group {
-  height: 57px;
-  width: 100%;
-
-  display: flex;
-  align-items: center;
-
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-
-  margin-bottom: 16px;
-
-  padding: 0 17px;
-
-  background: rgba(255, 255, 255, 0.9);
-
-  transition: all 0.2s ease;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-}
-
-.input-group:focus-within {
-  border-color: #8E0E5B;
-  background: #ffffff;
-  box-shadow:
-    0 0 0 3px rgba(142, 14, 91, 0.1),
-    inset 0 1px 2px rgba(0,0,0,0.02);
-}
-
-.input-icon {
-  width: 23px;
-  height: 23px;
-
-  color: #64748B;
-
-  flex-shrink: 0;
-}
-
-.input-group input {
+/* GPU-accelerated fixed full background: rock-solid across all browsers & devices */
+body.auth-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100%;
-
-  border: none;
-  outline: none;
-
-  background: transparent;
-
-  padding: 0 15px;
-
-  font-size: 16px;
-  color: #1F2937;
-}
-
-.input-group input::placeholder {
-  color: #9aa5b8;
-}
-
-/* ========================
-   PASSWORD EYE
-======================== */
-
-.eye-button {
-  width: 35px;
-  height: 35px;
-
-  border: none;
-  background: transparent;
-
-  cursor: pointer;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  color: #64748B;
-}
-
-.eye-button svg {
-  width: 22px;
-  height: 22px;
-}
-
-/* ========================
-   REMEMBER / FORGOT
-======================== */
-
-.login-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  margin: 22px 0 28px;
-}
-
-.remember {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  cursor: pointer;
-
-  color: #1F2937;
-  font-size: 15px;
-}
-
-.remember input {
-  width: 22px;
-  height: 22px;
-
-  accent-color: #8E0E5B;
-  cursor: pointer;
-}
-
-.login-options a {
-  color: #00AEEF; /* Info */
-  font-size: 15px;
-  font-weight: 500;
-
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-/* ========================
-   SIGN IN BUTTON
-======================== */
-
-.sign-in-button {
-  width: 100%;
-  height: 62px;
-
-  border: none;
-  border-radius: 11px;
-
-  background: linear-gradient(
-    90deg,
-    #8E0E5B 0%,
-    #A31068 100%
-  );
-
-  color: white;
-
-  font-size: 19px;
-  font-weight: 700;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  gap: 18px;
-
-  cursor: pointer;
-
-  box-shadow:
-    0 8px 20px rgba(142, 14, 91, 0.25);
-
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.sign-in-button:hover {
-  transform: translateY(-1px);
-
-  box-shadow:
-    0 12px 25px rgba(142, 14, 91, 0.35);
-}
-
-.sign-in-button:active {
-  transform: translateY(0);
-}
-
-.arrow {
-  font-size: 28px;
-  font-weight: 300;
-}
-
-/* ========================
-   DIVIDER
-======================== */
-
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-
-  margin: 25px 0 20px;
-}
-
-.divider span {
-  flex: 1;
-  height: 1px;
-  background: #E8E8EB;
-}
-
-.divider p {
-  margin: 0;
-  color: #64748B;
-  font-size: 15px;
-}
-
-/* ========================
-   MICROSOFT BUTTON
-======================== */
-
-.microsoft-button {
-  width: 100%;
-  height: 55px;
-
-  border: none;
-  border-radius: 11px;
-
-  background: #F8F9FB;
-  border: 1px solid #E8E8EB;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  gap: 14px;
-
-  color: #1F2937;
-
-  font-size: 15px;
-  font-weight: 500;
-
-  cursor: pointer;
-
-  transition: background 0.2s ease;
-}
-
-.microsoft-button:hover {
-  background: #F3E6F6; /* Soft Purple Tint */
-  border-color: #8E0E5B;
-}
-
-/* Microsoft Logo */
-
-.microsoft-logo {
-  width: 21px;
-  height: 21px;
-
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-
-  gap: 2px;
-}
-
-.microsoft-logo i:nth-child(1) {
-  background: #f25022;
-}
-
-.microsoft-logo i:nth-child(2) {
-  background: #7fba00;
-}
-
-.microsoft-logo i:nth-child(3) {
-  background: #00a4ef;
-}
-
-.microsoft-logo i:nth-child(4) {
-  background: #ffb900;
-}
-
-/* ========================
-   DECORATIVE LEAF
-======================== */
-
-.decorative-leaf {
-  position: absolute;
-
-  width: 180px;
-  height: 180px;
-
-  right: -65px;
-  bottom: -55px;
-
-  opacity: 0.1;
-
-  transform: rotate(-25deg);
-
+  background: #0F172A url('../img/login.png') center/cover no-repeat;
+  z-index: -1;
   pointer-events: none;
 }
 
-.decorative-leaf span {
+.auth-layout {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.04) 40%,
+    rgba(15, 23, 42, 0.20) 100%
+  );
+}
+
+/* =========================================================
+   LEFT SHOWCASE PANEL (BORDERLESS CINEMATIC TYPOGRAPHY)
+   ========================================================= */
+
+.showcase-side {
+  flex: 1 1 56%;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+}
+
+.showcase-overlay {
   position: absolute;
-
-  width: 70px;
-  height: 130px;
-
-  border-radius: 100% 0 100% 0;
-
-  background: #8E0E5B;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(10, 16, 32, 0.88) 0%,
+    rgba(15, 23, 42, 0.55) 24%,
+    rgba(15, 23, 42, 0.12) 48%,
+    transparent 68%
+  );
+  pointer-events: none;
 }
 
-.decorative-leaf span:nth-child(1) {
-  left: 20px;
-  top: 20px;
-
-  transform: rotate(-30deg);
+.showcase-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: clamp(28px, 3.5vw, 44px) clamp(32px, 4.5vw, 56px);
+  box-sizing: border-box;
 }
 
-.decorative-leaf span:nth-child(2) {
-  left: 70px;
-  top: 0;
-
-  background: #F18A00;
+.showcase-hero {
+  max-width: 620px;
 }
 
-.decorative-leaf span:nth-child(3) {
-  left: 95px;
-  top: 55px;
-
-  transform: rotate(35deg);
+.showcase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 30px;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* ========================
-   ALERTS / ERROR MESSAGES
-======================== */
-.alert {
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  font-size: 14px;
-  font-weight: 500;
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00E676;
+  box-shadow: 0 0 10px #00E676;
 }
 
-.alert-error {
-  background-color: #ffebee;
-  color: #E30613;
-  border: 1px solid #ffcdd2;
+.showcase-title {
+  font-size: clamp(24px, 2.2vw, 34px);
+  font-weight: 800;
+  color: #FFFFFF;
+  margin: 0 0 8px;
+  line-height: 1.22;
+  letter-spacing: -0.5px;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.85), 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-.alert-warning {
-  background-color: #fff8e1;
-  color: #F18A00;
-  border: 1px solid #ffecb3;
+.showcase-desc {
+  font-size: clamp(13px, 1.05vw, 15px);
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.55;
+  margin: 0 0 16px;
+  max-width: 520px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
-.alert-success {
-  background-color: #e8f5e9;
-  color: #00A651;
-  border: 1px solid #c8e6c9;
+.showcase-metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 22px;
+  margin: 16px 0 18px;
+  padding: 6px 0;
 }
 
-/* ========================
-   LOCALE DROPDOWN (React Component)
-======================== */
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.metric-val {
+  font-size: clamp(22px, 1.8vw, 28px);
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.metric-lbl {
+  font-size: clamp(10px, 0.75vw, 11px);
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.metric-divider {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.35) 30%,
+    rgba(255, 255, 255, 0.35) 70%,
+    transparent
+  );
+}
+
+.showcase-trust {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+.shield-icon {
+  width: 16px;
+  height: 16px;
+  color: #00E676;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(0, 230, 118, 0.6));
+}
+
+/* =========================================================
+   RIGHT PORTAL / AUTH FORM PANEL (BLENDED GLASSMORPHISM)
+   ========================================================= */
+
+.portal-side {
+  flex: 0 0 44%;
+  min-width: 440px;
+  max-width: 560px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28px 40px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+  box-shadow: -15px 0 40px rgba(0, 0, 0, 0.20);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom modern scrollbar */
+.portal-side::-webkit-scrollbar {
+  width: 6px;
+}
+.portal-side::-webkit-scrollbar-track {
+  background: transparent;
+}
+.portal-side::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+}
+.portal-side::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.portal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+
+.mobile-brand-pill {
+  display: none;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.mobile-brand-pill .coopfed-text {
+  color: var(--primary);
+}
+
+.mobile-brand-pill .erp-text {
+  color: var(--secondary);
+}
+
+/* Language Dropdown (Floating Glass Pill) */
 
 .language-position {
-  position: absolute;
-  top: 25px;
-  right: 30px;
-  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  margin-left: auto;
+  position: relative;
+  z-index: 100;
 }
 
 .language-wrapper {
@@ -539,7 +346,6 @@ body.login-pf-page {
   display: inline-block;
 }
 
-/* The picker is a <details>: it opens and closes without script (no inline handlers). */
 summary.language-selector {
   list-style: none;
 }
@@ -553,133 +359,485 @@ summary.language-selector::-webkit-details-marker {
 }
 
 .language-selector {
-  height: 48px;
-  padding: 0 15px;
-
+  height: 36px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 14px;
-
-  color: #14254c;
-
-  font-size: 15px;
-  font-weight: 500;
-
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-
-  box-shadow: 0 4px 15px rgba(24, 73, 130, 0.08);
-
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
   transition: all 0.2s ease;
+  user-select: none;
 }
 
 .language-selector:hover {
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 6px 18px rgba(24, 73, 130, 0.14);
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .globe-icon {
-  width: 20px;
-  height: 20px;
-  color: #14254c;
+  width: 16px;
+  height: 16px;
+  color: #FFFFFF;
 }
 
 .arrow-icon {
-  width: 18px;
-  height: 18px;
-  transition: transform 0.25s ease;
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  transition: transform 0.2s ease;
 }
-
-.arrow-icon.rotate {
-  transform: rotate(180deg);
-}
-
-/* Dropdown */
 
 .language-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   width: 140px;
-  padding: 7px;
-  background: #ffffff;
-  border: 1px solid #e5e8ef;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(20, 37, 76, 0.14);
-  z-index: 100;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.2), 0 4px 8px -2px rgba(15, 23, 42, 0.08);
+  z-index: 1000;
 }
 
 .language-dropdown a {
   display: block;
-  text-decoration: none;
-}
-
-.language-dropdown button,
-.language-dropdown a {
   width: 100%;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #14254c;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-  transition: 0.2s;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s ease;
 }
 
-.language-dropdown button:hover,
 .language-dropdown a:hover {
-  background: #F3E6F6; /* Adapted to new soft purple tint */
-  color: #8E0E5B; /* Adapted to new primary brand color */
+  background: #F8FAFC;
+  color: var(--primary);
 }
 
 .language-dropdown .active-language {
-  background: #F3E6F6; /* Adapted to soft purple tint */
-  color: #8E0E5B;
-  font-weight: 600;
+  background: #F3E6F6;
+  color: var(--primary);
+  font-weight: 700;
 }
 
-/* ========================
-   RESPONSIVE
-======================== */
+/* Portal Main Content */
 
-@media (max-width: 650px) {
-  .login-card {
-    max-width: 94%;
-    padding: 35px 25px 40px;
-    border-radius: 22px;
+.portal-main {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 0;
+}
+
+/* Frosted Glass Form Card */
+
+.portal-card {
+  width: 100%;
+  max-width: 410px;
+  background: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 252, 254, 0.86) 50%,
+    rgba(250, 252, 255, 0.90) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 24px;
+  box-shadow:
+    0 20px 45px -10px rgba(15, 23, 42, 0.22),
+    0 8px 20px -4px rgba(142, 14, 91, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+  padding: 30px 34px;
+  box-sizing: border-box;
+}
+
+/* Brand */
+
+.brand {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.logo-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.coopfed-logo {
+  height: 64px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
+  transition: transform 0.2s ease;
+}
+
+.coopfed-logo:hover {
+  transform: scale(1.03);
+}
+
+.brand h1 {
+  margin: 0 0 4px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.coopfed {
+  color: var(--primary);
+}
+
+.erp {
+  color: var(--secondary);
+}
+
+.tagline {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Welcome */
+
+.welcome {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.welcome h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.welcome p {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  margin: 0;
+}
+
+/* Alerts */
+
+.alert {
+  padding: 9px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.alert-error {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.alert-warning {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.alert-success {
+  background: #F0FDF4;
+  color: #16A34A;
+  border: 1px solid #BBF7D0;
+}
+
+/* Form Fields */
+
+.form-field {
+  margin-bottom: 12px;
+}
+
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 5px;
+}
+
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.forgot-link {
+  font-size: 12.5px;
+  color: var(--secondary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+  color: var(--primary);
+}
+
+/* Input Group with Single Clean Border */
+
+.input-group {
+  height: 46px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid rgba(142, 14, 91, 0.28);
+  border-radius: 11px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.input-group:hover {
+  border-color: var(--primary);
+  background: #FFFFFF;
+}
+
+.input-group:focus-within {
+  border-color: var(--primary);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3.5px rgba(142, 14, 91, 0.14);
+}
+
+.input-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.input-group input {
+  width: 100%;
+  height: 100%;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 0 10px;
+  font-size: 14.5px;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.input-group input:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Clean webkit autofill styling */
+.input-group input:-webkit-autofill,
+.input-group input:-webkit-autofill:hover,
+.input-group input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+  -webkit-text-fill-color: var(--text-main) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.input-group input::placeholder {
+  color: #94A3B8;
+  font-weight: 400;
+}
+
+/* Eye button */
+
+.eye-button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94A3B8;
+  transition: color 0.15s ease;
+}
+
+.eye-button:hover {
+  color: var(--primary);
+}
+
+.eye-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Remember me */
+
+.login-options {
+  margin: 8px 0 16px;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.remember input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Sign In Button */
+
+.sign-in-button {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #8E0E5B 0%, #A31068 50%, #2E3192 100%);
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(142, 14, 91, 0.4);
+  transition: all 0.2s ease;
+}
+
+.sign-in-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(142, 14, 91, 0.48);
+}
+
+.sign-in-button:active {
+  transform: translateY(0);
+}
+
+.btn-arrow {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
+}
+
+.sign-in-button:hover .btn-arrow {
+  transform: translateX(3px);
+}
+
+/* Footer */
+
+.portal-footer {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.portal-footer p {
+  color: #FFFFFF;
+  font-size: 12px;
+  margin: 0;
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
+}
+
+/* =========================================================
+   RESPONSIVE BREAKPOINTS (TABLETS & MOBILE)
+   ========================================================= */
+
+@media (max-width: 992px) {
+  .showcase-side {
+    display: none;
+  }
+
+  .auth-layout {
+    justify-content: center;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.65);
+    padding: 20px;
+  }
+
+  .portal-side {
+    flex: 1 1 100%;
+    max-width: 440px;
+    height: auto;
+    max-height: none;
+    border-radius: var(--radius-lg);
+    background: transparent;
+    border-left: none;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .portal-card {
+    padding: 26px 24px;
+    border-radius: 20px;
+  }
+
+  .mobile-brand-pill {
+    display: block;
+    color: #FFFFFF;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  .mobile-brand-pill .coopfed-text {
+    color: #FF80AB;
+  }
+
+  .mobile-brand-pill .erp-text {
+    color: #82B1FF;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-layout {
+    padding: 12px;
+  }
+
+  .portal-card {
+    padding: 20px 18px;
+    border-radius: 16px;
   }
 
   .brand h1 {
     font-size: 26px;
   }
 
-  .brand p {
-    font-size: 12px;
-  }
-
-  .welcome {
-    margin-top: 38px;
+  .coopfed-logo {
+    height: 52px;
   }
 
   .welcome h2 {
-    font-size: 27px;
-  }
-
-  .login-options {
-    gap: 10px;
-  }
-
-  .login-options a,
-  .remember {
-    font-size: 13px;
+    font-size: 19px;
   }
 }

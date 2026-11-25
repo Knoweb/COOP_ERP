@@ -153,6 +153,23 @@ permissions:
     module: "m3pricing"
     description_en: "Set the multi-MRP policy of an item"
     scope: "ENTITY"
+  - code: "prc.review.view"
+    module: "m3pricing"
+    description_en: "View pricing reviews"
+    scope: "ENTITY"
+  - code: "prc.adjust.special"
+    module: "m3pricing"
+    description_en: "Apply special discounts to orders"
+    scope: "FEDERATION"
+  - code: "prc.adjust.delivery"
+    module: "m3pricing"
+    description_en: "Apply delivery fees to orders"
+    scope: "FEDERATION"
+  # PRC-03 / 23A section 3.1: queue and retrieve shelf-label print jobs for the entity's shops.
+  - code: "prc.label.print"
+    module: "m3pricing"
+    description_en: "Print shelf price labels"
+    scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes
@@ -212,6 +229,14 @@ permissions:
     module: "m2catalogue"
     description_en: "Import item sheets"
     scope: "ENTITY"
+  - code: "cat.department.manage"
+    module: "m2catalogue"
+    description_en: "Define and manage merchandise department categories"
+    scope: "FEDERATION"
+  - code: "cat.uom.manage"
+    module: "m2catalogue"
+    description_en: "Define and manage units of measure"
+    scope: "FEDERATION"
   # M4 Trading Documents (24A section 3.1: "seed/m4/permissions.yaml (appended)"). M4 has no
   # permission file of its own for the same reason as M2: security.permission is M1's table and
   # M1SeedLoader reads this one file. "F" in the guide is scope FEDERATION, "mfa" requires_mfa,
@@ -233,6 +258,10 @@ permissions:
   - code: "ord.order.accept"
     module: "m4trading"
     description_en: "Accept, allocate and reject orders received as the seller"
+    scope: "ENTITY"
+  - code: "ord.order.adjust"
+    module: "m4trading"
+    description_en: "Record adjustments on orders"
     scope: "ENTITY"
   - code: "ord.order.lock_override"
     module: "m4trading"
@@ -425,6 +454,21 @@ permissions:
     module: "m5inventory"
     description_en: "Pick delivery notes at the warehouse"
     scope: "ENTITY"
+  # Polgolla M2-01: reorder controls and low-stock event
+  - code: "inv.reorder.manage"
+    module: "m5inventory"
+    description_en: "Maintain reorder levels, reorder quantities and maximum quantities"
+    scope: "ENTITY"
+  # Polgolla M2-03: stock repricing and waste/spoilage adjustments
+  - code: "inv.stock.reprice"
+    module: "m5inventory"
+    description_en: "Reprice stock lot unit cost and adjust valuation"
+    scope: "ENTITY"
+  # Polgolla M2-07: expiry alerts and slow-moving detection
+  - code: "inv.expiry.scan"
+    module: "m5inventory"
+    description_en: "Trigger evaluation and scan of near-expiry and slow-moving stock alerts"
+    scope: "ENTITY"
   # M8 Reporting (28A section 3.1, "seed/m8/permissions.yaml (appended)"): the two codes the
   # demo's reports need. rpt.report.run reads a report and the dashboard (28A also checks the
   # audience per definition: deferred with the definitions as data); rpt.export.run takes a
@@ -438,12 +482,44 @@ permissions:
     module: "m8reporting"
     description_en: "Export a report as CSV or print it to PDF"
     scope: "ENTITY"
+  # Polgolla M1-01: shop sales target management and actual sales comparison
+  - code: "rpt.target.view"
+    module: "m8reporting"
+    description_en: "View shop sales targets and actual performance comparison"
+    scope: "ENTITY"
+  - code: "rpt.target.manage"
+    module: "m8reporting"
+    description_en: "Define and update shop sales targets"
+    scope: "ENTITY"
+  # Polgolla M1-08: profit centers and agency month-end P&L
+  - code: "rpt.profit_center.view"
+    module: "m8reporting"
+    description_en: "View profit center dimensions and month-end P&L reports"
+    scope: "ENTITY"
+  - code: "rpt.profit_center.manage"
+    module: "m8reporting"
+    description_en: "Define and maintain profit center reporting dimensions"
+    scope: "ENTITY"
+  # Polgolla M1-04: asset register and branch/Coop City asset view
+  - code: "rpt.asset.view"
+    module: "m8reporting"
+    description_en: "View fixed asset registers and branch asset distributions"
+    scope: "ENTITY"
+  - code: "rpt.asset.manage"
+    module: "m8reporting"
+    description_en: "Register and maintain society fixed assets"
+    scope: "ENTITY"
   # M6 Point of Sale, the central side (26A section 10), minimal for the demo: the reads of the
   # receipts and sessions the tills uploaded. The till's own permissions (sale, refund, session)
   # come with the till track.
   - code: "pos.receipt.view"
     module: "m6pos"
     description_en: "See the receipts and till sessions of the shops"
+    scope: "LOCATION"
+  # Polgolla M1-03: POS profit and margin visibility for authorized staff
+  - code: "pos.receipt.margin"
+    module: "m6pos"
+    description_en: "View cost, profit and margin on sales receipts"
     scope: "LOCATION"
   # M7 Customers & Payment Recording (27A section 3.1, seed/m7/permissions.yaml, appended here as
   # M4 and M6 do: M1SeedLoader reads this one file). cus.customer.view is the read code of the
@@ -501,7 +577,7 @@ permissions:
   # do: M1SeedLoader reads this one file). The demo scope: the accounting export and the
   # notification screens. int.notify.view is the read code of the notification log, templates
   # and rules (29A names no read code; one per aggregate, as M1 does, decided 29 September 2026
-  # on the architect's delegation). int.client.manage, int.journal.ack, int.provider.manage,
+  # on the architect's delegation). int.client.manage, int.provider.manage,
   # int.einvoice.manage and int.api.publish come with their tickets.
   - code: "int.journal.read"
     module: "m9integration"
@@ -511,6 +587,10 @@ permissions:
     module: "m9integration"
     description_en: "Generate a journal export for the accounting package and download it"
     scope: "ENTITY"
+  - code: "int.journal.ack"
+    module: "m9integration"
+    description_en: "Acknowledge receipt of a generated journal export"
+    scope: "ENTITY"
   - code: "int.notify.view"
     module: "m9integration"
     description_en: "See the notification templates, rules and delivery log"
@@ -519,6 +599,48 @@ permissions:
     module: "m9integration"
     description_en: "Activate and retire the federation's notification rules"
     scope: "FEDERATION"
+  - code: "int.employee.manage"
+    module: "m9integration"
+    description_en: "Register and maintain employee profiles for attendance and payroll"
+    scope: "ENTITY"
+  - code: "int.attendance.import"
+    module: "m9integration"
+    description_en: "Import biometric attendance records from fingerprint machines"
+    scope: "ENTITY"
+  - code: "int.overtime.approve"
+    module: "m9integration"
+    description_en: "Approve calculated overtime for payroll contribution"
+    scope: "ENTITY"
+  - code: "int.payroll.view"
+    module: "m9integration"
+    description_en: "View employee profiles, attendance records, overtime calculations and payroll contributions"
+    scope: "ENTITY"
+  # M3-06 (Wave 6): Delivery vehicle tracking, route history, and delivery reports
+  - code: "int.delivery.track"
+    module: "m9integration"
+    description_en: "Record delivery vehicle and mobile device GPS location updates"
+    scope: "ENTITY"
+  - code: "int.delivery.manage"
+    module: "m9integration"
+    description_en: "Plan delivery trips, record drops, and update delivery status"
+    scope: "ENTITY"
+  - code: "int.delivery.view"
+    module: "m9integration"
+    description_en: "View live vehicle locations, route history, and delivery reports"
+    scope: "ENTITY"
+  # M3-07 (Wave 7): Online payments, COD and LankaQR payment orchestration
+  - code: "int.payment.initiate"
+    module: "m9integration"
+    description_en: "Initiate online payments and generate LankaQR payment codes"
+    scope: "ENTITY"
+  - code: "int.payment.manage"
+    module: "m9integration"
+    description_en: "Confirm payments, settle COD transactions, retry payments, and process provider callbacks"
+    scope: "ENTITY"
+  - code: "int.payment.view"
+    module: "m9integration"
+    description_en: "View payment intents, transactions, QR codes, and settlement history"
+    scope: "ENTITY"
   # wave 2, PR 03 (CR-32-1 item 2, decided 6 October 2026): an administrator of the society
   # resolves a quarantined till event (REPAIRED or DISCARDED, with a reason, once). The kernel's
   # operation (openapi/sync.yaml, resolveQuarantine); listed here because M1SeedLoader reads this
@@ -527,6 +649,12 @@ permissions:
     module: "kernel"
     description_en: "Resolve a till event the sync gateway quarantined, as repaired or discarded"
     scope: "ENTITY"
+  # doc 31 section 4 (TILL-PLAT-07): publish, pause, resume till releases and manage rollout rings
+  - code: "sync.release.manage"
+    module: "kernel"
+    description_en: "Publish, pause, resume till application releases and assign rollout rings"
+    scope: "FEDERATION"
+    requires_mfa: true
   # wave 2, PR 11 (CR-21A-7; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (1)): no
   # new code. inv.writeoff.approve and inv.adjust.approve above now carry a limits_schema with
   # max_value required, so a role grants each up to a value (doc 25 section 7: "writeoff_bands as

@@ -125,7 +125,7 @@ public class ReuseDetector {
      * another society did), a NEEDS_CONFIRMATION is refused until confirmed. Answers the previous
      * holders a confirmation covered, for the audit record (own ids and a count only).
      */
-    Confirmed guard(String phone, UUID forCustomer, boolean confirmed, ScopeContext scope) {
+    public Confirmed guard(String phone, UUID forCustomer, boolean confirmed, ScopeContext scope) {
         Outcome outcome = check(phone, forCustomer, scope);
         switch (outcome.kind()) {
             case CONFLICT -> {

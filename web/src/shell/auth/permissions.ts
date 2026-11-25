@@ -27,11 +27,16 @@ export type PermissionSet = {
 /**
  * The permission codes that name a read, by the catalogue's convention (gov.entity.view,
  * cat.sku.view, hello.greeting.read). Everything else is a command.
+ *
+ * M8 reporting query/export operations (rpt.report.run, rpt.export.run) are read operations
+ * that end in .run; they are explicitly allow-listed so that non-OWN read-only classes
+ * (FEDERATION_VIEW) can run and export reports without opening command permissions (like cat.import.run).
  */
 const READ_SUFFIXES = [".view", ".read"];
+const READ_EXPLICIT = new Set(["rpt.report.run", "rpt.export.run"]);
 
 function isRead(permission: string): boolean {
-  return READ_SUFFIXES.some((suffix) => permission.endsWith(suffix));
+  return READ_SUFFIXES.some((suffix) => permission.endsWith(suffix)) || READ_EXPLICIT.has(permission);
 }
 
 /**

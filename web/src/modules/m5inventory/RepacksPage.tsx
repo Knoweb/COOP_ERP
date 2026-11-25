@@ -13,6 +13,7 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Sku } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import { CustomSelect } from "./CustomSelect";
 import { SkuLabel } from "./SkuLabel";
 import { expectedOutputOf, quantityOf } from "./stockControl";
 import { errorText, isSyntheticBatchNo } from "./stockView";
@@ -36,25 +37,159 @@ function SkuFinder({
   const { locale } = useIntl();
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Sku[] | null>(null);
+
+  const search = async () => {
+    if (q.trim() === "") return;
+    setFound(await api.searchSkus(q.trim()));
+  };
+
   return (
-    <div className="inventory-search-form">
-      <label className="inventory-form-field">
-        {label}
-        <input value={q} onChange={(event) => setQ(event.target.value)} />
-      </label>
-      <button type="button" disabled={q.trim() === ""} onClick={async () => setFound(await api.searchSkus(q.trim()))}>
-        {buttonLabel}
-      </button>
-      {found?.length === 0 && <p>{t("inventory.find.none").text}</p>}
-      <ul className="inventory-list">
-        {(found ?? []).map((sku) => (
-          <li key={sku.skuId}>
-            <button type="button" aria-pressed={chosenId === sku.skuId} onClick={() => onChoose(sku)}>
-              {`${sku.skuCode} ${inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa)}`}
+    <div className="repack-finder-field">
+      <span className="repack-field-label">{label}</span>
+      <div className="repack-finder-row">
+        <div className="repack-finder-input-wrapper">
+          <svg
+            className="repack-finder-search-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="search"
+            className="repack-finder-input"
+            value={q}
+            placeholder={label}
+            onChange={(event) => setQ(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void search();
+              }
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          className="repack-finder-btn"
+          disabled={q.trim() === ""}
+          onClick={() => void search()}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span>{buttonLabel}</span>
+        </button>
+      </div>
+
+      {chosenId !== "" && (
+        <div className="repack-chosen-indicator">
+          <span className="repack-chosen-label">{t("inventory.column.item").text}:</span>
+          <span className="repack-chosen-name">
+            <SkuLabel skuId={chosenId} />
+          </span>
+        </div>
+      )}
+
+      {found?.length === 0 && <p className="repack-finder-empty">{t("inventory.find.none").text}</p>}
+      {found && found.length > 0 && (
+        <div className="repack-finder-dropdown-panel">
+          <div className="repack-finder-dropdown-header">
+            <span>{found.length} {t("inventory.column.item").text}</span>
+            <button
+              type="button"
+              className="repack-finder-dismiss-btn"
+              onClick={() => setFound(null)}
+              aria-label={t("inventory.stock.explain.close").text}
+              title={t("inventory.stock.explain.close").text}
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
-          </li>
-        ))}
-      </ul>
+          </div>
+          <ul className="repack-finder-results">
+            {found.map((sku) => {
+              const isSelected = chosenId === sku.skuId;
+              return (
+                <li key={sku.skuId} className="repack-finder-result-item">
+                  <button
+                    type="button"
+                    className={`repack-finder-result-btn ${isSelected ? "repack-finder-result-btn--selected" : ""}`}
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      onChoose(sku);
+                      setFound(null);
+                    }}
+                  >
+                    <div className="repack-sku-info">
+                      <span className="repack-sku-code">{sku.skuCode}</span>
+                      <span className="repack-sku-name">
+                        {inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa)}
+                      </span>
+                    </div>
+                    {isSelected ? (
+                      <svg
+                        className="repack-sku-check"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="repack-sku-arrow"
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -177,115 +312,240 @@ export function RepacksPage() {
 
   return (
     <main className="shell-page">
+      <div>
+        <Link className="back-pill-btn" to="/inventory">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("inventory.back").text}
+        </Link>
+      </div>
       <PageHeader
-        icon="stock"
-        title={t("inventory.title").text}
-        actions={
-          <Link className="action-link" to="/inventory">
-            <span>{t("inventory.back").text}</span>
-          </Link>
-        }
+        icon="repacks"
+        title={t("inventory.repack.title").text}
       />
 
       <div className="inventory-control-links">
         <Link className="action-link" to="/inventory/counts">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
           <span>{t("inventory.counts.link").text}</span>
         </Link>
         <Link className="action-link" to="/inventory/write-offs">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="9" y1="15" x2="15" y2="15" />
+          </svg>
           <span>{t("inventory.writeoffs.link").text}</span>
         </Link>
         <Link className="action-link action-link--primary" to="/inventory/repacks">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="m21 16-4 4-4-4" />
+            <path d="M17 20V4" />
+            <path d="m3 8 4-4 4 4" />
+            <path d="M7 4v16" />
+          </svg>
           <span>{t("inventory.repacks.link").text}</span>
         </Link>
         <Link className="action-link" to="/inventory/transfer-requests">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <rect x="1" y="3" width="15" height="13" />
+            <polygon points="16 8 20 8 23 11 23 16 16 16 8" />
+            <circle cx="5.5" cy="18.5" r="2.5" />
+            <circle cx="18.5" cy="18.5" r="2.5" />
+          </svg>
           <span>{t("inventory.request.link").text}</span>
         </Link>
       </div>
 
       <section className="modern-table-card" style={{ marginBottom: 'var(--space-4)' }}>
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.repack.recipes").text}</h2>
+        <div className="inventory-card-header">
+          <span className="inventory-card-header__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m21 16-4 4-4-4" />
+              <path d="M17 20V4" />
+              <path d="m3 8 4-4 4 4" />
+              <path d="M7 4v16" />
+            </svg>
+          </span>
+          <h2 className="inventory-card-header__title">{t("inventory.repack.recipes").text}</h2>
         </div>
-      {recipes.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.recipe.none").text}</p>}
-      {recipes.data && recipes.data.length > 0 && (
-        <div className="modern-table-scroll">
-          <table className="modern-table stock-table">
-          <thead>
-            <tr>
-              <th>{t("inventory.repack.recipe.name").text}</th>
-              <th>{t("inventory.repack.recipe.input").text}</th>
-              <th>{t("inventory.repack.recipe.output").text}</th>
-              <th>{t("inventory.repack.recipe.loss").text}</th>
-              <th>{t("inventory.repack.column.status").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {recipes.data.map((r) => (
-              <tr key={r.recipeId}>
-                <td>{r.name}</td>
-                <td>
-                  {`${r.inputQty} × `}
-                  <SkuLabel skuId={r.inputSkuId} />
-                </td>
-                <td>
-                  {`${r.outputQty} × `}
-                  <SkuLabel skuId={r.outputSkuId} />
-                </td>
-                <td className="numeric-cell">{r.expectedLossPct}</td>
-                <td>{t(`inventory.repack.recipe.status.${r.status}`).text}</td>
-                <td>
-                  {r.status === "ACTIVE" && canManage && (
-                    <button type="button" disabled={retire.isPending} onClick={() => retire.mutate(r.recipeId)}>
-                      {t("inventory.repack.recipe.retire").text}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      )}
+        {recipes.data?.length === 0 && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.repack.recipe.none").text}</p>}
+        {recipes.data && recipes.data.length > 0 && (
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
+              <thead>
+                <tr>
+                  <th>{t("inventory.repack.recipe.name").text}</th>
+                  <th>{t("inventory.repack.recipe.input").text}</th>
+                  <th>{t("inventory.repack.recipe.output").text}</th>
+                  <th>{t("inventory.repack.recipe.loss").text}</th>
+                  <th>{t("inventory.repack.column.status").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {recipes.data.map((r) => (
+                  <tr key={r.recipeId}>
+                    <td>{r.name}</td>
+                    <td>
+                      {`${r.inputQty} × `}
+                      <SkuLabel skuId={r.inputSkuId} />
+                    </td>
+                    <td>
+                      {`${r.outputQty} × `}
+                      <SkuLabel skuId={r.outputSkuId} />
+                    </td>
+                    <td className="numeric-cell">{r.expectedLossPct}</td>
+                    <td>{t(`inventory.repack.recipe.status.${r.status}`).text}</td>
+                    <td>
+                      {r.status === "ACTIVE" && canManage && (
+                        <button type="button" className="table-action-btn" disabled={retire.isPending} onClick={() => retire.mutate(r.recipeId)}>
+                          {t("inventory.repack.recipe.retire").text}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {canManage && (
-        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
-          <h2>{t("inventory.repack.recipe.new").text}</h2>
-          <label className="inventory-form-field">
-            {t("inventory.repack.recipe.name").text}
-            <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
-          </label>
-          <SkuFinder
-            label={t("inventory.repack.find_input").text}
-            buttonLabel={t("inventory.repack.find_input_button").text}
-            chosenId={draft.inputSkuId}
-            onChoose={(sku) => setDraft({ ...draft, inputSkuId: sku.skuId })}
-          />
-          <label className="inventory-form-field">
-            {t("inventory.repack.recipe.input_qty").text}
-            <input inputMode="decimal" value={draft.inputQty} onChange={(event) => setDraft({ ...draft, inputQty: event.target.value })} />
-          </label>
-          <SkuFinder
-            label={t("inventory.repack.find_output").text}
-            buttonLabel={t("inventory.repack.find_output_button").text}
-            chosenId={draft.outputSkuId}
-            onChoose={(sku) => setDraft({ ...draft, outputSkuId: sku.skuId })}
-          />
-          <label className="inventory-form-field">
-            {t("inventory.repack.recipe.output_qty").text}
-            <input inputMode="decimal" value={draft.outputQty} onChange={(event) => setDraft({ ...draft, outputQty: event.target.value })} />
-          </label>
-          <label className="inventory-form-field">
-            {t("inventory.repack.recipe.loss").text}
-            <input inputMode="decimal" value={draft.loss} onChange={(event) => setDraft({ ...draft, loss: event.target.value })} />
-          </label>
-          <div className="inventory-action-bar">
-            <button type="button" disabled={!draftReady || define.isPending} onClick={() => define.mutate()}>
-              {t("inventory.repack.recipe.define").text}
-            </button>
+        <section className="modern-table-card inventory-form-card repack-card" style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="inventory-card-header">
+            <span className="inventory-card-header__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </span>
+            <div>
+              <h2 className="inventory-card-header__title">{t("inventory.repack.recipe.new").text}</h2>
+            </div>
           </div>
-          {define.isError && <p role="alert">{errorText(define.error, t("inventory.error.generic").text)}</p>}
+          <div className="repack-form-body">
+            <div className="repack-grid-2">
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.recipe.name").text}</span>
+                <input
+                  aria-label={t("inventory.repack.recipe.name").text}
+                  value={draft.name}
+                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                  placeholder={t("inventory.repack.recipe.name").text}
+                />
+              </label>
+              <label className="inventory-form-field">
+                <span className="repack-field-label">
+                  {t("inventory.repack.recipe.loss").text}
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={draft.loss}
+                  onChange={(event) => setDraft({ ...draft, loss: event.target.value })}
+                  placeholder="0.00"
+                />
+              </label>
+            </div>
+
+            <div className="repack-conversion-flow">
+              <div className="repack-conversion-card repack-conversion-card--input">
+                <div className="repack-conversion-card__header">
+                  <span className="repack-conversion-card__badge repack-conversion-card__badge--input">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
+                    </svg>
+                    {t("inventory.repack.recipe.input").text}
+                  </span>
+                </div>
+                <div className="repack-conversion-card__body">
+                  <SkuFinder
+                    label={t("inventory.repack.find_input").text}
+                    buttonLabel={t("inventory.repack.find_input_button").text}
+                    chosenId={draft.inputSkuId}
+                    onChoose={(sku) => setDraft({ ...draft, inputSkuId: sku.skuId })}
+                  />
+                  <label className="inventory-form-field">
+                    <span className="repack-field-label">{t("inventory.repack.recipe.input_qty").text}</span>
+                    <input
+                      aria-label={t("inventory.repack.recipe.input_qty").text}
+                      inputMode="decimal"
+                      value={draft.inputQty}
+                      onChange={(event) => setDraft({ ...draft, inputQty: event.target.value })}
+                      placeholder="1.000"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="repack-conversion-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </div>
+
+              <div className="repack-conversion-card repack-conversion-card--output">
+                <div className="repack-conversion-card__header">
+                  <span className="repack-conversion-card__badge repack-conversion-card__badge--output">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 15V3M8 7l4-4 4 4M4 21h16" />
+                    </svg>
+                    {t("inventory.repack.recipe.output").text}
+                  </span>
+                </div>
+                <div className="repack-conversion-card__body">
+                  <SkuFinder
+                    label={t("inventory.repack.find_output").text}
+                    buttonLabel={t("inventory.repack.find_output_button").text}
+                    chosenId={draft.outputSkuId}
+                    onChoose={(sku) => setDraft({ ...draft, outputSkuId: sku.skuId })}
+                  />
+                  <label className="inventory-form-field">
+                    <span className="repack-field-label">{t("inventory.repack.recipe.output_qty").text}</span>
+                    <input
+                      aria-label={t("inventory.repack.recipe.output_qty").text}
+                      inputMode="decimal"
+                      value={draft.outputQty}
+                      onChange={(event) => setDraft({ ...draft, outputQty: event.target.value })}
+                      placeholder="1.000"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="inventory-action-bar">
+              <button
+                type="button"
+                className="inventory-submit-btn modern-btn modern-btn--primary"
+                disabled={!draftReady || define.isPending}
+                onClick={() => define.mutate()}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>{t("inventory.repack.recipe.define").text}</span>
+              </button>
+            </div>
+            {define.isError && <p role="alert" className="inventory-form-error">{errorText(define.error, t("inventory.error.generic").text)}</p>}
+          </div>
         </section>
       )}
 
@@ -296,118 +556,171 @@ export function RepacksPage() {
       </section>
 
       {canExecute && locationId !== "" && (
-        <section className="modern-table-card inventory-section" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
-          <h2>{t("inventory.repack.execute_section").text}</h2>
-          <label className="inventory-form-field">
-            {t("inventory.repack.recipe").text}
-            <select
-              aria-label={t("inventory.repack.recipe").text}
-              value={run.recipeId}
-              onChange={(event) => setRun({ ...run, recipeId: event.target.value, batchId: "" })}
-            >
-              <option value="" />
-              {active.map((r) => (
-                <option key={r.recipeId} value={r.recipeId}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="inventory-form-field">
-            {t("inventory.repack.input_lot").text}
-            <select
-              aria-label={t("inventory.repack.input_lot").text}
-              value={run.batchId}
-              onChange={(event) => setRun({ ...run, batchId: event.target.value })}
-            >
-              <option value="" />
-              {inputLots.map((lot) => (
-                <option key={lot.stockLotId} value={lot.batchId}>
-                  {`${isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")} · ${lot.qtyOnHand}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="inventory-form-field">
-            {t("inventory.repack.input_qty").text}
-            <input inputMode="decimal" value={run.inputQty} onChange={(event) => setRun({ ...run, inputQty: event.target.value })} />
-          </label>
-          {recipe && inputQty !== null && (
-            <p>{t("inventory.repack.expected", undefined, { qty: expectedOutputOf(recipe, inputQty) }).text}</p>
-          )}
-          <label className="inventory-form-field">
-            {t("inventory.repack.actual").text}
-            <input inputMode="decimal" value={run.actual} onChange={(event) => setRun({ ...run, actual: event.target.value })} />
-          </label>
-          <label className="inventory-form-field">
-            {t("inventory.repack.variance_reason").text}
-            <input value={run.reason} onChange={(event) => setRun({ ...run, reason: event.target.value })} />
-          </label>
-          <div className="inventory-action-bar">
-            <button type="button" disabled={!runReady || execute.isPending} onClick={() => execute.mutate()}>
-              {t("inventory.repack.execute").text}
-            </button>
+        <section className="modern-table-card inventory-form-card repack-card" style={{ marginTop: 'var(--space-4)' }}>
+          <div className="inventory-card-header">
+            <span className="inventory-card-header__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <path d="m21 16-4 4-4-4" />
+                <path d="M17 20V4" />
+                <path d="m3 8 4-4 4 4" />
+                <path d="M7 4v16" />
+              </svg>
+            </span>
+            <h2 className="inventory-card-header__title">{t("inventory.repack.execute_section").text}</h2>
           </div>
-          {execute.isError && <p role="alert">{errorText(execute.error, t("inventory.error.generic").text)}</p>}
+          <div className="repack-form-body">
+            <div className="repack-grid-2">
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.recipe").text}</span>
+                <CustomSelect
+                  ariaLabel={t("inventory.repack.recipe").text}
+                  value={run.recipeId}
+                  onChange={(val) => setRun({ ...run, recipeId: val, batchId: "" })}
+                  options={[
+                    { value: "", label: "" },
+                    ...active.map((r) => ({
+                      value: r.recipeId,
+                      label: r.name
+                    }))
+                  ]}
+                />
+              </label>
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.input_lot").text}</span>
+                <CustomSelect
+                  ariaLabel={t("inventory.repack.input_lot").text}
+                  value={run.batchId}
+                  onChange={(val) => setRun({ ...run, batchId: val })}
+                  options={[
+                    { value: "", label: "" },
+                    ...inputLots.map((lot) => ({
+                      value: lot.batchId,
+                      label: `${isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")} · ${lot.qtyOnHand}`
+                    }))
+                  ]}
+                />
+              </label>
+            </div>
+            <div className="repack-grid-2">
+              <div>
+                <label className="inventory-form-field">
+                  <span className="repack-field-label">{t("inventory.repack.input_qty").text}</span>
+                  <input
+                    aria-label={t("inventory.repack.input_qty").text}
+                    inputMode="decimal"
+                    value={run.inputQty}
+                    onChange={(event) => setRun({ ...run, inputQty: event.target.value })}
+                    placeholder="0.000"
+                  />
+                </label>
+                {recipe && inputQty !== null && (
+                  <p className="repack-yield-hint">{t("inventory.repack.expected", undefined, { qty: expectedOutputOf(recipe, inputQty) }).text}</p>
+                )}
+              </div>
+              <label className="inventory-form-field">
+                <span className="repack-field-label">{t("inventory.repack.actual").text}</span>
+                <input
+                  aria-label={t("inventory.repack.actual").text}
+                  inputMode="decimal"
+                  value={run.actual}
+                  onChange={(event) => setRun({ ...run, actual: event.target.value })}
+                  placeholder="0.000"
+                />
+              </label>
+            </div>
+            <label className="inventory-form-field">
+              <span className="repack-field-label">{t("inventory.repack.variance_reason").text}</span>
+              <input
+                value={run.reason}
+                onChange={(event) => setRun({ ...run, reason: event.target.value })}
+                placeholder={t("inventory.repack.variance_reason").text}
+              />
+            </label>
+            <div className="inventory-action-bar">
+              <button
+                type="button"
+                className="inventory-submit-btn modern-btn modern-btn--primary"
+                disabled={!runReady || execute.isPending}
+                onClick={() => execute.mutate()}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <path d="m21 16-4 4-4-4" />
+                  <path d="M17 20V4" />
+                  <path d="m3 8 4-4 4 4" />
+                  <path d="M7 4v16" />
+                </svg>
+                <span>{t("inventory.repack.execute").text}</span>
+              </button>
+            </div>
+            {execute.isError && <p role="alert" className="inventory-form-error">{errorText(execute.error, t("inventory.error.generic").text)}</p>}
+          </div>
         </section>
       )}
 
       <section className="modern-table-card" style={{ marginTop: 'var(--space-4)' }}>
-      {locationId !== "" && (
-        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
-          <h2>{t("inventory.repack.list").text}</h2>
-        </div>
-      )}
-      {repacks.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.none").text}</p>}
-      {repacks.data && repacks.data.length > 0 && (
-        <div className="modern-table-scroll">
-          <table className="modern-table stock-table">
-          <thead>
-            <tr>
-              <th>{t("inventory.card.column.when").text}</th>
-              <th>{t("inventory.repack.recipe.input").text}</th>
-              <th>{t("inventory.repack.recipe.output").text}</th>
-              <th>{t("inventory.repack.column.output_batch").text}</th>
-              <th>{t("inventory.repack.column.variance").text}</th>
-              <th>{t("inventory.repack.column.unit_cost").text}</th>
-              <th>{t("inventory.repack.column.status").text}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {repacks.data.map((r) => (
-              <tr key={r.repackId}>
-                <td>{r.executedAt ? formatInstant(r.executedAt) : ""}</td>
-                <td>
-                  {`${r.inputQty} × `}
-                  <SkuLabel skuId={r.inputSkuId} />
-                </td>
-                <td>
-                  {`${r.actualOutputQty} × `}
-                  <SkuLabel skuId={r.outputSkuId} />
-                </td>
-                <td>{isSyntheticBatchNo(r.outputBatchNo) ? t("inventory.field.batch_not_tracked").text : (r.outputBatchNo ?? "")}</td>
-                <td className="numeric-cell">{r.varianceQty}</td>
-                <td className="numeric-cell">{r.outputUnitCost == null ? "" : <MoneyDisplay amount={r.outputUnitCost} />}</td>
-                <td>
-                  <StateChip
-                    state={r.status === "REVERSED" ? "void" : "issued"}
-                    label={t(`inventory.repack.status.${r.status}`).text}
-                  />
-                </td>
-                <td>
-                  {r.status === "EXECUTED" && canReverse && (
-                    <button type="button" onClick={() => setReversing(r.repackId)}>
-                      {t("inventory.repack.reverse").text}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      )}
+        {locationId !== "" && (
+          <div className="inventory-card-header">
+            <span className="inventory-card-header__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+                <path d="m21 16-4 4-4-4" />
+                <path d="M17 20V4" />
+                <path d="m3 8 4-4 4 4" />
+                <path d="M7 4v16" />
+              </svg>
+            </span>
+            <h2 className="inventory-card-header__title">{t("inventory.repack.list").text}</h2>
+          </div>
+        )}
+        {repacks.data?.length === 0 && <p style={{ padding: 'var(--space-3) var(--space-4)' }}>{t("inventory.repack.none").text}</p>}
+        {repacks.data && repacks.data.length > 0 && (
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
+              <thead>
+                <tr>
+                  <th>{t("inventory.card.column.when").text}</th>
+                  <th>{t("inventory.repack.recipe.input").text}</th>
+                  <th>{t("inventory.repack.recipe.output").text}</th>
+                  <th>{t("inventory.repack.column.output_batch").text}</th>
+                  <th>{t("inventory.repack.column.variance").text}</th>
+                  <th>{t("inventory.repack.column.unit_cost").text}</th>
+                  <th>{t("inventory.repack.column.status").text}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {repacks.data.map((r) => (
+                  <tr key={r.repackId}>
+                    <td>{r.executedAt ? formatInstant(r.executedAt) : ""}</td>
+                    <td>
+                      {`${r.inputQty} × `}
+                      <SkuLabel skuId={r.inputSkuId} />
+                    </td>
+                    <td>
+                      {`${r.actualOutputQty} × `}
+                      <SkuLabel skuId={r.outputSkuId} />
+                    </td>
+                    <td>{isSyntheticBatchNo(r.outputBatchNo) ? t("inventory.field.batch_not_tracked").text : (r.outputBatchNo ?? "")}</td>
+                    <td className="numeric-cell">{r.varianceQty}</td>
+                    <td className="numeric-cell">{r.outputUnitCost == null ? "" : <MoneyDisplay amount={r.outputUnitCost} />}</td>
+                    <td>
+                      <StateChip
+                        state={r.status === "REVERSED" ? "void" : "issued"}
+                        label={t(`inventory.repack.status.${r.status}`).text}
+                      />
+                    </td>
+                    <td>
+                      {r.status === "EXECUTED" && canReverse && (
+                        <button type="button" className="table-action-btn" onClick={() => setReversing(r.repackId)}>
+                          {t("inventory.repack.reverse").text}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       {reversing && (
         <ReasonCapture

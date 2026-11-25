@@ -49,7 +49,7 @@ export function SessionsPage() {
       <Link className="back-link" to={`/pos?location=${locationId}&day=${day}`}>
         {t("pos.back").text}
       </Link>
-      <PageHeader icon="stock" title={t("pos.sessions.title").text} />
+      <PageHeader icon="sessions" title={t("pos.sessions.title").text} />
 
       <section className="modern-filter-panel pos-filters">
         <ShopPicker value={locationId} onChange={setLocationId} />

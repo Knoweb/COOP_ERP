@@ -85,6 +85,23 @@ every location of the entity having `BusinessDate.current(location) > periodTo` 
 `RequestJournalExportHandler` cites `2026-10-06-wave2-journal-export.md` (2)); whether one shop
 offline for two days should block the entity's final export is open for the architect.
 
+## Journal export acknowledgement and overdue review (ACC-03)
+
+- An entity-wide OWN user with `int.journal.ack` can acknowledge a generated export using
+  `POST /v1/integration/journal-exports/{exportId}/acknowledge`, with an Idempotency-Key.
+- Acknowledgement records the user and timestamp, changes the status from `GENERATED`
+  to `ACKNOWLEDGED`, records `JOURNAL_EXPORT_ACKNOWLEDGED` and publishes
+  `journal.acknowledged.v1`. A repeated acknowledgement has no additional effects.
+- The stored journal file, its hash and its accounting lines remain unchanged.
+- The scheduled `journal-unacknowledged-review` job records
+  `JOURNAL_EXPORT_UNACKNOWLEDGED` reviews for generated exports older than the
+  entity's `integration.journal_unacknowledged_review_days` threshold (default 30).
+  Repeated runs do not duplicate existing reviews.
+- PostgreSQL RLS restricts acknowledgements to the owning entity. The journal screen
+  offers acknowledgement only to permitted users for generated exports.
+- The migration, handlers, overdue job and frontend controls have PostgreSQL
+  integration tests and frontend regression tests.
+
 ## Notifications
 
 The kernel (K-10) dispatches, renders, suppresses, retries and logs. M9 gives it:
@@ -136,7 +153,7 @@ own delivery test stands in its test channels).
    open-period guard is `periodTo >= today` in the business time zone with the `provisional` flag
    as the escape (29A's "all locations' day-close" waits for location-dated postings); doc 29's
    SUPERSEDED and "supersedes" are withdrawn, a late posting is a supplement and the exports page
-   says when one is due; acknowledge, regenerate and the unacknowledged-review job are not built.
+   says when one is due; regenerate is not built; acknowledgement and overdue review are implemented under ACC-03.
 3. `posting_map_registry` is not built: the roles travel on the event, both sides of an invoice
    and a credit note on one event (`2026-10-06-wave2-buyer-postings.md` (2)); the buyer's side is
    filed by `m9.journal.buyer` under the kernel's counterparty delivery (CR-19A-13), not by an

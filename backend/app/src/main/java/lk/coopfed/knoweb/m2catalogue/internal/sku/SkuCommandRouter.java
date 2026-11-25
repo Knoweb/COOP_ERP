@@ -8,6 +8,8 @@ import lk.coopfed.knoweb.m2catalogue.api.ActivateLocalSku;
 import lk.coopfed.knoweb.m2catalogue.api.ActivateSharedSku;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
 import lk.coopfed.knoweb.m2catalogue.api.DeactivateSku;
+import lk.coopfed.knoweb.m2catalogue.api.MergeIntoShared;
+import lk.coopfed.knoweb.m2catalogue.api.PromoteToShared;
 import lk.coopfed.knoweb.m2catalogue.api.ReactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.UpdateSku;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
@@ -39,6 +41,8 @@ public class SkuCommandRouter {
     private final ActivateSharedSkuHandler activateShared;
     private final DeactivateSkuHandler deactivate;
     private final ReactivateSkuHandler reactivate;
+    private final PromoteToSharedHandler promoteHandler;
+    private final MergeIntoSharedHandler mergeHandler;
 
     SkuCommandRouter(
             CatalogueQueries queries,
@@ -48,7 +52,9 @@ public class SkuCommandRouter {
             ActivateLocalSkuHandler activateLocal,
             ActivateSharedSkuHandler activateShared,
             DeactivateSkuHandler deactivate,
-            ReactivateSkuHandler reactivate) {
+            ReactivateSkuHandler reactivate,
+            PromoteToSharedHandler promoteHandler,
+            MergeIntoSharedHandler mergeHandler) {
         this.queries = queries;
         this.create = create;
         this.updateLocal = updateLocal;
@@ -57,6 +63,8 @@ public class SkuCommandRouter {
         this.activateShared = activateShared;
         this.deactivate = deactivate;
         this.reactivate = reactivate;
+        this.promoteHandler = promoteHandler;
+        this.mergeHandler = mergeHandler;
     }
 
     /**
@@ -107,6 +115,22 @@ public class SkuCommandRouter {
 
     public UUID reactivate(ReactivateSku command, ScopeContext scope) {
         return reactivate.handle(command, scope);
+    }
+
+    public UUID promoteToShared(PromoteToShared command, ScopeContext scope) {
+        return promoteHandler.handle(command, scope);
+    }
+
+    public UUID promoteToShared(UUID skuId, ScopeContext scope) {
+        return promoteHandler.handle(new PromoteToShared(skuId), scope);
+    }
+
+    public UUID mergeIntoShared(MergeIntoShared command, ScopeContext scope) {
+        return mergeHandler.handle(command, scope);
+    }
+
+    public UUID mergeIntoShared(UUID sourceSkuId, UUID targetSkuId, ScopeContext scope) {
+        return mergeHandler.handle(new MergeIntoShared(sourceSkuId, targetSkuId), scope);
     }
 
     private static boolean isSkuCodeClash(Throwable error) {

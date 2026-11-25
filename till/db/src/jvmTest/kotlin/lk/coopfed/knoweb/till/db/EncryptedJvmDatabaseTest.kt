@@ -9,13 +9,23 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.money.Qty
+import lk.coopfed.knoweb.till.core.snapshot.SnapshotRow
+import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
 
 class EncryptedJvmDatabaseTest {
 
@@ -60,6 +70,36 @@ class EncryptedJvmDatabaseTest {
             val store = SqlTillStore(driver)
             store.saveReceipt(receipt)
             assertFailsWith<Exception> { store.saveReceipt(receipt.copy(documentId = "another")) }
+        }
+    }
+
+    @Test
+    fun tendersArePersistedAtomicallyWithReceiptAndCanBeQueried() {
+        EncryptedJvmDatabase.open(file, key).use { driver ->
+            val store = SqlTillStore(driver)
+            val cardTender = TenderRecord(seq = 1, kind = "CARD", amount = Money.parse("1000.00"), reference = "AUTH-123456")
+            val cashTender = TenderRecord(seq = 2, kind = "CASH", amount = Money.parse("250.00"), changeGiven = Money.parse("250.00"))
+            val splitReceipt = receipt.copy(
+                documentId = "d-split",
+                number = 2,
+                numberDisplay = "S01-T2-2",
+                gross = Money.parse("1250.00"),
+                tendered = Money.parse("1500.00"),
+                change = Money.parse("250.00"),
+                tenders = listOf(cardTender, cashTender),
+            )
+            store.saveReceipt(splitReceipt)
+
+            val rows = store.tillQueries.selectTendersByDocument("d-split").executeAsList()
+            assertEquals(2, rows.size)
+            assertEquals("CARD", rows[0].kind)
+            assertEquals("1000.00", rows[0].amount)
+            assertEquals("AUTH-123456", rows[0].reference)
+            assertEquals(0L, rows[0].offline)
+
+            assertEquals("CASH", rows[1].kind)
+            assertEquals("250.00", rows[1].amount)
+            assertEquals("250.00", rows[1].change_given)
         }
     }
 
@@ -113,6 +153,116 @@ class EncryptedJvmDatabaseTest {
             assertEquals(0, store.unseenAnomalyCount())
             assertEquals(3, store.anomalies(10).size)
             assertEquals(null, store.maxReceiptNumber())
+        }
+    }
+
+    @Test
+    fun inventorySnapshotTablesPersistAndReloadAcrossDatabaseRestarts() {
+        val lotId = "0190f0de-0000-7000-8000-0000000e0001"
+        val taskId = "0190f0de-0000-7000-8000-0000000f0001"
+        val locationId = "0190f0de-0000-7000-8000-000000000132"
+        val transferId = "0190f0de-0000-7000-8000-000000100001"
+
+        val lotRow = SnapshotRow(
+            "lot", lotId, null,
+            buildJsonObject {
+                put("stock_lot_id", lotId)
+                put("sku_id", "sku-01")
+                put("batch_no", "BATCH-01")
+                put("expiry_date", "2027-06-30")
+                put("condition", "GOOD")
+                put("quantity", "15.000")
+                put("fefo_rank", 1)
+            },
+        )
+        val taskRow = SnapshotRow(
+            "count_task", taskId, null,
+            buildJsonObject {
+                put("task_id", taskId)
+                put("task_number", "CNT-01")
+                put("status", "COUNTING")
+                putJsonArray("expectations") {
+                    add(buildJsonObject {
+                        put("stock_lot_id", lotId)
+                        put("sku_id", "sku-01")
+                        put("expected_qty", "15.000")
+                    })
+                }
+            },
+        )
+        val policyRow = SnapshotRow(
+            "inventory_policy", locationId, null,
+            buildJsonObject {
+                put("inventory.negative_stock.allowed", false)
+                put("inventory.expiry.near_threshold_days", 30)
+                put("inventory.transfer.transit_loss_limit_pct", "0.0200")
+            },
+        )
+        val transferRow = SnapshotRow(
+            "expected_transfer", transferId, null,
+            buildJsonObject {
+                put("transfer_id", transferId)
+                put("transfer_no", "TRN-01")
+                put("source_location_id", "loc-src")
+                put("destination_location_id", locationId)
+                putJsonArray("lines") {
+                    add(buildJsonObject {
+                        put("line_number", 1)
+                        put("sku_id", "sku-01")
+                        put("quantity", "50.000")
+                    })
+                }
+            },
+        )
+
+        val state = SnapshotState(
+            version = 5L,
+            live = mapOf(
+                "lot" to mapOf(lotId to lotRow),
+                "count_task" to mapOf(taskId to taskRow),
+                "inventory_policy" to mapOf(locationId to policyRow),
+                "expected_transfer" to mapOf(transferId to transferRow),
+            ),
+            held = emptyList(),
+        )
+
+        EncryptedJvmDatabase.open(file, key).use { driver ->
+            val store = SqlTillStore(driver)
+            store.saveSnapshot(state)
+        }
+
+        EncryptedJvmDatabase.open(file, key).use { driver ->
+            val store = SqlTillStore(driver)
+            val reloaded = store.loadSnapshot()
+            assertEquals(5L, reloaded.version)
+
+            val lots = reloaded.table("lot")
+            assertEquals(1, lots.size)
+            val lot = lots.first()
+            assertEquals(lotId, lot.rowId)
+            assertEquals("15.000", lot.data?.get("quantity")?.jsonPrimitive?.content)
+            assertEquals("1", lot.data?.get("fefo_rank")?.jsonPrimitive?.content)
+
+            val tasks = reloaded.table("count_task")
+            assertEquals(1, tasks.size)
+            val task = tasks.first()
+            assertEquals(taskId, task.rowId)
+            assertEquals("COUNTING", task.data?.get("status")?.jsonPrimitive?.content)
+            assertEquals(1, task.data?.get("expectations")?.jsonArray?.size)
+
+            val policies = reloaded.table("inventory_policy")
+            assertEquals(1, policies.size)
+            val policy = policies.first()
+            assertEquals(locationId, policy.rowId)
+            assertEquals("false", policy.data?.get("inventory.negative_stock.allowed")?.jsonPrimitive?.content)
+            assertEquals("30", policy.data?.get("inventory.expiry.near_threshold_days")?.jsonPrimitive?.content)
+
+            val transfers = reloaded.table("expected_transfer")
+            assertEquals(1, transfers.size)
+            val transfer = transfers.first()
+            assertEquals(transferId, transfer.rowId)
+            assertEquals("TRN-01", transfer.data?.get("transfer_no")?.jsonPrimitive?.content)
+            assertEquals(1, transfer.data?.get("lines")?.jsonArray?.size)
         }
     }
 

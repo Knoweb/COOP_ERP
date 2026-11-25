@@ -175,6 +175,16 @@ config_items:
     scope_kind: LOCATION
     change_permission: sys.config.manage
     till_visible: true
+  - key: pos.parked_sale_max_age
+    value_type: DURATION
+    schema: { minimum: "PT1M", maximum: "PT24H" }
+    description_en: Maximum time an unfinished sale may remain parked on a till
+    description_si: මුදල් යන්ත්‍රයක නිම නොකළ විකිණීමක් නවතා තැබිය හැකි උපරිම කාලය
+    description_ta: பணப்பெட்டியில் முடிக்கப்படாத விற்பனையை நிறுத்தி வைக்கக்கூடிய அதிகபட்ச நேரம்
+    default: "PT2H"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    till_visible: true
   - key: notification.sms.quiet_hours
     value_type: STRING
     schema: { pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$|^$", window_max_hours: 15 }
@@ -535,6 +545,25 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  - key: catalogue.duplicate_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 1.0 }
+    description_en: Threshold above which two SKUs are considered a duplicate suspect for the data steward
+    description_si: දත්ත භාරකරු සඳහා අයිතම දෙකක් අනුපිටපත් සැකයක් ලෙස සලකනු ලබන සීමාව
+    description_ta: தரவு பொறுப்பாளருக்கு இரண்டு உருப்படிகள் நகல் சந்தேகமாகக் கருதப்படும் வரம்பு
+    default: "0.85"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  - key: catalogue.local_sku_requires_barcode
+    value_type: BOOLEAN
+    description_en: Whether local SKU activation requires at least one active barcode
+    description_si: දේශීය SKU සක්‍රිය කිරීම සඳහා අවම වශයෙන් එක් සක්‍රිය තීරු කේතයක් අවශ්‍යද යන්න
+    description_ta: உள்ளூர் SKU செயல்படுத்தலுக்கு குறைந்தது ஒரு செயலில் உள்ள பார்கோடு தேவையா என்பது
+    default: "false"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m2catalogue
   # M4 Trading Documents (24A section 3.1, "seed/m4/config.yaml"; doc 24 section 7): the defaults
   # of doc 24 DR-1 to DR-6 as doc 10 F-09 and A-03 assume them. Configuration, so a different
   # answer from the Federation admins is a value, not a code change.
@@ -641,6 +670,15 @@ config_items:
     change_permission: prc.mrp_policy.set
     till_visible: true
     module: m3pricing
+  - key: pricing.trade_above_mrp_review
+    value_type: BOOLEAN
+    description_en: Whether a trade list price above the lowest printed MRP raises a review
+    description_si: වෙළඳ ලැයිස්තු මිල අඩුම මුද්‍රිත MRP එකට වඩා වැඩි වූ විට සමාලෝචනයක් ඇතිකරනවාද
+    description_ta: வர்த்தக பட்டியல் விலை குறைந்த அச்சிடப்பட்ட MRP ஐ விட அதிகமாக இருக்கும் போது மதிப்பாய்வு எழுப்பப்படுமா
+    default: "true"
+    scope_kind: FEDERATION
+    change_permission: prc.pricelist.publish
+    module: m3pricing
   - key: pricing.picker_gap_amount
     value_type: DECIMAL
     schema: { minimum: 0, maximum: 100000 }
@@ -662,6 +700,77 @@ config_items:
     scope_kind: ENTITY
     change_permission: prc.mrp_policy.set
     till_visible: true
+    module: m3pricing
+  # PRC-03 / doc 23 section 7: the A4Renderer template selected for a society's shelf labels.
+  - key: pricing.label_template
+    value_type: STRING
+    schema: { pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    description_en: The print template used for shelf price labels
+    description_si: රාක්ක මිල ලේබල මුද්‍රණය සඳහා භාවිත කරන ආකෘතිය
+    description_ta: அலமாரி விலைச் சீட்டுகளை அச்சிடப் பயன்படும் வார்ப்புரு
+    default: "default"
+    scope_kind: ENTITY
+    change_permission: prc.label.print
+    module: m3pricing
+  # PGL-M1-07: Expiry and slow-moving discount markdown rules
+  - key: pricing.expiry_discounts_enabled
+    value_type: BOOLEAN
+    description_en: Whether automated expiry and slow-moving discount markdowns are enabled
+    description_si: ස්වයංක්‍රීය කල් ඉකුත්වීමේ සහ මන්දගාමී තොග වට්ටම් සක්‍රීයද
+    description_ta: தானியங்கி காலாவதி மற்றும் மெதுவாக நகரும் இருப்பு தள்ளுபடிகள் இயக்கப்பட்டுள்ளதா
+    default: "true"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.near_expiry_discount_critical_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to critically near-expiry stock
+    description_si: ඉතා ආසන්නව කල් ඉකුත්වන තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: அவசரமாக காலாவதியாகும் இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "30.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.near_expiry_discount_warning_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to warning near-expiry stock
+    description_si: අවවාදාත්මක කල් ඉකුත්වීමේ තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: எச்சரிக்கை காலாவதி இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "15.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.slow_moving_discount_stagnant_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to stagnant stock with zero sales
+    description_si: ශුන්‍ය විකුණුම් සහිත අක්‍රිය තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: விற்பனையற்ற தேக்கமடைந்த இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "20.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.slow_moving_discount_slow_velocity_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 90 }
+    description_en: Discount percentage applied to slow-velocity stock exceeding days of supply threshold
+    description_si: සැපයුම් දින සීමාව ඉක්මවන මන්දගාමී තොග සඳහා අදාළ වන වට්ටම් ප්‍රතිශතය
+    description_ta: விநியோக நாட்களை விட அதிகமான மெதுவான வேக இருப்புக்கு வழங்கப்படும் தள்ளுபடி சதவீதம்
+    default: "10.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
+    module: m3pricing
+  - key: pricing.max_markdown_percent
+    value_type: DECIMAL
+    schema: { minimum: 1, maximum: 90 }
+    description_en: Maximum allowable discount percentage ceiling for expiry and slow-moving markdowns
+    description_si: කල් ඉකුත්වීමේ සහ මන්දගාමී තොග සඳහා උපරිම අවසර ලත් වට්ටම් ප්‍රතිශතය
+    description_ta: காலாவதி மற்றும் மெதுவாக நகரும் தள்ளுபடிகளுக்கான அதிகபட்ச அனுமதிக்கப்பட்ட தள்ளுபடி வரம்பு
+    default: "50.00"
+    scope_kind: ENTITY
+    change_permission: prc.rule.activate
     module: m3pricing
   # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
   # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
@@ -694,6 +803,7 @@ config_items:
     default: 5000
     scope_kind: ENTITY
     change_permission: cus.account.manage
+    till_visible: true
     module: m7customers
   # M5 stock control (25A section 3.1; doc 25 section 7): the count tolerance below which a variance
   # posts without approval (F-10), the value bands of an adjustment or a write-off (E-07), remote
@@ -843,6 +953,18 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m6pos
+  # TILL-SELL-11 (C-02c, doc 26 section 7): how many rupees a closed till session's cash shortage
+  # may reach before central raises a REVIEW audit event (pos.session_variance_review_threshold).
+  - key: pos.session_variance_review_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 1000000 }
+    description_en: How many rupees a closed till session's cash shortage may reach before central raises a review
+    description_si: මධ්‍යස්ථානය සමාලෝචනයක් මතු කිරීමට පෙර වසා දැමූ මුදල් යන්ත්‍ර සැසියක මුදල් හිඟය ළඟා විය හැකි රුපියල් ප්‍රමාණය
+    description_ta: மையம் ஒரு மதிப்பாய்வை எழுப்புவதற்கு முன் மூடப்பட்ட பணப்பெட்டி அமர்வின் பணப் பற்றாக்குறை எட்டக்கூடிய ரூபாய்
+    default: 500.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m6pos
   # wave 2, PR 12 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-pricing-rules.md
   # (3), CR-23A-1): how far back a control price may take effect, to the gazette's own date.
   - key: pricing.control_price_backdate_days
@@ -934,6 +1056,66 @@ config_items:
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory
+  - key: inventory.expiry_warning_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days before batch expiry when an expiry review task and count task are opened
+    description_si: කල් ඉකුත්වීමේ සමාලෝචන කාර්යයක් සහ ගණන් කිරීමේ කාර්යයක් විවෘත වන කාණ්ඩය කල් ඉකුත්වීමට පෙර දින ගණන
+    description_ta: தொகுதி காலாவதியாகும் முன் காலாவதி மதிப்பாய்வு மற்றும் எண்ணிக்கை பணி திறக்கப்படும் நாட்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.near_expiry_critical_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 90 }
+    description_en: Days before batch expiry when stock is marked as critically near-expiry
+    description_si: තොගය ඉතා ආසන්නව කල් ඉකුත් වන බවට ලකුණු කරනු ලබන කාණ්ඩය කල් ඉකුත්වීමට පෙර දින ගණන
+    description_ta: இருப்பு மிகவும் அவசரமாக காலாவதியாகிறது எனக் குறிக்கப்படும் தொகுதி காலாவதியாகும் முன் நாட்கள்
+    default: 7
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.slow_moving_days
+    value_type: INTEGER
+    schema: { minimum: 7, maximum: 365 }
+    description_en: Inactivity period in days with zero or low sales before stock is evaluated as slow-moving
+    description_si: තොගය මන්දගාමී ලෙස ඇගයීමට ලක් කිරීමට පෙර බිංදුව හෝ අඩු විකුණුම් සහිත දින වල අක්‍රිය කාල සීමාව
+    description_ta: இருப்பு மெதுவாக நகர்வதாக மதிப்பிடப்படுவதற்கு முன் பூஜ்ஜியம் அல்லது குறைந்த விற்பனையுடன் உள்ள செயலற்ற நாட்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.slow_moving_threshold_dos
+    value_type: INTEGER
+    schema: { minimum: 14, maximum: 730 }
+    description_en: Days of supply threshold above which stock with sales is considered slow-moving
+    description_si: විකුණුම් සහිත තොගය මන්දගාමී ලෙස සලකනු ලබන සැපයුම් දින සීමාව
+    description_ta: விற்பனையுடன் கூடிய இருப்பு மெதுவாக நகர்வதாகக் கருதப்படும் விநியோக நாட்களின் வரம்பு
+    default: 90
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.negative_lot_escalation_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days an oversold stock lot may remain unacknowledged before escalating
+    description_si: අධික ලෙස විකිණූ තොග කාණ්ඩයක් ඉහළට යොමු කිරීමට පෙර පිළිගැනීමකින් තොරව පැවතිය හැකි දින ගණන
+    description_ta: அதிகப்படியாக விற்கப்பட்ட இருப்புத் தொகுதி தீவிரப்படுத்தப்படுவதற்கு முன் ஒப்புக்கொள்ளப்படாமல் இருக்கக்கூடிய நாட்கள்
+    default: 7
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.transfer_receipt_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Calendar days a dispatched transfer may remain unreceived before a review is raised
+    description_si: යැවූ මාරු කිරීමක් සමාලෝචනයක් මතු කිරීමට පෙර නොලැබී පැවතිය හැකි දින දර්ශන දින ගණන
+    description_ta: அனுப்பப்பட்ட இடமாற்றம் மதிப்பாய்வு எழுப்பப்படுவதற்கு முன் பெறப்படாமல் இருக்கக்கூடிய நாட்காட்டி நாட்கள்
+    default: 3
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
   # wave 2, PR 08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-trading-projections.md
   # (7), CR-28A-2): the longest period and the most rows one report answers, the row cap applied in SQL.
   - key: reporting.max_period_days
@@ -956,3 +1138,138 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m8reporting
+  # wave 4, TILL-DATA-06: kernel configuration sync (doc 32 section 5.2, CR-32-1 item 3).
+  - key: sync.outbox.retention_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 90 }
+    description_en: How many days of acknowledged sync outbox rows an enrolled till keeps before purging
+    description_si: පිළිගත් සමමුහුර්ත පිටත ලිපිගොනු පේළි මකා දැමීමට පෙර ලියාපදිංචි ටිල් එකක් තබා ගන්නා දින ගණන
+    description_ta: ஒப்புக்கொள்ளப்பட்ட ஒத்திசைவு வெளிப்பெட்டி வரிசைகளை அழிப்பதற்கு முன் பதிவுசெய்யப்பட்ட டில் வைத்திருக்கும் நாட்களின் எண்ணிக்கை
+    default: 7
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: true
+    module: kernel
+  - key: pos.snapshot_staleness_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 30 }
+    description_en: How many days without a verified snapshot before a till warns that prices and ceilings may be stale
+    description_si: මිල සහ උපරිම සීමාවන් යල් පැන ගොස් තිබිය හැකි බවට ටිල් එකක් අනතුරු ඇඟවීමට පෙර තහවුරු කළ ස්නැප්ෂොට් එකක් නොමැති දින ගණන
+    description_ta: விலைகள் மற்றும் உச்சவரம்புகள் காலாவதியாகியிருக்கலாம் என்று டில் எச்சரிப்பதற்கு முன் சரிபார்க்கப்பட்ட ஸ்னாப்ஷாட் இல்லாத நாட்களின் எண்ணிக்கை
+    default: 3
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: true
+    module: m6pos
+  - key: integration.journal_unacknowledged_review_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 3650 }
+    description_en: Days a generated journal export may remain unacknowledged before review
+    description_si: ජනනය කළ ජර්නල් අපනයනයක් සමාලෝචනයට පෙර තහවුරු නොකර පැවතිය හැකි දින ගණන
+    description_ta: உருவாக்கப்பட்ட ஜர்னல் ஏற்றுமதி மதிப்பாய்வுக்கு முன் உறுதிப்படுத்தப்படாமல் இருக்கக்கூடிய நாட்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  # M3-05: HR Fingerprint Attendance and Overtime calculation rules
+  - key: hr.attendance.standard_daily_minutes
+    value_type: INTEGER
+    schema: { minimum: 60, maximum: 1440 }
+    description_en: Standard working minutes per day before overtime eligibility
+    description_si: අතිකාල සුදුසුකමට පෙර දිනකට සම්මත වැඩ කරන මිනිත්තු
+    description_ta: மேலதிக நேர தகுதிக்கு முன் ஒரு நாளைக்கு நிலையான வேலை நிமிடங்கள்
+    default: 480
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  - key: hr.attendance.overtime_threshold_minutes
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 240 }
+    description_en: Minimum excess minutes worked required to qualify for overtime
+    description_si: අතිකාල සඳහා සුදුසුකම් ලැබීමට අවශ්‍ය අවම අමතර වැඩ කරන මිනිත්තු
+    description_ta: மேலதிக நேரத்திற்கு தகுதி பெற தேவையான குறைந்தபட்ச கூடுதல் வேலை நிமிடங்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  - key: hr.attendance.overtime_rate_multiplier
+    value_type: DECIMAL
+    schema: { minimum: 1.0, maximum: 3.0 }
+    description_en: Hourly rate multiplier for standard weekday overtime
+    description_si: සාමාන්‍ය සතියේ දින අතිකාල සඳහා පැයක ගාස්තු ගුණකය
+    description_ta: நிலையான வாரநாள் மேலதிக நேரத்திற்கான மணிநேர வீதப் பெருக்கி
+    default: 1.50
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  - key: hr.attendance.weekend_rate_multiplier
+    value_type: DECIMAL
+    schema: { minimum: 1.0, maximum: 3.0 }
+    description_en: Hourly rate multiplier for weekend overtime
+    description_si: සති අන්ත අතිකාල සඳහා පැයක ගාස්තු ගුණකය
+    description_ta: வார இறுதி மேලதிக நேரத்திற்கான மணிநேர வீதப் பெருக்கி
+    default: 2.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m9integration
+  # M3-03: Loyalty Monthly Reward & Insurance Eligibility rules
+  - key: customers.loyalty.monthly_spend_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 1000000.0 }
+    description_en: Monthly qualifying spend threshold required for loyalty rewards and insurance eligibility
+    description_si: පක්ෂපාතිත්ව ප්‍රතිලාභ සහ රක්ෂණ සුදුසුකම් සඳහා අවශ්‍ය මාසික සුදුසුකම් ලබන වියදම් සීමාව
+    description_ta: விசுவாச வெகுமதிகள் மற்றும் காப்பீட்டுத் தகுதிக்குத் தேவையான மாதாந்த தகுதியான செலவு வரம்பு
+    default: 20000.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers
+  - key: customers.loyalty.min_membership_months
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 120 }
+    description_en: Minimum membership age in months required for loyalty reward points and insurance eligibility
+    description_si: පක්ෂපාතිත්ව ලකුණු සහ රක්ෂණ සුදුසුකම් සඳහා අවශ්‍ය අවම සාමාජිකත්ව කාලය (මාස වලින්)
+    description_ta: விசுவாச வெகுமதி புள்ளிகள் மற்றும் காப்பீட்டுத் தகுதிக்குத் தேவையான குறைந்தபட்ச உறுப்பினர் காலம் (மாதங்களில்)
+    default: 3
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers
+  - key: customers.loyalty.monthly_reward_points
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 100000 }
+    description_en: Monthly reward points awarded to eligible loyalty customers meeting spend threshold
+    description_si: වියදම් සීමාව සපුරාලන සුදුසුකම් ලත් පක්ෂපාතිත්ව පාරිභෝගිකයින්ට පිරිනමන මාසික ප්‍රතිලාභ ලකුණු
+    description_ta: செலவு வரம்பை பூர்த்தி செய்யும் தகுதியான விசுவாச வாடிக்கையாளர்களுக்கு வழங்கப்படும் மாதாந்த வெகுமதி புள்ளிகள்
+    default: 200
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers
+  - key: customers.loyalty.insurance_benefit_amount
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 10000000.0 }
+    description_en: Configured policy insurance cover amount for eligible loyalty members
+    description_si: සුදුසුකම් ලත් පක්ෂපාතිත්ව සාමාජිකයින් සඳහා ප්‍රතිපත්තිමය රක්ෂණ ආවරණ මුදල
+    description_ta: தகுதியான விசுவாச உறுப்பினர்களுக்கான கொள்கை காப்பீட்டுத் தொகை
+    default: 50000.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: false
+    module: m7customers

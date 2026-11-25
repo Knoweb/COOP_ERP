@@ -108,6 +108,18 @@ class JvmCryptoTest {
     }
 
     @Test
+    fun seededM1PinHashesVerifyOnTheTill() {
+        val cashierHash = "\$argon2id\$v=19\$m=65536,t=3,p=2\$YKJZ+HhfOVd56BBEjJSQog\$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o"
+        val supervisorHash = "\$argon2id\$v=19\$m=65536,t=3,p=2\$908LNOIyKO6h79VZQmL3TA\$qZ7GKCe9DXMDVBK8w4p2u9fjfohvVFs/M2vH1syzfcQ"
+
+        assertTrue(Argon2PinVerifier.verify("1234", cashierHash))
+        assertFalse(Argon2PinVerifier.verify("9999", cashierHash))
+
+        assertTrue(Argon2PinVerifier.verify("5678", supervisorHash))
+        assertFalse(Argon2PinVerifier.verify("1234", supervisorHash))
+    }
+
+    @Test
     fun aPinRecordTheTillCannotReadIsNotAWrongPin() {
         val good = phc()
         val unreadable = listOf(

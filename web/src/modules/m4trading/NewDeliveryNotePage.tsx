@@ -7,6 +7,7 @@ import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
 import { useTradingApi, type LotBalance } from "./tradingApi";
 import { deliveryRequest, errorText, isSyntheticBatchNo, openQty, type DispatchRow } from "./tradingView";
@@ -106,8 +107,17 @@ export function NewDeliveryNotePage() {
 
   return (
     <main className="shell-page">
-      <Link to={`/trading/orders/${o.orderId}`}>{t("trading.back_to_order").text}</Link>
-      <h1>{t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}</h1>
+      <Link className="back-link back-pill-btn" to={`/trading/orders/${o.orderId}`}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back_to_order").text}</span>
+      </Link>
+      <PageHeader
+        icon="suppliers"
+        title={t("trading.note.new.title", undefined, { number: o.docNumber ?? "" }).text}
+      />
       <dl>
         <dt>{t("trading.column.buyer").text}</dt>
         <dd>
@@ -138,50 +148,54 @@ export function NewDeliveryNotePage() {
           {t("trading.field.driver").text}
           <input value={driverName} maxLength={120} onChange={(event) => setDriverName(event.target.value)} />
         </label>
-        <table>
-          <thead>
-            <tr>
-              <th>{t("trading.column.item").text}</th>
-              <th>{t("trading.column.batch").text}</th>
-              <th>{t("trading.column.qty").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.orderLineId}>
-                <td>
-                  <SkuLabel skuId={row.skuId} />
-                </td>
-                <td>
-                  <select
-                    aria-label={t("trading.column.batch").text}
-                    value={row.batchId}
-                    onChange={(event) => setRow(index, { batchId: event.target.value })}
-                  >
-                    <option value="">{t("trading.field.no_batch").text}</option>
-                    {(lots.data ?? [])
-                      .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
-                      .map((lot) => (
-                        <option key={lot.stockLotId} value={lot.batchId}>
-                          {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`}
-                        </option>
-                      ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    aria-label={t("trading.column.qty").text}
-                    value={row.qty}
-                    onChange={(event) => setRow(index, { qty: event.target.value })}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="modern-table-card trading-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table trading-table">
+              <thead>
+                <tr>
+                  <th>{t("trading.column.item").text}</th>
+                  <th>{t("trading.column.batch").text}</th>
+                  <th>{t("trading.column.qty").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={row.orderLineId}>
+                    <td>
+                      <SkuLabel skuId={row.skuId} />
+                    </td>
+                    <td>
+                      <select
+                        aria-label={t("trading.column.batch").text}
+                        value={row.batchId}
+                        onChange={(event) => setRow(index, { batchId: event.target.value })}
+                      >
+                        <option value="">{t("trading.field.no_batch").text}</option>
+                        {(lots.data ?? [])
+                          .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
+                          .map((lot) => (
+                            <option key={lot.stockLotId} value={lot.batchId}>
+                              {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        aria-label={t("trading.column.qty").text}
+                        value={row.qty}
+                        onChange={(event) => setRow(index, { qty: event.target.value })}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div>
           <button
             type="submit"

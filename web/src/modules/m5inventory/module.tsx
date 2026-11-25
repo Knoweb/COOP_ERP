@@ -17,6 +17,12 @@ import { CountPage } from "./CountPage";
 import { WriteOffsPage } from "./WriteOffsPage";
 import { WriteOffPage } from "./WriteOffPage";
 import { RepacksPage } from "./RepacksPage";
+import { PickListPage } from "./PickListPage";
+import { ExpiryListPage } from "./ExpiryListPage";
+import { LossShrinkagePage } from "./LossShrinkagePage";
+import { InventoryPoliciesPage } from "./InventoryPoliciesPage";
+import { ReorderControlsPage } from "./ReorderControlsPage";
+import { MobileStockTakePage } from "./MobileStockTakePage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -42,9 +48,38 @@ export const inventoryModule: ModuleDefinition = {
     // the damage and expiry register, repacks.
     { path: "inventory/counts", element: <CountsPage /> },
     { path: "inventory/counts/:taskId", element: <CountPage /> },
+    { path: "inventory/stock-take", element: <MobileStockTakePage /> },
+    { path: "inventory/stock-take/:sessionId", element: <MobileStockTakePage /> },
     { path: "inventory/write-offs", element: <WriteOffsPage /> },
     { path: "inventory/write-offs/:writeOffId", element: <WriteOffPage /> },
-    { path: "inventory/repacks", element: <RepacksPage /> }
+    { path: "inventory/repacks", element: <RepacksPage /> },
+    {
+      path: "inventory/pick-lists",
+      element: (
+        <RequirePermission anyOf={["whs.pick"]}>
+          <PickListPage />
+        </RequirePermission>
+      )
+    },
+
+    { path: "inventory/expiry", element: <ExpiryListPage /> },
+    { path: "inventory/losses", element: <LossShrinkagePage /> },
+    {
+      path: "inventory/policies",
+      element: (
+        <RequirePermission anyOf={["inv.stock.view"]}>
+          <InventoryPoliciesPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "inventory/reorder-controls",
+      element: (
+        <RequirePermission anyOf={["inv.stock.view", "inv.reorder.manage"]}>
+          <ReorderControlsPage />
+        </RequirePermission>
+      )
+    }
   ],
 
   // The label is a message id of inventory.messages.json, never literal text.
@@ -59,6 +94,16 @@ export const inventoryModule: ModuleDefinition = {
     "inv.transfer.issue",
     "shop.transfer.receive",
     "shop.transfer.request",
-    "mpcs.transfer.approve"
+    "mpcs.transfer.approve",
+    "inv.count.schedule",
+    "shop.count.record",
+    "inv.writeoff.request",
+    "inv.writeoff.witness",
+    "inv.writeoff.approve",
+    "inv.recipe.manage",
+    "inv.repack.execute",
+    "inv.repack.reverse",
+    "whs.pick",
+    "inv.reorder.manage"
   ]
 };

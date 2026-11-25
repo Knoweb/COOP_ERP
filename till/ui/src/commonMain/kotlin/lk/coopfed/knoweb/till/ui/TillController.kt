@@ -13,14 +13,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlin.time.Clock
+import kotlin.time.Duration
 import lk.coopfed.knoweb.till.core.TillPolicy
 import lk.coopfed.knoweb.till.core.TillRefusal
 import lk.coopfed.knoweb.till.core.TillService
 import lk.coopfed.knoweb.till.core.TillStatus
 import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
+import lk.coopfed.knoweb.till.core.model.ParkedSaleRecord
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
+import lk.coopfed.knoweb.till.core.money.Qty
 import lk.coopfed.knoweb.till.core.port.CentralRefused
 import lk.coopfed.knoweb.till.core.port.CentralUnreachable
 import lk.coopfed.knoweb.till.core.receipt.MonoBitmap
@@ -36,10 +40,12 @@ import lk.coopfed.knoweb.till.core.snapshot.Operator
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRejected
 import lk.coopfed.knoweb.till.peripherals.PrintJob
 import lk.coopfed.knoweb.till.peripherals.PrinterPort
+import lk.coopfed.knoweb.till.peripherals.ScanLayer
+import lk.coopfed.knoweb.till.peripherals.Symbology
 import lk.coopfed.knoweb.till.render.ReceiptRasteriser
 
 /** Where the till is: the screen the cashier sees. */
-enum class Screen { STARTING, ENROL, SIGN_IN, OPEN_SESSION, SELL, CLOSE_SESSION, Z_REPORT }
+enum class Screen { STARTING, ENROL, SIGN_IN, OPEN_SESSION, SELL, CLOSE_SESSION, Z_REPORT, LOCKED }
 
 /**
  * Drives the shared screens from the [TillService]: holds what the screens show (Compose state),
@@ -54,8 +60,11 @@ class TillController(
     private val zone: TimeZone,
     private val paperDots: Int = MonoBitmap.DOTS_80MM,
     private val syncEveryMillis: Long = 20_000,
+    val scanLayer: ScanLayer = ScanLayer(),
 ) {
     var screen by mutableStateOf(Screen.STARTING)
+        private set
+    var screenBeforeLock by mutableStateOf<Screen?>(null)
         private set
     var busy by mutableStateOf(false)
         private set
@@ -84,6 +93,38 @@ class TillController(
     var clockDate by mutableStateOf<LocalDate?>(null)
         private set
 
+    enum class BeneficiaryMode { NONE, MEMBER, EMPLOYEE }
+
+    var beneficiaryMode by mutableStateOf(BeneficiaryMode.NONE)
+        private set
+    var customerClass by mutableStateOf<String?>(null)
+        private set
+    var beneficiaryIdentifier by mutableStateOf<String?>(null)
+        private set
+
+    val parkedSales = mutableStateListOf<ParkedSaleRecord>()
+    private var resumedParkedSaleId: String? = null
+
+    fun selectBeneficiaryMode(mode: BeneficiaryMode) {
+        recordActivity()
+        beneficiaryMode = mode
+        message = when (mode) {
+            BeneficiaryMode.MEMBER -> "Scan or enter Member card barcode"
+            BeneficiaryMode.EMPLOYEE -> "Enter Employee number"
+            BeneficiaryMode.NONE -> null
+        }
+        messageIsError = false
+    }
+
+    fun clearBeneficiary() {
+        recordActivity()
+        beneficiaryMode = BeneficiaryMode.NONE
+        customerClass = null
+        beneficiaryIdentifier = null
+        basket.clearBeneficiary()
+        say("Beneficiary cleared: General customer")
+    }
+
     private val basket = Basket()
     val lines = mutableStateListOf<BasketLine>()
     var total by mutableStateOf(Money.ZERO)
@@ -94,14 +135,18 @@ class TillController(
     val supervisors: List<Operator> get() = operators.filter { TillPolicy.SUPERVISOR_PERMISSION in it.permissions }
     /** Whether the sign-in screen offers the trial's stand-in cashier (the PC opted in and no operator was ever sent). */
     val trialCashierOffered: Boolean get() = service.trialCashierOffered
+    val operator: Operator? get() = service.operator
     val operatorName: String? get() = service.operator?.displayName
     val shopName: String get() = service.catalogue.shop?.name?.get(service.shopLanguage) ?: service.device?.let { "Shop ${it.locationId.takeLast(4)}" } ?: "COOP till"
     val tillLabel: String get() = service.device?.let { "${it.receiptPrefix} · ${it.hardwareSerial}" } ?: "not enrolled"
     val printerDescription: String get() = printer.description
+    val idleLockDuration: Duration get() = service.idleLockDuration
+    val isLocked: Boolean get() = service.isLocked || screen == Screen.LOCKED
     /** The shop's time zone, for times shown on screen. */
     val zoneForScreens: TimeZone get() = zone
 
     private var syncJob: Job? = null
+    private var idleJob: Job? = null
 
     fun start() = act {
         service.start()
@@ -109,7 +154,10 @@ class TillController(
         screen = if (service.isEnrolled && !service.isRevoked) Screen.SIGN_IN else Screen.ENROL
         refreshDates()
         watchStatus()
-        if (service.isEnrolled) startSyncLoop()
+        if (service.isEnrolled) {
+            startSyncLoop()
+            startIdleLoop()
+        }
     }
 
     // ---- enrolment ----
@@ -129,6 +177,12 @@ class TillController(
         afterSignIn()
     }
 
+    fun switchOperator(operator: Operator, pin: String, reason: String? = null) = act {
+        withContext(Dispatchers.Default) { service.switchOperator(operator, pin, reason) }
+        afterSignIn()
+        say("Switched operator to ${service.operator?.displayName}")
+    }
+
     fun signInTrialCashier() = act {
         service.signInTrialCashier()
         afterSignIn()
@@ -138,17 +192,72 @@ class TillController(
         session = service.currentSession()
         refreshDates()
         screen = if (session == null) Screen.OPEN_SESSION else Screen.SELL
+        screenBeforeLock = null
+        startIdleLoop()
         say("Signed in as ${service.operator?.displayName}")
     }
 
     fun signOut() {
         service.signOut()
+        screenBeforeLock = null
         screen = Screen.SIGN_IN
+    }
+
+    // ---- idle lock and activity ----
+
+    fun startIdleLoop() {
+        if (idleJob?.isActive == true) return
+        idleJob = scope.launch {
+            while (isActive) {
+                delay(1_000)
+                checkIdle()
+            }
+        }
+    }
+
+    fun checkIdle() {
+        if (screen != Screen.LOCKED && service.operator != null) {
+            if (service.checkIdleLock()) {
+                screenBeforeLock = screen
+                screen = Screen.LOCKED
+                say("Till locked due to inactivity")
+            }
+        }
+    }
+
+    fun recordActivity() {
+        if (screen != Screen.LOCKED) {
+            service.recordActivity()
+        }
+    }
+
+    fun lock() {
+        if (service.operator != null && screen != Screen.LOCKED) {
+            service.lock()
+            screenBeforeLock = screen
+            screen = Screen.LOCKED
+            say("Till locked")
+        }
+    }
+
+    fun unlock(pin: String) = act {
+        withContext(Dispatchers.Default) { service.unlock(pin) }
+        screen = screenBeforeLock ?: (if (session == null) Screen.OPEN_SESSION else Screen.SELL)
+        screenBeforeLock = null
+        say("Till unlocked")
+    }
+
+    fun unlockWithOperator(operator: Operator, pin: String) = act {
+        withContext(Dispatchers.Default) { service.unlock(operator, pin) }
+        screen = screenBeforeLock ?: (if (session == null) Screen.OPEN_SESSION else Screen.SELL)
+        screenBeforeLock = null
+        say("Till unlocked as ${service.operator?.displayName}")
     }
 
     // ---- session ----
 
     fun openSession(float: String) = act {
+        recordActivity()
         session = service.openSession(parseMoney(float))
         screen = Screen.SELL
         say("Session open with a float of LKR ${session!!.floatAmount.display()}")
@@ -189,15 +298,18 @@ class TillController(
     }
 
     fun toCloseSession() {
+        recordActivity()
         if (lines.isNotEmpty()) return say("Finish or clear the sale first", error = true)
         screen = Screen.CLOSE_SESSION
     }
 
     fun backToSelling() {
+        recordActivity()
         screen = Screen.SELL
     }
 
     fun closeSession(counted: String) = act {
+        recordActivity()
         val z = service.closeSession(parseMoney(counted))
         lastZReport = z
         session = null
@@ -218,34 +330,115 @@ class TillController(
 
     // ---- selling ----
 
-    /** A code from the scan field: a barcode first, else a search the screen shows. */
-    fun scan(code: String): List<Item> {
+    /** A code from the scan field: parsed through the scan layer, then looked up or searched. */
+    fun scan(code: String, atMillis: Long? = null): List<Item> {
+        recordActivity()
         val trimmed = code.trim()
         if (trimmed.isEmpty()) return emptyList()
-        val item = service.catalogue.byBarcode(trimmed)
-        if (item != null) {
-            add(item)
+
+        if (beneficiaryMode == BeneficiaryMode.MEMBER) {
+            if (service.catalogue.isMemberEligible(trimmed)) {
+                customerClass = "MEMBER"
+                beneficiaryIdentifier = trimmed
+                basket.setBeneficiary("MEMBER", trimmed)
+                beneficiaryMode = BeneficiaryMode.NONE
+                say("Member verified: MEMBER class applied")
+            } else {
+                say("Member barcode \"$trimmed\" not recognized or inactive", error = true)
+            }
             return emptyList()
         }
+
+        if (beneficiaryMode == BeneficiaryMode.EMPLOYEE) {
+            if (service.catalogue.isEmployeeEligible(trimmed)) {
+                customerClass = "EMPLOYEE"
+                beneficiaryIdentifier = trimmed
+                basket.setBeneficiary("EMPLOYEE", trimmed)
+                beneficiaryMode = BeneficiaryMode.NONE
+                say("Employee verified: EMPLOYEE class applied")
+            } else {
+                say("Employee number \"$trimmed\" not recognized or inactive", error = true)
+            }
+            return emptyList()
+        }
+
+        val scanResult = if (atMillis != null) scanLayer.parse(trimmed, atMillis) else scanLayer.parse(trimmed)
+        if (scanResult == null) {
+            // Deduplicated (dual-mark read or scanner bounce within 700 ms)
+            return emptyList()
+        }
+
+        // 1. Malformed or invalid structured barcodes must fail safely immediately
+        if (scanResult.isMalformed) {
+            say(scanResult.error ?: "Invalid barcode \"$trimmed\"", error = true)
+            return emptyList()
+        }
+
+        // 2. Resolve product by GTIN, SKU code, or raw barcode
+        val gtin = scanResult.gtin
+        val itemCode = scanResult.code
+        val isStructured = gtin != null || itemCode != null || scanResult.symbology != Symbology.UNKNOWN
+
+        val item = when {
+            gtin != null -> service.catalogue.byGtin(gtin) ?: service.catalogue.byBarcode(gtin)
+            itemCode != null -> service.catalogue.bySkuCode(itemCode) ?: service.catalogue.byBarcode(itemCode)
+            scanResult.symbology != Symbology.UNKNOWN -> service.catalogue.byBarcode(scanResult.rawData)
+            else -> service.catalogue.byBarcode(trimmed)
+        }
+
+        if (item != null) {
+            val weightGrams = scanResult.weightGrams
+            if (weightGrams != null) {
+                // Scanned barcode encodes an explicit weight (internal 20..24 label or GS1 AI 3103)
+                if (!item.soldByWeight) {
+                    say("Cannot apply weight to unit product \"${item.name.en}\"", error = true)
+                    return emptyList()
+                }
+                if (weightGrams <= 0L) {
+                    say("Weighed item scanned without valid weight", error = true)
+                    return emptyList()
+                }
+                add(item, Qty(weightGrams))
+            } else {
+                // Standard barcode with no embedded weight:
+                // Preserves existing manual workflow for soldByWeight items (defaults to 1.000 kg, editable)
+                // and 1 unit for sold-by-unit items.
+                add(item, Qty.ONE)
+            }
+            return emptyList()
+        }
+
+        // 3. Structured barcode not found in snapshot
+        if (isStructured) {
+            say("No item with barcode or code \"$trimmed\" in the snapshot", error = true)
+            return emptyList()
+        }
+
+        // 4. Non-structured input falls back to manual search (legacy codes or product names)
         val found = service.catalogue.search(trimmed)
         if (found.isEmpty()) say("No item with barcode or name \"$trimmed\" in the snapshot", error = true)
         return found
     }
 
-    fun search(query: String): List<Item> = service.catalogue.search(query)
+    fun search(query: String): List<Item> {
+        recordActivity()
+        return service.catalogue.search(query)
+    }
 
-    fun add(item: Item) {
+    fun add(item: Item, qty: Qty = Qty.ONE) {
+        recordActivity()
         val price = item.price
         if (price == null) {
             needsPrice = item
             return
         }
-        basket.add(item, price)
+        basket.add(item, price, qty)
         refreshBasket()
         message = null
     }
 
     fun addWithKeyedPrice(price: String) {
+        recordActivity()
         val item = needsPrice ?: return
         try {
             basket.add(item, parseMoney(price))
@@ -257,10 +450,12 @@ class TillController(
     }
 
     fun cancelKeyedPrice() {
+        recordActivity()
         needsPrice = null
     }
 
     fun changeQty(index: Int, delta: Int) {
+        recordActivity()
         val line = lines.getOrNull(index) ?: return
         val next = line.qty.milli + delta * 1000L
         if (next <= 0) basket.remove(index) else basket.setQty(index, lk.coopfed.knoweb.till.core.money.Qty(next))
@@ -268,23 +463,149 @@ class TillController(
     }
 
     fun removeLine(index: Int) {
+        recordActivity()
         basket.remove(index)
         refreshBasket()
     }
 
     fun clearSale() {
+        recordActivity()
         basket.clear()
+        resumedParkedSaleId = null
+        beneficiaryMode = BeneficiaryMode.NONE
+        customerClass = null
+        beneficiaryIdentifier = null
         refreshBasket()
+    }
+
+    fun parkedAgeMinutes(sale: ParkedSaleRecord): Long =
+        ((Clock.System.now().epochSeconds - sale.parkedAt).coerceAtLeast(0)) / 60
+
+    fun parkSale(onDone: () -> Unit = {}) = act {
+        recordActivity()
+        service.parkSale(basket, resumedParkedSaleId)
+        resumedParkedSaleId = null
+        beneficiaryMode = BeneficiaryMode.NONE
+        customerClass = null
+        beneficiaryIdentifier = null
+        refreshBasket()
+        reloadParkedSales()
+        onDone()
+        say("Sale parked without using a receipt number")
+    }
+
+    fun refreshParkedSales(onDone: () -> Unit = {}) = act {
+        recordActivity()
+        reloadParkedSales()
+        onDone()
+    }
+
+    private suspend fun reloadParkedSales() {
+        parkedSales.clear()
+        parkedSales.addAll(service.parkedSales())
+    }
+
+    fun resumeParkedSale(id: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        if (lines.isNotEmpty()) throw TillRefusal("Park or clear the current sale first")
+        val (parked, restored) = service.resumeParkedSale(id)
+        basket.clear()
+        restored.lines.forEach { basket.add(it.item, it.unitPrice, it.qty) }
+        basket.setBeneficiary(restored.customerClass, restored.beneficiaryIdentifier)
+        customerClass = restored.customerClass
+        beneficiaryIdentifier = restored.beneficiaryIdentifier
+        beneficiaryMode = BeneficiaryMode.NONE
+        resumedParkedSaleId = parked.id
+        refreshBasket()
+        onDone()
+        say("Parked sale resumed")
     }
 
     /** Cash tendered; the receipt is numbered, stored, printed, and the drawer opens. */
     fun payCash(tendered: String, onDone: () -> Unit = {}) = act {
-        val receipt = service.sellForCash(basket, parseMoney(tendered))
+        recordActivity()
+        val receipt = service.sellForCash(basket, parseMoney(tendered), resumedParkedSaleId)
+        resumedParkedSaleId = null
         refreshBasket()
         lastReceipt = receipt
         onDone()
         say("${receipt.numberDisplay}: change LKR ${receipt.change.display()}")
         print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = true)
+        syncSoon()
+    }
+
+    /** Card tendered on standalone terminal; receipt printed, drawer does NOT open. */
+    fun payCard(reference: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val receipt = service.sellForCard(basket, reference, resumedParkedSaleId)
+        resumedParkedSaleId = null
+        refreshBasket()
+        lastReceipt = receipt
+        onDone()
+        say("${receipt.numberDisplay}: Card LKR ${receipt.gross.display()} (Ref: $reference)")
+        print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = false)
+        syncSoon()
+    }
+
+    /** Mobile wallet payment on standalone terminal / app; receipt printed, drawer does NOT open. */
+    fun payWallet(reference: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val receipt = service.sellForWallet(basket, reference, resumedParkedSaleId)
+        resumedParkedSaleId = null
+        refreshBasket()
+        lastReceipt = receipt
+        onDone()
+        say("${receipt.numberDisplay}: Wallet LKR ${receipt.gross.display()} (Ref: $reference)")
+        print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = false)
+        syncSoon()
+    }
+
+    /** QR payment on terminal / dynamic QR; receipt printed, drawer does NOT open. */
+    fun payQr(reference: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val receipt = service.sellForQr(basket, reference, resumedParkedSaleId)
+        resumedParkedSaleId = null
+        refreshBasket()
+        lastReceipt = receipt
+        onDone()
+        say("${receipt.numberDisplay}: QR LKR ${receipt.gross.display()} (Ref: $reference)")
+        print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = false)
+        syncSoon()
+    }
+
+    /** Cash drop from drawer to safe; recorded, slip printed, and drawer kicks. */
+    fun recordCashDrop(amount: String, reason: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val parsed = parseMoney(amount)
+        val movement = service.recordCashDrop(parsed, reason)
+        onDone()
+        say("Cash drop recorded: LKR ${movement.amount.display()}")
+        val layout = ReceiptLayouts.cashMovement(
+            movement = movement,
+            header = header(),
+            operatorName = operatorName ?: "",
+            language = service.shopLanguage,
+            zone = zone,
+        )
+        print("DROP-${movement.movementId.takeLast(8)}", layout, kickDrawer = true)
+        syncSoon()
+    }
+
+    /** Pay-out from drawer; recorded, slip printed, and drawer kicks. */
+    fun recordPayout(amount: String, reason: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val parsed = parseMoney(amount)
+        val movement = service.recordPayout(parsed, reason)
+        onDone()
+        say("Pay-out recorded: LKR ${movement.amount.display()}")
+        val layout = ReceiptLayouts.cashMovement(
+            movement = movement,
+            header = header(),
+            operatorName = operatorName ?: "",
+            language = service.shopLanguage,
+            zone = zone,
+        )
+        print("PAYOUT-${movement.movementId.takeLast(8)}", layout, kickDrawer = true)
         syncSoon()
     }
 
@@ -325,6 +646,10 @@ class TillController(
                     basket.clear()
                 } else if (!it.revoked && wasRevoked && screen == Screen.ENROL && service.isEnrolled) {
                     screen = Screen.SIGN_IN
+                }
+                if (it.locked && screen != Screen.LOCKED && screen != Screen.ENROL && screen != Screen.SIGN_IN && screen != Screen.STARTING) {
+                    screenBeforeLock = screen
+                    screen = Screen.LOCKED
                 }
             }
         }

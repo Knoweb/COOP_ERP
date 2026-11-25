@@ -344,6 +344,18 @@ export function useTradingApi() {
         return data!;
       },
 
+      /** Authorises one photograph of the discrepancy, then PUTs its bytes to the store at the URL the server signed. */
+      async addDiscrepancyPhoto(discrepancyId: string, file: File, key: string): Promise<void> {
+        const { data } = await api.POST("/v1/trading/discrepancies/{discrepancyId}/photos", {
+          params: { path: { discrepancyId }, header: { "Idempotency-Key": key } },
+          body: { contentType: file.type, contentLength: file.size }
+        });
+        const upload = await fetch(data!.url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+        if (!upload.ok) {
+          throw new Error(`upload ${upload.status}`);
+        }
+      },
+
       /** Applies what a credit note holds unapplied to an open invoice of the same buyer (CR-24A-3 item 2). */
       async applyCreditNote(creditNoteId: string, invoiceId: string, key: string): Promise<CreditNote> {
         const { data } = await api.POST("/v1/trading/credit-notes/{creditNoteId}/apply", {

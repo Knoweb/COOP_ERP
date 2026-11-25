@@ -19,7 +19,7 @@ import java.util.zip.GZIPOutputStream;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Messages;
-import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
+import lk.coopfed.knoweb.kernel.internal.web.ProblemResponses;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;

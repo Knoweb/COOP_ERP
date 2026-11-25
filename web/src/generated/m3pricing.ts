@@ -91,6 +91,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/lists/{listId}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk import price list lines from a sheet or rows into a draft price list
+         * @description Parses a CSV/TSV sheet or line items, validates each line against catalogue SKUs and authoring rules, and populates an existing draft price list without activating/publishing prices. Guards: price list must exist in DRAFT status in the caller's owner scope. Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+         */
+        post: operations["importPriceListLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/lists/{listId}/publish": {
         parameters: {
             query?: never;
@@ -107,6 +129,28 @@ export interface paths {
          * @description A second factor is required (every kind). The lines are checked again against the ceilings in force on applyFrom. Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, m3.price_list.apply_from_past, m3.price_list.no_lines, m3.price_list.lines_invalid, scope.invalid.
          */
         post: operations["publishPriceList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/lists/{listId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw an unpublished price-list draft
+         * @description Only the owning entity may withdraw a DRAFT. A reason is required. Published versions cannot be withdrawn.
+         */
+        post: operations["withdrawDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -145,6 +189,70 @@ export interface paths {
          * @description Steps 1 to 4 of doc 23 section 3.5 through the shared engine: the society's published RETAIL line in force, the printed MRP of the batches in stock at the location under the effective MRP policy, and the control price; the lowest of them, with the bound that set it (capReason). Rules are not applied. 23A section 5 has resolveBasket (POST, a whole basket); this is its one-line, read-only form, a GET like resolveTradePrice.
          */
         get: operations["resolveRetailPrice"];
+        put?: never;
+        /**
+         * Resolve a basket at a shop
+         * @description Steps 1 to 4 of doc 23 section 3.5 through the shared engine for a whole basket.
+         */
+        post: operations["resolveBasket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/resolve/commercial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The commercial selling price of a SKU at a shop on a date (tax-inclusive, per unit), under MRP and control ceilings
+         * @description Prioritizes the society's published COMMERCIAL list in force on the date, falling back to RETAIL list when no commercial line exists, bounded by in-stock MRP and the control price.
+         */
+        get: operations["resolveCommercialPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/customer/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer price lookup for an item at a shop location
+         * @description Customer-facing price lookup that resolves the current permitted public retail price for a product at a given shop using the effective retail price resolver. Internal cost, margin, batch references, supplier identity, and restricted owner data are strictly excluded.
+         */
+        get: operations["lookupCustomerPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/customer/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search current permitted product prices at a shop location for customer portal
+         * @description Customer-facing search across catalog items at a given shop location. Returns permitted public retail prices with zero internal cost or margin data.
+         */
+        get: operations["searchCustomerPrices"];
         put?: never;
         post?: never;
         delete?: never;
@@ -278,6 +386,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue shelf labels for the published retail list in force today
+         * @description The shop belongs to the caller and every requested SKU has a line on the caller's published RETAIL list in force on the print date. The configured pricing.label_template is recorded with the QUEUED job. Ask for the job until it is RENDERED or FAILED. Codes this operation can answer with 422: m3.label.location_not_owned, m3.label.retail_list_not_found, m3.label.sku_not_on_list, m3.label.template_invalid.
+         */
+        post: operations["printShelfLabels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/labels/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A shelf-label print job with a fresh PDF link when rendered */
+        get: operations["getLabelJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/rules/{ruleId}": {
         parameters: {
             query?: never;
@@ -341,6 +486,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pricing reviews in the caller's scope */
+        get: operations["listReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/expiry-slow-moving-discounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+         * @description Returns active markdown discounts calculated deterministically from authoritative inventory near-expiry and slow-moving facts. Filterable by reason (NEAR_EXPIRY, SLOW_MOVING) and status (ACTIVE).
+         */
+        get: operations["listExpirySlowMovingDiscounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/expiry-slow-moving-discounts/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate near-expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+         * @description Triggers evaluation of inventory near-expiry and slow-moving candidates against configured markdown rules, records audit EXPIRY_SLOW_MOVING_DISCOUNTS_EVALUATED, publishes pricing.expiry_slow_moving_discounts_evaluated.v1, and returns evaluation summary.
+         */
+        post: operations["evaluateExpirySlowMovingDiscounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -353,6 +555,16 @@ export interface components {
             minQty?: number | null;
             daysToExpiry?: number | null;
             billTotalFrom?: number | null;
+            /**
+             * @description Optional customer-class targeting (PGL-M1-06); null applies to general public.
+             * @enum {string|null}
+             */
+            customerClass?: "MEMBER" | "EMPLOYEE" | null;
+            /**
+             * Format: uuid
+             * @description Optional shop/branch location scope (PGL-M1-06); null applies society-wide to all branches.
+             */
+            locationId?: string | null;
         };
         RuleBenefit: {
             /** @enum {string} */
@@ -398,7 +610,7 @@ export interface components {
         };
         CreatePriceListRequest: {
             /** @enum {string} */
-            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            kind: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
             name: string;
         };
         PublishPriceListRequest: {
@@ -407,6 +619,9 @@ export interface components {
              * @description The first business date the version applies
              */
             applyFrom: string;
+        };
+        WithdrawDraftRequest: {
+            reason: string;
         };
         SetLinesRequest: {
             lines: components["schemas"]["PriceListLineInput"][];
@@ -440,6 +655,48 @@ export interface components {
             /** @description The gazette reference of a control price, the batch number of an MRP */
             ceilingRef?: string | null;
         };
+        ImportPriceListLinesRequest: {
+            /** @description Raw CSV, TSV or delimited spreadsheet text with headers (e.g. sku,uom,tier,price) */
+            sheet?: string;
+            lines?: components["schemas"]["ImportPriceListLineRow"][];
+            /**
+             * @description When true, replaces existing draft lines; when false, merges lines into the draft list
+             * @default true
+             */
+            replace: boolean;
+        };
+        ImportPriceListLineRow: {
+            /** @description SKU code, barcode, or SKU UUID */
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** @description Unit of measure; defaults to SKU base UOM if omitted */
+            uomCode?: string;
+            /**
+             * @description Quantity threshold from which the price applies
+             * @default 0
+             */
+            tierFromQty: number;
+            /** @description Unit price */
+            price: number;
+        };
+        PriceListImportReportResponse: {
+            /** Format: uuid */
+            priceListId: string;
+            /** @description True if lines were saved into the draft list */
+            saved: boolean;
+            totalRows: number;
+            importedLines: number;
+            errorRows: number;
+            problems: components["schemas"]["PriceListImportProblem"][];
+            outcomes: components["schemas"]["LineOutcome"][];
+        };
+        PriceListImportProblem: {
+            line: number;
+            sku?: string | null;
+            field?: string | null;
+            message: string;
+        };
         RetailPriceResponse: {
             /** Format: uuid */
             locationId: string;
@@ -469,6 +726,26 @@ export interface components {
             /** Format: uuid */
             batchId?: string | null;
             engineVersion: string;
+        };
+        CustomerPriceLookupResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            productName: string;
+            uom: string;
+            /** @description Current permitted retail price, tax-inclusive */
+            publicPrice: number;
+            /** @default LKR */
+            currency: string;
+            isAvailable: boolean;
+            /** @description Gazetted maximum retail price ceiling if applicable */
+            controlPrice?: number | null;
+            isPriceControlled: boolean;
+            /** Format: uuid */
+            locationId: string;
+            locationName?: string | null;
+            /** Format: date */
+            effectiveDate?: string | null;
         };
         EnterControlPriceRequest: {
             /** Format: uuid */
@@ -537,6 +814,39 @@ export interface components {
             /** Format: date-time */
             setAt?: string | null;
         };
+        PrintShelfLabelsRequest: {
+            /** Format: uuid */
+            locationId: string;
+            skuIds: string[];
+        };
+        LabelRefusal: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            /** @enum {string} */
+            reason: "ABOVE_CONTROL_PRICE";
+            listPrice: number;
+            ceilingPrice: number;
+            ceilingReference?: string | null;
+        };
+        LabelJobResponse: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            status: "QUEUED" | "RENDERED" | "FAILED";
+            requestedCount: number;
+            renderedCount: number;
+            refused: components["schemas"]["LabelRefusal"][];
+            /**
+             * Format: uri
+             * @description A fresh pre-signed PDF link when RENDERED
+             */
+            downloadUrl?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         PriceListResponse: {
             /** Format: uuid */
             priceListId: string;
@@ -548,7 +858,7 @@ export interface components {
             /** Format: uuid */
             ownerEntityId?: string;
             /** @enum {string} */
-            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            kind: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
             name: string;
             version: number;
             /** Format: uuid */
@@ -596,6 +906,142 @@ export interface components {
             /** @description Per unit and tax-exclusive with four decimals */
             unitPrice: number;
             engineVersion: string;
+        };
+        ResolveBasketRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date */
+            businessDate: string;
+            /**
+             * @description Doc 23 section 3.5: CASH rounds the total to the rupee; CARD, KHATA (the member's account) and CHEQUE are exact. VOUCHER is not priced by M3 (vouchers are a later phase) and is refused with 400 m3.basket.tender_not_priced.
+             * @enum {string}
+             */
+            tenderKind: "CASH" | "CARD" | "KHATA" | "CHEQUE" | "VOUCHER";
+            /**
+             * @description Optional explicit beneficiary class (PGL-M1-06). Requires beneficiaryIdentifier when supplied.
+             * @enum {string|null}
+             */
+            beneficiaryClass?: "MEMBER" | "EMPLOYEE" | null;
+            /** @description Optional explicit beneficiary credential (e.g. memberNo for MEMBER, employeeNo for EMPLOYEE). */
+            beneficiaryIdentifier?: string | null;
+            lines: components["schemas"]["ResolveBasketLineRequest"][];
+        };
+        ResolveBasketLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            uom: string;
+            /** @description At most three decimals (doc 18); a fourth is refused with 400 m3.basket.qty_precision. */
+            qty: number;
+            /** Format: uuid */
+            batchId?: string | null;
+            /** Format: uuid */
+            pickedBatchId?: string | null;
+        };
+        BatchCandidate: {
+            /** Format: uuid */
+            batchId: string;
+            batchNo: string;
+            printedMrp?: number | null;
+            /** Format: date */
+            expiry?: string | null;
+            /** @description The image of the batch for the picker; not filled at central yet (no image per batch) */
+            thumbKey?: string | null;
+        };
+        LineResult: {
+            /** Format: uuid */
+            skuId: string;
+            uom: string;
+            qty: number;
+            /** Format: uuid */
+            batchId?: string | null;
+            unitPrice: number;
+            mrpApplied?: number | null;
+            controlPriceApplied?: number | null;
+            /** @enum {string} */
+            capReason: "NONE" | "MRP_LOWEST" | "MRP_BARCODE" | "MRP_PICKED" | "CONTROL_PRICE";
+            /** Format: uuid */
+            ruleId?: string | null;
+            discountAmount: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            /** @description Filled only when the policy is PICKER and the till must pick a batch (23A section 5) */
+            candidates?: components["schemas"]["BatchCandidate"][];
+        };
+        BasketResult: {
+            lines: components["schemas"]["LineResult"][];
+            /** Format: uuid */
+            billRuleId?: string | null;
+            billDiscount?: number;
+            subtotal: number;
+            total: number;
+            rounding: number;
+            engineVersion: string;
+            /** @description The till's snapshot version; null at central, which reads the tables rather than a snapshot */
+            snapshotVersion?: string | null;
+        };
+        /** @description Escalation (23A section 8) is not in the contract yet: no review is settled or escalated until the exception-queue flow exists. */
+        ReviewItem: {
+            /** Format: uuid */
+            reviewId: string;
+            kind: string;
+            severity: string;
+            /**
+             * @description Every review is OPEN until a settle command exists
+             * @enum {string}
+             */
+            status: "OPEN" | "SETTLED";
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuName?: string | null;
+            skuCode?: string | null;
+            details?: Record<string, never>;
+        };
+        ExpirySlowMovingDiscountResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            /** Format: uuid */
+            stockLotId?: string | null;
+            /** Format: uuid */
+            batchId?: string | null;
+            batchNo?: string | null;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            reason: "NEAR_EXPIRY" | "SLOW_MOVING";
+            tierOrClassification: string;
+            basePrice: number;
+            markdownPercent: number;
+            discountedPrice: number;
+            qtyOnHand: number;
+            /** Format: date */
+            expiryDate?: string | null;
+            daysToExpiry?: number | null;
+            /** Format: date */
+            validFrom?: string | null;
+            /** Format: date */
+            validTo?: string | null;
+            /** @enum {string} */
+            status: "ACTIVE";
+        };
+        EvaluateExpirySlowMovingDiscountsRequest: {
+            /** Format: uuid */
+            locationId: string;
+        };
+        ExpirySlowMovingEvaluationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            totalEvaluated: number;
+            markdownsActive: number;
+            nearExpiryCount: number;
+            slowMovingCount: number;
+            /** Format: date-time */
+            evaluatedAt: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -655,7 +1101,7 @@ export interface operations {
     listPriceLists: {
         parameters: {
             query?: {
-                kind?: "TRADE" | "RETAIL" | "ADVISORY";
+                kind?: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
                 status?: "DRAFT" | "PUBLISHED" | "SUPERSEDED" | "WITHDRAWN";
             };
             header?: never;
@@ -795,6 +1241,37 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    importPriceListLines: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportPriceListLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description Import report with outcome status, row counts, problems, and per-line outcomes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListImportReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
     publishPriceList: {
         parameters: {
             query?: never;
@@ -814,6 +1291,37 @@ export interface operations {
         };
         responses: {
             /** @description The published version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    withdrawDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description The withdrawn draft */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -890,6 +1398,136 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    resolveBasket: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBasketRequest"];
+            };
+        };
+        responses: {
+            /** @description The resolved basket */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasketResult"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description The location is not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resolveCommercialPrice: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId: string;
+                uom: string;
+                qty: number;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The commercial price, or why the item is not sellable there */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetailPriceResponse"];
+                };
+            };
+            /** @description The location or the SKU is not visible in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    lookupCustomerPrice: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+                barcode?: string;
+                skuCode?: string;
+                query?: string;
+                uom?: string;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The customer-safe public price */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPriceLookupResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Location or product not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    searchCustomerPrices: {
+        parameters: {
+            query: {
+                locationId: string;
+                query?: string;
+                date?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching product public prices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPriceLookupResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
     listAdvisoryLines: {
@@ -1124,6 +1762,64 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    printShelfLabels: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrintShelfLabelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelJobResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getLabelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The label job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelJobResponse"];
+                };
+            };
+            /** @description No such label job in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getRule: {
         parameters: {
             query?: never;
@@ -1205,6 +1901,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listReviews: {
+        parameters: {
+            query?: {
+                kind?: "BATCH_MRP_BELOW_LIST" | "TRADE_ABOVE_MRP" | "LIST_ABOVE_CEILING_AT_GAZETTE";
+                /** @description OPEN answers every review; SETTLED answers none until a settle command exists */
+                status?: "OPEN" | "SETTLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The reviews */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"][];
+                };
+            };
+        };
+    };
+    listExpirySlowMovingDiscounts: {
+        parameters: {
+            query: {
+                locationId: string;
+                reason?: "ALL" | "NEAR_EXPIRY" | "SLOW_MOVING";
+                status?: "ALL" | "ACTIVE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of active expiry and slow-moving discount markdowns */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpirySlowMovingDiscountResponse"][];
+                };
+            };
+        };
+    };
+    evaluateExpirySlowMovingDiscounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateExpirySlowMovingDiscountsRequest"];
+            };
+        };
+        responses: {
+            /** @description Evaluation result summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpirySlowMovingEvaluationResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

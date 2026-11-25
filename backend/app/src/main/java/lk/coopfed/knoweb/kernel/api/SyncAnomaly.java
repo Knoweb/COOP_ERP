@@ -8,7 +8,8 @@ import java.util.UUID;
  * less than the device was told it holds. The audit record beside it carries the severity.
  *
  * @param anomalyId the quarantine row for a quarantined event; a fresh id otherwise
- * @param kind      QUARANTINED, REPEATED_GAP, CLOCK_DRIFT or CURSOR_BEHIND
+ * @param kind      QUARANTINED, REPEATED_GAP, CLOCK_DRIFT, CURSOR_BEHIND or APP_VERSION_BELOW_FLOOR
+ *                  (once per device and floor, after the grace)
  * @param deviceSeq the sequence concerned, when there is one
  * @param reason    for QUARANTINED, the reason (SCHEMA, DUPLICATE_ID, HASH ...)
  */

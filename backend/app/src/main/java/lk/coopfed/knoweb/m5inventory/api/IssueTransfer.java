@@ -6,8 +6,8 @@ import java.util.UUID;
 
 /**
  * IssueTransfer (25A section 6.3; doc 25 flow 6.6): stock of one entity leaves one of its
- * locations for another (a warehouse to a shop). Issue and dispatch are one step at demo scope:
- * the stock leaves the source as TRANSFER_OUT and is in transit until the destination receives.
+ * locations for another (a warehouse to a shop). The stock leaves the source as TRANSFER_OUT;
+ * dispatch is recorded separately before the destination may receive it.
  *
  * @param lines             at least one; each a GOOD batch at the source and a quantity it holds
  * @param transferRequestId the M4 transfer request the transfer fulfils (M4-10), or null for a

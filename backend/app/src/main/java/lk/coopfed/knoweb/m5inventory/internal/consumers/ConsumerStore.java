@@ -90,7 +90,11 @@ class ConsumerStore {
                        l.qty_on_hand - coalesce((select sum(p.qty)
                                                    from inventory.pick_list_line p
                                                    join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
-                                                  where pl.status = 'OPEN' and p.stock_lot_id = l.stock_lot_id), 0) as free
+                                                   left join inventory.pick_override o
+                                                     on o.pick_line_id = p.pick_line_id
+                                                  where pl.status = 'OPEN'
+                                                    and coalesce(o.replacement_stock_lot_id, p.stock_lot_id)
+                                                        = l.stock_lot_id), 0) as free
                   from inventory.stock_lot l
                  where l.sku_id = ? and l.condition = 'GOOD' and l.qty_on_hand > 0
                    and (?::uuid is null or l.batch_id = ?)
@@ -137,10 +141,15 @@ class ConsumerStore {
     List<Pick> lotPicks(UUID pickListId) {
         return jdbc.query(
                 """
-                select location_id, stock_lot_id, batch_id, qty
-                  from inventory.pick_list_line
-                 where pick_list_id = ? and stock_lot_id is not null
-                 order by location_id, batch_id
+                select coalesce(o.location_id, p.location_id) as location_id,
+                       coalesce(o.replacement_stock_lot_id, p.stock_lot_id) as stock_lot_id,
+                       coalesce(o.replacement_batch_id, p.batch_id) as batch_id,
+                       p.qty
+                  from inventory.pick_list_line p
+                  left join inventory.pick_override o on o.pick_line_id = p.pick_line_id
+                 where p.pick_list_id = ? and p.stock_lot_id is not null
+                 order by coalesce(o.location_id, p.location_id),
+                          coalesce(o.replacement_batch_id, p.batch_id)
                 """,
                 (rs, n) -> new Pick(
                         rs.getObject("location_id", UUID.class),

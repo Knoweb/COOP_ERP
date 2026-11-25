@@ -7,7 +7,8 @@ import type {
   OpeningBalance,
   OpeningBalanceLineRequest,
   RequestTransferRequest,
-  TransferRequest
+  TransferRequest,
+  Transfer
 } from "./inventoryApi";
 
 // A batch-less SKU still needs a batch row (M2-05, doc 22 section 3.7), so M2 registers a
@@ -35,7 +36,13 @@ export function transferLinesOf(lots: LotBalance[], quantities: Record<string, s
 
 /** The look of an opening balance's state (doc 30 section 2.2): being prepared, signed once, posted. */
 export function chipOf(status: OpeningBalance["status"]): ChipState {
-  return status === "POSTED" ? "issued" : "draft";
+  if (status === "POSTED") {
+    return "issued";
+  }
+  if (status === "REJECTED") {
+    return "void";
+  }
+  return "draft";
 }
 
 /** The problem's title, which the server has already translated; the fallback otherwise. */
@@ -106,4 +113,20 @@ export function sourceFor(
   }
   const warehouses = locations.filter((l) => l.locationType === "WAREHOUSE");
   return warehouses.length === 1 ? warehouses[0].locationId : undefined;
+}
+
+/** The look of a transfer's state: issued, in transit, received, or cancelled. */
+export function transferChip(status: Transfer["status"]): ChipState {
+  switch (status) {
+    case "ISSUED":
+      return "draft";
+    case "IN_TRANSIT":
+      return "alert";
+    case "RECEIVED":
+      return "issued";
+    case "CANCELLED":
+      return "void";
+    default:
+      return "draft";
+  }
 }

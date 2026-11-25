@@ -9,6 +9,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { useSession } from "../../shell/auth/session";
 import { ApprovalBar, type ApprovalAction } from "../../shell/components/ApprovalBar";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Count } from "./inventoryApi";
@@ -97,30 +98,45 @@ export function CountPage() {
   const approvals: ApprovalAction[] =
     task.status === "VARIANCE_REVIEW" && canApprove
       ? [
-          {
-            id: "approve",
-            label: t("inventory.count.approve").text,
-            primary: true,
-            pending: approve.isPending,
-            disabledReason: ownCount ? t("inventory.count.sod").text : undefined,
-            onClick: () => approve.mutate()
-          },
-          {
-            id: "reject",
-            label: t("inventory.count.reject").text,
-            pending: reject.isPending,
-            onClick: () => setRejecting(true)
-          }
-        ]
+        {
+          id: "approve",
+          label: t("inventory.count.approve").text,
+          primary: true,
+          pending: approve.isPending,
+          disabledReason: ownCount ? t("inventory.count.sod").text : undefined,
+          onClick: () => approve.mutate()
+        },
+        {
+          id: "reject",
+          label: t("inventory.count.reject").text,
+          pending: reject.isPending,
+          onClick: () => setRejecting(true)
+        }
+      ]
       : [];
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/inventory/counts">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("inventory.count.back").text}
-      </Link>
-      <h1>{t("inventory.count.sheet_title").text}</h1>
+      <div>
+        <Link className="back-pill-btn" to="/inventory/counts">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          {t("inventory.count.back").text}
+        </Link>
+      </div>
+      <PageHeader icon="counts" title={t("inventory.count.sheet_title").text} />
       <p>
         <StateChip state={countChip(task.status)} label={t(`inventory.count.status.${task.status}`).text} />
         {task.outcome && ` ${t(`inventory.count.outcome.${task.outcome}`).text}`}

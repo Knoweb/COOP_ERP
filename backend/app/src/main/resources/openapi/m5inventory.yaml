@@ -44,6 +44,76 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/LotBalanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/locations/{locationId}/stock-summary:
+    get:
+      tags: [Inventory]
+      operationId: getStockSummaries
+      summary: Stock balance summaries for a location with explainable quantities
+      description: >
+        Aggregated stock position summaries for a location with explainable on-hand, reserved,
+        in-transit, and count variance quantities, optionally filtered by department, UOM, or discrepancy.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: departmentId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uomCode
+          required: false
+          schema: { type: string }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: includeZero
+          required: false
+          schema: { type: boolean, default: false }
+        - in: query
+          name: discrepancyOnly
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Stock summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockSummaryResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/locations/{locationId}/skus/{skuId}/explanation:
+    get:
+      tags: [Inventory]
+      operationId: getStockExplanation
+      summary: Explainability drilldown for a SKU stock position at a location
+      description: >
+        Surfaces the individual lots, active pick list reservations, in-transit transfers,
+        and latest count session details explaining the stock quantities.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Stock explanation details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockExplanationResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: Stock explanation not found, or the caller's scope may not see it
   /v1/inventory/locations/{locationId}/movements:
     get:
       tags: [Inventory]
@@ -156,6 +226,67 @@ paths:
               schema: { $ref: '#/components/schemas/PickListResponse' }
         '404':
           description: No pick list for this delivery note, or the caller's scope may not see it
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override:
+    post:
+      tags: [Inventory]
+      operationId: overridePick
+      summary: Replace one FEFO-suggested lot before dispatch
+      description: >
+        The original pick line remains immutable. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid,
+        m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found,
+        m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original,
+        m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch,
+        m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+      x-permission: whs.pick
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OverridePickRequest' }
+      responses:
+        '204':
+          description: The replacement lot is now the effective reservation
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates:
+    get:
+      tags: [Inventory]
+      operationId: listPickReplacementCandidates
+      summary: Eligible replacement lots for one FEFO-suggested pick
+      description: >
+        Returns only in-date GOOD lots of the same SKU and source location with enough currently
+        unreserved stock for the whole pick line, excluding its original lot. The OverridePick
+        command locks and revalidates the selected lot because availability may change after this
+        read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+      x-permission: whs.pick
+      parameters:
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: pickLineId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Currently eligible replacement lots in FEFO order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PickReplacementCandidateResponse' }
   /v1/inventory/opening-balances:
     post:
       tags: [Inventory]
@@ -181,6 +312,47 @@ paths:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/bulk:
+    post:
+      tags: [Inventory]
+      operationId: bulkImportOpeningStock
+      summary: Import opening stock in bulk from a sheet or rows
+      description: >
+        Parses opening stock data and registers it as an opening balance in status DRAFT,
+        awaiting signatures before becoming active. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding,
+        m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required,
+        m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+      x-permission: inv.opening.prepare
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkImportStockRequest' }
+      responses:
+        '201':
+          description: Opening stock imported and converted into opening balance awaiting signatures
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkStockReport' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/template:
+    get:
+      tags: [Inventory]
+      operationId: downloadOpeningStockTemplate
+      summary: Download official opening stock Excel spreadsheet template
+      x-permission: inv.stock.view
+      responses:
+        '200':
+          description: Excel spreadsheet template (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /v1/inventory/opening-balances/{openingBalanceId}:
     get:
       tags: [Inventory]
@@ -228,9 +400,13 @@ paths:
       operationId: countersignOpeningBalance
       summary: The Federation's officer countersigns; the OPB is issued and the stock posted
       description: >
-        Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found,
+        Codes this operation can answer with 422: m5.scope.own_required,
+        m5.opening.user_required, m5.opening.federation_required, m5.opening.not_found,
         m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock,
-        m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+        m5.opening.entity_unknown, m2.sku.not_found, m2.batch.sku_not_active,
+        m2.batch.batch_no_too_long, m2.batch.mrp_required, m2.batch.mrp_invalid,
+        m2.batch.expiry_required, m2.batch.dates_invalid; mfa.required when the second factor is
+        not fresh.
       x-permission: inv.opening.countersign
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -245,6 +421,33 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/{openingBalanceId}/reject:
+    post:
+      tags: [Inventory]
+      operationId: rejectOpeningBalance
+      summary: A higher officer rejects a draft or signed opening balance with a documented reason
+      description: >
+        Rejects an opening balance in DRAFT or SIGNED_ENTITY status, recording the officer and
+        reason, freeing the location for re-preparation.
+      x-permission: inv.opening.sign
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: openingBalanceId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectOpeningBalanceRequest' }
+      responses:
+        '200':
+          description: Rejected, in status REJECTED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/inventory/transfers:
     get:
       tags: [Inventory]
@@ -252,8 +455,8 @@ paths:
       summary: The transfers leaving or arriving at a location, newest first
       description: >
         A session at the source sees the transfers it sent, a session at the destination the ones
-        addressed to it; an entity-wide user both. Status IN_TRANSIT until the destination
-        receives, then RECEIVED.
+        addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until
+        the destination receives, then RECEIVED, or CANCELLED when cancelled before receipt.
       x-permission: inv.stock.view
       parameters:
         - in: query
@@ -272,10 +475,10 @@ paths:
     post:
       tags: [Inventory]
       operationId: issueTransfer
-      summary: Send stock from one location of the entity to another (issue and dispatch)
+      summary: Issue stock from one location of the entity to another
       description: >
-        The stock leaves the source as TRANSFER_OUT and is in transit until the destination
-        receives it. Codes this operation can answer with 422: m5.scope.own_required,
+        The stock leaves the source as TRANSFER_OUT and remains ISSUED until separately dispatched.
+        Codes this operation can answer with 422: m5.scope.own_required,
         m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid,
         m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found,
         m5.transfer.insufficient_stock.
@@ -289,7 +492,7 @@ paths:
             schema: { $ref: '#/components/schemas/IssueTransferRequest' }
       responses:
         '201':
-          description: Issued, in status IN_TRANSIT
+          description: Issued, in status ISSUED
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransferResponse' }
@@ -314,15 +517,17 @@ paths:
               schema: { $ref: '#/components/schemas/TransferResponse' }
         '404':
           description: No such transfer, or the caller's scope may not see it
-  /v1/inventory/transfers/{transferId}/receive:
+  /v1/inventory/transfers/{transferId}/dispatch:
     post:
       tags: [Inventory]
-      operationId: receiveTransfer
-      summary: The destination receives the transfer in full
+      operationId: dispatchTransfer
+      summary: Dispatch an issued transfer from its source
       description: >
-        Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
-        m5.transfer.not_destination, m5.transfer.already_received.
-      x-permission: shop.transfer.receive
+        Records the insert-only dispatch fact and moves the derived lifecycle from ISSUED to
+        IN_TRANSIT. Dispatch posts no stock movements. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_source,
+        m5.transfer.already_dispatched, m5.transfer.already_received.
+      x-permission: inv.transfer.issue
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
         - in: path
@@ -331,11 +536,308 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200':
-          description: Received
+          description: Dispatched, in status IN_TRANSIT
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransferResponse' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/transfers/{transferId}/receive:
+    post:
+      tags: [Inventory]
+      operationId: receiveTransfer
+      summary: The destination receives the transfer
+      description: >
+        An absent body preserves the original full-receipt operation. When a body is supplied it
+        must name every immutable transfer line exactly once. A positive quantity below the issued
+        quantity receives only that amount and creates an unposted DAMAGED_IN_TRANSIT shortfall draft.
+        Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
+        m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received,
+        m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid,
+        m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown,
+        m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid,
+        m5.transfer.receipt_qty_exceeds_sent.
+      x-permission: shop.transfer.receive
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: transferId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceiveTransferRequest' }
+      responses:
+        '200':
+          description: Received
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/transfers/{transferId}/cancel:
+    post:
+      tags: [Inventory]
+      operationId: cancelTransfer
+      summary: Cancel an unreceived transfer and restore its stock at the source
+      description: >
+        An ISSUED transfer can be cancelled directly. An IN_TRANSIT transfer can be cancelled only
+        after the source user verifies that the goods physically returned to the original source.
+        Cancellation posts one compensating TRANSFER_IN at that source per issued line. Codes this
+        operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
+        m5.transfer.not_source, m5.transfer.already_received, m5.transfer.already_cancelled,
+        m5.transfer.physical_return_required, m5.transfer.cancellation_reason_invalid.
+      x-permission: inv.transfer.issue
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: transferId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelTransferRequest' }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  # ---- stock repricing & valuation adjustments (PGL-M2-03) ------------------
+  /v1/inventory/lots/{stockLotId}/reprice:
+    post:
+      tags: [Inventory]
+      operationId: repriceStockLot
+      summary: Reprice a stock lot or part of it with new unit cost and optional condition change
+      description: >
+        Temporarily unavailable (Option B safety correction) pending the approved M5/M8 inventory
+        ledger and accounting correction. All mutation requests are refused with 422
+        m5.reprice.temporarily_unavailable before any inventory or valuation changes occur.
+        Codes this operation can answer with 422: m5.scope.own_required,
+        m5.reprice.temporarily_unavailable, m5.location.not_in_scope, m5.reprice.not_found,
+        m5.reprice.invalid_qty, m5.reprice.qty_exceeded, m5.reprice.invalid_cost,
+        m5.reprice.reason_required.
+      x-permission: inv.stock.reprice
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: stockLotId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RepriceStockLotRequest' }
+      responses:
+        '200':
+          description: Stock lot repriced
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockRepricingResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/repricings:
+    get:
+      tags: [Inventory]
+      operationId: listRepricings
+      summary: List stock repricing history for a location and optionally an SKU
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Repricing history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockRepricingResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  # ---- reorder controls & low-stock evaluation (PGL-M2-01) ----------------------------------
+  /v1/inventory/reorder-controls:
+    get:
+      tags: [ReorderControls]
+      operationId: listReorderControls
+      summary: List reorder controls for a location
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Reorder control settings for the location
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReorderControlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+    put:
+      tags: [ReorderControls]
+      operationId: configureReorderControl
+      summary: Set or update reorder level, reorder quantity and max quantity for an SKU at a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfigureReorderControlRequest' }
+      responses:
+        '200':
+          description: Reorder control configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderControlResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+    delete:
+      tags: [ReorderControls]
+      operationId: deleteReorderControl
+      summary: Delete reorder control for an SKU at a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Reorder control deleted
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/inventory/reorder-controls/evaluate:
+    post:
+      tags: [ReorderControls]
+      operationId: evaluateLowStock
+      summary: Trigger low stock evaluation for a location
+      x-permission: inv.reorder.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Number of low stock items detected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvaluateLowStockResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
+  /v1/inventory/locations/{locationId}/expiry-feed:
+    get:
+      tags: [ExpiryAlerts]
+      operationId: getExpiryAlertFeed
+      summary: Near-expiry stock alert feed for a location with remaining quantities and urgency tiers
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: windowDays
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 365 }
+        - in: query
+          name: tier
+          required: false
+          schema: { type: string, enum: [ALL, CRITICAL, WARNING, APPROACHING, EXPIRED] }
+      responses:
+        '200':
+          description: List of near-expiry stock lots with urgency tiers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExpiryAlertItemResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/inventory/locations/{locationId}/slow-moving:
+    get:
+      tags: [ExpiryAlerts]
+      operationId: getSlowMovingStock
+      summary: Slow-moving and stagnant stock items at a location
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: evaluationDays
+          required: false
+          schema: { type: integer, minimum: 7, maximum: 365 }
+        - in: query
+          name: thresholdDaysOfSupply
+          required: false
+          schema: { type: integer, minimum: 14, maximum: 730 }
+      responses:
+        '200':
+          description: List of slow-moving stock items with velocity metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SlowMovingStockResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+
+  /v1/inventory/locations/{locationId}/expiry-alerts/scan:
+    post:
+      tags: [ExpiryAlerts]
+      operationId: scanExpiryAlerts
+      summary: Trigger evaluation and publishing of near-expiry and slow-moving alerts for a location
+      x-permission: inv.expiry.scan
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Alert scan evaluation summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpiryAlertScanResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+
   # ---- stock control (M5-11, M5-13, repack): counts, write-offs, recipes, repacks ----------
   /v1/inventory/counts:
     get:
@@ -623,6 +1125,30 @@ paths:
               schema: { $ref: '#/components/schemas/PhotoUploadResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}/photos/{attachmentId}:
+    get:
+      tags: [StockControl]
+      operationId: getWriteOffPhoto
+      summary: Authorise a short-lived view of one verified write-off photograph
+      description: >
+        Returns a fresh signed read URL only when the photograph belongs to this write-off, is
+        verified, and both the write-off and its kernel document attachment are visible in the
+        caller's current entity/location scope. The object itself is never made public.
+      x-permission: inv.stock.view
+      parameters:
+        - $ref: '#/components/parameters/WriteOffId'
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: A fresh short-lived view link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PhotoViewResponse' }
+        '404':
+          description: No such verified photograph, or the caller's scope may not see it
   /v1/inventory/write-offs/{writeOffId}/submit:
     post:
       tags: [StockControl]
@@ -856,6 +1382,193 @@ paths:
               schema: { $ref: '#/components/schemas/RepackResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions:
+    post:
+      tags: [StockTake]
+      operationId: openStockTakeSession
+      summary: Open or resume an active mobile stock-taking session for a location
+      description: >
+        Opens or resumes a counting session for the specified location.
+        If a count task is in COUNTING status, returns it. If in SCHEDULED, transitions it to COUNTING.
+        If no count task is open, schedules and starts one.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpenStockTakeSessionRequest' }
+      responses:
+        '200':
+          description: Stock-taking session opened or resumed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeSessionResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions/active:
+    get:
+      tags: [StockTake]
+      operationId: getActiveStockTakeSession
+      summary: Get the currently active stock-taking session for a location
+      x-permission: shop.count.record
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Active session found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeSessionResponse' }
+        '404':
+          description: No active stock-taking session found for this location
+  /v1/inventory/stock-take/sessions/{sessionId}:
+    get:
+      tags: [StockTake]
+      operationId: getStockTakeSession
+      summary: Get stock-taking session details
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeSessionResponse' }
+        '404':
+          description: Session not found
+  /v1/inventory/stock-take/sessions/{sessionId}/scan:
+    post:
+      tags: [StockTake]
+      operationId: recordStockTakeScan
+      summary: Record an individual barcode or SKU scan in a session
+      description: >
+        Accepts a barcode or SKU scan, resolves the item and lot safely, and records the counted quantity.
+        Idempotent by scanId: repeated submissions with identical attributes return the existing scan result without double-counting.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockTakeScanRequest' }
+      responses:
+        '200':
+          description: Scan recorded or recognized as identical retry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeScanResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions/{sessionId}/scans:
+    get:
+      tags: [StockTake]
+      operationId: listStockTakeScans
+      summary: List all recorded scans for a stock-taking session
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of scans
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockTakeScanItemResponse' }
+        '404':
+          description: Session not found
+  /v1/inventory/stock-take/sessions/{sessionId}/scans/batch:
+    post:
+      tags: [StockTake]
+      operationId: batchStockTakeScan
+      summary: Ingest an offline batch of queued mobile scans
+      description: >
+        Processes multiple queued scans with row-level deduplication.
+        Already-recorded scans in the batch are safely skipped without double-counting.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockTakeBatchScanRequest' }
+      responses:
+        '200':
+          description: Batch processed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeBatchScanResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/stock-take/sessions/{sessionId}/review:
+    get:
+      tags: [StockTake]
+      operationId: reviewStockTakeSession
+      summary: Review expected vs counted variances for a stock-taking session
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Review report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeReviewResponse' }
+        '404':
+          description: Session not found
+  /v1/inventory/stock-take/sessions/{sessionId}/reconcile:
+    post:
+      tags: [StockTake]
+      operationId: reconcileStockTakeSession
+      summary: Reconcile and submit counted quantities into the inventory count workflow
+      description: >
+        Aggregates session scans, processes uncounted items (ZERO or SKIP), and submits into M5's
+        tolerance evaluation and approval workflow.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockTakeReconcileRequest' }
+      responses:
+        '200':
+          description: Session reconciled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTakeReconcileResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     TaskId:
@@ -891,6 +1604,38 @@ components:
       properties:
         batchId: { type: string, format: uuid }
         qty: { type: number, exclusiveMinimum: 0 }
+    ReceiveTransferRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/ReceiveTransferLineRequest' }
+    ReceiveTransferLineRequest:
+      type: object
+      required: [transferLineId, receivedQty]
+      properties:
+        transferLineId: { type: string, format: uuid }
+        receivedQty:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 99999999999.999
+          multipleOf: 0.001
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 11, fraction = 3)'
+    CancelTransferRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          pattern: '.*\S.*'
+        physicalReturnVerified:
+          type: boolean
+          description: Must be true when cancelling an IN_TRANSIT transfer after physical return
     TransferResponse:
       type: object
       required: [transferId, fromLocationId, toLocationId, status, lines]
@@ -898,22 +1643,38 @@ components:
         transferId: { type: string, format: uuid }
         fromLocationId: { type: string, format: uuid }
         toLocationId: { type: string, format: uuid }
-        status: { type: string, enum: [IN_TRANSIT, RECEIVED] }
+        status: { type: string, enum: [ISSUED, IN_TRANSIT, RECEIVED, CANCELLED] }
+        documentNo: { type: string }
         issuedBy: { type: string, format: uuid }
         issuedAt: { type: string, format: date-time }
+        dispatchedBy: { type: string, format: uuid }
+        dispatchedAt: { type: string, format: date-time }
         receivedBy: { type: string, format: uuid }
         receivedAt: { type: string, format: date-time }
+        shortfallId:
+          type: string
+          format: uuid
+          description: The destination-owned unposted discrepancy draft, when the receipt was short
+        shortfallStatus: { type: string, enum: [DRAFT] }
+        shortfallCategory: { type: string, enum: [DAMAGED_IN_TRANSIT] }
         lines:
           type: array
           items: { $ref: '#/components/schemas/TransferLineResponse' }
     TransferLineResponse:
       type: object
-      required: [lineNo, batchId, skuId, qty]
+      required: [transferLineId, lineNo, batchId, skuId, qty]
       properties:
+        transferLineId: { type: string, format: uuid }
         lineNo: { type: integer }
         batchId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         qty: { type: number }
+        receivedQty:
+          type: number
+          description: The accepted receipt quantity; absent before receipt
+        shortfallQty:
+          type: number
+          description: The positive missing quantity recorded on the shortfall draft, when any
     MovementResponse:
       type: object
       required: [movementId, locationId, skuId, batchId, condition, movementType, qtyDelta, documentId, movementSeq]
@@ -948,14 +1709,109 @@ components:
           items: { $ref: '#/components/schemas/PickResponse' }
     PickResponse:
       type: object
-      required: [deliveryLineId, skuId, qty]
+      required: [pickLineId, deliveryLineId, skuId, qty]
       properties:
+        pickLineId: { type: string, format: uuid }
         deliveryLineId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         locationId: { type: string, format: uuid, description: 'absent on the short part of a line' }
         stockLotId: { type: string, format: uuid }
         batchId: { type: string, format: uuid }
         qty: { type: number }
+    OverridePickRequest:
+      type: object
+      required: [replacementStockLotId, reason]
+      properties:
+        replacementStockLotId: { type: string, format: uuid }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PickReplacementCandidateResponse:
+      type: object
+      required: [stockLotId, batchId, availableQty]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        availableQty: { type: number }
+    BulkImportStockRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+          default: COMMIT
+        sheet: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowRequest' }
+    StockRowRequest:
+      type: object
+      properties:
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string, maxLength: 40 }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        qty: { type: number, exclusiveMinimum: 0 }
+        unitCost: { type: number, minimum: 0 }
+        uom: { type: string }
+    BulkStockReport:
+      type: object
+      required: [status, totalRows, importedLines]
+      properties:
+        importId: { type: string, format: uuid }
+        openingBalanceId: { type: string, format: uuid }
+        status: { type: string, enum: [IMPORTED, REJECTED, EMPTY, VALID] }
+        totalRows: { type: integer }
+        importedLines: { type: integer }
+        validRows: { type: integer }
+        errorRows: { type: integer }
+        totalValuation: { type: number }
+        problems:
+          type: array
+          items: { $ref: '#/components/schemas/StockProblem' }
+        previewRows:
+          type: array
+          items: { $ref: '#/components/schemas/StockRowPreview' }
+    StockProblem:
+      type: object
+      required: [line, message]
+      properties:
+        line: { type: integer }
+        sku: { type: string }
+        field: { type: string }
+        message: { type: string }
+    StockRowPreview:
+      type: object
+      required: [lineNo, status]
+      properties:
+        lineNo: { type: integer }
+        sku: { type: string }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        itemName: { type: string }
+        baseUom: { type: string }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qty: { type: number }
+        unitCost: { type: number }
+        extendedCost: { type: number }
+        batchTracked: { type: boolean }
+        expiryTracked: { type: boolean }
+        hasPrintedMrp: { type: boolean }
+        status: { type: string, enum: [VALID, ERROR] }
+        error: { type: string }
+    RejectOpeningBalanceRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 500 }
     PrepareOpeningBalanceRequest:
       type: object
       required: [locationId, lines]
@@ -970,7 +1826,8 @@ components:
       type: object
       description: >
         A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and
-        printedMrp as the item requires), which the prepare registers in M2 (M5-12).
+        printedMrp as the item requires). The counted attributes remain on the signed line and
+        the Federation countersign registers the batch in M2 in the posting transaction.
       required: [qty, unitCost]
       properties:
         batchId: { type: string, format: uuid }
@@ -987,21 +1844,27 @@ components:
       properties:
         openingBalanceId: { type: string, format: uuid }
         locationId: { type: string, format: uuid }
-        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED] }
+        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED, REJECTED] }
         preparedBy: { type: string, format: uuid }
         signedEntityBy: { type: string, format: uuid }
         countersignedBy: { type: string, format: uuid }
+        rejectedBy: { type: string, format: uuid }
+        rejectedAt: { type: string, format: date-time }
+        rejectionReason: { type: string }
         documentId: { type: string, format: uuid }
         lines:
           type: array
           items: { $ref: '#/components/schemas/OpeningBalanceLineResponse' }
     OpeningBalanceLineResponse:
       type: object
-      required: [lineNo, batchId, skuId, condition, qty, unitCost]
+      required: [lineNo, skuId, condition, qty, unitCost]
       properties:
         lineNo: { type: integer }
         batchId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number }
         condition: { type: string, enum: [GOOD, DAMAGED] }
         qty: { type: number }
         unitCost: { type: number }
@@ -1143,7 +2006,7 @@ components:
         category:
           type: string
           enum: [DAMAGED_IN_TRANSIT, DAMAGED_IN_STORE, EXPIRED, THEFT, SHRINKAGE_UNEXPLAINED, STAFF_CONSUMPTION,
-                 SAMPLES, DONATION, OTHER]
+                 SAMPLES, DONATION, OTHER, WASTE, SPOILAGE]
         note: { type: string, maxLength: 500 }
         lines:
           type: array
@@ -1170,6 +2033,13 @@ components:
         attachmentId: { type: string, format: uuid }
         url: { type: string }
         expiresAt: { type: string, format: date-time }
+    PhotoViewResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: Short-lived signed object-store URL; request a new one after it expires
     WriteOffResponse:
       type: object
       required: [writeOffId, locationId, category, status, remoteWitness, photosRequired, lines, photos]
@@ -1274,3 +2144,358 @@ components:
         executedAt: { type: string, format: date-time }
         reversalReason: { type: string }
         reversedAt: { type: string, format: date-time }
+    ConfigureReorderControlRequest:
+      type: object
+      required: [locationId, skuId, reorderLevel, reorderQty]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        reorderLevel: { type: number, minimum: 0 }
+        reorderQty: { type: number, exclusiveMinimum: 0 }
+        maxQty: { type: number, minimum: 0 }
+    ReorderControlResponse:
+      type: object
+      required: [reorderControlId, ownerEntityId, locationId, skuId, reorderLevel, reorderQty, alertTriggered]
+      properties:
+        reorderControlId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        reorderLevel: { type: number }
+        reorderQty: { type: number }
+        maxQty: { type: number }
+        alertTriggered: { type: boolean }
+        lastAlertedAt: { type: string, format: date-time }
+        lastAlertQty: { type: number }
+        currentOnHandQty: { type: number }
+        currentAvailableQty: { type: number }
+    EvaluateLowStockResponse:
+      type: object
+      required: [evaluatedCount, alertsTriggeredCount]
+      properties:
+        evaluatedCount: { type: integer }
+        alertsTriggeredCount: { type: integer }
+    RepriceStockLotRequest:
+      type: object
+      required: [qty, newUnitCost, reason]
+      properties:
+        qty: { type: number, exclusiveMinimum: 0, description: 'Quantity to reprice' }
+        newUnitCost: { type: number, minimum: 0, description: 'New unit cost (>= 0)' }
+        targetCondition: { type: string, enum: [GOOD, DAMAGED], description: 'Target condition if condition is changed' }
+        reason: { type: string, minLength: 1, maxLength: 500, description: 'Reason for repricing' }
+    StockRepricingResponse:
+      type: object
+      required: [repricingId, stockLotId, skuId, batchId, condition, qtyAffected, previousUnitCost, newUnitCost, targetCondition, valueAdjustment, reason, repricedBy, repricedAt]
+      properties:
+        repricingId: { type: string, format: uuid }
+        stockLotId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qtyAffected: { type: number }
+        previousUnitCost: { type: number }
+        newUnitCost: { type: number }
+        targetCondition: { type: string, enum: [GOOD, DAMAGED] }
+        targetLotId: { type: string, format: uuid }
+        valueAdjustment: { type: number }
+        reason: { type: string }
+        repricedBy: { type: string, format: uuid }
+        repricedAt: { type: string, format: date-time }
+    ExpiryAlertItemResponse:
+      type: object
+      required: [stockLotId, locationId, skuId, batchId, batchNo, expiryDate, daysToExpiry, qtyOnHand, unitCost, urgencyTier, alertActive]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        daysToExpiry: { type: integer }
+        qtyOnHand: { type: number }
+        unitCost: { type: number }
+        urgencyTier: { type: string, enum: [CRITICAL, WARNING, APPROACHING, EXPIRED, HEALTHY] }
+        alertActive: { type: boolean }
+    SlowMovingStockResponse:
+      type: object
+      required: [locationId, skuId, qtyOnHand, unitCost, daysWithoutSale, salesInWindow, averageDailySales, daysOfSupply, classification, alertActive]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        qtyOnHand: { type: number }
+        unitCost: { type: number }
+        daysWithoutSale: { type: integer }
+        lastSaleDate: { type: string, format: date, nullable: true }
+        salesInWindow: { type: number }
+        averageDailySales: { type: number }
+        daysOfSupply: { type: number }
+        classification: { type: string, enum: [STAGNANT, SLOW_VELOCITY] }
+        alertActive: { type: boolean }
+    ExpiryAlertScanResponse:
+      type: object
+      required: [nearExpiryAlertsEmitted, slowMovingAlertsEmitted, totalEvaluated]
+      properties:
+        nearExpiryAlertsEmitted: { type: integer }
+        slowMovingAlertsEmitted: { type: integer }
+        totalEvaluated: { type: integer }
+    OpenStockTakeSessionRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+        scopeKind: { type: string, enum: [FULL, SKUS], default: FULL }
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+    StockTakeSessionResponse:
+      type: object
+      required: [sessionId, ownerEntityId, locationId, scopeKind, skuIds, status, expectedLotsCount, totalScansCount, totalCountedUnits]
+      properties:
+        sessionId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        scopeKind: { type: string, enum: [FULL, SKUS] }
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+        status: { type: string, enum: [SCHEDULED, COUNTING, VARIANCE_REVIEW, CLOSED] }
+        startedAt: { type: string, format: date-time }
+        startedBy: { type: string, format: uuid }
+        expectedLotsCount: { type: integer }
+        totalScansCount: { type: integer }
+        totalCountedUnits: { type: number }
+    StockTakeScanRequest:
+      type: object
+      required: [quantity]
+      properties:
+        scanId: { type: string, format: uuid, description: Client-generated UUID for offline deduplication }
+        barcode: { type: string, maxLength: 100 }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string, maxLength: 50 }
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        quantity: { type: number, minimum: 0.001 }
+        scannedAt: { type: string, format: date-time }
+        deviceId: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 500 }
+    StockTakeScanResponse:
+      type: object
+      required: [scanId, skuId, skuCode, skuNameEn, batchId, condition, quantity, totalCountedForLot, wasDuplicate]
+      properties:
+        scanId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        quantity: { type: number }
+        totalCountedForLot: { type: number }
+        wasDuplicate: { type: boolean }
+    StockTakeScanItemResponse:
+      type: object
+      required: [scanId, sessionId, scannedCode, skuId, skuCode, skuNameEn, batchId, condition, countedQty, scannedAt]
+      properties:
+        scanId: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        scannedCode: { type: string }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        countedQty: { type: number }
+        scannedAt: { type: string, format: date-time }
+        scannedBy: { type: string, format: uuid }
+        deviceId: { type: string }
+        notes: { type: string }
+    StockTakeBatchScanRequest:
+      type: object
+      required: [scans]
+      properties:
+        scans:
+          type: array
+          items: { $ref: '#/components/schemas/StockTakeScanRequest' }
+    StockTakeBatchScanResponse:
+      type: object
+      required: [sessionId, processedCount, duplicateCount, totalScansCount]
+      properties:
+        sessionId: { type: string, format: uuid }
+        processedCount: { type: integer }
+        duplicateCount: { type: integer }
+        totalScansCount: { type: integer }
+    StockTakeReviewResponse:
+      type: object
+      required: [sessionId, locationId, status, totalExpectedLots, totalCountedLots, matchedLots, discrepantLots, uncountedLots, totalVarianceQty, totalVarianceValue, lines]
+      properties:
+        sessionId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        status: { type: string }
+        totalExpectedLots: { type: integer }
+        totalCountedLots: { type: integer }
+        matchedLots: { type: integer }
+        discrepantLots: { type: integer }
+        uncountedLots: { type: integer }
+        totalVarianceQty: { type: number }
+        totalVarianceValue: { type: number }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StockTakeReviewLine' }
+    StockTakeReviewLine:
+      type: object
+      required: [skuId, skuCode, skuNameEn, condition, expectedQty, countedQty, varianceQty, unitCost, varianceValue, status]
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        skuNameSi: { type: string }
+        skuNameTa: { type: string }
+        barcode: { type: string }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        expectedQty: { type: number }
+        countedQty: { type: number }
+        varianceQty: { type: number }
+        unitCost: { type: number }
+        varianceValue: { type: number }
+        status: { type: string, enum: [MATCHED, OVER, SHORT, UNCOUNTED, UNEXPECTED] }
+    StockTakeReconcileRequest:
+      type: object
+      properties:
+        uncountedHandling: { type: string, enum: [ZERO, SKIP], default: ZERO }
+        skipReason: { type: string, maxLength: 500 }
+    StockTakeReconcileResponse:
+      type: object
+      required: [sessionId, status]
+      properties:
+        sessionId: { type: string, format: uuid }
+        status: { type: string, enum: [SCHEDULED, COUNTING, VARIANCE_REVIEW, CLOSED] }
+        outcome: { type: string, enum: [POSTED, APPROVED, REJECTED] }
+        reviewValue: { type: number }
+        reviewBand: { type: integer }
+    StockSummaryResponse:
+      type: object
+      required:
+        - locationId
+        - skuId
+        - skuCode
+        - skuNameEn
+        - baseUomCode
+        - qtyOnHand
+        - reservedQty
+        - availableQty
+        - inTransitIncomingQty
+        - inTransitOutgoingQty
+        - remainingStockQty
+        - lotCount
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        skuNameSi: { type: string }
+        skuNameTa: { type: string }
+        baseUomCode: { type: string }
+        departmentId: { type: string, format: uuid }
+        departmentNameEn: { type: string }
+        departmentNameSi: { type: string }
+        departmentNameTa: { type: string }
+        qtyOnHand: { type: number }
+        reservedQty: { type: number }
+        availableQty: { type: number }
+        inTransitIncomingQty: { type: number }
+        inTransitOutgoingQty: { type: number }
+        countedVarianceQty: { type: number }
+        countedVarianceValue: { type: number }
+        latestCountStatus: { type: string }
+        latestCountedAt: { type: string, format: date-time }
+        remainingStockQty: { type: number }
+        lotCount: { type: integer }
+        lots:
+          type: array
+          items: { $ref: '#/components/schemas/LotBalanceResponse' }
+    StockExplanationResponse:
+      type: object
+      required:
+        - locationId
+        - skuId
+        - skuCode
+        - skuNameEn
+        - baseUomCode
+        - qtyOnHand
+        - reservedQty
+        - availableQty
+        - inTransitIncomingQty
+        - inTransitOutgoingQty
+        - remainingStockQty
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        skuNameEn: { type: string }
+        skuNameSi: { type: string }
+        skuNameTa: { type: string }
+        baseUomCode: { type: string }
+        departmentId: { type: string, format: uuid }
+        departmentNameEn: { type: string }
+        departmentNameSi: { type: string }
+        departmentNameTa: { type: string }
+        qtyOnHand: { type: number }
+        reservedQty: { type: number }
+        availableQty: { type: number }
+        inTransitIncomingQty: { type: number }
+        inTransitOutgoingQty: { type: number }
+        countedVarianceQty: { type: number }
+        remainingStockQty: { type: number }
+        lots:
+          type: array
+          items: { $ref: '#/components/schemas/LotBalanceResponse' }
+        reservations:
+          type: array
+          items: { $ref: '#/components/schemas/StockReservationDetail' }
+        incomingTransfers:
+          type: array
+          items: { $ref: '#/components/schemas/StockInTransitDetail' }
+        outgoingTransfers:
+          type: array
+          items: { $ref: '#/components/schemas/StockInTransitDetail' }
+        latestCount:
+          $ref: '#/components/schemas/StockCountDetail'
+    StockReservationDetail:
+      type: object
+      required: [pickListId, reservedQty, pickStatus]
+      properties:
+        pickListId: { type: string, format: uuid }
+        deliveryDocumentId: { type: string, format: uuid }
+        deliveryDocNumber: { type: string }
+        reservedQty: { type: number }
+        pickStatus: { type: string }
+        reservedAt: { type: string, format: date-time }
+    StockInTransitDetail:
+      type: object
+      required: [transferId, qty, status]
+      properties:
+        transferId: { type: string, format: uuid }
+        documentNo: { type: string }
+        locationId: { type: string, format: uuid }
+        locationName: { type: string }
+        qty: { type: number }
+        dispatchedAt: { type: string, format: date-time }
+        status: { type: string }
+    StockCountDetail:
+      type: object
+      required: [taskId, status, expectedQty, countedQty, varianceQty]
+      properties:
+        taskId: { type: string, format: uuid }
+        scopeKind: { type: string }
+        status: { type: string }
+        outcome: { type: string }
+        expectedQty: { type: number }
+        countedQty: { type: number }
+        varianceQty: { type: number }
+        varianceValue: { type: number }
+        startedAt: { type: string, format: date-time }
+        submittedAt: { type: string, format: date-time }

@@ -1240,6 +1240,30 @@ test(
 );
 
 test(
+  "m2catalogue slice is guarded by frozen-contract check when version is 1.0.0",
+  () => {
+    one(
+      problemsOfFrozenContract("openapi/m2catalogue.yaml", FROZEN, FROZEN, true, new Set()),
+      /openapi\/m2catalogue\.yaml: frozen at 1\.0\.0 on origin\/main.*info\.version was not raised/s
+    );
+    assert.deepEqual(
+      problemsOfFrozenContract("openapi/m2catalogue.yaml", FROZEN, "info:\n  version: 1.1.0\n", true, new Set()),
+      []
+    );
+    assert.deepEqual(
+      problemsOfFrozenContract(
+        "openapi/m2catalogue.yaml",
+        FROZEN,
+        FROZEN_WITH_CR("CR-22A-4"),
+        true,
+        new Set(["CR-22A-4.md"])
+      ),
+      []
+    );
+  }
+);
+
+test(
   "the real slices and Java packages pass check-frozen-contracts.mjs",
   () => {
     execFileSync(

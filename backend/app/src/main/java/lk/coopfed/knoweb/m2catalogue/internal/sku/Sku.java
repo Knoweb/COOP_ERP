@@ -81,6 +81,9 @@ class Sku implements Persistable<UUID> {
     @Column(name = "tax_category_id", nullable = false)
     private UUID taxCategoryId;
 
+    @Column(name = "department_id")
+    private UUID departmentId;
+
     @Column(name = "multi_mrp_policy", nullable = false)
     private String multiMrpPolicy;
 
@@ -120,6 +123,15 @@ class Sku implements Persistable<UUID> {
 
     void activateLocal() {
         requireStatus(DRAFT);
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
+        }
         status = LOCAL;
         priorStatus = null;
     }
@@ -129,6 +141,16 @@ class Sku implements Persistable<UUID> {
 
         if (shortNameSi == null || shortNameTa == null) {
             throw new ProblemException("m2.sku.shared_translations_required");
+        }
+
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
         }
 
         status = SHARED;
@@ -153,6 +175,35 @@ class Sku implements Persistable<UUID> {
 
         status = priorStatus;
         priorStatus = null;
+    }
+
+    void promoteToShared(UUID federationEntityId) {
+        if (!LOCAL.equals(status)) {
+            throw new ProblemException("m2.sku.not_local");
+        }
+        if (shortNameSi == null || shortNameTa == null || shortNameSi.isBlank() || shortNameTa.isBlank()) {
+            throw new ProblemException("m2.sku.shared_translations_required");
+        }
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        this.ownerEntityId = federationEntityId;
+        this.status = SHARED;
+        this.priorStatus = null;
+    }
+
+    void mergeIntoShared() {
+        if (!LOCAL.equals(status)) {
+            throw new ProblemException("m2.sku.not_local");
+        }
+        this.priorStatus = LOCAL;
+        this.status = INACTIVE;
     }
 
     private void apply(SkuDetails details) {
@@ -180,6 +231,7 @@ class Sku implements Persistable<UUID> {
             throw new ProblemException("request.field.required", Map.of("field", "taxCategoryId"));
         }
         taxCategoryId = details.taxCategoryId();
+        departmentId = details.departmentId();
 
         multiMrpPolicy =
                 details.multiMrpPolicy() == null || details.multiMrpPolicy().isBlank()
@@ -250,8 +302,36 @@ class Sku implements Persistable<UUID> {
         return expiryTracked;
     }
 
+    UUID departmentId() {
+        return departmentId;
+    }
+
     UUID taxCategoryId() {
         return taxCategoryId;
+    }
+
+    String shortNameEn() {
+        return shortNameEn;
+    }
+
+    String shortNameSi() {
+        return shortNameSi;
+    }
+
+    String shortNameTa() {
+        return shortNameTa;
+    }
+
+    String multiMrpPolicy() {
+        return multiMrpPolicy;
+    }
+
+    String originKind() {
+        return originKind;
+    }
+
+    Map<String, Object> attributes() {
+        return attributes;
     }
 
     Map<String, Object> auditState() {
@@ -271,6 +351,7 @@ class Sku implements Persistable<UUID> {
         state.put("hasPrintedMrp", hasPrintedMrp);
         state.put("expiryWarningDays", expiryWarningDays);
         state.put("taxCategoryId", taxCategoryId);
+        state.put("departmentId", departmentId);
         state.put("multiMrpPolicy", multiMrpPolicy);
         state.put("originKind", originKind);
         state.put("attributes", new LinkedHashMap<>(attributes));

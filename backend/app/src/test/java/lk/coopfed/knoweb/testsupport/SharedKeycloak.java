@@ -32,6 +32,37 @@ public final class SharedKeycloak {
 
     static {
         CONTAINER.start();
+
+        // Test-only: Docker Desktop may expose the mapped HTTP port
+        // as an external address. Keycloak's built-in master realm
+        // would otherwise reject the test admin-token request.
+        try {
+            var result = CONTAINER.execInContainer(
+                    "/opt/keycloak/bin/kcadm.sh",
+                    "update",
+                    "realms/master",
+                    "-s",
+                    "sslRequired=NONE",
+                    "--no-config",
+                    "--server",
+                    "http://localhost:8080",
+                    "--realm",
+                    "master",
+                    "--user",
+                    "admin",
+                    "--password",
+                    "admin");
+
+            if (result.getExitCode() != 0) {
+                throw new IllegalStateException(
+                        "Could not configure test Keycloak master realm: " + result.getStdout() + result.getStderr());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ExceptionInInitializerError(e);
+        } catch (java.io.IOException e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     private SharedKeycloak() {}

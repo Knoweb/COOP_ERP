@@ -1,3 +1,15 @@
+# Frozen at M2-11 / QA-05 (22A section 10; docs/PLAN_TO_M2.md Phase 5): version 1 means the shape below
+# is depended on by M3, M4, M5, M6, the web shell and the till. A change from here on is a new minor
+# or major version, not an edit in place, and goes through the change-request path of AGENTS.md
+# ("contract... frozen once depended on"). See m2catalogue/README.md, "Contract freeze (M2-11 / QA-05)",
+# for the review this freeze recorded.
+#
+# tools/check-frozen-contracts.mjs enforces the freeze: once info.version reaches 1.0.0, a diff
+# against origin/main touching this file, backend/.../m2catalogue/api/** or .../m2catalogue/query/**
+# needs either a higher info.version here (the slice itself changed) or an info.x-change-request
+# naming a file under docs/change-requests/ that differs from origin/main's value (api/query-only
+# change, the slice's shape unchanged).
+#
 # M2 Catalogue & Batch API slice.
 #
 # Mutating operations use the kernel Idempotency-Key and x-permission contract.
@@ -16,7 +28,7 @@ openapi: 3.1.0
 
 info:
   title: COOP ERP M2 Catalogue & Batch API
-  version: 0.1.0
+  version: 1.0.0
   description: >
     Catalogue SKU identity, lifecycle and search. Visibility of reads is governed
     by catalogue RLS: SHARED is visible to authenticated scopes; LOCAL and DRAFT
@@ -251,6 +263,43 @@ paths:
       responses:
         '204':
           description: SKU activated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/promote:
+
+    post:
+      tags: [Catalogue]
+      operationId: promoteSku
+      summary: Promote a LOCAL SKU to SHARED, or merge it into an existing SHARED SKU
+      x-permission: cat.sku.promote
+      x-scope: FEDERATION
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromoteSkuRequest'
+
+      responses:
+        '204':
+          description: SKU promoted or merged
 
         '400':
           $ref: 'common.yaml#/components/responses/RequestProblem'
@@ -1030,6 +1079,542 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/suppliers/import:
+
+    post:
+      tags: [Supplier]
+      operationId: importSuppliers
+      summary: Bulk import suppliers from CSV or structured rows
+      description: >
+        Validates (dry-run) or commits a bulk batch of suppliers for the caller's entity.
+        Idempotently skips identical existing suppliers and rejects conflicting records.
+      x-permission: cat.supplier.manage
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportSuppliersRequest'
+
+      responses:
+        '200':
+          description: Import report with validation errors and created/skipped counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierImportReportResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/import:
+
+    post:
+      tags: [Steward]
+      operationId: importSkus
+      summary: Bulk import catalogue SKUs from payload rows or raw CSV
+      description: >
+        Validates or commits a bulk batch of catalogue SKUs (~20,000 items).
+        Translates missing names, scores duplicates, and executes batch inserts.
+      x-permission: cat.import.run
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportSkusRequest'
+
+      responses:
+        '200':
+          description: Import report with validation errors and duplicate suspects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReportResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/steward/suspects:
+
+    get:
+      tags: [Steward]
+      operationId: listDuplicateSuspects
+      summary: List duplicate suspect pairs
+      description: >
+        Returns duplicate suspects flagged during catalogue import or creation.
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, MERGED, DISMISSED]
+            default: OPEN
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+
+      responses:
+        '200':
+          description: List of duplicate suspect pairs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DuplicateSuspectResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+
+  /v1/catalogue/steward/suspects/{suspectId}/resolve:
+
+    post:
+      tags: [Steward]
+      operationId: resolveDuplicateSuspect
+      summary: Resolve a duplicate suspect pair as MERGED or DISMISSED
+      x-permission: cat.sku.create_local
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: suspectId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveDuplicateSuspectRequest'
+
+      responses:
+        '204':
+          description: Suspect resolved
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/departments:
+
+    get:
+      tags: [Department]
+      operationId: listDepartmentCategories
+      summary: List all merchandise department categories
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: List of department categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Department]
+      operationId: defineDepartmentCategory
+      summary: Define a new merchandise department category
+      x-permission: cat.department.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineDepartmentCategoryRequest'
+
+      responses:
+        '201':
+          description: Department category defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/departments/{departmentId}:
+
+    parameters:
+      - in: path
+        name: departmentId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Department]
+      operationId: getDepartmentCategory
+      summary: Get a department category by id
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: Department category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.department.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+    put:
+      tags: [Department]
+      operationId: updateDepartmentCategory
+      summary: Update an existing merchandise department category
+      x-permission: cat.department.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentCategoryRequest'
+
+      responses:
+        '200':
+          description: Department category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.department.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/tax/categories:
+
+    get:
+      tags: [Tax]
+      operationId: listTaxCategories
+      summary: List all tax categories
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: List of tax categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaxCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Tax]
+      operationId: defineTaxCategory
+      summary: Define a new tax category
+      x-permission: cat.tax.publish
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineTaxCategoryRequest'
+
+      responses:
+        '201':
+          description: Tax category defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/tax/rates:
+
+    get:
+      tags: [Tax]
+      operationId: listTaxRates
+      summary: List rates of a category or the rate in force
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: query
+          name: categoryId
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: date
+          required: false
+          schema:
+            type: string
+            format: date
+
+      responses:
+        '200':
+          description: Tax rates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaxRateResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Tax]
+      operationId: publishTaxRate
+      summary: Publish a tax rate for a category
+      x-permission: cat.tax.publish
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishTaxRateRequest'
+
+      responses:
+        '201':
+          description: Tax rate published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRateResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+
+  /v1/catalogue/uoms:
+
+    get:
+      tags: [Uom]
+      operationId: listUoms
+      summary: List units of measure
+      description: Returns units of measure, optionally including inactive ones. All authenticated scopes read.
+      x-permission: cat.sku.view
+      parameters:
+        - name: includeInactive
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+
+      responses:
+        '200':
+          description: List of units of measure
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Uom]
+      operationId: defineUom
+      summary: Define a new unit of measure
+      description: Federation Catalogue Steward only.
+      x-permission: cat.uom.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineUomRequest'
+
+      responses:
+        '201':
+          description: Unit of measure defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/uoms/{uomCode}:
+
+    parameters:
+      - in: path
+        name: uomCode
+        required: true
+        schema:
+          type: string
+
+    get:
+      tags: [Uom]
+      operationId: getUom
+      summary: Get unit of measure by code
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: Unit of measure details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.uom.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+    put:
+      tags: [Uom]
+      operationId: updateUom
+      summary: Update an existing unit of measure
+      description: Federation Catalogue Steward only.
+      x-permission: cat.uom.manage
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUomRequest'
+
+      responses:
+        '200':
+          description: Unit of measure updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UomDetailResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.uom.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -1097,6 +1682,10 @@ components:
           type: string
           format: uuid
 
+        departmentId:
+          type: string
+          format: uuid
+
         multiMrpPolicy:
           type: string
           enum:
@@ -1125,6 +1714,20 @@ components:
           enum:
             - LOCAL
             - SHARED
+
+
+    PromoteSkuRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum:
+            - NEW
+            - MERGE
+        targetSkuId:
+          type: string
+          format: uuid
 
 
     ReasonRequest:
@@ -1214,6 +1817,10 @@ components:
           type: integer
 
         taxCategoryId:
+          type: string
+          format: uuid
+
+        departmentId:
           type: string
           format: uuid
 
@@ -1320,6 +1927,81 @@ components:
           enum: [ACTIVE, RETIRED]
 
 
+
+    UomDetailResponse:
+      type: object
+      required:
+        - uomCode
+        - nameEn
+        - weight
+        - status
+      properties:
+        uomCode:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        weight:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        createdAt:
+          type: string
+          format: date-time
+
+
+    DefineUomRequest:
+      type: object
+      required:
+        - uomCode
+        - nameEn
+        - weight
+      properties:
+        uomCode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        weight:
+          type: boolean
+
+
+    UpdateUomRequest:
+      type: object
+      required:
+        - nameEn
+        - weight
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        weight:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+
+
     UomResponse:
       type: object
       required: [uomCode, nameEn, weight]
@@ -1355,7 +2037,7 @@ components:
 
     CatalogueReferenceResponse:
       type: object
-      required: [units, taxCategories]
+      required: [units, taxCategories, departments]
       properties:
         units:
           type: array
@@ -1365,6 +2047,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TaxCategoryResponse'
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentCategoryResponse'
+
+
+    DepartmentCategoryResponse:
+      type: object
+      required:
+        - departmentId
+        - code
+        - nameEn
+        - displayOrder
+        - status
+      properties:
+        departmentId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+
+
+    DefineDepartmentCategoryRequest:
+      type: object
+      required:
+        - code
+        - nameEn
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+
+
+    UpdateDepartmentCategoryRequest:
+      type: object
+      required:
+        - nameEn
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        description:
+          type: string
+        displayOrder:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
 
 
     RegisterBarcodeRequest:
@@ -1703,3 +2462,347 @@ components:
           enum:
             - ACTIVE
             - INACTIVE
+
+        supplierCode:
+          type: string
+
+
+    BulkImportSuppliersRequest:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+        csvContent:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierImportRowItem'
+
+    SupplierImportRowItem:
+      type: object
+      required:
+        - rowNumber
+        - name
+      properties:
+        rowNumber:
+          type: integer
+        name:
+          type: string
+        supplierCode:
+          type: string
+
+    SupplierImportReportResponse:
+      type: object
+      required:
+        - status
+        - rows
+        - created
+        - skipped
+        - rejected
+        - errors
+      properties:
+        status:
+          type: string
+          enum: [VALIDATED, ACCEPTED, REJECTED]
+        rows:
+          type: integer
+        created:
+          type: integer
+        skipped:
+          type: integer
+        rejected:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierValidationError'
+
+    SupplierValidationError:
+      type: object
+      required:
+        - rowNumber
+        - field
+        - code
+        - message
+      properties:
+        rowNumber:
+          type: integer
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        rejectedValue:
+          type: string
+
+
+    BulkImportSkusRequest:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+        csvContent:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportSkuRowItem'
+
+
+    ImportSkuRowItem:
+      type: object
+      required:
+        - rowNumber
+        - nameEn
+      properties:
+        rowNumber:
+          type: integer
+        skuCode:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        descriptionEn:
+          type: string
+        descriptionSi:
+          type: string
+        descriptionTa:
+          type: string
+        baseUomCode:
+          type: string
+        soldByWeight:
+          type: boolean
+        batchTracked:
+          type: boolean
+        expiryTracked:
+          type: boolean
+        hasPrintedMrp:
+          type: boolean
+        expiryWarningDays:
+          type: integer
+        taxCategoryCode:
+          type: string
+        price:
+          type: number
+        barcodes:
+          type: array
+          items:
+            type: string
+        brand:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+
+    ImportReportResponse:
+      type: object
+      required:
+        - status
+        - rows
+        - accepted
+        - rejected
+        - errors
+        - suspects
+      properties:
+        status:
+          type: string
+          enum: [VALIDATED, ACCEPTED, REJECTED]
+        rows:
+          type: integer
+        accepted:
+          type: integer
+        rejected:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportValidationError'
+        suspects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportDuplicateSuspectItem'
+
+
+    ImportValidationError:
+      type: object
+      required:
+        - rowNumber
+        - field
+        - code
+        - message
+      properties:
+        rowNumber:
+          type: integer
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        params:
+          type: string
+
+
+    ImportDuplicateSuspectItem:
+      type: object
+      required:
+        - rowNumber
+        - candidateName
+        - score
+        - reasons
+      properties:
+        rowNumber:
+          type: integer
+        candidateName:
+          type: string
+        matchedSkuId:
+          type: string
+          format: uuid
+        matchedSkuCode:
+          type: string
+        matchedSkuName:
+          type: string
+        score:
+          type: number
+        reasons:
+          type: array
+          items:
+            type: string
+
+
+    DuplicateSuspectResponse:
+      type: object
+      required:
+        - suspectId
+        - skuA
+        - skuB
+        - score
+        - reasons
+        - status
+        - createdAt
+      properties:
+        suspectId:
+          type: string
+          format: uuid
+        skuA:
+          type: string
+          format: uuid
+        skuB:
+          type: string
+          format: uuid
+        skuACode:
+          type: string
+        skuAName:
+          type: string
+        skuBCode:
+          type: string
+        skuBName:
+          type: string
+        score:
+          type: number
+        reasons:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [OPEN, MERGED, DISMISSED]
+        decidedBy:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+
+    ResolveDuplicateSuspectRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum: [MERGED, DISMISSED]
+        canonicalSkuId:
+          type: string
+          format: uuid
+
+
+    DefineTaxCategoryRequest:
+      type: object
+      required:
+        - code
+        - nameEn
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 12
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 80
+        nameSi:
+          type: string
+          maxLength: 80
+        nameTa:
+          type: string
+          maxLength: 80
+
+
+    PublishTaxRateRequest:
+      type: object
+      required:
+        - taxCategoryId
+        - ratePercent
+        - applyFrom
+      properties:
+        taxCategoryId:
+          type: string
+          format: uuid
+        ratePercent:
+          type: number
+          minimum: 0
+          maximum: 100
+        applyFrom:
+          type: string
+          format: date
+
+
+    TaxRateResponse:
+      type: object
+      required:
+        - taxCategoryId
+        - ratePercent
+        - effectiveFrom
+      properties:
+        taxCategoryId:
+          type: string
+          format: uuid
+        taxCategoryCode:
+          type: string
+        ratePercent:
+          type: number
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type: string
+          format: date
+
+

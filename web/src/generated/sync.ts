@@ -350,6 +350,13 @@ export interface components {
             occurred_at: string;
             /** @description The local reading, yyyy-MM-ddTHH:mm:ss */
             occurred_local?: string | null;
+            /** @description True when recorded without an active clock sync offset */
+            offline_timed?: boolean | null;
+            /**
+             * Format: int64
+             * @description The clock offset (server - device) applied when occurred_at was created
+             */
+            clock_offset_ms?: number | null;
             /**
              * Format: uuid
              * @description The operator

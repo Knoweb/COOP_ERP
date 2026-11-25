@@ -42,7 +42,7 @@ const pending: PendingCommand = {
 function renderReplay() {
   const queryClient = new QueryClient();
   const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-  render(
+  const result = render(
     <IntlProvider locale="en" messages={messages.en}>
       <QueryClientProvider client={queryClient}>
         <ScopeProvider>
@@ -51,7 +51,7 @@ function renderReplay() {
       </QueryClientProvider>
     </IntlProvider>
   );
-  return { invalidate };
+  return { invalidate, rerender: result.rerender };
 }
 
 describe("the replay after a step-up", () => {
@@ -143,5 +143,31 @@ describe("the replay after a step-up", () => {
     renderReplay();
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("did not go through"));
+  });
+
+  it("does not discard the finished outcome if an in-flight re-render cancels the effect cleanup", async () => {
+    broughtBack = pending;
+    let finishReplay!: (value: ReplayOutcome) => void;
+    replay.mockReturnValue(new Promise((resolve) => { finishReplay = resolve; }));
+    const { rerender } = renderReplay();
+
+    expect(screen.getByRole("status").textContent).toContain("Finishing the action");
+
+    // Re-render while replay is in-flight (simulates dependency change such as locationId/locale)
+    rerender(
+      <IntlProvider locale="en" messages={messages.en}>
+        <QueryClientProvider client={new QueryClient()}>
+          <ScopeProvider>
+            <StepUpReplay />
+          </ScopeProvider>
+        </QueryClientProvider>
+      </IntlProvider>
+    );
+
+    // In-flight replay resolves
+    finishReplay({ ok: true });
+
+    // Fails under the cancelled=true bug
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("is done"));
   });
 });

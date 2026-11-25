@@ -90,6 +90,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Tag defined
 
+  - code: TAX_CATEGORY_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Tax category defined
+
   - code: TAX_RATE_PUBLISHED
     severity: INFO
     offline_capturable: false
@@ -110,7 +115,48 @@ audit_event_types:
     offline_capturable: false
     description_en: Supplier registered
 
+  - code: SUPPLIERS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Batch of suppliers imported
+
   - code: SUSPECT_RESOLVED
     severity: INFO
     offline_capturable: false
     description_en: Duplicate suspect resolved
+
+  - code: SKUS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Batch of catalogue SKUs imported by data steward
+
+  - code: DUPLICATE_SUSPECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Duplicate SKU suspect detected
+
+  - code: ASSORTMENT_DRIFT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Assortment maintainer reconcile detected and repaired drift
+
+  - code: DEPARTMENT_CATEGORY_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Merchandise department category defined
+
+  - code: DEPARTMENT_CATEGORY_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Merchandise department category updated
+
+  - code: UOM_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Unit of measure defined
+
+  - code: UOM_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Unit of measure updated
+

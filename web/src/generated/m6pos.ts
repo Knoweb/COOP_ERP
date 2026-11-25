@@ -41,6 +41,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pos/receipts/{documentId}/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The authoritative cost, gross profit and margin of one receipt
+         * @description Available only to authorized management and accounting staff (pos.receipt.margin). Computes line-level and receipt-level gross profit based on authoritative net sales revenue and authoritative inventory cost allocated from M5 stock movements at the moment of sale. If any line has pending cost (e.g. oversold before inventory intake), costPending is true and overall profit is not calculated as fake zero cost.
+         */
+        get: operations["getReceiptProfit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pos/sessions": {
         parameters: {
             query?: never;
@@ -70,6 +90,23 @@ export interface paths {
         };
         /** One till session, with its close when it arrived */
         get: operations["getTillSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pos/sessions/{sessionId}/cash-movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cash drops and pay-outs recorded during a till session */
+        get: operations["listSessionCashMovements"];
         put?: never;
         post?: never;
         delete?: never;
@@ -121,6 +158,8 @@ export interface components {
             /** @description CASH, CARD ... as the till reported it */
             kind: string;
             amount: number;
+            /** @description Approval reference from the terminal */
+            reference?: string | null;
         };
         ReceiptLineResponse: {
             lineNo: number;
@@ -154,6 +193,57 @@ export interface components {
             countedCash?: number;
             expectedCash?: number;
             variance?: number;
+        };
+        CashMovementResponse: {
+            /** Format: uuid */
+            movementId: string;
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            tillPositionId?: string;
+            /** Format: uuid */
+            deviceId?: string;
+            /** @enum {string} */
+            kind: "DROP" | "PAYOUT";
+            amount: number;
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: uuid */
+            operatorUserId?: string;
+            reason: string;
+            /** Format: int64 */
+            deviceSeq?: number;
+            /** @description What central found odd (e.g. LOCATION_MISMATCH, SESSION_UNKNOWN, SESSION_CLOSED) */
+            flags?: string[];
+        };
+        ReceiptProfitResponse: {
+            /** Format: uuid */
+            documentId: string;
+            /** Format: uuid */
+            locationId: string;
+            netSales: number;
+            totalCost?: number | null;
+            grossProfit?: number | null;
+            marginPercent?: number | null;
+            costPending: boolean;
+            currency: string;
+            lines: components["schemas"]["ReceiptLineProfitResponse"][];
+        };
+        ReceiptLineProfitResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            qty: number;
+            unitPrice: number;
+            lineTotal: number;
+            lineNet: number;
+            unitCost?: number | null;
+            lineCost?: number | null;
+            lineProfit?: number | null;
+            marginPercent?: number | null;
+            costPending: boolean;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -255,6 +345,36 @@ export interface operations {
             };
         };
     };
+    getReceiptProfit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt profit breakdown */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptProfitResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description No such receipt, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listSessions: {
         parameters: {
             query: {
@@ -299,6 +419,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description No such session, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listSessionCashMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash movements recorded during the session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashMovementResponse"][];
                 };
             };
             400: components["responses"]["RequestProblem"];

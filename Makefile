@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed demo-data demo-till-sale urls build test test-int format coverage hooks lint-ci gen-clients check-generated progress new-module test-scaffold smoke e2e
+.PHONY: help image up up-2 down reset migrate seed demo-data demo-till-sale test-till-stack urls build test test-int format coverage hooks lint-ci gen-clients check-generated progress new-module test-scaffold smoke e2e
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -47,8 +47,9 @@ help:
 	@echo "make seed         load the development seed rows (safe to repeat)"
 	@echo "make demo-data    load the demo for cooperative staff (docs/DEMO.md; safe to repeat)"
 	@echo "make demo-till-sale  a till sale at the demo shop through the sync contract (after demo-data)"
+	@echo "make test-till-stack desktop till against central (Doc 32 section 11 conformance, after demo-data)"
 	@echo "make roles        apply the database users and groups to the running database (make up does this)"
-	@echo "make build        build backend and web on the host"
+	@echo "make build        build backend, web and till on the host"
 	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
 	@echo "make format       format the Java files you changed (the pipeline checks this)"
@@ -159,6 +160,14 @@ demo-data:
 demo-till-sale:
 	cd backend && ./gradlew --no-daemon -q :app:demoTillSale
 
+# Conformance suite (Doc 32 section 11, QA-01): the real KMP desktop till against central.
+# Registers DESKTOP-TRIAL-S01, enrols, refreshes snapshot, sells items for cash, prints,
+# closes session, uploads through sync, and asserts central holds the receipt unflagged.
+# Needs the stack (make up or make up-2) and demo data (make demo-data).
+test-till-stack:
+	cd till && ./gradlew --no-daemon -q :desktop:devEnrolmentCode
+	cd till && $(if $(shell which xvfb-run 2>/dev/null),xvfb-run -a ,)./gradlew --no-daemon :desktop:stackTest
+
 urls:
 	@echo ""
 	@echo "COOP ERP local stack is up"
@@ -180,6 +189,7 @@ urls:
 build:
 	cd backend && ./gradlew build -x test
 	cd web && pnpm install --frozen-lockfile && pnpm build
+	cd till && ./gradlew build :desktop:createDistributable
 
 test:
 	cd backend && ./gradlew spotlessCheck test
@@ -242,8 +252,8 @@ gen-clients:
 # when git then sees a difference, which means somebody changed a slice or a module
 # dependency and did not commit what it generates. The pipeline runs it on every push.
 # ARCH_TESTS is the Gradle call that runs the documenter (ArchitectureTests writes docs/modules).
-# The pipeline passes ARCH_TESTS=:app:test: right after `make test` that task is up to date and
-# Gradle skips it, instead of starting a filtered run of the architecture tests a second time.
+# The pipeline uses the default to run only the architecture tests. (Overriding with :app:test
+# runs the full suite again because tools/normalize-components-puml.mjs breaks the cache.)
 ARCH_TESTS ?= :app:test --tests "*ArchitectureTests*"
 check-generated:
 	sh tools/gen-clients.sh
@@ -297,6 +307,7 @@ test-scaffold:
 	fi
 	node tools/scaffold-proof-prepare.mjs
 	node tools/new-module.mjs --name m9integration --schema integration --entity webhook
+	node tools/scaffold-proof-prepare.mjs --restore
 	sh tools/gen-clients.sh
 	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
 	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \

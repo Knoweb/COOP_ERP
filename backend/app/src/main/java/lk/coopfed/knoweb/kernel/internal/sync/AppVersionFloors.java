@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,6 +46,16 @@ class AppVersionFloors implements AppVersionFloor {
 
     @Override
     public Standing standing(String appVersion, ScopeContext scope) {
+        ScopeContext targetScope = (scope == null || scope.policyClass() != PolicyClass.OWN)
+                ? system.own().orElse(scope)
+                : scope;
+        if (targetScope == null) {
+            return computeStanding(appVersion, scope);
+        }
+        return system.inOwnTransaction(targetScope, () -> computeStanding(appVersion, targetScope));
+    }
+
+    private Standing computeStanding(String appVersion, ScopeContext scope) {
         String floor = settings.appVersionFloor(scope);
         if (AppVersions.atLeast(appVersion, floor)) {
             return new Standing(floor, false, null, false);
@@ -62,7 +73,7 @@ class AppVersionFloors implements AppVersionFloor {
      * a change page) carries no version.
      */
     Standing standingOfDevice(ScopeContext device) {
-        List<String> reported = system.inScope(
+        List<String> reported = system.inOwnTransaction(
                 device,
                 () -> jdbc.queryForList(
                         """
@@ -80,7 +91,7 @@ class AppVersionFloors implements AppVersionFloor {
             }
         }
         if (latest == null) {
-            return new Standing(settings.appVersionFloor(device), false, null, false);
+            return new Standing(standing("0.0.0", device).floor(), false, null, false);
         }
         return standing(latest, device);
     }

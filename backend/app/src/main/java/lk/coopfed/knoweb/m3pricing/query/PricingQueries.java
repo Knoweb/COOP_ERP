@@ -87,6 +87,86 @@ public interface PricingQueries {
     Optional<RetailPrice> resolveRetailPrice(
             UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
 
+    /**
+     * ResolveCommercialPrice: commercial/institutional selling price of a SKU at a shop on a date,
+     * prioritizing the society's published COMMERCIAL list in force, falling back to RETAIL, bounded
+     * by in-stock batch MRP and the control price.
+     */
+    Optional<RetailPrice> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
+
+    /**
+     * ResolveBasket(location, date, tenderKind, lines, beneficiaryClass, beneficiaryIdentifier) (PGL-M1-06).
+     */
+    Optional<lk.coopfed.knoweb.engine.BasketResult> resolveBasket(
+            UUID locationId,
+            LocalDate date,
+            lk.coopfed.knoweb.engine.TenderKind tender,
+            lk.coopfed.knoweb.engine.Basket basket,
+            lk.coopfed.knoweb.m3pricing.api.BeneficiaryClass beneficiaryClass,
+            String beneficiaryIdentifier,
+            ScopeContext scope);
+
+    /**
+     * ResolveBasket(location, date, tenderKind, lines) of doc 23 section 5.2.
+     */
+    default Optional<lk.coopfed.knoweb.engine.BasketResult> resolveBasket(
+            UUID locationId,
+            LocalDate date,
+            lk.coopfed.knoweb.engine.TenderKind tender,
+            lk.coopfed.knoweb.engine.Basket basket,
+            ScopeContext scope) {
+        return resolveBasket(locationId, date, tender, basket, null, null, scope);
+    }
+
     /** The published ADVISORY lines in force on the date, of every Federation list (the shelf list's advisory column). */
     List<PriceListLineView> advisoryLines(LocalDate date, ScopeContext scope);
+
+    /**
+     * listReviews(kind, status) of doc 23 section 5.2.
+     */
+    List<ReviewItem> listReviews(String kind, String status, ScopeContext scope);
+
+    /** One shelf-label print job, empty when RLS does not expose it to the caller. */
+    Optional<LabelJobView> labelJob(UUID jobId, ScopeContext scope);
+
+    // ---- M3-07 / PRC-10: adjustment types ----------------------------------------------------
+
+    /** GetAdjustmentType: one adjustment type by code; empty when it does not exist. */
+    Optional<AdjustmentTypeView> getAdjustmentType(String code, ScopeContext scope);
+
+    /** ListAdjustmentTypes: all registered adjustment types. */
+    List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope);
+
+    // ---- PGL-M1-07: Expiry / Slow-Moving Discounts -------------------------------------------
+
+    /**
+     * List active expiry and slow-moving discount markdowns for a location (PGL-M1-07).
+     * Filters by reason (NEAR_EXPIRY, SLOW_MOVING) and status (ACTIVE) when provided.
+     */
+    List<ExpirySlowMovingDiscountView> listExpirySlowMovingDiscounts(
+            UUID locationId, String reason, String status, ScopeContext scope);
+
+    // ---- M3-08: Customer Price Lookup Web Portal ---------------------------------------------
+
+    /**
+     * Customer price lookup for an item at a shop location (M3-08): resolves the permitted public
+     * retail price using the core engine effective price resolver. Strictly excludes internal cost,
+     * margins, batch references, and restricted owner data.
+     */
+    Optional<CustomerPriceLookupView> lookupCustomerPrice(
+            UUID locationId,
+            UUID skuId,
+            String barcode,
+            String skuCode,
+            String query,
+            String uom,
+            LocalDate date,
+            ScopeContext scope);
+
+    /**
+     * Customer price search for items at a shop location (M3-08).
+     */
+    List<CustomerPriceLookupView> searchCustomerPrices(
+            UUID locationId, String query, LocalDate date, int limit, ScopeContext scope);
 }

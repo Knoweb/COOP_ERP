@@ -57,6 +57,7 @@
     "trading.field.find_item": "Find an item by code or name",
     "trading.find": "Find",
     "trading.find.none": "No item in use matches.",
+    "trading.add": "Add",
     "trading.add_item": "Add {code} {name}",
     "trading.remove": "Remove",
     "trading.sellers.none": "Your entity has no active trading relationship to order from.",
@@ -230,6 +231,8 @@
     "trading.exposure.warning": "Past {percent} % of the credit limit",
     "trading.exposure.after_accept": "Accepting this order takes the exposure to about",
     "trading.exposure.over_limit": "That is over the credit limit. The order can still be accepted: the limit warns, it does not block.",
+    "trading.note.exposure_warning": "Buyer exposure exceeds the credit limit. Delivery is not blocked: the limit warns, it does not prevent delivery.",
+    "trading.note.exposure_freshness": "Data as of {when}",
     "trading.accounts.buyers.title": "Our buyers' accounts",
     "trading.accounts.sellers.title": "Our accounts with suppliers",
     "trading.accounts.empty": "No trading relationships.",
@@ -289,7 +292,11 @@
     "trading.claim.return": "Send the goods back",
     "trading.claims.empty": "No claims",
     "trading.claims.received.title": "Claims received",
-    "trading.claims.raised.title": "Claims raised"
+    "trading.claims.raised.title": "Claims raised",
+    "trading.order.manual_branch": "Manual branch",
+    "trading.order.on_behalf.badge": "On-behalf order",
+    "trading.order.on_behalf.description": "Entering order on behalf of non-computerized branch: {branch}. Head-office user recorded as acting operator.",
+    "trading.order.acting_user": "Entered by"
   },
   "si": {
     "trading.nav": "වෙළඳාම",
@@ -349,6 +356,7 @@
     "trading.field.find_item": "කේතයෙන් හෝ නමින් භාණ්ඩයක් සොයන්න",
     "trading.find": "සොයන්න",
     "trading.find.none": "ගැළපෙන භාවිතයේ ඇති භාණ්ඩයක් නැත.",
+    "trading.add": "එක් කරන්න",
     "trading.add_item": "{code} {name} එක් කරන්න",
     "trading.remove": "ඉවත් කරන්න",
     "trading.sellers.none": "ඔබේ ආයතනයට ඇණවුම් කළ හැකි සක්‍රිය වෙළඳ සබඳතාවක් නැත.",
@@ -522,6 +530,8 @@
     "trading.exposure.warning": "ණය සීමාවෙන් {percent} % ඉක්මවා ඇත",
     "trading.exposure.after_accept": "මෙම ඇණවුම පිළිගැනීමෙන් නිරාවරණය දළ වශයෙන් මෙතෙක් වේ:",
     "trading.exposure.over_limit": "එය ණය සීමාවට වඩා වැඩිය. ඇණවුම තවමත් පිළිගත හැක: සීමාව අනතුරු අඟවයි, අවහිර නොකරයි.",
+    "trading.note.exposure_warning": "ගැනුම්කරුගේ නිරාවරණය ණය සීමාව ඉක්මවා ඇත. බෙදාහැරීම අවහිර නොවේ: සීමාව අනතුරු අඟවයි, බෙදාහැරීම වළක්වන්නේ නැත.",
+    "trading.note.exposure_freshness": "{when} විට දත්ත",
     "trading.accounts.buyers.title": "අපගේ ගැනුම්කරුවන්ගේ ගිණුම්",
     "trading.accounts.sellers.title": "සැපයුම්කරුවන් සමඟ අපගේ ගිණුම්",
     "trading.accounts.empty": "වෙළඳ සබඳතා නැත.",
@@ -581,7 +591,11 @@
     "trading.claim.return": "භාණ්ඩ ආපසු යවන්න",
     "trading.claims.empty": "හිමිකම් ඉල්ලීම් නැත",
     "trading.claims.received.title": "ලැබුණු හිමිකම් ඉල්ලීම්",
-    "trading.claims.raised.title": "ඉදිරිපත් කළ හිමිකම් ඉල්ලීම්"
+    "trading.claims.raised.title": "ඉදිරිපත් කළ හිමිකම් ඉල්ලීම්",
+    "trading.order.manual_branch": "අතින් ක්‍රියාත්මක ශාඛාව",
+    "trading.order.on_behalf.badge": "වෙනුවෙන් නියෝගය",
+    "trading.order.on_behalf.description": "පරිගණකගත නොකළ ශාඛාව වෙනුවෙන් නියෝගය ඇතුළත් කිරීම: {branch}. ක්‍රියාකාරී ක්‍රියාකරු ලෙස ප්‍රධාන කාර්යාල පරිශීලක සටහන් වේ.",
+    "trading.order.acting_user": "ඇතුළත් කළේ"
   },
   "ta": {
     "trading.nav": "வர்த்தகம்",
@@ -641,6 +655,7 @@
     "trading.field.find_item": "குறியீடு அல்லது பெயரால் பொருளைத் தேடுக",
     "trading.find": "தேடு",
     "trading.find.none": "பொருந்தும் பயன்பாட்டிலுள்ள பொருள் இல்லை.",
+    "trading.add": "சேர்",
     "trading.add_item": "{code} {name} சேர்",
     "trading.remove": "நீக்கு",
     "trading.sellers.none": "உங்கள் நிறுவனத்துக்கு ஆணையிடக்கூடிய செயலில் உள்ள வர்த்தக உறவு இல்லை.",
@@ -814,6 +829,8 @@
     "trading.exposure.warning": "கடன் வரம்பின் {percent} % ஐத் தாண்டியது",
     "trading.exposure.after_accept": "இந்த ஆணையை ஏற்றால் வெளிப்பாடு ஏறக்குறைய இவ்வளவு ஆகும்:",
     "trading.exposure.over_limit": "இது கடன் வரம்பை மீறுகிறது. ஆணையை இன்னும் ஏற்கலாம்: வரம்பு எச்சரிக்கிறது, தடுப்பதில்லை.",
+    "trading.note.exposure_warning": "வாங்குபவரின் வெளிப்பாடு கடன் வரம்பை மீறுகிறது. விநியோகம் தடுக்கப்படவில்லை: வரம்பு எச்சரிக்கிறது, விநியோகத்தைத் தடுப்பதில்லை.",
+    "trading.note.exposure_freshness": "{when} நிலவரப்படி தரவு",
     "trading.accounts.buyers.title": "எங்கள் வாங்குநர்களின் கணக்குகள்",
     "trading.accounts.sellers.title": "விநியோகஸ்தர்களுடன் எங்கள் கணக்குகள்",
     "trading.accounts.empty": "வர்த்தக உறவுகள் இல்லை.",
@@ -873,6 +890,10 @@
     "trading.claim.return": "பொருட்களைத் திருப்பி அனுப்புங்கள்",
     "trading.claims.empty": "உரிமைகோரல்கள் இல்லை",
     "trading.claims.received.title": "பெறப்பட்ட உரிமைகோரல்கள்",
-    "trading.claims.raised.title": "எழுப்பிய உரிமைகோரல்கள்"
+    "trading.claims.raised.title": "எழுப்பிய உரிமைகோரல்கள்",
+    "trading.order.manual_branch": "கையேடு கிளை",
+    "trading.order.on_behalf.badge": "சார்பாக ஆணை",
+    "trading.order.on_behalf.description": "கணினிமயமாக்கப்படாத கிளை சார்பாக ஆணை உள்ளிடப்படுகிறது: {branch}. தலைமை அலுவலக பயனர் செயல்படும் ஆபரேட்டராக பதிவு செய்யப்பட்டுள்ளார்.",
+    "trading.order.acting_user": "உள்ளிட்டவர்"
   }
 }

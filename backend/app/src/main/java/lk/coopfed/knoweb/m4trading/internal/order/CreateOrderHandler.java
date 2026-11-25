@@ -110,7 +110,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         List<OrderLineSummary> summary = priced.summary();
 
         documents.save(TradingDocuments.draft(
-                orderId, OrderTypeHandler.ORD, buyer, seller, null, scope.userId(), null, command.notes()));
+                orderId, OrderTypeHandler.ORD, buyer, seller, deliverTo, scope.userId(), null, command.notes()));
         documents.saveLines(orderId, lines);
         jdbc.update(
                 """
@@ -144,6 +144,13 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         after.put("sellerEntityId", seller);
         after.put("requestedEta", command.requestedEta());
         after.put("deliverToLocationId", deliverTo);
+        after.put("branchLocationId", deliverTo);
+        after.put("actingUserId", scope.userId());
+        if (deliverToLocation != null) {
+            after.put("branchCode", deliverToLocation.locationCode());
+            after.put("manualBranch", !deliverToLocation.connectivitySpecMet());
+        }
+        after.put("onBehalf", deliverTo != null);
         after.put("lines", summary.size());
         audit.record(AUDIT_CREATED, Subject.of("order", orderId), null, after, scope);
 

@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.SnapshotContributor.Shop;
@@ -23,6 +24,7 @@ import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
+import lk.coopfed.knoweb.m7customers.api.RegisterLoyaltyCustomer;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,9 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
 
     @Autowired
     SystemScope transactions;
+
+    @Autowired
+    Handles<RegisterLoyaltyCustomer, UUID> registerLoyalty;
 
     @Autowired
     Handles<RegisterCustomer, UUID> register;
@@ -137,7 +142,7 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
                 SystemScope.own(SOCIETY, SHOP),
                 () -> contributor.rows("customer", shop, List.of(open1, closed, noAccount, elsewhere, inactive)));
         assertThat(some).containsOnlyKeys(open1);
-        assertThat(contributor.tables()).containsExactly("customer");
+        assertThat(contributor.tables()).containsExactlyInAnyOrder("customer", "member_discount_eligibility");
     }
 
     private UUID member(String name, String nameSi, String phone, List<String> tags, UUID society) {
@@ -154,5 +159,36 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
                         tags,
                         false),
                 society.equals(SOCIETY) ? office() : other());
+    }
+
+    @Test
+    void theTillGetsSanitizedMemberDiscountEligibilityFactsOnly() {
+        RegisterLoyaltyCustomer cmd = new RegisterLoyaltyCustomer(
+                null,
+                "Perera Silva",
+                "පෙරේරා සිල්වා",
+                "பெரேரா சில்வா",
+                "si",
+                "0700000888",
+                "199000005678",
+                SHOP,
+                "POL-ZONE-01",
+                "MEM-99901",
+                "GOLD",
+                true,
+                Set.of(),
+                Map.of("cluster", "Agri-North"));
+        UUID loyaltyId = registerLoyalty.handle(cmd, office());
+
+        Map<UUID, Map<String, Object>> rows = transactions.inScope(
+                SystemScope.own(SOCIETY, SHOP),
+                () -> contributor.allRows(CustomerSnapshotContributor.MEMBER_DISCOUNT_ELIGIBILITY, shop));
+
+        assertThat(rows).containsKey(loyaltyId);
+        Map<String, Object> row = rows.get(loyaltyId);
+        assertThat(row)
+                .containsEntry("member_no", "MEM-99901")
+                .containsEntry("active", true)
+                .doesNotContainKeys("nic", "nic_hash", "nic_last4", "phone", "attributes", "consents", "cluster");
     }
 }

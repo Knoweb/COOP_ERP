@@ -33,12 +33,12 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
 
     /** The policies of every table M2-01 creates (V0001), and batch_key of the review (V0003). */
     private static final Map<String, Set<String>> POLICIES = Map.ofEntries(
-            Map.entry("uom", Set.of("authenticated_read", "seed_reference")),
+            Map.entry("uom", Set.of("authenticated_read", "seed_reference", "governed_write", "governed_update")),
             Map.entry("tax_category", with("own_update", "authenticated_read", "seed_reference")),
             Map.entry("tax_rate", with("own_update", "authenticated_read", "seed_reference")),
-            Map.entry("sku", with("own_update", "shared_read")),
+            Map.entry("sku", with("own_update", "shared_read", "fed_promote")),
             Map.entry("sku_uom_conversion", with("own_update", "shared_read")),
-            Map.entry("sku_barcode", with("own_update", "shared_read")),
+            Map.entry("sku_barcode", with("own_update", "shared_read", "fed_merge_barcode")),
             // V0007 (CR-22A-1): the Federation writes the governed tags.
             Map.entry(
                     "tag", with("own_update", "governed_read", "seed_reference", "governed_write", "governed_update")),
@@ -49,7 +49,15 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0007: a supplier is read beyond its owner once a batch cites it.
             Map.entry("supplier", with("cited_read")),
             // V0005 (M2-06): the images; own_write follows the SKU, shared_read the SKU owner's rows.
-            Map.entry("sku_image", with("own_update", "shared_read")));
+            Map.entry("sku_image", with("own_update", "shared_read")),
+            // V0009 (CAT-01): the duplicate suspects.
+            Map.entry("duplicate_suspect", with("own_update")),
+            // V0010 (CAT-03): sku_alias.
+            Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")),
+            // V0011 (CAT-06): location_assortment.
+            Map.entry("location_assortment", with("own_update", "own_delete")),
+            // PGL-M2-08: department_category.
+            Map.entry("department_category", Set.of("authenticated_read", "governed_write", "governed_update")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
@@ -144,9 +152,17 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             assertThat(may(db, table, "TRUNCATE")).as(table + " TRUNCATE").isFalse();
             assertThat(may(db, table, "SELECT")).as(table + " SELECT").isTrue();
         }
-        // Units are reference data: read only.
-        assertThat(may(db, "uom", "INSERT")).isFalse();
-        assertThat(may(db, "uom", "UPDATE")).isFalse();
+        // PGL-M2-04: Units can be managed by app_rw, but uom_code is immutable.
+        assertThat(may(db, "uom", "INSERT")).isTrue();
+        assertThat(may(db, "uom", "UPDATE")).as("UPDATE on the whole row").isFalse();
+        assertThat(mayUpdateColumn(db, "uom", "name_en")).isTrue();
+        assertThat(mayUpdateColumn(db, "uom", "status")).isTrue();
+        assertThat(mayUpdateColumn(db, "uom", "uom_code"))
+                .as("uom_code is immutable")
+                .isFalse();
+        assertThat(mayUpdateColumn(db, "uom", "created_at"))
+                .as("created_at is immutable")
+                .isFalse();
         // A tag assignment is never changed.
         assertThat(may(db, "sku_tag", "UPDATE")).isFalse();
         // 22A section 3: "batch: INSERT + UPDATE(status) only".
@@ -172,7 +188,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(may(db, "sku_barcode", "UPDATE")).isFalse();
         assertThat(mayUpdateColumn(db, "sku_barcode", "status")).isTrue();
         assertThat(mayUpdateColumn(db, "sku_barcode", "batch_id")).isTrue();
-        assertThat(mayUpdateColumn(db, "sku_barcode", "sku_id")).isFalse();
+        assertThat(mayUpdateColumn(db, "sku_barcode", "sku_id")).isTrue();
         assertThat(may(db, "batch_key", "UPDATE")).isFalse();
         assertThat(mayUpdateColumn(db, "batch_key", "batch_id")).isTrue();
         assertThat(mayUpdateColumn(db, "batch_key", "batch_no")).isFalse();
@@ -185,6 +201,13 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(mayUpdateColumn(db, "sku_image", "object_key_thumb")).isTrue();
         assertThat(mayUpdateColumn(db, "sku_image", "object_key_full")).isFalse();
         assertThat(mayUpdateColumn(db, "sku_image", "content_hash")).isFalse();
+        // V0009: duplicate suspects can update status, decided_by, decided_at.
+        assertThat(may(db, "duplicate_suspect", "INSERT")).isTrue();
+        assertThat(may(db, "duplicate_suspect", "UPDATE")).isFalse();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "status")).isTrue();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "decided_by")).isTrue();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "decided_at")).isTrue();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "score")).isFalse();
     }
 
     @Test
@@ -275,6 +298,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         } finally {
             db.update("delete from catalogue.batch where batch_id = ?", batch);
             db.update("delete from catalogue.batch_key where batch_id = ?", batch);
+            db.update("delete from catalogue.location_assortment where sku_id = ?", sku);
             db.update("delete from catalogue.sku where sku_id = ?", sku);
             dropTheMonthsBeyondTheMigration(db);
         }

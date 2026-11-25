@@ -4,7 +4,7 @@ import java.util.UUID;
 
 /**
  * DraftNewVersion (23A section 7): a new DRAFT version of a PUBLISHED or SUPERSEDED list. The
- * draft starts empty: carrying the source's lines forward is deferred for the demo (M3-04).
+ * draft carries the chosen source version's lines forward for editing.
  *
  * @param sourcePriceListId the version the new one follows
  */

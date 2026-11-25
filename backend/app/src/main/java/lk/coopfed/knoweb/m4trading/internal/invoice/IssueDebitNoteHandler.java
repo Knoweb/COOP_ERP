@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Mutation: the seller's ENTITY series of DN2, the issuance, the DEBITS link to the invoice with
  * the gross amount, {@code doc_debit_note}, and the invoice's {@code
  * debited_amount} cache recomputed from its DEBITS links. Audit DEBIT_NOTE_ISSUED; events
- * debit_note.issued.v1 and journal.postings_ready.v1 (the seller's side, by {@link PostingMapper}).
+ * debit_note.issued.v1 and journal.postings_ready.v1 (both parties' sides, by {@link PostingMapper}).
  */
 @Service
 @CommandHandler(permission = "bil.debitnote.issue")
@@ -130,8 +130,9 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
         BigDecimal debited = debitedFromLinks(documents, invoiceId);
         jdbc.update("update trading.doc_invoice set debited_amount = ? where document_id = ?", debited, invoiceId);
 
-        List<Posting> journal = postings.postings(
-                DN2, "CHARGE", "SELLER", Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+        Map<String, BigDecimal> amounts = Map.of("net", issued.netAmount(), "tax", issued.taxAmount());
+        List<Posting> journal = new ArrayList<>(postings.postings(DN2, "CHARGE", "SELLER", amounts));
+        journal.addAll(postings.postings(DN2, "CHARGE", "BUYER", amounts));
 
         audit.record(
                 AUDIT_ISSUED,

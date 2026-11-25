@@ -30,10 +30,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * The slice over HTTP (27A section 5, back office): the office registers a member, confirms a
- * reused number, opens the account, the till's charge arrives, the office records a repayment and
- * the statement shows it; the kernel refuses a malformed request (400) and another society sees
- * nothing (404). The statement's period is read from the account's own postings, not from today.
+ * The slice over HTTP (27A section 5, back office): the office registers a
+ * member, confirms a
+ * reused number, opens the account, the till's charge arrives, the office
+ * records a repayment and
+ * the statement shows it; the kernel refuses a malformed request (400) and
+ * another society sees
+ * nothing (404). The statement's period is read from the account's own
+ * postings, not from today.
  */
 class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
 
@@ -51,6 +55,69 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void clean() {
         CustomersFixture.clean(superuserJdbc());
+    }
+
+    @Test
+    void customerCardReadsAreAuditedWithoutExposingPersonalData() {
+        ResponseEntity<JsonNode> registered = post(
+                "/v1/customers",
+                Map.of(
+                        "displayName", "Audit Test Customer",
+                        "phone", "0700000288",
+                        "consents", List.of("CREDIT_ACCOUNT"),
+                        "via", "PAPER"),
+                OFFICE_USER,
+                SOCIETY);
+
+        assertThat(registered.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID customerId = UUID.fromString(registered.getBody().get("customerId").asText());
+
+        String auditCountSql =
+                """
+                                select count(*)
+                                  from kernel.audit_event
+                                 where event_type_code = 'CUSTOMER_VIEWED'
+                                   and subject_table = 'customer'
+                                   and subject_id = ?
+                                """;
+
+        assertThat(superuserJdbc().queryForObject(auditCountSql, Long.class, customerId))
+                .isZero();
+
+        ResponseEntity<JsonNode> card = get("/v1/customers/" + customerId, OFFICE_USER, SOCIETY);
+
+        assertThat(card.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(superuserJdbc().queryForObject(auditCountSql, Long.class, customerId))
+                .isEqualTo(1L);
+
+        Long safeAudit = superuserJdbc()
+                .queryForObject(
+                        """
+                                                                select count(*)
+                                                                  from kernel.audit_event
+                                                                 where event_type_code = 'CUSTOMER_VIEWED'
+                                                                   and subject_id = ?
+                                                                   and actor_user_id = ?
+                                                                   and owner_entity_id = ?
+                                                                   and before_state is null
+                                                                   and after_state is null
+                                                                """,
+                        Long.class,
+                        customerId,
+                        OFFICE_USER,
+                        SOCIETY);
+
+        assertThat(safeAudit).isEqualTo(1L);
+
+        assertThat(get("/v1/customers/" + customerId, OTHER_USER, OTHER).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThat(get("/v1/customers/" + UUID.randomUUID(), OFFICE_USER, SOCIETY)
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThat(superuserJdbc().queryForObject(auditCountSql, Long.class, customerId))
+                .isEqualTo(1L);
     }
 
     @Test
@@ -120,7 +187,8 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
         assertThat(card.get("nicLast4").asText()).isEqualTo("0101");
         assertThat(card.toString()).doesNotContain("190000000101");
 
-        // The period from the sale day to the payment's own business date, whatever today is.
+        // The period from the sale day to the payment's own business date, whatever
+        // today is.
         String paymentDay = superuserJdbc()
                 .queryForObject(
                         "select business_date::text from customers.account_posting where kind = 'PAYMENT' and account_id = ?::uuid",
@@ -172,7 +240,8 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
                 .get("accountId")
                 .asText();
 
-        // A lower limit and a hard block: no second factor. A higher limit asks for one (401).
+        // A lower limit and a hard block: no second factor. A higher limit asks for one
+        // (401).
         ResponseEntity<JsonNode> lowered = post(
                 "/v1/accounts/" + accountId + "/limits",
                 Map.of("creditLimit", 8000, "hardBlock", true, "reason", "Missed a month"),
@@ -254,7 +323,8 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
                         .decimalValue())
                 .isEqualByComparingTo("150");
 
-        // An access request: recorded by the office, answered by the responsible officer only.
+        // An access request: recorded by the office, answered by the responsible
+        // officer only.
         ResponseEntity<JsonNode> recorded =
                 post("/v1/privacy/requests", Map.of("customerId", customerId, "kind", "ACCESS"), OFFICE_USER, SOCIETY);
         assertThat(recorded.getStatusCode())
@@ -275,7 +345,8 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
                 .as(String.valueOf(fulfilled.getBody()))
                 .isEqualTo(HttpStatus.OK);
         assertThat(fulfilled.getBody().get("status").asText()).isEqualTo("FULFILLED");
-        // The export is handed over by a command (wave 2, M7CR-11): the officer's, audited, and
+        // The export is handed over by a command (wave 2, M7CR-11): the officer's,
+        // audited, and
         // without the NIC's hash.
         ResponseEntity<JsonNode> handedOver =
                 post("/v1/privacy/requests/" + requestId + "/export", Map.of(), CustomersFixture.OFFICER_USER, SOCIETY);
@@ -314,8 +385,35 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
                 Map.of("displayName", "No consent", "phone", "0700000202", "consents", List.of()),
                 OFFICE_USER,
                 SOCIETY);
-        assertThat(noConsent.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(String.valueOf(noConsent.getBody())).contains("m7.customer.consent_required");
+        assertThat(noConsent.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID noConsentCustId =
+                UUID.fromString(noConsent.getBody().get("customerId").asText());
+
+        // Opening an account for a member without CREDIT_ACCOUNT consent is refused
+        // with m7.customer.consent_required
+        ResponseEntity<JsonNode> openWithoutConsent = post(
+                "/v1/customers/" + noConsentCustId + "/accounts", Map.of("creditLimit", 5000), OFFICE_USER, SOCIETY);
+        assertThat(openWithoutConsent.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(String.valueOf(openWithoutConsent.getBody())).contains("m7.customer.consent_required");
+
+        // Invalid consent purpose is refused by the slice as 400 Bad Request (request.invalid)
+        ResponseEntity<JsonNode> badConsent = post(
+                "/v1/customers",
+                Map.of("displayName", "Bad consent", "phone", "0700000203", "consents", List.of("INVALID_PURPOSE")),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(badConsent.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // Ordinary member registration succeeds with SMS-only consent
+        ResponseEntity<JsonNode> smsOnly = post(
+                "/v1/customers",
+                Map.of(
+                        "displayName", "SMS only",
+                        "phone", "0700000204",
+                        "consents", List.of("STATEMENTS_NOTIFICATIONS")),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(smsOnly.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     private ResponseEntity<JsonNode> post(String path, Object body, UUID user, UUID entity) {

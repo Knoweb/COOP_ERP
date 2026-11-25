@@ -113,11 +113,23 @@ class ArchitectureRulesBiteTest {
     @Test
     void jobScopeRuleCatchesAnEntitysScopeTakenOutsideAScheduledJob() {
         assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.borrow");
+        assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.peek");
+        assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.mint");
         String report = ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule()
                 .evaluate(FIXTURES)
                 .getFailureReport()
                 .toString();
         assertTrue(!report.contains("BorrowsAnEntitysScope.job "), report);
+    }
+
+    @Test
+    void federationViewRuleCatchesAModuleBuildingItsOwn() {
+        assertViolation(ArchitectureTests.onlyTheKernelBuildsAFederationViewRule(), "BuildsAFederationView");
+        String report = ArchitectureTests.onlyTheKernelBuildsAFederationViewRule()
+                .evaluate(FIXTURES)
+                .getFailureReport()
+                .toString();
+        assertTrue(!report.contains("ComparesWithTheFederationView"), report);
     }
 
     @Test
@@ -141,6 +153,11 @@ class ArchitectureRulesBiteTest {
         assertViolation(ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "JobCallingAnInternalCommand");
         assertViolation(
                 ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "ControllerReachingAnInternalCommand");
+    }
+
+    @Test
+    void stubPackageRuleCatchesAClassInAStubPackage() {
+        assertViolation(ArchitectureTests.noProductionClassesInStubPackageRule(), "ProductionClassInStub");
     }
 
     private static void assertViolation(ArchRule rule, String offendingClass) {

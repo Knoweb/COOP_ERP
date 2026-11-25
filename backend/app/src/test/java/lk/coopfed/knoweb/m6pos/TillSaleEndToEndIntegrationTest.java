@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m6pos;
 
+import static lk.coopfed.knoweb.m5inventory.InventoryFixture.at;
 import static lk.coopfed.knoweb.m5inventory.InventoryFixture.own;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,9 +66,14 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     private static final UUID MPCS = UUID.fromString("0190e6a0-0000-7000-8000-000000000002");
     private static final UUID SHOP = UUID.fromString("0190e6a0-0000-7000-8000-000000000101");
     private static final UUID POSITION = UUID.fromString("0190e6a0-0000-7000-8000-000000000201");
+    private static final UUID POSITION_TWO = UUID.fromString("0190e6a0-0000-7000-8000-000000000202");
     private static final UUID DEVICE = UUID.fromString("0190e6a0-0000-7000-8000-000000000301");
     private static final UUID SERIES = UUID.fromString("0190e6a0-0000-7000-8000-000000000401");
+    private static final UUID DEVICE_TWO = UUID.fromString("0190e6a0-0000-7000-8000-000000000303");
+    private static final UUID SERIES_TWO = UUID.fromString("0190e6a0-0000-7000-8000-000000000402");
     private static final UUID REPLACEMENT = UUID.fromString("0190e6a0-0000-7000-8000-000000000302");
+    private static final UUID OTHER_ENTITY = UUID.fromString("0190e6a0-0000-7000-8000-000000000003");
+    private static final UUID SIBLING_LOCATION = UUID.fromString("0190e6a0-0000-7000-8000-000000000102");
     private static final java.time.ZoneId COLOMBO = java.time.ZoneId.of("Asia/Colombo");
 
     @Autowired
@@ -239,6 +245,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents())
                 .filteredOn(TillSessionRecorded.class::isInstance)
                 .hasSize(2);
+        assertThat(kernel.committedEvents())
+                .filteredOn(lk.coopfed.knoweb.kernel.api.LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
 
         // Over HTTP, the office reads the receipt on its business day, and on its own; the shop's
         // own session too. The day is the one the receipt was issued on in the business time zone,
@@ -294,6 +303,71 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void theTillPerformsCashDropAndPayoutAndAfterSyncMovementsAndExpectedCashReconcile() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        UUID session = till.openSession(new BigDecimal("1000.00"));
+        UUID receipt = till.sell(List.of(new Sale("4790001000011", new BigDecimal("1"), new BigDecimal("1450.00"))));
+
+        UUID drop = till.cashDrop(new BigDecimal("500.00"), "Midday safe sweep");
+        UUID payout = till.cashPayout(new BigDecimal("150.00"), "Cleaning supplies");
+
+        // Expected cash: 1000 + 1450 - 500 - 150 = 1800.00
+        till.closeSession(new BigDecimal("1800.00"));
+
+        till.drain(50, Instant.now().plusSeconds(30));
+        assertThat(till.pending()).isZero();
+        deliverTheTillsEvents();
+
+        ScopeContext office = own(MPCS);
+        List<PosQueries.CashMovementView> movements = pos.cashMovements(session, office);
+        assertThat(movements).hasSize(2);
+        assertThat(movements)
+                .extracting(PosQueries.CashMovementView::movementId)
+                .containsExactlyInAnyOrder(drop, payout);
+
+        assertThat(movements)
+                .filteredOn(m -> m.kind().equals("DROP"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.amount()).isEqualByComparingTo("500.00");
+                    assertThat(m.reason()).isEqualTo("Midday safe sweep");
+                    assertThat(m.flags()).isEmpty();
+                });
+
+        assertThat(movements)
+                .filteredOn(m -> m.kind().equals("PAYOUT"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.amount()).isEqualByComparingTo("150.00");
+                    assertThat(m.reason()).isEqualTo("Cleaning supplies");
+                    assertThat(m.flags()).isEmpty();
+                });
+
+        // The session's blind close worked out zero variance
+        assertThat(sessionsAt(office)).singleElement().satisfies(s -> {
+            assertThat(s.sessionId()).isEqualTo(session);
+            assertThat(s.countedCash()).isEqualByComparingTo("1800.00");
+            assertThat(s.expectedCash()).isEqualByComparingTo("1800.00");
+            assertThat(s.variance()).isEqualByComparingTo("0.00");
+        });
+
+        // Query over HTTP
+        JsonNode cashMovementsJson = http.exchange(
+                        "/v1/pos/sessions/" + session + "/cash-movements",
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(cashMovementsJson).hasSize(2);
+
+        // Committed audit contains movement recorded events
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("CASH_MOVEMENT_RECORDED", "TILL_SESSION_OPENED", "TILL_SESSION_CLOSED");
+    }
+
+    @Test
     void anOversellIsAppliedAndFlaggedNeverRefused() throws Exception {
         TillSimulator till = till();
         till.refreshSnapshot();
@@ -306,6 +380,92 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains("RECEIPT_RECORDED", "STOCK_SOLD", "STOCK_LOT_NEGATIVE");
+    }
+
+    /**
+     * QA-12 / FR-POS-070: each offline till sees the same last unit before either fact reaches
+     * central. Both immutable sales must apply. The resulting negative-lot period is flagged once
+     * for review; it is not one negative period per receipt.
+     */
+    @Test
+    void twoOfflineTillsSellingTheSameLastUnitBothApplyAndFlagTheOversell() throws Exception {
+        registerSecondTill();
+        UUID lastUnit = item(superuserJdbc(), "LAST1", "4790001000042", "1");
+        kernel.reset();
+
+        TillSimulator first = till();
+        TillSimulator second = secondTill();
+        // Both local caches contain the same final unit before either till uploads its sale.
+        first.refreshSnapshot();
+        second.refreshSnapshot();
+        first.openSession(BigDecimal.ZERO);
+        second.openSession(BigDecimal.ZERO);
+        UUID firstSale = first.sell(List.of(new Sale("4790001000042", BigDecimal.ONE, new BigDecimal("100.00"))));
+        UUID secondSale = second.sell(List.of(new Sale("4790001000042", BigDecimal.ONE, new BigDecimal("100.00"))));
+
+        first.drain(50, Instant.now().plusSeconds(30));
+        second.drain(50, Instant.now().plusSeconds(30));
+        assertThat(first.pending()).isZero();
+        assertThat(second.pending()).isZero();
+
+        deliverTheTillsEvents(DEVICE);
+        deliverTheTillsEvents(DEVICE_TWO);
+
+        assertThat(onHand(lastUnit)).isEqualByComparingTo("-1");
+        assertThat(inventory.movementsOf(firstSale, own(MPCS)))
+                .singleElement()
+                .satisfies(m -> assertThat(m.movementType()).isEqualTo("SALE"));
+        assertThat(inventory.movementsOf(secondSale, own(MPCS)))
+                .singleElement()
+                .satisfies(m -> assertThat(m.movementType()).isEqualTo("SALE"));
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select distinct source from inventory.stock_movement where document_id in (?, ?)",
+                                String.class,
+                                firstSale,
+                                secondSale))
+                .containsExactlyInAnyOrder(DEVICE.toString(), DEVICE_TWO.toString());
+
+        assertThat(receiptsAt(own(MPCS)))
+                .extracting(PosQueries.ReceiptView::documentId)
+                .containsExactlyInAnyOrder(firstSale, secondSale);
+        assertThat(receiptsAt(at(MPCS, SIBLING_LOCATION))).isEmpty();
+        assertThat(receiptsAt(own(OTHER_ENTITY))).isEmpty();
+
+        // Each sale is applied and audited. The ledger raises one REVIEW when their shared lot
+        // crosses below zero, with the receipt that caused the crossing in central's order.
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("STOCK_SOLD"))
+                .extracting(a -> a.subject().id())
+                .containsExactlyInAnyOrder(firstSale, secondSale);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("STOCK_LOT_NEGATIVE"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains(secondSale.toString()));
+        assertThat(kernel.committedEvents())
+                .filteredOn(lk.coopfed.knoweb.m5inventory.api.LotNegative.class::isInstance)
+                .map(lk.coopfed.knoweb.m5inventory.api.LotNegative.class::cast)
+                .singleElement()
+                .satisfies(e -> {
+                    assertThat(e.documentId()).isEqualTo(secondSale);
+                    assertThat(e.qtyOnHand()).isEqualByComparingTo("-1");
+                });
+
+        // Broker redelivery is idempotent for both devices: neither sale nor review is repeated.
+        deliverTheTillsEvents(DEVICE);
+        deliverTheTillsEvents(DEVICE_TWO);
+        assertThat(onHand(lastUnit)).isEqualByComparingTo("-1");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id in (?, ?)",
+                                Long.class,
+                                firstSale,
+                                secondSale))
+                .isEqualTo(2L);
+        assertThat(receiptsAt(own(MPCS))).hasSize(2);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("STOCK_LOT_NEGATIVE"))
+                .hasSize(1);
     }
 
     /**
@@ -432,6 +592,141 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
+     * Doc 32 Section 11 Case 6 (QA-03): Business-rule breach: Event applied, line flagged, ALERT
+     * raised; nothing rejected.
+     *
+     * <p>Proves that when an offline till uploads facts breaching business rules (both a duplicate
+     * receipt number breaking series uniqueness, and a runaway number jump breaking series
+     * continuity), central never rejects the facts:
+     * <ul>
+     *   <li>The gateway accepts the batch with outcome APPLIED, cursor advances, not quarantined.</li>
+     *   <li>Every receipt is applied and stored in {@code pos.receipt} with lines in {@code pos.receipt_line}.</li>
+     *   <li>The duplicate receipt is flagged {@code DUPLICATE_NUMBER} and emits {@code RECEIPT_NUMBER_DUPLICATED} ALERT.</li>
+     *   <li>The jumped receipt is flagged {@code NUMBER_JUMP} and emits {@code RECEIPT_NUMBER_JUMPED} ALERT.</li>
+     *   <li>Both receipts emit {@code RECEIPT_FLAGGED} REVIEW and {@code receipt.recorded.v1}.</li>
+     *   <li>M5 consumes each bundle, records {@code STOCK_SOLD}, and deducts inventory as a fact.</li>
+     *   <li>Tenant and location isolation hold under RLS: sibling locations and other entities see nothing.</li>
+     *   <li>Broker redelivery / replay is idempotent: neither receipts, stock movements, nor ALERTs are duplicated.</li>
+     * </ul>
+     */
+    @Test
+    void businessRuleBreachTransactionIsAppliedFlaggedAndRaisesAlertWithoutRejection() throws Exception {
+        TillSimulator first = till();
+        first.refreshSnapshot();
+        first.openSession(BigDecimal.ZERO);
+        UUID original = first.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))));
+        first.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents(DEVICE);
+
+        assertThat(onHand(rice)).isEqualByComparingTo("9");
+        assertThat(numberOf(original)).isEqualTo(1L);
+
+        // Replacement till restarts numbering from 1: breaches uniqueness (DUPLICATE_NUMBER)
+        replaceTheTill();
+        TillSimulator second = till(REPLACEMENT).numberingFrom(1);
+        second.refreshSnapshot();
+        second.openSession(BigDecimal.ZERO);
+        UUID duplicate = second.sell(List.of(new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))));
+
+        // And then issues a receipt with a runaway counter jump: breaches continuity (NUMBER_JUMP)
+        second.numberingFrom(25000L);
+        UUID jumped = second.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+
+        // Gateway accepts the batch: facts are not rejected or quarantined
+        second.drain(50, Instant.now().plusSeconds(30));
+        assertThat(second.pending()).isZero();
+
+        kernel.reset();
+        deliverTheTillsEvents(REPLACEMENT);
+
+        // 1. Transactions are applied: all receipts exist and quantities are deducted
+        assertThat(numberOf(duplicate)).isEqualTo(1L);
+        assertThat(numberOf(jumped)).isEqualTo(25000L);
+        assertThat(onHand(dhal)).as("dhal deducted for duplicate receipt").isEqualByComparingTo("9");
+        assertThat(onHand(soap)).as("soap deducted for jumped receipt").isEqualByComparingTo("9");
+
+        assertThat(inventory.movementsOf(duplicate, own(MPCS)))
+                .singleElement()
+                .satisfies(m -> assertThat(m.movementType()).isEqualTo("SALE"));
+        assertThat(inventory.movementsOf(jumped, own(MPCS))).singleElement().satisfies(m -> assertThat(m.movementType())
+                .isEqualTo("SALE"));
+
+        // 2. Receipts are flagged with their respective business rule breaches
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(duplicate))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("DUPLICATE_NUMBER"));
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(jumped))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("NUMBER_JUMP"));
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(original))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).isEmpty());
+
+        // Flagged receipts filter query in M6 returns exactly the two breached receipts
+        assertThat(pos.receipts(new PosQueries.ReceiptFilter(SHOP, null, true, null, null), own(MPCS))
+                        .items())
+                .extracting(PosQueries.ReceiptView::documentId)
+                .containsExactlyInAnyOrder(duplicate, jumped);
+
+        // 3. Required ALERTS and REVIEWS are created
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_DUPLICATED"))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.subject().id()).isEqualTo(duplicate);
+                    assertThat(String.valueOf(a.after())).contains(original.toString());
+                });
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_JUMPED"))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.subject().id()).isEqualTo(jumped);
+                    assertThat(String.valueOf(a.after())).contains("docNumber=25000");
+                });
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_FLAGGED"))
+                .extracting(a -> a.subject().id())
+                .containsExactlyInAnyOrder(duplicate, jumped);
+
+        // Domain events emitted with the flags
+        assertThat(kernel.committedEvents())
+                .filteredOn(ReceiptRecorded.class::isInstance)
+                .map(ReceiptRecorded.class::cast)
+                .extracting(ReceiptRecorded::documentId)
+                .contains(duplicate, jumped);
+
+        // 4. Tenant and location isolation remain correct under RLS
+        assertThat(receiptsAt(at(MPCS, SIBLING_LOCATION))).isEmpty();
+        assertThat(receiptsAt(own(OTHER_ENTITY))).isEmpty();
+
+        // 5. Replay / redelivery does not create duplicate records, movements or alerts
+        deliverTheTillsEvents(REPLACEMENT);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from pos.receipt where document_id in (?, ?)",
+                                Long.class,
+                                duplicate,
+                                jumped))
+                .isEqualTo(2L);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id in (?, ?)",
+                                Long.class,
+                                duplicate,
+                                jumped))
+                .isEqualTo(2L);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_DUPLICATED"))
+                .hasSize(1);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_JUMPED"))
+                .hasSize(1);
+    }
+
+    /**
      * Wave 2, M6-01 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
      * (1)): a receipt the till sent in the wrong shape (here two lines with the same line_no,
      * under a hash that matches) is quarantined at the gateway, before the outbox, so it reaches
@@ -534,6 +829,50 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TOTAL_MISMATCH"));
     }
 
+    @Test
+    void endToEndTillCardSaleSyncsAndPosReceiptQueryReturnsReference() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID cardSaleId =
+                till.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))), payload -> {
+                    payload.put(
+                            "tenders",
+                            List.of(Map.of(
+                                    "seq", 1,
+                                    "kind", "CARD",
+                                    "amount", "1450.00",
+                                    "reference", "AUTH-E2E-CARD-8899")));
+                });
+        till.closeSession(BigDecimal.ZERO);
+        till.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents();
+
+        // Check PosQueries returns reference
+        assertThat(pos.receipt(cardSaleId, own(MPCS))).hasValueSatisfying(r -> {
+            assertThat(r.grossAmount()).isEqualByComparingTo("1450.00");
+            assertThat(r.flags()).isEmpty();
+            assertThat(r.tenders()).singleElement().satisfies(t -> {
+                assertThat(t.kind()).isEqualTo("CARD");
+                assertThat(t.amount()).isEqualByComparingTo("1450.00");
+                assertThat(t.reference()).isEqualTo("AUTH-E2E-CARD-8899");
+            });
+        });
+
+        // Check HTTP endpoint returns reference
+        JsonNode response = http.exchange(
+                        "/v1/pos/receipts/" + cardSaleId,
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(response.get("tenders")).singleElement().satisfies(t -> {
+            assertThat(t.get("kind").asText()).isEqualTo("CARD");
+            assertThat(t.get("amount").asDouble()).isEqualTo(1450.00);
+            assertThat(t.get("reference").asText()).isEqualTo("AUTH-E2E-CARD-8899");
+        });
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {
@@ -556,6 +895,11 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .sellsAs(MPCS, POSITION, SERIES, "M6S1-1");
     }
 
+    private TillSimulator secondTill() {
+        return new TillSimulator(http, json, DEVICE_TWO, SHOP, SyncTestKeys.signingKey(context))
+                .sellsAs(MPCS, POSITION_TWO, SERIES_TWO, "M6S1-2");
+    }
+
     /** The position's RCT series, held by the first till, as M1 registers it at enrolment. */
     private void registerTheSeries() {
         superuserJdbc()
@@ -570,6 +914,39 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                         SHOP,
                         POSITION,
                         DEVICE);
+    }
+
+    /** A second enrolled device at the same shop, with its own till position and RCT series. */
+    private void registerSecondTill() {
+        JdbcTemplate db = superuserJdbc();
+        db.update(
+                "insert into party.till_position (till_position_id, location_id, position_no, owner_entity_id)"
+                        + " values (?, ?, 2, ?)",
+                POSITION_TWO,
+                SHOP,
+                MPCS);
+        db.update(
+                """
+                insert into party.device (device_id, hardware_serial, device_kind, owner_entity_id,
+                                          current_till_position_id, status, enrolled_at, location_id)
+                values (?, 'SN-M6-0003', 'POS_TERMINAL', ?, ?, 'ACTIVE', now(), ?)
+                """,
+                DEVICE_TWO,
+                MPCS,
+                POSITION_TWO,
+                SHOP);
+        db.update("insert into kernel.device_sync_cursor (device_id, owner_entity_id) values (?, ?)", DEVICE_TWO, MPCS);
+        db.update(
+                """
+                insert into kernel.numbering_series (series_id, doc_type_code, series_scope, owner_entity_id,
+                                                     location_id, till_position_id, prefix, holder_device_id)
+                values (?, 'RCT', 'TILL_POSITION', ?, ?, ?, 'M6S1-2', ?)
+                """,
+                SERIES_TWO,
+                MPCS,
+                SHOP,
+                POSITION_TWO,
+                DEVICE_TWO);
     }
 
     /** The first till leaves the position; a replacement device takes it and its series. */
@@ -713,6 +1090,15 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 barcode,
                 sku,
                 MPCS);
+        db.update(
+                """
+                insert into catalogue.location_assortment (location_id, sku_id, reasons, sell_through, since, owner_entity_id)
+                values (?, ?, ARRAY['LOCAL']::text[], false, now(), ?)
+                on conflict (location_id, sku_id) do nothing
+                """,
+                SHOP,
+                sku,
+                MPCS);
         outer.run(
                 own(MPCS),
                 () -> ledger.post(
@@ -739,8 +1125,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static void forget(JdbcTemplate db) {
-        db.execute("truncate table pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
-                + " pos.till_session");
+        db.execute(
+                "truncate table pos.cash_movement, pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
+                        + " pos.till_session");
         db.update("delete from kernel.event_outbox where owner_entity_id = ?", MPCS);
         for (String table : List.of(
                 "kernel.sync_event",
@@ -751,8 +1138,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 "kernel.location_snapshot_version")) {
             db.update("delete from " + table + " where owner_entity_id = ?", MPCS);
         }
+        db.update("delete from catalogue.location_assortment where owner_entity_id = ?", MPCS);
         db.update("delete from catalogue.sku_barcode where owner_entity_id = ?", MPCS);
-        db.update("delete from kernel.numbering_series where series_id = ?", SERIES);
+        db.update("delete from kernel.numbering_series where series_id in (?, ?)", SERIES, SERIES_TWO);
         db.update("delete from party.device where owner_entity_id = ?", MPCS);
         db.update("delete from party.till_position where owner_entity_id = ?", MPCS);
         db.update("delete from kernel.location_business_date where location_id = ?", SHOP);

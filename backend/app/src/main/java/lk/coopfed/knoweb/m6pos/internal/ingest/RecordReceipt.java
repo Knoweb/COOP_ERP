@@ -41,5 +41,9 @@ record RecordReceipt(
             BigDecimal unitPrice,
             BigDecimal lineTotal) {}
 
-    record Tender(int seq, String kind, BigDecimal amount) {}
+    record Tender(int seq, String kind, BigDecimal amount, String reference) {
+        Tender(int seq, String kind, BigDecimal amount) {
+            this(seq, kind, amount, null);
+        }
+    }
 }

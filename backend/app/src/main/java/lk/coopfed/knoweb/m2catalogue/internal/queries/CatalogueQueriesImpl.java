@@ -16,12 +16,15 @@ import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.ConversionView;
+import lk.coopfed.knoweb.m2catalogue.query.DepartmentCategoryView;
+import lk.coopfed.knoweb.m2catalogue.query.DuplicateSuspectView;
 import lk.coopfed.knoweb.m2catalogue.query.ImageView;
 import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m2catalogue.query.TaxCategoryView;
+import lk.coopfed.knoweb.m2catalogue.query.TaxRateHistoryView;
 import lk.coopfed.knoweb.m2catalogue.query.TaxRateView;
 import lk.coopfed.knoweb.m2catalogue.query.UomView;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -54,6 +57,7 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                 tax_category_id,
                 multi_mrp_policy,
                 origin_kind,
+                department_id,
                 attributes::text as attributes_json
             from catalogue.sku
             """;
@@ -75,14 +79,48 @@ class CatalogueQueriesImpl implements CatalogueQueries {
 
     @Override
     public List<UomView> units(ScopeContext scope) {
+        return listUoms(false, scope);
+    }
+
+    @Override
+    public List<UomView> listUoms(boolean includeInactive, ScopeContext scope) {
+        String sql = includeInactive
+                ? "select uom_code, name_en, name_si, name_ta, is_weight, description, status, created_at from catalogue.uom order by uom_code"
+                : "select uom_code, name_en, name_si, name_ta, is_weight, description, status, created_at from catalogue.uom where status = 'ACTIVE' order by uom_code";
         return jdbc.query(
-                "select uom_code, name_en, name_si, name_ta, is_weight from catalogue.uom order by uom_code",
+                sql,
                 (rs, row) -> new UomView(
                         rs.getString("uom_code"),
                         rs.getString("name_en"),
                         rs.getString("name_si"),
                         rs.getString("name_ta"),
-                        rs.getBoolean("is_weight")));
+                        rs.getBoolean("is_weight"),
+                        rs.getString("description"),
+                        rs.getString("status"),
+                        rs.getTimestamp("created_at") != null
+                                ? rs.getTimestamp("created_at").toInstant()
+                                : null));
+    }
+
+    @Override
+    public Optional<UomView> getUom(String uomCode, ScopeContext scope) {
+        return jdbc
+                .query(
+                        "select uom_code, name_en, name_si, name_ta, is_weight, description, status, created_at from catalogue.uom where uom_code = ?",
+                        (rs, row) -> new UomView(
+                                rs.getString("uom_code"),
+                                rs.getString("name_en"),
+                                rs.getString("name_si"),
+                                rs.getString("name_ta"),
+                                rs.getBoolean("is_weight"),
+                                rs.getString("description"),
+                                rs.getString("status"),
+                                rs.getTimestamp("created_at") != null
+                                        ? rs.getTimestamp("created_at").toInstant()
+                                        : null),
+                        uomCode)
+                .stream()
+                .findFirst();
     }
 
     @Override
@@ -126,6 +164,40 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                         onDate)
                 .stream()
                 .findFirst();
+    }
+
+    @Override
+    public List<TaxRateHistoryView> taxRates(UUID taxCategoryId, LocalDate onDate, ScopeContext scope) {
+        if (scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        StringBuilder sql = new StringBuilder(
+                """
+                select r.tax_category_id, c.code, r.rate_percent, r.effective_from, r.effective_to
+                from catalogue.tax_rate r
+                join catalogue.tax_category c on c.tax_category_id = r.tax_category_id
+                where 1 = 1
+                """);
+        List<Object> params = new ArrayList<>();
+        if (taxCategoryId != null) {
+            sql.append(" and r.tax_category_id = ?");
+            params.add(taxCategoryId);
+        }
+        if (onDate != null) {
+            sql.append(" and r.effective_from <= ? and (r.effective_to is null or r.effective_to >= ?)");
+            params.add(onDate);
+            params.add(onDate);
+        }
+        sql.append(" order by c.code, r.effective_from desc");
+        return jdbc.query(
+                sql.toString(),
+                (rs, row) -> new TaxRateHistoryView(
+                        rs.getObject("tax_category_id", UUID.class),
+                        rs.getString("code"),
+                        rs.getBigDecimal("rate_percent"),
+                        rs.getObject("effective_from", LocalDate.class),
+                        rs.getObject("effective_to", LocalDate.class)),
+                params.toArray());
     }
 
     @Override
@@ -346,6 +418,141 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                 rs.getObject("tax_category_id", UUID.class),
                 rs.getString("multi_mrp_policy"),
                 rs.getString("origin_kind"),
-                attributes);
+                attributes,
+                rs.getObject("department_id", UUID.class));
+    }
+
+    @Override
+    public List<DuplicateSuspectView> listDuplicateSuspects(String status, int limit, ScopeContext scope) {
+        String filterStatus =
+                (status == null || status.isBlank()) ? "OPEN" : status.trim().toUpperCase();
+        int max = (limit <= 0 || limit > 200) ? 50 : limit;
+
+        String sql =
+                """
+            SELECT
+                d.suspect_id,
+                d.sku_a,
+                d.sku_b,
+                sa.sku_code AS sku_a_code,
+                sa.short_name_en AS sku_a_name,
+                sb.sku_code AS sku_b_code,
+                sb.short_name_en AS sku_b_name,
+                d.score,
+                d.reasons,
+                d.status,
+                d.decided_by,
+                d.decided_at,
+                d.created_at
+            FROM catalogue.duplicate_suspect d
+            JOIN catalogue.sku sa ON sa.sku_id = d.sku_a
+            JOIN catalogue.sku sb ON sb.sku_id = d.sku_b
+            WHERE d.status = ?
+            ORDER BY d.score DESC, d.created_at DESC
+            LIMIT ?
+            """;
+
+        return jdbc.query(
+                sql,
+                (rs, rowNum) -> {
+                    java.sql.Array reasonsArr = rs.getArray("reasons");
+                    List<String> reasons = List.of();
+                    if (reasonsArr != null) {
+                        String[] items = (String[]) reasonsArr.getArray();
+                        if (items != null) {
+                            reasons = List.of(items);
+                        }
+                    }
+                    java.sql.Timestamp decidedAtTs = rs.getTimestamp("decided_at");
+                    java.sql.Timestamp createdAtTs = rs.getTimestamp("created_at");
+                    java.util.UUID decidedByUuid = rs.getObject("decided_by", java.util.UUID.class);
+                    return new DuplicateSuspectView(
+                            rs.getObject("suspect_id", UUID.class),
+                            rs.getObject("sku_a", UUID.class),
+                            rs.getObject("sku_b", UUID.class),
+                            rs.getString("sku_a_code"),
+                            rs.getString("sku_a_name"),
+                            rs.getString("sku_b_code"),
+                            rs.getString("sku_b_name"),
+                            rs.getBigDecimal("score"),
+                            reasons,
+                            rs.getString("status"),
+                            decidedByUuid != null ? decidedByUuid.toString() : null,
+                            decidedAtTs != null ? decidedAtTs.toInstant() : null,
+                            createdAtTs != null ? createdAtTs.toInstant() : null);
+                },
+                filterStatus,
+                max);
+    }
+
+    @Override
+    public UUID resolveAlias(UUID skuId, ScopeContext scope) {
+        if (skuId == null) {
+            return null;
+        }
+        UUID current = skuId;
+        for (int depth = 0; depth < 3; depth++) {
+            List<UUID> next = jdbc.query(
+                    "select canonical_sku_id from catalogue.sku_alias where alias_sku_id = ?",
+                    (rs, row) -> rs.getObject("canonical_sku_id", UUID.class),
+                    current);
+            if (next.isEmpty()) {
+                break;
+            }
+            UUID canonical = next.get(0);
+            if (canonical == null || canonical.equals(current)) {
+                break;
+            }
+            current = canonical;
+        }
+        return current;
+    }
+
+    @Override
+    public List<DepartmentCategoryView> departmentCategories(ScopeContext scope) {
+        if (scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        return jdbc.query(
+                """
+                select department_id, code, name_en, name_si, name_ta, description, display_order, status
+                  from catalogue.department_category
+                 order by display_order, code
+                """,
+                (rs, row) -> new DepartmentCategoryView(
+                        rs.getObject("department_id", UUID.class),
+                        rs.getString("code"),
+                        rs.getString("name_en"),
+                        rs.getString("name_si"),
+                        rs.getString("name_ta"),
+                        rs.getString("description"),
+                        rs.getInt("display_order"),
+                        rs.getString("status")));
+    }
+
+    @Override
+    public Optional<DepartmentCategoryView> getDepartmentCategory(UUID departmentId, ScopeContext scope) {
+        if (departmentId == null || scope == null || !scope.hasActiveScope()) {
+            return Optional.empty();
+        }
+        return jdbc
+                .query(
+                        """
+                select department_id, code, name_en, name_si, name_ta, description, display_order, status
+                  from catalogue.department_category
+                 where department_id = ?
+                """,
+                        (rs, row) -> new DepartmentCategoryView(
+                                rs.getObject("department_id", UUID.class),
+                                rs.getString("code"),
+                                rs.getString("name_en"),
+                                rs.getString("name_si"),
+                                rs.getString("name_ta"),
+                                rs.getString("description"),
+                                rs.getInt("display_order"),
+                                rs.getString("status")),
+                        departmentId)
+                .stream()
+                .findFirst();
     }
 }

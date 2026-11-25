@@ -1,0 +1,1 @@
+- Added an `inv.stock.view`-guarded **Expiry & Slow-Moving Stock** link to the Stock Position controls, routing authorized users to the existing PGL-M2-07 page at `/inventory/expiry`, with trilingual labels and focused frontend navigation coverage; expiry detection, alert evaluation, and slow-moving business rules are unchanged.

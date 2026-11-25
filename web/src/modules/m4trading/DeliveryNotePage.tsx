@@ -8,6 +8,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
 import { deliveryChip, errorText } from "./tradingView";
@@ -35,6 +36,14 @@ export function DeliveryNotePage() {
   const [driverName, setDriverName] = useState("");
 
   const note = useQuery({ queryKey: ["trading", "note", deliveryNoteId], queryFn: () => api.deliveryNote(deliveryNoteId) });
+  const isSeller = note.data !== undefined && note.data.sellerEntityId === scope.entityId;
+  const isBuyer = note.data !== undefined && note.data.buyerEntityId === scope.entityId;
+  const exposures = useQuery({
+    queryKey: ["trading", "exposures", "SELLER"],
+    queryFn: () => api.exposures("SELLER"),
+    enabled: isSeller
+  });
+
   useEffect(() => {
     if (note.data) {
       setVehicleRef((current) => current || note.data.vehicleRef || "");
@@ -66,7 +75,7 @@ export function DeliveryNotePage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(note.error, t("trading.error.not_found").text)}</p>
-        <Link className="back-link" to="/trading">
+        <Link className="back-link back-pill-btn" to="/trading">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
@@ -75,13 +84,17 @@ export function DeliveryNotePage() {
   }
 
   const n = note.data;
-  const isSeller = n.sellerEntityId === scope.entityId;
-  const isBuyer = n.buyerEntityId === scope.entityId;
+  const exposure = exposures.data?.find((row) => row.buyerEntityId === n.buyerEntityId);
+  const isOverLimit =
+    isSeller &&
+    exposure?.creditLimit !== undefined &&
+    exposure.creditLimit !== null &&
+    exposure.amount > exposure.creditLimit;
   const failed = [issue, dispatch].find((m) => m.isError);
 
   return (
-    <main className="shell-page">
-      <Link className="back-link" to="/trading">
+    <main className="shell-page delivery-note-page">
+      <Link className="back-link back-pill-btn" to="/trading">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
@@ -98,7 +111,48 @@ export function DeliveryNotePage() {
           { label: t("trading.field.issued_at").text, value: n.issuedAt && formatInstant(n.issuedAt) },
           { label: t("trading.field.dispatched_at").text, value: n.dispatchedAt && formatInstant(n.dispatchedAt) }
         ]}
-      />
+      >
+        <div className="trading-header-actions">
+          <button
+            type="button"
+            className="trading-print-btn"
+            onClick={() => window.print()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>{t("trading.invoice.print").text}</span>
+          </button>
+        </div>
+      </DocumentHeader>
+
+      {isSeller && isOverLimit && exposure && (
+        <aside
+          role="status"
+          data-testid="exposure-warning-banner"
+          className="trading-warning-banner"
+          aria-label={t("trading.note.exposure_warning").text}
+        >
+          <p className="trading-warning">
+            {t("trading.note.exposure_warning").text}
+          </p>
+          <div className="trading-warning-banner__details">
+            <span>
+              {t("trading.exposure.amount").text}: <MoneyDisplay amount={exposure.amount} />
+            </span>
+            <span>·</span>
+            <span>
+              {t("trading.exposure.limit").text}: <MoneyDisplay amount={exposure.creditLimit!} />
+            </span>
+            <span>·</span>
+            <span className="trading-warning-banner__freshness">
+              {t("trading.note.exposure_freshness", undefined, { when: formatInstant(exposure.asOf) }).text}
+            </span>
+          </div>
+        </aside>
+      )}
 
       {isSeller && n.status === "ISSUED" && <p>{t("trading.note.reserved").text}</p>}
       {n.status === "IN_TRANSIT" && <p>{t("trading.note.in_transit").text}</p>}
@@ -109,42 +163,46 @@ export function DeliveryNotePage() {
       )}
 
       {n.drops.map((drop) => (
-        <section key={drop.dropId}>
-          <h2>
-            {t("trading.note.drop", undefined, { seq: drop.seq }).text} <LocationName locationId={drop.shipToLocationId} own={isBuyer} orderId={drop.orderIds[0]} />
-          </h2>
-          <table>
-            <thead>
-              <tr>
-                <th>{t("trading.column.item").text}</th>
-                <th>{t("trading.column.unit").text}</th>
-                <th>{t("trading.column.qty").text}</th>
-                <th>{t("trading.column.order").text}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drop.lines.map((line) => (
-                <tr key={line.lineId}>
-                  <td>
-                    <SkuLabel skuId={line.skuId} />
-                  </td>
-                  <td>{line.uomCode}</td>
-                  <td>{line.dispatchedQty}</td>
-                  <td>
-                    <Link to={`/trading/orders/${line.orderId}`}>{t("trading.order.open").text}</Link>
-                  </td>
+        <section key={drop.dropId} className="modern-table-card delivery-drop-card">
+          <div className="delivery-drop-card__header">
+            <h2>
+              {t("trading.note.drop", undefined, { seq: drop.seq }).text} <LocationName locationId={drop.shipToLocationId} own={isBuyer} orderId={drop.orderIds[0]} />
+            </h2>
+          </div>
+          <div className="modern-table-scroll">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th>{t("trading.column.item").text}</th>
+                  <th>{t("trading.column.unit").text}</th>
+                  <th className="numeric-cell">{t("trading.column.qty").text}</th>
+                  <th>{t("trading.column.order").text}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {drop.lines.map((line) => (
+                  <tr key={line.lineId}>
+                    <td className="font-semibold">
+                      <SkuLabel skuId={line.skuId} />
+                    </td>
+                    <td>{line.uomCode}</td>
+                    <td className="numeric-cell font-tabular">{line.dispatchedQty}</td>
+                    <td>
+                      <Link className="trading-doc-link" to={`/trading/orders/${line.orderId}`}>{t("trading.order.open").text}</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {drop.grnId && (
-            <p>
-              <Link to={`/trading/grns/${drop.grnId}`}>{t("trading.grn.open").text}</Link>
+            <p className="delivery-drop-action">
+              <Link className="trading-doc-link" to={`/trading/grns/${drop.grnId}`}>{t("trading.grn.open").text}</Link>
             </p>
           )}
           {isBuyer && canReceive && !drop.grnId && (n.status === "ISSUED" || n.status === "IN_TRANSIT") && (
-            <p>
-              <Link to={`/trading/grns/new?deliveryNoteId=${n.deliveryNoteId}&dropId=${drop.dropId}`}>
+            <p className="delivery-drop-action">
+              <Link className="button button--primary" to={`/trading/grns/new?deliveryNoteId=${n.deliveryNoteId}&dropId=${drop.dropId}`}>
                 {t("trading.grn.new").text}
               </Link>
             </p>

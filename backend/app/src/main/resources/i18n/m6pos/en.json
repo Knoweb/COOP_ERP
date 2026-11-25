@@ -5,5 +5,10 @@
   "m6.receipt.duplicate_number": "Another receipt of the same till series already has this number; both receipts are kept for review",
   "m6.receipt.replay_differs": "The receipt arrived again under the same document id with other content; the first copy is kept",
   "m6.receipt.number_jump": "The receipt’s number is far past its series’ next number; the series was moved only as far as the configured limit",
-  "m6.session.close_replay_differs": "The till session’s close arrived again with other amounts; the first close is kept"
+  "m6.session.close_replay_differs": "The till session’s close arrived again with other amounts; the first close is kept",
+  "m6.cash_movement.malformed": "The cash movement from the till has no movement id, session id, kind, amount, or time",
+  "m6.cash_movement.invalid_amount": "Cash movement amount must be greater than zero",
+  "m6.cash_movement.reason_required": "Reason is mandatory for a cash movement",
+  "m6.cash_movement.replay_differs": "The cash movement arrived again under the same id with other details; the first copy is kept",
+  "m6.session.shortage_review": "The till session closed with a cash shortage exceeding the review threshold"
 }

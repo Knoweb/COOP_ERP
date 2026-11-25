@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.till.core.snapshot
 
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -68,7 +69,11 @@ data class Shop(
  * sends one, then a local price book (a file the shop can be given for the trial), and otherwise
  * asks the cashier to key the price. See the till README, "Deviations".
  */
-class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = emptyMap()) {
+class Catalogue(
+    snapshot: SnapshotState,
+    localPrices: Map<String, Money> = emptyMap(),
+    val businessDate: LocalDate? = null,
+) {
 
     val items: List<Item>
     val operators: List<Operator>
@@ -80,6 +85,8 @@ class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = empty
      */
     val config: Map<String, String>
     private val byBarcode: Map<String, Item>
+    private val memberEligibility: Map<String, Boolean>
+    private val employeeEligibility: Map<String, Boolean>
 
     init {
         config = snapshot.table("config").mapNotNull { row ->
@@ -88,30 +95,75 @@ class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = empty
             val value = d.str("value") ?: return@mapNotNull null
             key to value
         }.toMap()
-        val centralPrices = snapshot.table("price").mapNotNull { row ->
-            val data = row.data ?: return@mapNotNull null
-            val sku = data.str("sku_id") ?: return@mapNotNull null
-            val price = data.str("unit_price") ?: return@mapNotNull null
-            sku to Money.parse(price)
-        }.toMap()
+
+        val hasAuthoritativePriceList = snapshot.table("price_list_line").isNotEmpty()
+
+        val retailPriceLines = snapshot.table("price_list_line").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            if (row.applyFrom != null && businessDate != null && row.applyFrom > businessDate) return@mapNotNull null
+            val effFromStr = d.str("effective_from")
+            val effFromDate = effFromStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (businessDate != null && effFromDate != null && effFromDate > businessDate) return@mapNotNull null
+            val effToStr = d.str("effective_to")
+            val effToDate = effToStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (businessDate != null && effToDate != null && effToDate < businessDate) return@mapNotNull null
+
+            val tierStr = d.str("tier_from_qty")
+            if (tierStr != null && (tierStr.toDoubleOrNull() ?: 0.0) > 0.0) return@mapNotNull null
+
+            val sku = d.str("sku_id") ?: return@mapNotNull null
+            val uom = d.str("uom_code") ?: return@mapNotNull null
+            val priceStr = d.str("price") ?: d.str("unit_price") ?: return@mapNotNull null
+            (sku to uom) to ((effFromStr ?: "") to Money.parse(priceStr))
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, entries) -> entries.maxByOrNull { it.first }?.second }
+
+        val legacyTestPrices = if (hasAuthoritativePriceList) {
+            emptyMap()
+        } else {
+            snapshot.table("price").mapNotNull { row ->
+                val data = row.data ?: return@mapNotNull null
+                val sku = data.str("sku_id") ?: return@mapNotNull null
+                val priceStr = data.str("unit_price") ?: data.str("price") ?: return@mapNotNull null
+                sku to Money.parse(priceStr)
+            }.toMap()
+        }
+
         items = snapshot.table("sku").mapNotNull { row ->
             val d = row.data ?: return@mapNotNull null
             if (d.str("status") == "RETIRED") return@mapNotNull null
             val barcodes = (d["barcodes"] as? JsonArray).orEmpty().mapNotNull {
                 (it as? JsonObject)?.str("barcode")
             }
+            val baseUom = d.str("base_uom_code") ?: "EA"
+            val authoritativePrice = retailPriceLines[row.rowId to baseUom]
+            val resolvedPrice = authoritativePrice
+                ?: legacyTestPrices[row.rowId]
+                ?: barcodes.firstNotNullOfOrNull { localPrices[it] }
+                ?: localPrices[row.rowId]
+                ?: localPrices[d.str("sku_code") ?: ""]
             Item(
                 skuId = row.rowId,
                 skuCode = d.str("sku_code") ?: "",
                 name = Trilingual(d.str("short_name_en") ?: d.str("sku_code") ?: "?", d.str("short_name_si"), d.str("short_name_ta")),
-                baseUom = d.str("base_uom_code") ?: "EA",
+                baseUom = baseUom,
                 soldByWeight = d["sold_by_weight"]?.jsonPrimitive?.booleanOrNull ?: false,
                 barcodes = barcodes,
-                price = centralPrices[row.rowId] ?: barcodes.firstNotNullOfOrNull { localPrices[it] }
-                    ?: localPrices[row.rowId] ?: localPrices[d.str("sku_code") ?: ""],
+                price = resolvedPrice,
             )
         }.sortedBy { it.name.en }
-        byBarcode = buildMap { items.forEach { item -> item.barcodes.forEach { put(it, item) } } }
+        byBarcode = buildMap {
+            items.forEach { item ->
+                item.barcodes.forEach { bc ->
+                    val trimmed = bc.trim()
+                    put(trimmed, item)
+                    val stripped = trimmed.trimStart('0')
+                    if (stripped.isNotEmpty() && !containsKey(stripped)) {
+                        put(stripped, item)
+                    }
+                }
+            }
+        }
         operators = snapshot.table("operator").mapNotNull { row ->
             val d = row.data ?: return@mapNotNull null
             Operator(
@@ -131,9 +183,45 @@ class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = empty
                 language = Language.of(d.str("language")),
             )
         }
+
+        memberEligibility = snapshot.table("member_discount_eligibility").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            val no = d.str("member_no")?.trim() ?: return@mapNotNull null
+            val active = d["active"]?.jsonPrimitive?.booleanOrNull ?: (d.str("active") == "true")
+            no.lowercase() to active
+        }.toMap()
+
+        employeeEligibility = snapshot.table("employee_discount_eligibility").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            val no = d.str("employee_no")?.trim() ?: return@mapNotNull null
+            val active = d["active"]?.jsonPrimitive?.booleanOrNull ?: (d.str("active") == "true")
+            no.lowercase() to active
+        }.toMap()
     }
 
     fun byBarcode(code: String): Item? = byBarcode[code.trim()]
+
+    /** Looks up an item by its SKU code, matching exact code or stripped leading zeros. */
+    fun bySkuCode(code: String): Item? {
+        val trimmed = code.trim()
+        val stripped = trimmed.trimStart('0')
+        return items.firstOrNull { it.skuCode == trimmed || (stripped.isNotEmpty() && it.skuCode == stripped) }
+    }
+
+    /** Looks up an item by GTIN (14-digit or stripped leading zeros). */
+    fun byGtin(gtin: String): Item? {
+        val trimmed = gtin.trim()
+        val stripped = trimmed.trimStart('0')
+        return byBarcode[trimmed] ?: (if (stripped.isNotEmpty()) byBarcode[stripped] else null)
+    }
+
+    /** Resolves member discount eligibility offline: trimmed and case-insensitive (PGL-M1-06). */
+    fun isMemberEligible(memberNo: String): Boolean =
+        memberEligibility[memberNo.trim().lowercase()] == true
+
+    /** Resolves employee discount eligibility offline: trimmed and case-insensitive (PGL-M1-06). */
+    fun isEmployeeEligible(employeeNo: String): Boolean =
+        employeeEligibility[employeeNo.trim().lowercase()] == true
 
     /** Items whose name (any language), code or barcode contains [query]. */
     fun search(query: String, limit: Int = 20): List<Item> {

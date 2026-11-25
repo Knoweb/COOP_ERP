@@ -38,7 +38,8 @@ export function ApprovalBar({ actions }: ApprovalBarProps) {
           <div key={action.id} className="approval-bar__action">
             <button
               type="button"
-              className={action.primary ? "approval-bar__button approval-bar__button--primary" : "approval-bar__button"}
+              data-action={action.id}
+              className={action.primary ? "approval-bar__button approval-bar__button--primary" : `approval-bar__button approval-bar__button--${action.id}`}
               onClick={action.onClick}
               disabled={Boolean(action.disabledReason) || action.pending}
               aria-describedby={reasonId}

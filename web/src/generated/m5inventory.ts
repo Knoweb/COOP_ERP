@@ -24,6 +24,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/locations/{locationId}/stock-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock balance summaries for a location with explainable quantities
+         * @description Aggregated stock position summaries for a location with explainable on-hand, reserved, in-transit, and count variance quantities, optionally filtered by department, UOM, or discrepancy.
+         */
+        get: operations["getStockSummaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/skus/{skuId}/explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explainability drilldown for a SKU stock position at a location
+         * @description Surfaces the individual lots, active pick list reservations, in-transit transfers, and latest count session details explaining the stock quantities.
+         */
+        get: operations["getStockExplanation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/locations/{locationId}/movements": {
         parameters: {
             query?: never;
@@ -101,6 +141,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace one FEFO-suggested lot before dispatch
+         * @description The original pick line remains immutable. Codes this operation can answer with 422: m5.scope.own_required, m5.pick.user_required, m5.pick.reason_invalid, m5.pick_list.not_found, m5.pick_list.not_open, m5.pick.line_not_found, m5.pick.short_line_not_overridable, m5.pick.replacement_same_as_original, m5.pick.already_overridden, m5.pick.replacement_lot_not_found, m5.pick.sku_mismatch, m5.pick.location_mismatch, m5.pick.lot_unavailable, m5.pick.lot_expired.
+         */
+        post: operations["overridePick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/pick-lists/{deliveryNoteId}/lines/{pickLineId}/replacement-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Eligible replacement lots for one FEFO-suggested pick
+         * @description Returns only in-date GOOD lots of the same SKU and source location with enough currently unreserved stock for the whole pick line, excluding its original lot. The OverridePick command locks and revalidates the selected lot because availability may change after this read. An unknown, hidden, short, dispatched or already-overridden line returns an empty list.
+         */
+        get: operations["listPickReplacementCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/opening-balances": {
         parameters: {
             query?: never;
@@ -115,6 +195,43 @@ export interface paths {
          * @description Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required, m5.opening.line_invalid, m5.batch.not_found.
          */
         post: operations["prepareOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import opening stock in bulk from a sheet or rows
+         * @description Parses opening stock data and registers it as an opening balance in status DRAFT, awaiting signatures before becoming active. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_not_onboarding, m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required, m5.opening.line_invalid, m5.batch.not_found, m5.opening.sku_not_found.
+         */
+        post: operations["bulkImportOpeningStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download official opening stock Excel spreadsheet template */
+        get: operations["downloadOpeningStockTemplate"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -169,9 +286,29 @@ export interface paths {
         put?: never;
         /**
          * The Federation's officer countersigns; the OPB is issued and the stock posted
-         * @description Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.opening.user_required, m5.opening.federation_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown, m2.sku.not_found, m2.batch.sku_not_active, m2.batch.batch_no_too_long, m2.batch.mrp_required, m2.batch.mrp_invalid, m2.batch.expiry_required, m2.batch.dates_invalid; mfa.required when the second factor is not fresh.
          */
         post: operations["countersignOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/{openingBalanceId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A higher officer rejects a draft or signed opening balance with a documented reason
+         * @description Rejects an opening balance in DRAFT or SIGNED_ENTITY status, recording the officer and reason, freeing the location for re-preparation.
+         */
+        post: operations["rejectOpeningBalance"];
         delete?: never;
         options?: never;
         head?: never;
@@ -187,13 +324,13 @@ export interface paths {
         };
         /**
          * The transfers leaving or arriving at a location, newest first
-         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status IN_TRANSIT until the destination receives, then RECEIVED.
+         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until the destination receives, then RECEIVED, or CANCELLED when cancelled before receipt.
          */
         get: operations["listTransfers"];
         put?: never;
         /**
-         * Send stock from one location of the entity to another (issue and dispatch)
-         * @description The stock leaves the source as TRANSFER_OUT and is in transit until the destination receives it. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid, m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found, m5.transfer.insufficient_stock.
+         * Issue stock from one location of the entity to another
+         * @description The stock leaves the source as TRANSFER_OUT and remains ISSUED until separately dispatched. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid, m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found, m5.transfer.insufficient_stock.
          */
         post: operations["issueTransfer"];
         delete?: never;
@@ -219,6 +356,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/transfers/{transferId}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dispatch an issued transfer from its source
+         * @description Records the insert-only dispatch fact and moves the derived lifecycle from ISSUED to IN_TRANSIT. Dispatch posts no stock movements. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_source, m5.transfer.already_dispatched, m5.transfer.already_received.
+         */
+        post: operations["dispatchTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/transfers/{transferId}/receive": {
         parameters: {
             query?: never;
@@ -229,10 +386,154 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * The destination receives the transfer in full
-         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.already_received.
+         * The destination receives the transfer
+         * @description An absent body preserves the original full-receipt operation. When a body is supplied it must name every immutable transfer line exactly once. A positive quantity below the issued quantity receives only that amount and creates an unposted DAMAGED_IN_TRANSIT shortfall draft. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received, m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid, m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown, m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid, m5.transfer.receipt_qty_exceeds_sent.
          */
         post: operations["receiveTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/transfers/{transferId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an unreceived transfer and restore its stock at the source
+         * @description An ISSUED transfer can be cancelled directly. An IN_TRANSIT transfer can be cancelled only after the source user verifies that the goods physically returned to the original source. Cancellation posts one compensating TRANSFER_IN at that source per issued line. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_source, m5.transfer.already_received, m5.transfer.already_cancelled, m5.transfer.physical_return_required, m5.transfer.cancellation_reason_invalid.
+         */
+        post: operations["cancelTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/lots/{stockLotId}/reprice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reprice a stock lot or part of it with new unit cost and optional condition change
+         * @description Temporarily unavailable (Option B safety correction) pending the approved M5/M8 inventory ledger and accounting correction. All mutation requests are refused with 422 m5.reprice.temporarily_unavailable before any inventory or valuation changes occur. Codes this operation can answer with 422: m5.scope.own_required, m5.reprice.temporarily_unavailable, m5.location.not_in_scope, m5.reprice.not_found, m5.reprice.invalid_qty, m5.reprice.qty_exceeded, m5.reprice.invalid_cost, m5.reprice.reason_required.
+         */
+        post: operations["repriceStockLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/repricings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List stock repricing history for a location and optionally an SKU */
+        get: operations["listRepricings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/reorder-controls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List reorder controls for a location */
+        get: operations["listReorderControls"];
+        /** Set or update reorder level, reorder quantity and max quantity for an SKU at a location */
+        put: operations["configureReorderControl"];
+        post?: never;
+        /** Delete reorder control for an SKU at a location */
+        delete: operations["deleteReorderControl"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/reorder-controls/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger low stock evaluation for a location */
+        post: operations["evaluateLowStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/expiry-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Near-expiry stock alert feed for a location with remaining quantities and urgency tiers */
+        get: operations["getExpiryAlertFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/slow-moving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Slow-moving and stagnant stock items at a location */
+        get: operations["getSlowMovingStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/expiry-alerts/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger evaluation and publishing of near-expiry and slow-moving alerts for a location */
+        post: operations["scanExpiryAlerts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -452,6 +753,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/write-offs/{writeOffId}/photos/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Authorise a short-lived view of one verified write-off photograph
+         * @description Returns a fresh signed read URL only when the photograph belongs to this write-off, is verified, and both the write-off and its kernel document attachment are visible in the caller's current entity/location scope. The object itself is never made public.
+         */
+        get: operations["getWriteOffPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/write-offs/{writeOffId}/submit": {
         parameters: {
             query?: never;
@@ -631,6 +952,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/stock-take/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open or resume an active mobile stock-taking session for a location
+         * @description Opens or resumes a counting session for the specified location. If a count task is in COUNTING status, returns it. If in SCHEDULED, transitions it to COUNTING. If no count task is open, schedules and starts one.
+         */
+        post: operations["openStockTakeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the currently active stock-taking session for a location */
+        get: operations["getActiveStockTakeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get stock-taking session details */
+        get: operations["getStockTakeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record an individual barcode or SKU scan in a session
+         * @description Accepts a barcode or SKU scan, resolves the item and lot safely, and records the counted quantity. Idempotent by scanId: repeated submissions with identical attributes return the existing scan result without double-counting.
+         */
+        post: operations["recordStockTakeScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all recorded scans for a stock-taking session */
+        get: operations["listStockTakeScans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/scans/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest an offline batch of queued mobile scans
+         * @description Processes multiple queued scans with row-level deduplication. Already-recorded scans in the batch are safely skipped without double-counting.
+         */
+        post: operations["batchStockTakeScan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review expected vs counted variances for a stock-taking session */
+        get: operations["reviewStockTakeSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/stock-take/sessions/{sessionId}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconcile and submit counted quantities into the inventory count workflow
+         * @description Aggregates session scans, processes uncounted items (ZERO or SKIP), and submits into M5's tolerance evaluation and approval workflow.
+         */
+        post: operations["reconcileStockTakeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -647,6 +1116,19 @@ export interface components {
             batchId: string;
             qty: number;
         };
+        ReceiveTransferRequest: {
+            lines: components["schemas"]["ReceiveTransferLineRequest"][];
+        };
+        ReceiveTransferLineRequest: {
+            /** Format: uuid */
+            transferLineId: string;
+            receivedQty: number;
+        };
+        CancelTransferRequest: {
+            reason: string;
+            /** @description Must be true when cancelling an IN_TRANSIT transfer after physical return */
+            physicalReturnVerified?: boolean;
+        };
         TransferResponse: {
             /** Format: uuid */
             transferId: string;
@@ -655,24 +1137,44 @@ export interface components {
             /** Format: uuid */
             toLocationId: string;
             /** @enum {string} */
-            status: "IN_TRANSIT" | "RECEIVED";
+            status: "ISSUED" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
+            documentNo?: string;
             /** Format: uuid */
             issuedBy?: string;
             /** Format: date-time */
             issuedAt?: string;
             /** Format: uuid */
+            dispatchedBy?: string;
+            /** Format: date-time */
+            dispatchedAt?: string;
+            /** Format: uuid */
             receivedBy?: string;
             /** Format: date-time */
             receivedAt?: string;
+            /**
+             * Format: uuid
+             * @description The destination-owned unposted discrepancy draft, when the receipt was short
+             */
+            shortfallId?: string;
+            /** @enum {string} */
+            shortfallStatus?: "DRAFT";
+            /** @enum {string} */
+            shortfallCategory?: "DAMAGED_IN_TRANSIT";
             lines: components["schemas"]["TransferLineResponse"][];
         };
         TransferLineResponse: {
+            /** Format: uuid */
+            transferLineId: string;
             lineNo: number;
             /** Format: uuid */
             batchId: string;
             /** Format: uuid */
             skuId: string;
             qty: number;
+            /** @description The accepted receipt quantity; absent before receipt */
+            receivedQty?: number;
+            /** @description The positive missing quantity recorded on the shortfall draft, when any */
+            shortfallQty?: number;
         };
         MovementResponse: {
             /** Format: uuid */
@@ -712,6 +1214,8 @@ export interface components {
         };
         PickResponse: {
             /** Format: uuid */
+            pickLineId: string;
+            /** Format: uuid */
             deliveryLineId: string;
             /** Format: uuid */
             skuId: string;
@@ -726,12 +1230,105 @@ export interface components {
             batchId?: string;
             qty: number;
         };
+        OverridePickRequest: {
+            /** Format: uuid */
+            replacementStockLotId: string;
+            reason: string;
+        };
+        PickReplacementCandidateResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            availableQty: number;
+        };
+        BulkImportStockRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /**
+             * @default COMMIT
+             * @enum {string}
+             */
+            mode: "VALIDATE" | "COMMIT";
+            sheet?: string;
+            lines?: components["schemas"]["StockRowRequest"][];
+        };
+        StockRowRequest: {
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** Format: uuid */
+            batchId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            qty?: number;
+            unitCost?: number;
+            uom?: string;
+        };
+        BulkStockReport: {
+            /** Format: uuid */
+            importId?: string;
+            /** Format: uuid */
+            openingBalanceId?: string;
+            /** @enum {string} */
+            status: "IMPORTED" | "REJECTED" | "EMPTY" | "VALID";
+            totalRows: number;
+            importedLines: number;
+            validRows?: number;
+            errorRows?: number;
+            totalValuation?: number;
+            problems?: components["schemas"]["StockProblem"][];
+            previewRows?: components["schemas"]["StockRowPreview"][];
+        };
+        StockProblem: {
+            line: number;
+            sku?: string;
+            field?: string;
+            message: string;
+        };
+        StockRowPreview: {
+            lineNo: number;
+            sku?: string;
+            /** Format: uuid */
+            skuId?: string;
+            skuCode?: string;
+            itemName?: string;
+            baseUom?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /** @enum {string} */
+            condition?: "GOOD" | "DAMAGED";
+            qty?: number;
+            unitCost?: number;
+            extendedCost?: number;
+            batchTracked?: boolean;
+            expiryTracked?: boolean;
+            hasPrintedMrp?: boolean;
+            /** @enum {string} */
+            status: "VALID" | "ERROR";
+            error?: string;
+        };
+        RejectOpeningBalanceRequest: {
+            reason: string;
+        };
         PrepareOpeningBalanceRequest: {
             /** Format: uuid */
             locationId: string;
             lines: components["schemas"]["OpeningBalanceLineRequest"][];
         };
-        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires), which the prepare registers in M2 (M5-12). */
+        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires). The counted attributes remain on the signed line and the Federation countersign registers the batch in M2 in the posting transaction. */
         OpeningBalanceLineRequest: {
             /** Format: uuid */
             batchId?: string;
@@ -755,7 +1352,7 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             /** @enum {string} */
-            status: "DRAFT" | "SIGNED_ENTITY" | "POSTED";
+            status: "DRAFT" | "SIGNED_ENTITY" | "POSTED" | "REJECTED";
             /** Format: uuid */
             preparedBy?: string;
             /** Format: uuid */
@@ -763,15 +1360,24 @@ export interface components {
             /** Format: uuid */
             countersignedBy?: string;
             /** Format: uuid */
+            rejectedBy?: string;
+            /** Format: date-time */
+            rejectedAt?: string;
+            rejectionReason?: string;
+            /** Format: uuid */
             documentId?: string;
             lines: components["schemas"]["OpeningBalanceLineResponse"][];
         };
         OpeningBalanceLineResponse: {
             lineNo: number;
             /** Format: uuid */
-            batchId: string;
+            batchId?: string;
             /** Format: uuid */
             skuId: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
             /** @enum {string} */
             condition: "GOOD" | "DAMAGED";
             qty: number;
@@ -921,7 +1527,7 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             /** @enum {string} */
-            category: "DAMAGED_IN_TRANSIT" | "DAMAGED_IN_STORE" | "EXPIRED" | "THEFT" | "SHRINKAGE_UNEXPLAINED" | "STAFF_CONSUMPTION" | "SAMPLES" | "DONATION" | "OTHER";
+            category: "DAMAGED_IN_TRANSIT" | "DAMAGED_IN_STORE" | "EXPIRED" | "THEFT" | "SHRINKAGE_UNEXPLAINED" | "STAFF_CONSUMPTION" | "SAMPLES" | "DONATION" | "OTHER" | "WASTE" | "SPOILAGE";
             note?: string;
             lines: components["schemas"]["WriteOffLineRequest"][];
         };
@@ -946,6 +1552,10 @@ export interface components {
             url: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        PhotoViewResponse: {
+            /** @description Short-lived signed object-store URL; request a new one after it expires */
+            url: string;
         };
         WriteOffResponse: {
             /** Format: uuid */
@@ -1067,6 +1677,370 @@ export interface components {
             /** Format: date-time */
             reversedAt?: string;
         };
+        ConfigureReorderControlRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            reorderLevel: number;
+            reorderQty: number;
+            maxQty?: number;
+        };
+        ReorderControlResponse: {
+            /** Format: uuid */
+            reorderControlId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            reorderLevel: number;
+            reorderQty: number;
+            maxQty?: number;
+            alertTriggered: boolean;
+            /** Format: date-time */
+            lastAlertedAt?: string;
+            lastAlertQty?: number;
+            currentOnHandQty?: number;
+            currentAvailableQty?: number;
+        };
+        EvaluateLowStockResponse: {
+            evaluatedCount: number;
+            alertsTriggeredCount: number;
+        };
+        RepriceStockLotRequest: {
+            /** @description Quantity to reprice */
+            qty: number;
+            /** @description New unit cost (>= 0) */
+            newUnitCost: number;
+            /**
+             * @description Target condition if condition is changed
+             * @enum {string}
+             */
+            targetCondition?: "GOOD" | "DAMAGED";
+            /** @description Reason for repricing */
+            reason: string;
+        };
+        StockRepricingResponse: {
+            /** Format: uuid */
+            repricingId: string;
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            qtyAffected: number;
+            previousUnitCost: number;
+            newUnitCost: number;
+            /** @enum {string} */
+            targetCondition: "GOOD" | "DAMAGED";
+            /** Format: uuid */
+            targetLotId?: string;
+            valueAdjustment: number;
+            reason: string;
+            /** Format: uuid */
+            repricedBy: string;
+            /** Format: date-time */
+            repricedAt: string;
+        };
+        ExpiryAlertItemResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo: string;
+            /** Format: date */
+            expiryDate: string;
+            daysToExpiry: number;
+            qtyOnHand: number;
+            unitCost: number;
+            /** @enum {string} */
+            urgencyTier: "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED" | "HEALTHY";
+            alertActive: boolean;
+        };
+        SlowMovingStockResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            qtyOnHand: number;
+            unitCost: number;
+            daysWithoutSale: number;
+            /** Format: date */
+            lastSaleDate?: string | null;
+            salesInWindow: number;
+            averageDailySales: number;
+            daysOfSupply: number;
+            /** @enum {string} */
+            classification: "STAGNANT" | "SLOW_VELOCITY";
+            alertActive: boolean;
+        };
+        ExpiryAlertScanResponse: {
+            nearExpiryAlertsEmitted: number;
+            slowMovingAlertsEmitted: number;
+            totalEvaluated: number;
+        };
+        OpenStockTakeSessionRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /**
+             * @default FULL
+             * @enum {string}
+             */
+            scopeKind: "FULL" | "SKUS";
+            skuIds?: string[];
+        };
+        StockTakeSessionResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            scopeKind: "FULL" | "SKUS";
+            skuIds: string[];
+            /** @enum {string} */
+            status: "SCHEDULED" | "COUNTING" | "VARIANCE_REVIEW" | "CLOSED";
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: uuid */
+            startedBy?: string;
+            expectedLotsCount: number;
+            totalScansCount: number;
+            totalCountedUnits: number;
+        };
+        StockTakeScanRequest: {
+            /**
+             * Format: uuid
+             * @description Client-generated UUID for offline deduplication
+             */
+            scanId?: string;
+            barcode?: string;
+            /** Format: uuid */
+            skuId?: string;
+            skuCode?: string;
+            /** Format: uuid */
+            batchId?: string;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            quantity: number;
+            /** Format: date-time */
+            scannedAt?: string;
+            deviceId?: string;
+            notes?: string;
+        };
+        StockTakeScanResponse: {
+            /** Format: uuid */
+            scanId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            quantity: number;
+            totalCountedForLot: number;
+            wasDuplicate: boolean;
+        };
+        StockTakeScanItemResponse: {
+            /** Format: uuid */
+            scanId: string;
+            /** Format: uuid */
+            sessionId: string;
+            scannedCode: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            countedQty: number;
+            /** Format: date-time */
+            scannedAt: string;
+            /** Format: uuid */
+            scannedBy?: string;
+            deviceId?: string;
+            notes?: string;
+        };
+        StockTakeBatchScanRequest: {
+            scans: components["schemas"]["StockTakeScanRequest"][];
+        };
+        StockTakeBatchScanResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            processedCount: number;
+            duplicateCount: number;
+            totalScansCount: number;
+        };
+        StockTakeReviewResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            locationId: string;
+            status: string;
+            totalExpectedLots: number;
+            totalCountedLots: number;
+            matchedLots: number;
+            discrepantLots: number;
+            uncountedLots: number;
+            totalVarianceQty: number;
+            totalVarianceValue: number;
+            lines: components["schemas"]["StockTakeReviewLine"][];
+        };
+        StockTakeReviewLine: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            barcode?: string;
+            /** Format: uuid */
+            batchId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            expectedQty: number;
+            countedQty: number;
+            varianceQty: number;
+            unitCost: number;
+            varianceValue: number;
+            /** @enum {string} */
+            status: "MATCHED" | "OVER" | "SHORT" | "UNCOUNTED" | "UNEXPECTED";
+        };
+        StockTakeReconcileRequest: {
+            /**
+             * @default ZERO
+             * @enum {string}
+             */
+            uncountedHandling: "ZERO" | "SKIP";
+            skipReason?: string;
+        };
+        StockTakeReconcileResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            /** @enum {string} */
+            status: "SCHEDULED" | "COUNTING" | "VARIANCE_REVIEW" | "CLOSED";
+            /** @enum {string} */
+            outcome?: "POSTED" | "APPROVED" | "REJECTED";
+            reviewValue?: number;
+            reviewBand?: number;
+        };
+        StockSummaryResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            baseUomCode: string;
+            /** Format: uuid */
+            departmentId?: string;
+            departmentNameEn?: string;
+            departmentNameSi?: string;
+            departmentNameTa?: string;
+            qtyOnHand: number;
+            reservedQty: number;
+            availableQty: number;
+            inTransitIncomingQty: number;
+            inTransitOutgoingQty: number;
+            countedVarianceQty?: number;
+            countedVarianceValue?: number;
+            latestCountStatus?: string;
+            /** Format: date-time */
+            latestCountedAt?: string;
+            remainingStockQty: number;
+            lotCount: number;
+            lots?: components["schemas"]["LotBalanceResponse"][];
+        };
+        StockExplanationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            skuNameEn: string;
+            skuNameSi?: string;
+            skuNameTa?: string;
+            baseUomCode: string;
+            /** Format: uuid */
+            departmentId?: string;
+            departmentNameEn?: string;
+            departmentNameSi?: string;
+            departmentNameTa?: string;
+            qtyOnHand: number;
+            reservedQty: number;
+            availableQty: number;
+            inTransitIncomingQty: number;
+            inTransitOutgoingQty: number;
+            countedVarianceQty?: number;
+            remainingStockQty: number;
+            lots?: components["schemas"]["LotBalanceResponse"][];
+            reservations?: components["schemas"]["StockReservationDetail"][];
+            incomingTransfers?: components["schemas"]["StockInTransitDetail"][];
+            outgoingTransfers?: components["schemas"]["StockInTransitDetail"][];
+            latestCount?: components["schemas"]["StockCountDetail"];
+        };
+        StockReservationDetail: {
+            /** Format: uuid */
+            pickListId: string;
+            /** Format: uuid */
+            deliveryDocumentId?: string;
+            deliveryDocNumber?: string;
+            reservedQty: number;
+            pickStatus: string;
+            /** Format: date-time */
+            reservedAt?: string;
+        };
+        StockInTransitDetail: {
+            /** Format: uuid */
+            transferId: string;
+            documentNo?: string;
+            /** Format: uuid */
+            locationId?: string;
+            locationName?: string;
+            qty: number;
+            /** Format: date-time */
+            dispatchedAt?: string;
+            status: string;
+        };
+        StockCountDetail: {
+            /** Format: uuid */
+            taskId: string;
+            scopeKind?: string;
+            status: string;
+            outcome?: string;
+            expectedQty: number;
+            countedQty: number;
+            varianceQty: number;
+            varianceValue?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            submittedAt?: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1149,6 +2123,66 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    getStockSummaries: {
+        parameters: {
+            query?: {
+                departmentId?: string;
+                uomCode?: string;
+                skuId?: string;
+                includeZero?: boolean;
+                discrepancyOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSummaryResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getStockExplanation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock explanation details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockExplanationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Stock explanation not found, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listMovements: {
@@ -1251,6 +2285,59 @@ export interface operations {
             };
         };
     };
+    overridePick: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: string;
+                pickLineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverridePickRequest"];
+            };
+        };
+        responses: {
+            /** @description The replacement lot is now the effective reservation */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPickReplacementCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: string;
+                pickLineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Currently eligible replacement lots in FEFO order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickReplacementCandidateResponse"][];
+                };
+            };
+        };
+    };
     prepareOpeningBalance: {
         parameters: {
             query?: never;
@@ -1278,6 +2365,55 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkImportOpeningStock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkImportStockRequest"];
+            };
+        };
+        responses: {
+            /** @description Opening stock imported and converted into opening balance awaiting signatures */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkStockReport"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    downloadOpeningStockTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Excel spreadsheet template (.xlsx) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
         };
     };
     getOpeningBalance: {
@@ -1361,6 +2497,36 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    rejectOpeningBalance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                openingBalanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectOpeningBalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Rejected, in status REJECTED */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
     listTransfers: {
         parameters: {
             query: {
@@ -1400,7 +2566,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Issued, in status IN_TRANSIT */
+            /** @description Issued, in status ISSUED */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1442,7 +2608,7 @@ export interface operations {
             };
         };
     };
-    receiveTransfer: {
+    dispatchTransfer: {
         parameters: {
             query?: never;
             header: {
@@ -1456,6 +2622,36 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Dispatched, in status IN_TRANSIT */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    receiveTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReceiveTransferRequest"];
+            };
+        };
+        responses: {
             /** @description Received */
             200: {
                 headers: {
@@ -1465,6 +2661,279 @@ export interface operations {
                     "application/json": components["schemas"]["TransferResponse"];
                 };
             };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    cancelTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    repriceStockLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                stockLotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepriceStockLotRequest"];
+            };
+        };
+        responses: {
+            /** @description Stock lot repriced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockRepricingResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRepricings: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Repricing history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockRepricingResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    listReorderControls: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reorder control settings for the location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderControlResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    configureReorderControl: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureReorderControlRequest"];
+            };
+        };
+        responses: {
+            /** @description Reorder control configured */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderControlResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    deleteReorderControl: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId: string;
+            };
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reorder control deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    evaluateLowStock: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId?: string;
+            };
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Number of low stock items detected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluateLowStockResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getExpiryAlertFeed: {
+        parameters: {
+            query?: {
+                windowDays?: number;
+                tier?: "ALL" | "CRITICAL" | "WARNING" | "APPROACHING" | "EXPIRED";
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of near-expiry stock lots with urgency tiers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryAlertItemResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getSlowMovingStock: {
+        parameters: {
+            query?: {
+                evaluationDays?: number;
+                thresholdDaysOfSupply?: number;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of slow-moving stock items with velocity metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlowMovingStockResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    scanExpiryAlerts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alert scan evaluation summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryAlertScanResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };
@@ -1828,6 +3297,36 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    getWriteOffPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+                attachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A fresh short-lived view link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoViewResponse"];
+                };
+            };
+            /** @description No such verified photograph, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     submitWriteOff: {
         parameters: {
             query?: never;
@@ -2118,6 +3617,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepackResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    openStockTakeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenStockTakeSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Stock-taking session opened or resumed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeSessionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getActiveStockTakeSession: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active session found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeSessionResponse"];
+                };
+            };
+            /** @description No active stock-taking session found for this location */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getStockTakeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeSessionResponse"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recordStockTakeScan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Scan recorded or recognized as identical retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeScanResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listStockTakeScans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of scans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeScanItemResponse"][];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    batchStockTakeScan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeBatchScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Batch processed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeBatchScanResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reviewStockTakeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Review report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeReviewResponse"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reconcileStockTakeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTakeReconcileRequest"];
+            };
+        };
+        responses: {
+            /** @description Session reconciled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeReconcileResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

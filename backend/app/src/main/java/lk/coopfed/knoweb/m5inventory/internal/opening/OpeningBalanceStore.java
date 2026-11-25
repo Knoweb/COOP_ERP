@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m5inventory.internal.opening;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +21,16 @@ class OpeningBalanceStore {
             UUID signedEntityBy) {}
 
     record Line(
-            UUID lineId, int lineNo, UUID batchId, UUID skuId, String condition, BigDecimal qty, BigDecimal unitCost) {}
+            UUID lineId,
+            int lineNo,
+            UUID batchId,
+            UUID skuId,
+            String condition,
+            BigDecimal qty,
+            BigDecimal unitCost,
+            String batchNo,
+            LocalDate expiryDate,
+            BigDecimal printedMrp) {}
 
     private final JdbcTemplate jdbc;
 
@@ -53,7 +63,8 @@ class OpeningBalanceStore {
     List<Line> lines(UUID openingBalanceId) {
         return jdbc.query(
                 """
-                select line_id, line_no, batch_id, sku_id, condition, qty, unit_cost
+                select line_id, line_no, batch_id, sku_id, condition, qty, unit_cost,
+                       batch_no, expiry_date, printed_mrp
                   from inventory.opening_balance_line
                  where opening_balance_id = ?
                  order by line_no
@@ -65,7 +76,10 @@ class OpeningBalanceStore {
                         rs.getObject("sku_id", UUID.class),
                         rs.getString("condition"),
                         rs.getBigDecimal("qty"),
-                        rs.getBigDecimal("unit_cost")),
+                        rs.getBigDecimal("unit_cost"),
+                        rs.getString("batch_no"),
+                        rs.getObject("expiry_date", LocalDate.class),
+                        rs.getBigDecimal("printed_mrp")),
                 openingBalanceId);
     }
 
@@ -79,7 +93,7 @@ class OpeningBalanceStore {
 
     boolean openBalanceAt(UUID locationId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
-                "select exists (select 1 from inventory.opening_balance where location_id = ? and status <> 'POSTED')",
+                "select exists (select 1 from inventory.opening_balance where location_id = ? and status in ('DRAFT', 'SIGNED_ENTITY'))",
                 Boolean.class,
                 locationId));
     }

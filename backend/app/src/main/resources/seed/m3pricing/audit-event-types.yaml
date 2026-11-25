@@ -14,10 +14,20 @@ audit_event_types:
     offline_capturable: false
     description_en: Lines of a draft price list set
 
+  - code: PRICELIST_LINES_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Lines imported from a spreadsheet into a draft price list
+
   - code: PRICELIST_PUBLISHED
     severity: INFO
     offline_capturable: false
     description_en: Price list published
+
+  - code: PRICELIST_WITHDRAWN
+    severity: INFO
+    offline_capturable: false
+    description_en: Draft price list withdrawn
 
   # M3-05, discount rules (23A section 7). RULE_AUTHORED covers AuthorRule (AmendDraftRule and
   # AdoptAdvisoryRule are deferred for the demo).
@@ -35,6 +45,11 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Discount rule withdrawn
+
+  - code: RULE_EXPIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Discount rule expired by the clock
 
   # M3-06 and M3-07 (23A section 7): control prices and the multi-MRP policy.
   - code: CONTROL_PRICE_ENTERED
@@ -58,3 +73,48 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Multi-MRP policy of an item set
+
+  # M3-08 pricing reviews
+  - code: BATCH_MRP_BELOW_LIST
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A batch received with an MRP below the shelf/list price
+
+  - code: TRADE_ABOVE_MRP
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A trade list price above the lowest printed MRP
+
+  - code: LIST_ABOVE_CEILING_AT_GAZETTE
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A published retail or trade list line is above the newly entered control price
+
+  # Wave 4, M3R-08 (CR-19A-14): the review job marks a recorded event checked once its reviews are raised.
+  - code: PRICING_REVIEW_CHECKED
+    severity: INFO
+    offline_capturable: false
+    description_en: A batch MRP or control price checked against the price lists in force
+
+  # PRC-03 shelf-label job lifecycle. LABEL_JOB_CREATED is specified by 23A; completion and
+  # failure are separate handler facts because every database mutation is audited.
+  - code: LABEL_JOB_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job created
+
+  - code: LABEL_JOB_RENDERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job rendered
+
+  - code: LABEL_JOB_FAILED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job failed
+
+  # PGL-M1-07: Expiry / slow-moving discount evaluation
+  - code: EXPIRY_SLOW_MOVING_DISCOUNTS_EVALUATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Expiry and slow-moving discount evaluation executed

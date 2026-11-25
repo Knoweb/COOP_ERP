@@ -431,6 +431,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(view.name()).isEqualTo("Ceylon Rice Mills");
             assertThat(view.status()).isEqualTo("ACTIVE");
             assertThat(view.ownerEntityId()).isEqualTo(MPCS_A);
+            assertThat(view.supplierCode()).isNull();
         });
         assertThat(audit("SUPPLIER_REGISTERED"))
                 .singleElement()

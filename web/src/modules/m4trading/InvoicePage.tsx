@@ -100,7 +100,7 @@ export function InvoicePage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(invoice.error, t("trading.error.not_found").text)}</p>
-        <Link className="back-link" to="/trading">
+        <Link className="back-link back-pill-btn" to="/trading">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
@@ -118,7 +118,7 @@ export function InvoicePage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/trading">
+      <Link className="back-link back-pill-btn" to="/trading">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
         {t("trading.back").text}
       </Link>
@@ -142,8 +142,26 @@ export function InvoicePage() {
           {
             label: t("trading.account.title").text,
             value: (
-              <Link to={isBuyer ? `/trading/accounts/BUYER/${inv.sellerEntityId}` : `/trading/accounts/SELLER/${inv.buyerEntityId}`}>
-                {t("trading.accounts.open").text}
+              <Link
+                className="trading-doc-link invoice-doc-link"
+                to={isBuyer ? `/trading/accounts/BUYER/${inv.sellerEntityId}` : `/trading/accounts/SELLER/${inv.buyerEntityId}`}
+              >
+                <svg
+                  className="invoice-doc-link__icon"
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+                <span>{t("trading.accounts.open").text}</span>
               </Link>
             )
           },
@@ -154,8 +172,26 @@ export function InvoicePage() {
             value: (
               <>
                 {inv.grnIds.map((id, index) => (
-                  <Link key={id} to={`/trading/grns/${id}`}>
-                    {index === 0 && grn.data?.docNumber ? grn.data.docNumber : t("trading.grn.open").text}
+                  <Link
+                    key={id}
+                    className="trading-doc-link invoice-doc-link"
+                    to={`/trading/grns/${id}`}
+                  >
+                    <svg
+                      className="invoice-doc-link__icon"
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    </svg>
+                    <span>{index === 0 && grn.data?.docNumber ? grn.data.docNumber : t("trading.grn.open").text}</span>
                   </Link>
                 ))}
               </>
@@ -163,105 +199,155 @@ export function InvoicePage() {
           },
           {
             label: t("trading.note.title").text,
-            value: grn.data?.deliveryNoteId && (
-              <Link to={`/trading/delivery-notes/${grn.data.deliveryNoteId}`}>{t("trading.note.open").text}</Link>
-            )
+            value: grn.data?.deliveryNoteId ? (
+              <Link
+                className="trading-doc-link invoice-doc-link"
+                to={`/trading/delivery-notes/${grn.data.deliveryNoteId}`}
+              >
+                <svg
+                  className="invoice-doc-link__icon"
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                <span>{t("trading.note.open").text}</span>
+              </Link>
+            ) : undefined
           }
         ]}
       >
-        <button type="button" disabled={print.isPending} onClick={openPrint}>
-          {t("trading.invoice.print").text}
-        </button>
+        <div className="invoice-header-actions">
+          <button
+            type="button"
+            className="trading-print-btn invoice-print-btn"
+            disabled={print.isPending}
+            onClick={openPrint}
+          >
+            <svg
+              className="invoice-print-btn__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>{t("trading.invoice.print").text}</span>
+          </button>
+        </div>
       </DocumentHeader>
       {print.isError && <p role="alert">{errorText(print.error, t("trading.error.generic").text)}</p>}
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("trading.column.item").text}</th>
-            <th>{t("trading.column.unit").text}</th>
-            <th>{t("trading.column.qty").text}</th>
-            <th>{t("trading.column.tier_price").text}</th>
-            <th>{t("trading.invoice.vat_rate").text}</th>
-            <th>{t("trading.invoice.vat").text}</th>
-            <th>{t("trading.column.amount").text}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {inv.lines.map((line) => (
-            <tr key={line.lineId}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{line.uomCode}</td>
-              <td>{line.qty}</td>
-              <td>
-                <MoneyDisplay amount={line.unitPrice} />
-              </td>
-              <td>{line.taxRatePercent}</td>
-              <td>
-                <MoneyDisplay amount={line.taxAmount} />
-              </td>
-              <td>
-                <MoneyDisplay amount={line.lineTotal} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="modern-table-card invoice-lines-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table invoice-table">
+            <thead>
+              <tr>
+                <th>{t("trading.column.item").text}</th>
+                <th>{t("trading.column.unit").text}</th>
+                <th className="numeric-cell">{t("trading.column.qty").text}</th>
+                <th className="numeric-cell">{t("trading.column.tier_price").text}</th>
+                <th className="numeric-cell">{t("trading.invoice.vat_rate").text}</th>
+                <th className="numeric-cell">{t("trading.invoice.vat").text}</th>
+                <th className="numeric-cell">{t("trading.column.amount").text}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inv.lines.map((line) => (
+                <tr key={line.lineId}>
+                  <td className="font-semibold">
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>{line.uomCode}</td>
+                  <td className="numeric-cell font-tabular">{line.qty}</td>
+                  <td className="numeric-cell font-tabular">
+                    <MoneyDisplay amount={line.unitPrice} />
+                  </td>
+                  <td className="numeric-cell font-tabular">{line.taxRatePercent}</td>
+                  <td className="numeric-cell font-tabular">
+                    <MoneyDisplay amount={line.taxAmount} />
+                  </td>
+                  <td className="numeric-cell font-tabular font-semibold">
+                    <MoneyDisplay amount={line.lineTotal} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <dl className="document-header__facts trading-section">
-        <div className="document-header__fact">
-          <dt>{t("trading.invoice.net").text}</dt>
-          <dd>
-            <MoneyDisplay amount={inv.netAmount} />
-          </dd>
-        </div>
-        <div className="document-header__fact">
-          <dt>{t("trading.invoice.vat").text}</dt>
-          <dd>
-            <MoneyDisplay amount={inv.taxAmount} />
-          </dd>
-        </div>
-        <div className="document-header__fact">
-          <dt>{t("trading.invoice.gross").text}</dt>
-          <dd>
-            <MoneyDisplay amount={inv.grossAmount} size={credited || paid ? undefined : "total"} />
-          </dd>
-        </div>
-        {credited && (
+      <section className="modern-table-card invoice-totals-card">
+        <dl className="document-header__facts invoice-totals-grid trading-section">
           <div className="document-header__fact">
-            <dt>{t("trading.invoice.credited").text}</dt>
+            <dt>{t("trading.invoice.net").text}</dt>
             <dd>
-              <MoneyDisplay amount={inv.creditedAmount ?? 0} />
+              <MoneyDisplay amount={inv.netAmount} />
             </dd>
           </div>
-        )}
-        {debited && (
           <div className="document-header__fact">
-            <dt>{t("trading.invoice.debited").text}</dt>
+            <dt>{t("trading.invoice.vat").text}</dt>
             <dd>
-              <MoneyDisplay amount={inv.debitedAmount ?? 0} />
+              <MoneyDisplay amount={inv.taxAmount} />
             </dd>
           </div>
-        )}
-        {paid && (
           <div className="document-header__fact">
-            <dt>{t("trading.invoice.settled").text}</dt>
+            <dt>{t("trading.invoice.gross").text}</dt>
             <dd>
-              <MoneyDisplay amount={inv.settledAmount ?? 0} />
+              <MoneyDisplay amount={inv.grossAmount} size={credited || paid ? undefined : "total"} />
             </dd>
           </div>
-        )}
-        {(credited || paid || debited) && (
-          <div className="document-header__fact">
-            <dt>{t("trading.invoice.amount_due").text}</dt>
-            <dd>
-              <MoneyDisplay amount={amountDue} size="total" />
-            </dd>
-          </div>
-        )}
-      </dl>
+          {credited && (
+            <div className="document-header__fact">
+              <dt>{t("trading.invoice.credited").text}</dt>
+              <dd>
+                <MoneyDisplay amount={inv.creditedAmount ?? 0} />
+              </dd>
+            </div>
+          )}
+          {debited && (
+            <div className="document-header__fact">
+              <dt>{t("trading.invoice.debited").text}</dt>
+              <dd>
+                <MoneyDisplay amount={inv.debitedAmount ?? 0} />
+              </dd>
+            </div>
+          )}
+          {paid && (
+            <div className="document-header__fact">
+              <dt>{t("trading.invoice.settled").text}</dt>
+              <dd>
+                <MoneyDisplay amount={inv.settledAmount ?? 0} />
+              </dd>
+            </div>
+          )}
+          {(credited || paid || debited) && (
+            <div className="document-header__fact">
+              <dt>{t("trading.invoice.amount_due").text}</dt>
+              <dd>
+                <MoneyDisplay amount={amountDue} size="total" />
+              </dd>
+            </div>
+          )}
+        </dl>
+      </section>
 
       {paid && (
         <section className="trading-section">

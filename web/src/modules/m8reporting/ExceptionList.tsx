@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { ExceptionQueue, type ExceptionQueueItem } from "../../shell/components/ExceptionQueue";
 import { useReportingApi, type ExceptionItem } from "./reportingApi";
 import { errorText, exceptionLink } from "./reportView";
@@ -73,7 +74,7 @@ export function ExceptionsPage() {
   const t = useT();
   return (
     <main className="shell-page">
-      <h1>{t("reporting.exceptions.title").text}</h1>
+      <PageHeader icon="exceptions" title={t("reporting.exceptions.title").text} />
       <ExceptionList />
     </main>
   );

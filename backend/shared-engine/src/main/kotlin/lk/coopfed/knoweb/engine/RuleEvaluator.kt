@@ -14,13 +14,21 @@ import java.time.temporal.ChronoUnit
 object RuleEvaluator {
 
     @JvmStatic
-    fun applyLineRules(r: LineResult, ix: PricingSnapshotIndex, date: LocalDate, policy: StackingPolicy): LineResult {
+    @JvmOverloads
+    fun applyLineRules(
+        r: LineResult,
+        ix: PricingSnapshotIndex,
+        date: LocalDate,
+        policy: StackingPolicy,
+        customerClass: String? = null
+    ): LineResult {
         if (!r.sellable) {
             return r
         }
         // A rule that gives this line nothing is dropped before precedence, as the bill path
         // does, so it cannot take a real discount away from the customer (M3-01).
         val applicable = ix.lineRulesFor(r.skuId, date)
+            .filter { matchesCustomerClass(it, customerClass) }
             .filter { matches(it, r, date) }
             .filter { lineDiscount(it, r) > Money.ZERO }
         val chosen = choose(applicable, policy) { lineDiscount(it, r) } ?: return r
@@ -42,16 +50,26 @@ object RuleEvaluator {
 
     /** The one BILL_THRESHOLD rule that applies to the receipt, if any. */
     @JvmStatic
+    @JvmOverloads
     fun applyBillRule(
         lines: List<LineResult>,
         ix: PricingSnapshotIndex,
         date: LocalDate,
-        policy: StackingPolicy
+        policy: StackingPolicy,
+        customerClass: String? = null
     ): BillBenefit? {
         val rules = ix.billRules(date)
+            .filter { matchesCustomerClass(it, customerClass) }
         val benefit = { rule: Rule -> billDiscount(rule, lines, ix) }
         val chosen = choose(rules.filter { benefit(it) > Money.ZERO }, policy, benefit) ?: return null
         return BillBenefit(chosen.ruleId, benefit(chosen))
+    }
+
+    private fun matchesCustomerClass(rule: Rule, customerClass: String?): Boolean {
+        if (rule.customerClass == null) {
+            return true
+        }
+        return customerClass != null && rule.customerClass.equals(customerClass, ignoreCase = true)
     }
 
     private fun <T : Comparable<T>> choose(rules: List<Rule>, policy: StackingPolicy, benefit: (Rule) -> T): Rule? =

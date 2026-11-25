@@ -11,34 +11,38 @@
 -- The permission codes are those of seed/m1party/permissions.yaml; a code the catalogue does not
 -- have is skipped by the join below rather than failing the load.
 
-INSERT INTO security.app_user (user_id, home_entity_id, username, display_name, language, user_kind, status)
+INSERT INTO security.app_user (user_id, home_entity_id, username, display_name, language, user_kind, status, pin_hash)
 VALUES
     -- the Federation (0190f000-0000-7000-8000-000000000001)
-    ('0190f0de-0000-7000-8000-000000000201', '0190f000-0000-7000-8000-000000000001', 'fed-steward',  'Nirmala Perera',       'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000202', '0190f000-0000-7000-8000-000000000001', 'fed-pricing',  'Suresh Fernando',      'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000203', '0190f000-0000-7000-8000-000000000001', 'fed-stores',   'Kamal Jayasinghe',     'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000204', '0190f000-0000-7000-8000-000000000001', 'fed-sales',    'Tharindu Silva',       'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000205', '0190f000-0000-7000-8000-000000000001', 'fed-accounts', 'Fathima Rizwan',       'en', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000201', '0190f000-0000-7000-8000-000000000001', 'fed-steward',  'Nirmala Perera',       'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000202', '0190f000-0000-7000-8000-000000000001', 'fed-pricing',  'Suresh Fernando',      'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000203', '0190f000-0000-7000-8000-000000000001', 'fed-stores',   'Kamal Jayasinghe',     'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000204', '0190f000-0000-7000-8000-000000000001', 'fed-sales',    'Tharindu Silva',       'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000205', '0190f000-0000-7000-8000-000000000001', 'fed-accounts', 'Fathima Rizwan',       'en', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- D101 Wayamba Cooperative Distributors
-    ('0190f0de-0000-7000-8000-000000000211', '0190f0de-0000-7000-8000-0000000000e1', 'd101-buyer',    'Chaminda Rathnayake', 'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000212', '0190f0de-0000-7000-8000-0000000000e1', 'd101-stores',   'Lasantha Herath',     'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000213', '0190f0de-0000-7000-8000-0000000000e1', 'd101-accounts', 'Dilani Wijesekara',   'si', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000211', '0190f0de-0000-7000-8000-0000000000e1', 'd101-buyer',    'Chaminda Rathnayake', 'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000212', '0190f0de-0000-7000-8000-0000000000e1', 'd101-stores',   'Lasantha Herath',     'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000213', '0190f0de-0000-7000-8000-0000000000e1', 'd101-accounts', 'Dilani Wijesekara',   'si', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- D102 Northern Cooperative Distributors
-    ('0190f0de-0000-7000-8000-000000000221', '0190f0de-0000-7000-8000-0000000000e2', 'd102-buyer',    'Kumaran Sivalingam',  'ta', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000222', '0190f0de-0000-7000-8000-0000000000e2', 'd102-stores',   'Arun Thevarajah',     'ta', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000223', '0190f0de-0000-7000-8000-0000000000e2', 'd102-accounts', 'Priya Nadarajah',     'ta', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000221', '0190f0de-0000-7000-8000-0000000000e2', 'd102-buyer',    'Kumaran Sivalingam',  'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000222', '0190f0de-0000-7000-8000-0000000000e2', 'd102-stores',   'Arun Thevarajah',     'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000223', '0190f0de-0000-7000-8000-0000000000e2', 'd102-accounts', 'Priya Nadarajah',     'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- the societies
-    ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-0000000000e3', 'm101-buyer',    'Sandya Kumari',       'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-0000000000e3', 'm101-manager',  'Ruwan Dissanayake',   'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-0000000000e3', 'm101-buyer',    'Sandya Kumari',       'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-0000000000e3', 'm101-manager',  'Ruwan Dissanayake',   'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    -- the till operators of Kuliyapitiya town shop S01 (TILL-PLAT-02): Cashier (PIN 1234) and Supervisor (PIN 5678)
+    ('0190f0de-0000-7000-8000-000000000235', '0190f0de-0000-7000-8000-0000000000e3', 'm101-cashier',  'Nimali Jayawardena',  'si', 'TILL',        'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o'),
+    ('0190f0de-0000-7000-8000-000000000236', '0190f0de-0000-7000-8000-0000000000e3', 'm101-supervisor','Kamal Perera',      'si', 'TILL',        'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$908LNOIyKO6h79VZQmL3TA$qZ7GKCe9DXMDVBK8w4p2u9fjfohvVFs/M2vH1syzfcQ'),
+    ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- the shop staff of Pannala and Point Pedro (29 Sep 2026): each counts and signs its shop's
-    -- opening stock, which the society manager countersigns (DemoShopStock)
-    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BACK_OFFICE', 'ACTIVE')
-ON CONFLICT (user_id) DO NOTHING;
+    -- opening stock, which the society manager countersigns (DemoShopStock). They are BOTH users
+    -- with the demo Cashier PIN (1234), so each shop has a real active operator before activation.
+    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BOTH', 'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o'),
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BOTH', 'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o')
+ON CONFLICT (user_id) DO UPDATE SET user_kind = EXCLUDED.user_kind, pin_hash = EXCLUDED.pin_hash;
 
 INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
 VALUES
@@ -76,7 +80,7 @@ WITH job (role_id, codes) AS (
         -- gazetted control prices and the Federation's MRP policy (M3-06, M3-07)
         ('0190f0de-0000-7000-8000-000000000302'::uuid, ARRAY[
             'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish',
-            'prc.controlprice.enter', 'prc.mrp_policy.set',
+            'prc.controlprice.enter', 'prc.mrp_policy.set', 'prc.review.view',
             'prt.relationship.view', 'prt.relationship.open', 'prt.relationship.activate', 'prt.relationship.amend',
             'cat.sku.view', 'gov.entity.view']),
         -- stores and dispatch, at the Federation warehouse only (assignment below)
@@ -93,7 +97,7 @@ WITH job (role_id, codes) AS (
         -- of the terms with bil.creditlimit.change), and the second signature on the opening balance
         ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.creditnote.issue', 'bil.debitnote.issue',
-            'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
+            'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'prt.relationship.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
@@ -127,13 +131,13 @@ WITH job (role_id, codes) AS (
         -- distributor accounts
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
-            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate', 'prt.relationship.view',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
-            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.location.activate', 'prt.relationship.view',
             'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
@@ -143,20 +147,20 @@ WITH job (role_id, codes) AS (
             'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prt.relationship.view', 'inv.stock.view',
             'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign', 'gov.entity.view',
             'inv.count.schedule', 'shop.count.record', 'inv.adjust.request', 'inv.writeoff.request',
-            'inv.recipe.manage', 'inv.repack.execute']),
+            'inv.recipe.manage', 'inv.repack.execute', 'inv.reorder.manage']),
         -- society manager: the second signature (countersign), the shops and their tills; receives
         -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02); and the
         -- society's shelf prices: its RETAIL list, its MRP policy and its discount rules (M3-06)
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
             'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish', 'prc.mrp_policy.set',
-            'prc.rule.author', 'prc.rule.activate',
+            'prc.rule.author', 'prc.rule.activate', 'prc.review.view', 'prc.label.print',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
-            'pos.receipt.view', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
-            'cat.sku.create_local']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
+            'pos.receipt.view', 'pos.receipt.margin', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
+            'inv.reorder.manage', 'cat.sku.create_local']),
         -- the society managers of M102 and M103 also order from their distributor and receive
         -- at the shop (DEMO-02: the second tier of the demo history)
         ('0190f0de-0000-7000-8000-000000000342'::uuid, ARRAY[
@@ -165,14 +169,14 @@ WITH job (role_id, codes) AS (
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view', 'pos.receipt.margin']),
         ('0190f0de-0000-7000-8000-000000000352'::uuid, ARRAY[
             'ord.order.draft', 'ord.order.submit', 'shop.grn.confirm', 'prc.pricelist.view', 'prt.relationship.view',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'rpt.profit_center.view', 'rpt.profit_center.manage', 'rpt.asset.view', 'rpt.asset.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view', 'pos.receipt.margin']),
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
@@ -227,10 +231,16 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-000000000332', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
     ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', NULL),
+    -- the till operators of shop S01: Cashier template and Shop Supervisor template
+    ('0190f0de-0000-7000-8000-000000000235', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
+    ('0190f0de-0000-7000-8000-000000000236', '01999a10-2c4e-7f1a-8b3d-5e6f70819a12', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL),
     ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-000000000343', '0190f0de-0000-7000-8000-0000000000e4', '0190f0de-0000-7000-8000-000000000142'),
-    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-000000000353', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152')
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-000000000353', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152'),
+    -- Pannala and Point Pedro staff also operate their tills; keep their back-office shop role above.
+    ('0190f0de-0000-7000-8000-000000000243', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f0de-0000-7000-8000-0000000000e4', '0190f0de-0000-7000-8000-000000000142'),
+    ('0190f0de-0000-7000-8000-000000000253', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152')
 ON CONFLICT DO NOTHING;
 
 -- M7, the credit book's remainders and the privacy requests (29 September 2026, branch
@@ -258,10 +268,12 @@ ON CONFLICT DO NOTHING;
 -- of its own, so that the other lanes' additions above merge without a conflict.
 WITH job (role_id, codes) AS (
     VALUES
-        ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
-        ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY['int.notify.view', 'int.notify.manage']),
-        ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
-        ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view'])
+        ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.journal.ack', 'int.notify.view', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY['int.notify.view', 'int.notify.manage', 'int.employee.manage', 'int.attendance.import', 'int.overtime.approve', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.journal.ack', 'int.notify.view', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.journal.ack', 'int.notify.view', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY['int.employee.manage', 'int.attendance.import', 'int.overtime.approve', 'int.payroll.view']),
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, ARRAY['int.attendance.import', 'int.payroll.view'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code

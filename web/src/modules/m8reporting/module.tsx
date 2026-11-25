@@ -10,13 +10,25 @@ import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { DashboardPage } from "./DashboardPage";
 import { ReportPage } from "./ReportPage";
 import { ExceptionsPage } from "./ExceptionList";
+import { ShopTargetsPage } from "./ShopTargetsPage";
+import { ShopReportsPage } from "./ShopReportsPage";
+import { ProfitCentersPnlPage } from "./ProfitCentersPnlPage";
+import { AssetRegisterPage } from "./AssetRegisterPage";
+import { RevenueEstimatorPage } from "./RevenueEstimatorPage";
+import { FinancePage } from "./FinancePage";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 
 // Every M8 screen reads APIs that need rpt.report.run; rpt.export.run alone (a custom role) must
 // not get a page that ends in a 403. The CSV, print and run history inside ReportPage are shown
 // to rpt.export.run only (M1A-07).
 const REPORT = ["rpt.report.run"];
+const TARGETS = ["rpt.target.view"];
+const PROFIT_CENTERS = ["rpt.profit_center.view"];
+const ASSETS = ["rpt.asset.view"];
 const guard = (page: ReactElement) => <RequirePermission anyOf={REPORT}>{page}</RequirePermission>;
+const guardTargets = (page: ReactElement) => <RequirePermission anyOf={TARGETS}>{page}</RequirePermission>;
+const guardProfitCenters = (page: ReactElement) => <RequirePermission anyOf={PROFIT_CENTERS}>{page}</RequirePermission>;
+const guardAssets = (page: ReactElement) => <RequirePermission anyOf={ASSETS}>{page}</RequirePermission>;
 
 export const reportingModule: ModuleDefinition = {
   id: "reporting",
@@ -24,12 +36,49 @@ export const reportingModule: ModuleDefinition = {
   routes: [
     { path: "reporting", element: guard(<DashboardPage />) },
     { path: "reporting/exceptions", element: guard(<ExceptionsPage />) },
+    { path: "reporting/targets", element: guardTargets(<ShopTargetsPage />) },
+    { path: "reporting/shop-reports", element: guard(<ShopReportsPage />) },
+    { path: "reporting/profit-centers", element: guardProfitCenters(<ProfitCentersPnlPage />) },
+    { path: "reporting/revenue-estimator", element: guardTargets(<RevenueEstimatorPage />) },
     { path: "reporting/reports/:reportId", element: guard(<ReportPage />) }
   ],
 
   // The label is a message id of reporting.messages.json, never literal text.
-  navItems: [{ labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT }],
+  navItems: [
+    { labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT },
+    { labelId: "reporting.shop_reports.nav", to: "/reporting/shop-reports", requiredPermissions: REPORT },
+    { labelId: "reporting.profit_centers.nav", to: "/reporting/profit-centers", requiredPermissions: PROFIT_CENTERS },
+    { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS },
+    { labelId: "reporting.estimator.nav", to: "/reporting/revenue-estimator", requiredPermissions: TARGETS }
+  ],
 
   // x-permissions of openapi/m8reporting.yaml, read from the session's resolved set (PR #144).
-  requiredPermissions: ["rpt.report.run", "rpt.export.run"]
+  requiredPermissions: [
+    "rpt.report.run",
+    "rpt.export.run",
+    "rpt.target.view",
+    "rpt.target.manage",
+    "rpt.profit_center.view",
+    "rpt.profit_center.manage"
+  ]
+};
+
+export const financeModule: ModuleDefinition = {
+  id: "finance",
+
+  routes: [
+    { path: "reporting/finance", element: guard(<FinancePage />) },
+    { path: "reporting/assets", element: guardAssets(<AssetRegisterPage />) }
+  ],
+
+  navItems: [
+    { labelId: "reporting.finance.nav", to: "/reporting/finance", requiredPermissions: REPORT },
+    { labelId: "reporting.assets.nav", to: "/reporting/assets", requiredPermissions: ASSETS }
+  ],
+
+  requiredPermissions: [
+    "rpt.report.run",
+    "rpt.asset.view",
+    "rpt.asset.manage"
+  ]
 };

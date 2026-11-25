@@ -21,7 +21,8 @@ const ALLOWED: Allowed[] = [
   { file: "shell/design/DesignPage.tsx", text: "StateChip", reason: "Component name shown as literal code in the design gallery, not natural language." },
   { file: "shell/design/DesignPage.tsx", text: "TrainingBadge", reason: "Component name shown as literal code in the design gallery, not natural language." },
   { file: "shell/i18n/LangFallbackTag.tsx", text: "EN", reason: "The language code itself is untranslated by definition, indicating English fallback." },
-  { file: "router.tsx", text: "COOPFED ERP", reason: "The product's brand name in the sidebar, the same in every language." },
+  { file: "router.tsx", text: "Co-op", reason: "The product's brand name in the sidebar, the same in every language." },
+  { file: "router.tsx", text: "ERP", reason: "The product's brand suffix badge in the sidebar, the same in every language." },
 ];
 
 // A run of text after a tag's ">" that ends at the next tag or expression. Code also has ">"

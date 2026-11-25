@@ -19,6 +19,9 @@ posting_map:
   - { doc: CN,  line: GOODS,      side: SELLER, debit: VAT_OUTPUT,   credit: RECEIVABLE,   amount: tax }
   - { doc: DN2, line: CHARGE,     side: SELLER, debit: RECEIVABLE,   credit: OTHER_INCOME, amount: net }
   - { doc: DN2, line: CHARGE,     side: SELLER, debit: RECEIVABLE,   credit: VAT_OUTPUT,   amount: tax }
+  # ACC-02: buyer's additional expense and recoverable input VAT.
+  - { doc: DN2, line: CHARGE,     side: BUYER,  debit: OTHER_EXPENSE, credit: PAYABLE,      amount: net }
+  - { doc: DN2, line: CHARGE,     side: BUYER,  debit: VAT_INPUT,     credit: PAYABLE,      amount: tax }
   - { doc: PRC, line: RECEIPT,    side: SELLER, debit: BANK_OR_CASH, credit: RECEIVABLE,   amount: applied }
   - { doc: PRC, line: REVERSAL,   side: SELLER, debit: RECEIVABLE,   credit: BANK_OR_CASH, amount: applied }
   # wave 2, PR 14 (CR-24A-3 item 5; docs/progress/deviations/2026-10-06-wave2-buyer-postings.md (2)):

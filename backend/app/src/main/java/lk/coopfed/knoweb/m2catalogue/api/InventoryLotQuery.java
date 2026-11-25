@@ -20,4 +20,14 @@ public interface InventoryLotQuery {
 
     /** CorrectBatch: "caller owns a lot of the batch (M5 query) or F": the caller is the scope's entity. */
     boolean holdsLotOf(UUID batchId, ScopeContext scope);
+
+    /** Assortment: the SKUs with positive on-hand at the location. */
+    default java.util.List<UUID> skusWithLots(UUID locationId, ScopeContext scope) {
+        return java.util.List.of();
+    }
+
+    /** Assortment: whether the location has positive on-hand for the SKU. */
+    default boolean hasPositiveLotAt(UUID locationId, UUID skuId, ScopeContext scope) {
+        return false;
+    }
 }

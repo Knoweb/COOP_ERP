@@ -106,6 +106,11 @@ class NotifyConfiguration {
     }
 
     @Bean
+    MockSmsGateway integrationMockSmsGateway() {
+        return new MockSmsGateway();
+    }
+
+    @Bean
     NotificationChannel integrationSmsChannel(
             List<SmsGateway> gateways,
             @Value("${coop-erp.integration.sms.provider:" + LogSmsGateway.NAME + "}") String provider) {

@@ -83,6 +83,21 @@ public class ControlPriceStore {
                 .min(Comparator.comparing(ControlPriceView::ceilingPrice));
     }
 
+    /**
+     * Every ceiling of the SKU in force on the date, in any unit: the basket resolution hands them
+     * all to the engine's index, which matches a ceiling to a line by unit as the till's snapshot
+     * does (M3R-01).
+     */
+    public List<ControlPriceView> ceilingsFor(UUID skuId, LocalDate date) {
+        return jdbc.query(
+                "select " + COLUMNS + " from pricing.control_price where sku_id = ?"
+                        + " and effective_from <= ? and (effective_to is null or effective_to >= ?)",
+                ControlPriceStore::row,
+                skuId,
+                Date.valueOf(date),
+                Date.valueOf(date));
+    }
+
     /** The rows of the SKU whose range meets [from, to] (to null: open-ended). */
     List<ControlPriceView> overlapping(UUID skuId, LocalDate from, LocalDate to) {
         return jdbc.query(

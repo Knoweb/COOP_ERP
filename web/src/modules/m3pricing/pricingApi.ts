@@ -7,6 +7,7 @@ import { useApiClient } from "../../shell/api/client";
 import type { components, paths } from "../../generated/m3pricing";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
+import type { components as inventoryComponents, paths as inventoryPaths } from "../../generated/m5inventory";
 
 export type PriceList = components["schemas"]["PriceListResponse"];
 export type PriceListDetail = components["schemas"]["PriceListDetailResponse"];
@@ -14,13 +15,30 @@ export type PriceListLine = components["schemas"]["PriceListLineResponse"];
 export type PriceListLineInput = components["schemas"]["PriceListLineInput"];
 export type SetLinesResponse = components["schemas"]["SetLinesResponse"];
 export type LineOutcome = components["schemas"]["LineOutcome"];
+export type PriceListImportReport = components["schemas"]["PriceListImportReportResponse"];
+export type PriceListImportProblem = components["schemas"]["PriceListImportProblem"];
+export type ImportPriceListLinesRequest = components["schemas"]["ImportPriceListLinesRequest"];
 export type ControlPrice = components["schemas"]["ControlPriceResponse"];
 export type EnterControlPriceRequest = components["schemas"]["EnterControlPriceRequest"];
 export type RescindControlPriceRequest = components["schemas"]["RescindControlPriceRequest"];
 export type MrpPolicy = components["schemas"]["MrpPolicyResponse"];
 export type SetMrpPolicyRequest = components["schemas"]["SetMrpPolicyRequest"];
 export type RetailPrice = components["schemas"]["RetailPriceResponse"];
+export type ResolveBasketRequest = components["schemas"]["ResolveBasketRequest"];
+export type BasketResult = components["schemas"]["BasketResult"];
+export type CustomerPriceLookup = components["schemas"]["CustomerPriceLookupResponse"];
+export type Rule = components["schemas"]["RuleResponse"];
+export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
+export type WithdrawDraftRequest = components["schemas"]["WithdrawDraftRequest"];
+export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
+export type ReviewItem = components["schemas"]["ReviewItem"];
+export type LabelJob = components["schemas"]["LabelJobResponse"];
+export type ExpirySlowMovingDiscount = components["schemas"]["ExpirySlowMovingDiscountResponse"];
+export type ExpirySlowMovingEvaluation = components["schemas"]["ExpirySlowMovingEvaluationResponse"];
+export type EvaluateExpirySlowMovingDiscountsRequest = components["schemas"]["EvaluateExpirySlowMovingDiscountsRequest"];
+export type LotBalance = inventoryComponents["schemas"]["LotBalanceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
+export type SkuConversion = catalogueComponents["schemas"]["ConversionResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Relationship = partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
@@ -31,6 +49,8 @@ export function usePricingApi() {
   const catalogue = useApiClient<cataloguePaths>();
   // The shop picker of the shelf price check reads M1's published location list.
   const party = useApiClient<partyPaths>();
+  // The markdown queue reads M5's published lot balances.
+  const inventory = useApiClient<inventoryPaths>();
 
   return useMemo(
     () => ({
@@ -42,6 +62,13 @@ export function usePricingApi() {
       async getSku(skuId: string): Promise<Sku | null> {
         const { data } = await catalogue.GET("/v1/catalogue/skus/{skuId}", { params: { path: { skuId } } });
         return data ?? null;
+      },
+
+      async skuConversions(skuId: string): Promise<SkuConversion[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/skus/{skuId}/conversions", {
+          params: { path: { skuId } }
+        });
+        return data ?? [];
       },
 
       async locations(): Promise<Location[]> {
@@ -94,11 +121,47 @@ export function usePricingApi() {
         return data!;
       },
 
+      /** Bulk import price list lines from a sheet or rows into a draft list (CAT-13). */
+      async importPriceListLines(
+        listId: string,
+        request: ImportPriceListLinesRequest,
+        idempotencyKey: string
+      ): Promise<PriceListImportReport> {
+        const { data } = await api.POST("/v1/pricing/lists/{listId}/import", {
+          params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
       async publish(listId: string, applyFrom: string, idempotencyKey: string): Promise<PriceList> {
         const { data } = await api.POST("/v1/pricing/lists/{listId}/publish", {
           params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
           body: { applyFrom }
         });
+        return data!;
+      },
+
+      async withdrawDraft(listId: string, body: WithdrawDraftRequest, idempotencyKey: string): Promise<PriceList> {
+        const { data } = await api.POST("/v1/pricing/lists/{listId}/withdraw", {
+          params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      /** Queue all requested lines of the RETAIL list in force today for one shop. */
+      async printLabels(locationId: string, skuIds: string[], idempotencyKey: string): Promise<LabelJob> {
+        const { data } = await api.POST("/v1/pricing/labels", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId, skuIds }
+        });
+        return data!;
+      },
+
+      /** Re-read a label job so a rendered result always carries a fresh download link. */
+      async labelJob(jobId: string): Promise<LabelJob> {
+        const { data } = await api.GET("/v1/pricing/labels/{jobId}", { params: { path: { jobId } } });
         return data!;
       },
 
@@ -148,13 +211,122 @@ export function usePricingApi() {
       },
 
       /** The shelf price of one unit of the item at the shop on the date; null when the shop is not visible. */
+      /** Customer price lookup for an item at a shop (M3-08). Strictly excludes internal costs/margins. */
+      async lookupCustomerPrice(
+        locationId: string,
+        params: { skuId?: string; barcode?: string; skuCode?: string; query?: string; uom?: string; date?: string }
+      ): Promise<CustomerPriceLookup | null> {
+        const { data } = await api.GET("/v1/pricing/customer/lookup", {
+          params: { query: { locationId, ...params } }
+        });
+        return data ?? null;
+      },
+
+      /** Customer price search for items at a shop (M3-08). */
+      async searchCustomerPrices(
+        locationId: string,
+        query?: string,
+        date?: string,
+        limit?: number
+      ): Promise<CustomerPriceLookup[]> {
+        const { data } = await api.GET("/v1/pricing/customer/search", {
+          params: { query: { locationId, query, date, limit } }
+        });
+        return data ?? [];
+      },
+
       async resolveRetailPrice(locationId: string, skuId: string, uom: string, date: string): Promise<RetailPrice | null> {
         const { data } = await api.GET("/v1/pricing/resolve/retail", {
           params: { query: { locationId, skuId, uom, qty: 1, date } }
         });
         return data ?? null;
+      },
+
+      /** Resolve a basket at a shop centrally with rules, caps, and optional customer-class targeting (PGL-M1-06). */
+      async resolveBasket(body: ResolveBasketRequest, idempotencyKey: string): Promise<BasketResult | null> {
+        const { data } = await api.POST("/v1/pricing/resolve/retail", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data ?? null;
+      },
+
+      /** Discount rules in the caller's scope, filtered by kind and/or status. */
+      async listRules(filters?: { kind?: Rule["kind"]; status?: Rule["status"] }): Promise<Rule[]> {
+        const { data } = await api.GET("/v1/pricing/rules", { params: { query: filters } });
+        return data ?? [];
+      },
+
+      async getRule(ruleId: string): Promise<Rule | null> {
+        const { data } = await api.GET("/v1/pricing/rules/{ruleId}", { params: { path: { ruleId } } });
+        return data ?? null;
+      },
+
+      async authorRule(body: AuthorRuleRequest, idempotencyKey: string): Promise<Rule> {
+        const { data } = await api.POST("/v1/pricing/rules", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async activateRule(ruleId: string, idempotencyKey: string): Promise<Rule> {
+        const { data } = await api.POST("/v1/pricing/rules/{ruleId}/activate", {
+          params: { path: { ruleId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async withdrawRule(ruleId: string, body: WithdrawRuleRequest, idempotencyKey: string): Promise<Rule> {
+        const { data } = await api.POST("/v1/pricing/rules/{ruleId}/withdraw", {
+          params: { path: { ruleId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      /** Pricing exception reviews in the caller's scope, filtered by kind. */
+      async listReviews(kind?: ReviewItem["kind"]): Promise<ReviewItem[]> {
+        const { data } = await api.GET("/v1/pricing/reviews", {
+          params: {
+            query: kind ? { kind: kind as "BATCH_MRP_BELOW_LIST" | "TRADE_ABOVE_MRP" | "LIST_ABOVE_CEILING_AT_GAZETTE" } : {}
+          }
+        });
+        return data ?? [];
+      },
+
+      /** Good and damaged lots at a location with on-hand quantity, for the markdown queue. */
+      async listBalances(locationId: string): Promise<LotBalance[]> {
+        const { data } = await inventory.GET("/v1/inventory/locations/{locationId}/balances", {
+          params: { path: { locationId } }
+        });
+        return data ?? [];
+      },
+
+      /** Active expiry and slow-moving discount markdowns (PGL-M1-07). */
+      async listExpirySlowMovingDiscounts(
+        locationId: string,
+        reason?: "ALL" | "NEAR_EXPIRY" | "SLOW_MOVING",
+        status?: "ALL" | "ACTIVE"
+      ): Promise<ExpirySlowMovingDiscount[]> {
+        const { data } = await api.GET("/v1/pricing/expiry-slow-moving-discounts", {
+          params: { query: { locationId, reason, status } }
+        });
+        return data ?? [];
+      },
+
+      /** Trigger evaluation of near-expiry and slow-moving discount markdowns (PGL-M1-07). */
+      async evaluateExpirySlowMovingDiscounts(
+        locationId: string,
+        idempotencyKey: string
+      ): Promise<ExpirySlowMovingEvaluation> {
+        const { data } = await api.POST("/v1/pricing/expiry-slow-moving-discounts/evaluate", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId }
+        });
+        return data!;
       }
     }),
-    [api, catalogue, party]
+    [api, catalogue, party, inventory]
   );
 }

@@ -315,37 +315,37 @@ class DayClosePostgresIntegrationTest extends PostgresIntegrationTest {
         LocalDate today = LocalDate.now(ZoneId.of(zone));
         ObjectMapper mapper = new ObjectMapper();
 
-        // One session still open: nothing moves.
+        // An envelope that names no location: nothing moves, whatever the payload says (wave 2, TWK-23).
         inScope(ENTITY, () -> {
-            trigger.onSessionClosed(mapper.createObjectNode().put("openSessionsRemaining", 1), scope(ENTITY, SHOP));
-            return null;
-        });
-        assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
-
-        // A payload without the field: the cut-off's business, not the trigger's.
-        inScope(ENTITY, () -> {
-            trigger.onSessionClosed(mapper.createObjectNode(), scope(ENTITY, SHOP));
-            return null;
-        });
-        assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
-
-        // An envelope that names no location: nothing, whatever the payload says (wave 2, TWK-23).
-        inScope(ENTITY, () -> {
-            trigger.onSessionClosed(
-                    mapper.createObjectNode().put("locationId", SHOP.toString()).put("openSessionsRemaining", 0),
+            trigger.onSessionsClosed(
+                    mapper.createObjectNode()
+                            .put("closedLocationId", SHOP.toString())
+                            .put("locationId", SHOP.toString())
+                            .put("businessDate", today.toString()),
                     scope(ENTITY, null));
             return null;
         });
         assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
 
-        // The last one: the day of the envelope's shop closes; a payload naming another shop of the
-        // society (or nothing readable) is ignored, never closed (wave 2, TWK-23).
+        // A delayed/past date event: ignored, day date does not advance.
+        inScope(ENTITY, () -> {
+            trigger.onSessionsClosed(
+                    mapper.createObjectNode()
+                            .put("closedLocationId", SHOP.toString())
+                            .put("businessDate", today.minusDays(1).toString()),
+                    scope(ENTITY, SHOP));
+            return null;
+        });
+        assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
+
+        // When envelope scope names a location, envelope's location closes; a payload naming another shop
+        // is ignored.
         UUID elsewhere = UUID.randomUUID();
         inScope(ENTITY, () -> {
-            trigger.onSessionClosed(
+            trigger.onSessionsClosed(
                     mapper.createObjectNode()
-                            .put("locationId", elsewhere.toString())
-                            .put("openSessionsRemaining", 0),
+                            .put("closedLocationId", elsewhere.toString())
+                            .put("businessDate", today.toString()),
                     scope(ENTITY, SHOP));
             return null;
         });

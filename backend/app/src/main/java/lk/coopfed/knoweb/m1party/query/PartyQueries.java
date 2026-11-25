@@ -19,4 +19,13 @@ public interface PartyQueries {
 
     /** The positions of a location by number, retired ones included; empty if the location is not visible. */
     List<TillPositionView> listTillPositions(UUID locationId, ScopeContext scope);
+
+    /**
+     * The shops a change to central reference data must reach (doc 32 section 5.2), in any status
+     * (a till enrols before its shop is activated; a dormant shop's till keeps its version), ids
+     * only. {@code entityId} null: every shop of the federation, answered to the Federation's OWN
+     * scope only; otherwise that entity's shops, answered to that entity's or the Federation's OWN
+     * scope. Any other caller gets none (m1party V0017, {@code party.change_log_shops}).
+     */
+    List<ShopRef> listChangeLogShops(UUID entityId, ScopeContext scope);
 }

@@ -114,6 +114,22 @@ class TillScreensTest {
         waitForText("LKR 2,440.00")
         shot("3-basket")
 
+        // Park is local working state: it clears the screen without consuming a receipt number.
+        onNode(hasText("Park sale")).performClick()
+        waitForText("Sale parked without using a receipt number")
+        onNode(hasText("Parked sales")).performClick()
+        waitForText("2 lines")
+        onNode(hasText("Resume")).performClick()
+        waitForText("Parked sale resumed")
+        waitForText("LKR 2,440.00")
+
+        // Lock screen: operator locks the till; basket and session are preserved upon unlock
+        onNode(hasText("Lock")).performClick()
+        waitForText("Till locked")
+        shot("3b-locked")
+        onNode(hasText("Unlock")).performClick()
+        waitForText("LKR 2,440.00")
+
         scan.performKeyInput { pressKey(Key.F2) }
         waitForText("Cash: LKR 2,440.00")
         onNode(hasSetTextAction() and hasText("Cash given (LKR)")).performTextReplacement("5000")
@@ -134,6 +150,7 @@ class TillScreensTest {
         waitForText("Z-report · ", substring = true)
         shot("6-z-report")
 
+        waitUntil(timeoutMillis = 10_000) { controller.lastZReport != null }
         assertEquals(1, controller.lastReceipt?.number)
         assertEquals("0.00", controller.lastZReport?.variance?.plain())
         waitForPrints(2)

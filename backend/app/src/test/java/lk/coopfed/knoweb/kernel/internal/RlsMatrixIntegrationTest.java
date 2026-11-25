@@ -303,13 +303,47 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                             + " Federation's row for the item (EffectivePolicy)",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "pricing.adjustment_type",
+                    "everyone_reads (m3pricing V0008): adjustment types are read by all authenticated scopes",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "catalogue.department_category",
+                    "authenticated_read and governed_write/update (PGL-M2-08): reference data every class but"
+                            + " NONE reads; only Federation writes and updates (governed_write, governed_update),"
+                            + " so an entity's own INSERT is refused, and UPDATE and MOVE are hidden",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return everyClassButNoneReadsEverything(check);
+                        }
+                        if (check.op() == Op.INSERT) {
+                            return REFUSED;
+                        }
+                        if (check.op() == Op.UPDATE || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        return null;
+                    }),
+            new Departure(
                     "catalogue.tax_rate",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
+                    "catalogue.sku_alias",
+                    "authenticated_read (22A section 3): alias history every class but NONE reads; only the"
+                            + " Federation updates aliases (fed_update), so an entity's own UPDATE and MOVE are hidden",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return everyClassButNoneReadsEverything(check);
+                        }
+                        if (check.op() == Op.UPDATE || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        return null;
+                    }),
             new Departure(
                     "security.app_user",
                     "no ext_view on purpose (m1security V0009): the row carries pin_hash and provider_subject,"
@@ -330,6 +364,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0059, V0063): what a retry of a queued notification needs, sealed, held until it"
                             + " is settled; the sweep reads it in the owner's scope, nobody else at all",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "kernel.app_release",
+                    "the Federation's rows only (kernel V0094): releases published by Federation are readable by"
+                            + " every class but NONE, and only Federation writes",
+                    RlsMatrixIntegrationTest::federationRowsOnly),
             // The ENTITY series is the whole entity's: a shop-scoped session reads and advances it,
             // because a document at a shop may draw its number from an ENTITY series (24B) and a
             // counter carries no business content (kernel V0055; decided 27 September 2026 on the
@@ -373,6 +412,15 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "no fed_view or ext_view (m7customers V0003, CR-18-2): its notes and outcome are free text about"
                             + " the person, redacted at an erasure and read by the society alone until then",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            // PGL-M3-01: loyalty customers and permitted branch locations belong to the society
+            new Departure(
+                    "customers.loyalty_customer",
+                    "no fed_view or ext_view (PGL-M3-01): member loyalty personal data is the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.loyalty_permitted_location",
+                    "no fed_view or ext_view (PGL-M3-01): permitted branch locations are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "integration.notification_contact",
                     "own_* only (m9integration V0003, fed_view dropped by V0006; wave 2, M9-06 and"
@@ -393,8 +441,28 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "dest_read (m5inventory V0004): the receiving shop reads the lines of a transfer sent to it",
                     RlsMatrixIntegrationTest::addressedToTheShop),
             new Departure(
+                    "inventory.transfer_dispatch",
+                    "dest_read (m5inventory V0011): the receiving shop reads the dispatch fact of a transfer sent to it",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
                     "inventory.transfer_receipt",
                     "source_read (m5inventory V0004): the sending shop reads the receipt of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_receipt_line",
+                    "source_read (m5inventory V0012): the sending shop reads the received quantities of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_shortfall",
+                    "source_read (m5inventory V0013): the sending shop reads the shortfall of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_shortfall_line",
+                    "source_read (m5inventory V0013): the sending shop reads shortfall lines of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_cancellation",
+                    "dest_read (m5inventory V0012): the receiving shop reads cancellation of a transfer addressed to it",
                     RlsMatrixIntegrationTest::addressedToTheShop),
             new Departure(
                     "trading.transfer_request",
@@ -407,11 +475,75 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             new Departure(
                     "trading.transfer_request_decision",
                     "dest_read (m4trading V0008): the asking shop reads the decision on its request",
-                    RlsMatrixIntegrationTest::addressedToTheShop)
-            // pricing.price_list and price_list_line follow the template since m3pricing V0003
-            // (M3-03); beyond it, buyer_read admits the buyer of a relationship that binds the list,
-            // which no made-up row is. party.entity has its ext_view since m1party V0010.
-            );
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "kernel.config_value",
+                    // own_write keeps the template's location line (kernel V0092, K4-03): a shop
+                    // writes only at its own location, so the INSERT cells are the template's.
+                    "own_read admits a NULL location (the entity-wide value a shop inherits); only SELECT and"
+                            + " INSERT are granted",
+                    check -> {
+                        if (check.op() == Op.UPDATE
+                                || check.op() == Op.DELETE
+                                || check.op() == Op.MOVE
+                                || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                            return REFUSED;
+                        }
+                        if (check.op() == Op.SELECT
+                                && check.scope().is("OWN")
+                                && check.scope().location() != null
+                                && "A wide".equals(check.row())) {
+                            return VISIBLE;
+                        }
+                        return null;
+                    }),
+            new Departure("security.user_role", "own_read admits a NULL location; UPDATE is not granted", check -> {
+                if (check.op() == Op.UPDATE || check.op() == Op.MOVE || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                    return REFUSED;
+                }
+                if (check.op() == Op.SELECT
+                        && check.scope().is("OWN")
+                        && check.scope().location() != null
+                        && "A wide".equals(check.row())) {
+                    return VISIBLE;
+                }
+                return null;
+            }),
+            new Departure(
+                    "security.role_permission",
+                    "own policies follow the parent role so the made-up row is hidden/refused; fed_view reads it",
+                    check -> {
+                        if (check.op() == Op.SELECT
+                                && check.scope().policyClass().equals("FEDERATION_VIEW")) {
+                            return VISIBLE;
+                        }
+                        if (check.op() == Op.SELECT
+                                || check.op() == Op.UPDATE
+                                || check.op() == Op.DELETE
+                                || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        if (check.op() == Op.INSERT || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                            return REFUSED;
+                        }
+                        return null;
+                    }),
+            new Departure(
+                    "kernel.idempotency_key",
+                    "policies check kernel.user_id(), which the matrix test does not set",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return HIDDEN;
+                        }
+                        if (check.op() == Op.INSERT
+                                || check.op() == Op.UPDATE
+                                || check.op() == Op.DELETE
+                                || check.op() == Op.MOVE
+                                || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                            return REFUSED;
+                        }
+                        return null;
+                    }));
 
     private static String everyClassButNoneReadsEverything(Check check) {
         return check.op() == Op.SELECT
@@ -548,6 +680,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             "a correcting document links the issued original; a kernel row, not a module's extension table",
             "trading.claim_photo",
             "photographs may be added to an issued claim, as attachments (decision (1))",
+            "trading.discrepancy_photo",
+            "photographs may be added to an issued discrepancy, as attachments (decision (1))",
             "trading.payment_allocation",
             "an insert-only fact about an issued receipt, not an extension row (decision (2))",
             "trading.cheque",
@@ -585,6 +719,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         "trading.doc_order",
                         "trading.doc_grn_line",
                         "trading.claim_photo",
+                        "trading.discrepancy_photo",
                         "trading.payment_allocation");
         assertThat(WRITTEN_AFTER_ISSUE.keySet())
                 .as("every table written after issue is a row of a document")
@@ -795,6 +930,73 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                 .isEmpty();
     }
 
+    @Test
+    void configValueNoScopeReadReturnsNothing() throws SQLException {
+        try (Connection db = superuser()) {
+            db.setAutoCommit(false);
+            try (Statement st = db.createStatement()) {
+                st.execute("set local session_replication_role = replica");
+
+                st.execute(
+                        "insert into kernel.config_item (key, value_type, description_en, default_value, scope_kind, change_permission) values ('TEST_KEY', 'STRING', 'test', '\"def\"', 'FEDERATION', 'ADMIN')");
+                st.execute(
+                        "insert into kernel.config_value (key, scope_entity_id, value) values ('TEST_KEY', null, '\"test\"')");
+
+                String result = asApp(st, Scope.of("NONE", "NONE", null, null, Set.of()), () -> {
+                    try (ResultSet rs =
+                            st.executeQuery("select count(*) from kernel.config_value where key = 'TEST_KEY'")) {
+                        rs.next();
+                        return rs.getInt(1) == 0 ? "NOTHING" : "FOUND";
+                    }
+                });
+
+                assertThat(result).isEqualTo("NOTHING");
+            } finally {
+                db.rollback();
+            }
+        }
+    }
+
+    /**
+     * K4-03 (wave 4, kernel V0092): a federation-wide value (no entity) is written in the system
+     * entity's OWN scope only; any other entity's OWN session is refused by own_write itself, not
+     * only by ConfigRegistry.set.
+     */
+    @Test
+    void configValueFederationRowIsTheSystemEntitysAlone() throws SQLException {
+        try (Connection db = superuser()) {
+            db.setAutoCommit(false);
+            try (Statement st = db.createStatement()) {
+                st.execute("set local session_replication_role = replica");
+                UUID federation;
+                try (ResultSet rs = st.executeQuery("select kernel.system_entity()")) {
+                    rs.next();
+                    federation = UUID.fromString(rs.getString(1));
+                }
+                String insert =
+                        "insert into kernel.config_value (key, scope_entity_id, value) values ('TEST_KEY', null, '\"x\"')";
+
+                String byAnEntity = asApp(
+                        st,
+                        Scope.of("OWN(A)", "OWN", A, null, Set.of()),
+                        () -> st.executeUpdate(insert) == 1 ? DONE : HIDDEN);
+                String byAShopOfTheFederation = asApp(
+                        st,
+                        Scope.of("OWN(F@1)", "OWN", federation, LOCATION_1, Set.of()),
+                        () -> st.executeUpdate(insert) == 1 ? DONE : HIDDEN);
+                String byTheFederation = asApp(
+                        st,
+                        Scope.of("OWN(F)", "OWN", federation, null, Set.of()),
+                        () -> st.executeUpdate(insert) == 1 ? DONE : HIDDEN);
+
+                assertThat(byAnEntity).isEqualTo(REFUSED);
+                assertThat(byAShopOfTheFederation).isEqualTo(REFUSED);
+                assertThat(byTheFederation).isEqualTo(DONE);
+            } finally {
+                db.rollback();
+            }
+        }
+    }
     // ---- the engine -----------------------------------------------------------------------------
 
     private List<String> runMatrix(Connection db, String table, List<Departure> exceptions) throws SQLException {
@@ -947,8 +1149,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         asApp(
                                 st,
                                 atShop,
-                                () -> st.executeUpdate("update " + table + " t set location_id = '" + LOCATION_2
-                                                        + "' where " + where(tids.get(mine.label())))
+                                () -> st.executeUpdate("update " + table + " t set "
+                                                        + columns.locationColumn()
+                                                                .name() + " = '" + LOCATION_2 + "' where "
+                                                        + where(tids.get(mine.label())))
                                                 == 1
                                         ? DONE
                                         : HIDDEN));
@@ -1056,6 +1260,12 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         /** The column that decides the owner: owner_entity_id, or what it is generated from. */
         String ownerSource() {
             Column owner = find("owner_entity_id");
+            if (owner == null) {
+                if (find("scope_entity_id") != null) return "scope_entity_id";
+                if (table.equals("kernel.idempotency_key")) return "user_id";
+                if (table.equals("security.role_permission")) return "role_id";
+                throw new IllegalStateException("no owner column in " + table);
+            }
             if (!owner.generated()) {
                 return "owner_entity_id";
             }
@@ -1074,8 +1284,13 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             return table.equals("party.entity_relationship") ? "buyer_entity_id" : null;
         }
 
-        Shape shape(String table, Set<String> granted) {
+        Column locationColumn() {
             Column location = find("location_id");
+            return location != null ? location : find("scope_location_id");
+        }
+
+        Shape shape(String table, Set<String> granted) {
+            Column location = locationColumn();
             return new Shape(
                     table, location != null, location != null && location.notNull(), counterpartyColumn(), granted);
         }
@@ -1100,7 +1315,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     values.put(column.name(), literal(owner));
                 } else if (addressedTo != null && ADDRESSED.contains(column.name())) {
                     values.put(column.name(), literal(addressedTo));
-                } else if (column.name().equals("location_id")) {
+                } else if (column.name().equals("location_id") || column.name().equals("scope_location_id")) {
                     UUID at = location == null && column.notNull() ? UUID.randomUUID() : location;
                     values.put(column.name(), at == null ? "null" : literal(at));
                 } else if (column.name().equals(cp)) {
@@ -1205,8 +1420,9 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                 .query(
                         """
                         select n.nspname || '.' || c.relname as name,
-                               exists (select 1 from pg_attribute a where a.attrelid = c.oid
-                                        and a.attname = 'owner_entity_id' and not a.attisdropped) as owned,
+                               (exists (select 1 from pg_attribute a where a.attrelid = c.oid
+                                         and a.attname in ('owner_entity_id', 'scope_entity_id') and not a.attisdropped)
+                                 or c.relname in ('role_permission', 'idempotency_key')) as owned,
                                coalesce((select string_agg(coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' '
                                                            || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), ' ')
                                            from pg_policy p where p.polrelid = c.oid), '') as policies
@@ -1215,7 +1431,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                          where c.relkind in ('r', 'p') and not c.relispartition
                            and n.nspname not like 'pg\\_%' and n.nspname <> 'information_schema'
                            and (exists (select 1 from pg_attribute a where a.attrelid = c.oid
-                                         and a.attname in ('owner_entity_id', 'document_id') and not a.attisdropped)
+                                         and a.attname in ('owner_entity_id', 'document_id', 'scope_entity_id') and not a.attisdropped)
+                                or c.relname in ('role_permission', 'idempotency_key')
                                 or exists (select 1 from pg_policy p where p.polrelid = c.oid
                                             and coalesce(pg_get_expr(p.polqual, p.polrelid), '')
                                                 || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '')

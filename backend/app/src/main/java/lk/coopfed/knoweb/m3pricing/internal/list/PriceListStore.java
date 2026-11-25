@@ -22,12 +22,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class PriceListStore {
 
-    static final String TRADE = "TRADE";
-    static final String RETAIL = "RETAIL";
-    static final String ADVISORY = "ADVISORY";
-    static final String DRAFT = "DRAFT";
-    static final String PUBLISHED = "PUBLISHED";
-    static final String SUPERSEDED = "SUPERSEDED";
+    public static final String TRADE = "TRADE";
+    public static final String RETAIL = "RETAIL";
+    public static final String COMMERCIAL = "COMMERCIAL";
+    public static final String ADVISORY = "ADVISORY";
+    public static final String DRAFT = "DRAFT";
+    public static final String PUBLISHED = "PUBLISHED";
+    public static final String SUPERSEDED = "SUPERSEDED";
 
     private static final String LIST_COLUMNS = "price_list_id, root_price_list_id, owner_entity_id, kind, name,"
             + " version, source_version_id, status, apply_from, published_at, created_at";
@@ -147,8 +148,8 @@ public class PriceListStore {
 
     /**
      * The version of a list in force on a date: the newest version, published or since superseded,
-     * whose apply_from is on or before the date. Without the closure of the previous version's
-     * lines (deferred for the demo), this is what keeps two versions from both answering.
+     * whose apply_from is on or before the date. Publication also closes the predecessor's
+     * line dates, while version selection preserves historical price resolution.
      */
     public Optional<PriceListView> versionInForce(UUID rootPriceListId, LocalDate date) {
         return jdbc

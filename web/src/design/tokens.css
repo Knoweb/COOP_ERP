@@ -52,6 +52,15 @@
 
   /* ---- Space: the 8 px grid -------------------------------------------------------------- */
 
+  /* Data table column widths */
+  --reporting-cell-min: 110px;
+  --reporting-key-column-min: 200px;
+  --reporting-key-column-max: 260px;
+  --integration-log-table-min: 950px;
+  --integration-log-date-min: 145px;
+  --integration-log-detail-min: 120px;
+  --integration-log-detail-max: 240px;
+
   --space-half: 0.25rem; /* 4 px: the half step, inside a component only (icon to its label) */
   --space-1: 0.5rem; /* 8 px */
   --space-2: 1rem; /* 16 px */
@@ -142,11 +151,11 @@
   --color-polish-14: rgba(142, 14, 91, 0.05);
   --color-polish-15: rgba(31, 41, 55, 0.04);
   --color-polish-16: rgba(255, 255, 255, 0.4);
-  --color-polish-17: rgba(255, 255, 255, 0.8);
+  --color-polish-17: rgba(255, 255, 255, 0.75);
   --color-polish-18: rgba(142, 14, 91, 0.2);
-  --color-polish-19: #CF3392;
-  --color-polish-20: #E05CA9;
-  --color-polish-21: rgba(142, 14, 91, 0.4);
+  --color-polish-19: #c22d7f;
+  --color-polish-20: #d64796;
+  --color-polish-21: rgba(194, 45, 127, 0.42);
   --color-polish-22: #F6D7E9;
   --color-polish-23: rgba(0, 0, 0, 0.04);
   --color-polish-24: #fdfdfd;
@@ -158,4 +167,82 @@
   --color-polish-30: #00A651;
   --color-polish-31: #FCEDF5;
   --color-polish-32: #4a5568;
+
+  /* ---- Shell & Sidebar Themes ------------------------------------------------------------ */
+  --color-sidebar-bg-start: #780B4D;
+  --color-sidebar-bg-mid: #63083F;
+  --color-sidebar-bg-end: #4A052E;
+  --color-sidebar-border: rgba(255, 255, 255, 0.08);
+  --color-sidebar-shadow: rgba(15, 23, 42, 0.18);
+
+  --color-sidebar-brand-bg-start: rgba(255, 255, 255, 0.08);
+  --color-sidebar-brand-bg-end: rgba(255, 255, 255, 0.02);
+  --color-sidebar-brand-border: rgba(255, 255, 255, 0.09);
+  --color-sidebar-brand-shadow: rgba(0, 0, 0, 0.06);
+
+  --color-sidebar-brand-logo-shadow: rgba(0, 0, 0, 0.28);
+  --color-sidebar-brand-logo-ring: rgba(255, 255, 255, 0.95);
+  --color-sidebar-brand-logo-highlight: rgba(255, 255, 255, 0.9);
+  --color-sidebar-brand-logo-shadow-hover: rgba(0, 0, 0, 0.35);
+  --color-sidebar-brand-logo-ring-hover: rgba(255, 255, 255, 1);
+
+  --color-sidebar-brand-text-shadow: rgba(0, 0, 0, 0.35);
+  --color-sidebar-brand-badge-bg-start: rgba(255, 255, 255, 0.24);
+  --color-sidebar-brand-badge-bg-end: rgba(255, 255, 255, 0.10);
+  --color-sidebar-brand-badge-border: rgba(255, 255, 255, 0.35);
+  --color-sidebar-brand-badge-shadow: rgba(0, 0, 0, 0.22);
+
+  --color-sidebar-toggle-glow-1: rgba(142, 14, 91, 0.55);
+  --color-sidebar-toggle-glow-2: rgba(142, 14, 91, 0.35);
+  --color-sidebar-toggle-glow-shadow: rgba(0, 0, 0, 0.16);
+  --color-sidebar-toggle-glow-peak-1: rgba(142, 14, 91, 0.85);
+  --color-sidebar-toggle-glow-peak-2: rgba(142, 14, 91, 0.55);
+  --color-sidebar-toggle-glow-peak-shadow: rgba(0, 0, 0, 0.22);
+  --color-sidebar-toggle-hover-glow-1: rgba(142, 14, 91, 0.95);
+  --color-sidebar-toggle-hover-glow-2: rgba(142, 14, 91, 0.60);
+  --color-sidebar-toggle-hover-shadow: rgba(0, 0, 0, 0.30);
+
+  --color-sidebar-nav-text: rgba(255, 255, 255, 0.78);
+  --color-sidebar-nav-hover-bg: rgba(255, 255, 255, 0.10);
+  --color-sidebar-nav-active-bg-start: rgba(255, 255, 255, 0.20);
+  --color-sidebar-nav-active-bg-end: rgba(255, 255, 255, 0.10);
+  --color-sidebar-nav-active-shadow: rgba(0, 0, 0, 0.12);
+  --color-sidebar-nav-active-highlight: rgba(255, 255, 255, 0.18);
+  --color-sidebar-active-indicator-glow: rgba(255, 255, 255, 0.7);
+
+  --color-sidebar-scrollbar-firefox: rgba(255, 255, 255, 0.28);
+  --color-sidebar-scrollbar-thumb: rgba(255, 255, 255, 0.22);
+  --color-sidebar-scrollbar-border: rgba(255, 255, 255, 0.12);
+  --color-sidebar-scrollbar-thumb-hover: #9a4b68;
+
+  --color-sidebar-footer-bg: rgba(0, 0, 0, 0.10);
+  --color-sidebar-signout-text: rgba(255, 255, 255, 0.90);
+  --color-sidebar-signout-hover-bg: rgba(239, 68, 68, 0.18);
+  --color-sidebar-signout-hover-border: rgba(239, 68, 68, 0.35);
+  --color-sidebar-signout-hover-shadow: rgba(220, 38, 38, 0.25);
+
+  /* ---- Shell Home / Portal Dashboard ---------------------------------------------------- */
+  --color-home-hero-bg-1: rgba(120, 11, 77, 0.08);
+  --color-home-hero-bg-2: rgba(46, 49, 146, 0.05);
+  --color-home-hero-bg-3: rgba(255, 255, 255, 0.95);
+  --color-home-hero-border: rgba(120, 11, 77, 0.12);
+  --color-home-badge-border: rgba(120, 11, 77, 0.18);
+  --color-home-plum: #780B4D;
+  --color-home-status-dot: #10B981;
+  --color-home-heading: #0F172A;
+  --color-home-text-secondary: #64748B;
+  --color-home-entity-text: #1E293B;
+  --color-home-entity-border: rgba(15, 23, 42, 0.10);
+  --color-home-card-border: rgba(15, 23, 42, 0.08);
+  --color-home-card-border-hover: rgba(120, 11, 77, 0.25);
+  --color-home-card-shadow-hover: rgba(0, 0, 0, 0.05);
+  --color-home-card-shadow-hover-glow: rgba(120, 11, 77, 0.08);
+  --color-home-card-shadow-hover-base: rgba(0, 0, 0, 0.04);
+  --color-home-shadow-subtle-1: rgba(0, 0, 0, 0.03);
+  --color-home-shadow-subtle-2: rgba(0, 0, 0, 0.02);
+  --color-home-empty-border: rgba(15, 23, 42, 0.15);
+  --color-home-icon-sync-bg: rgba(37, 99, 235, 0.08);
+  --color-home-icon-sync-fg: #2563EB;
+  --color-home-icon-security-bg: rgba(16, 185, 129, 0.08);
+  --color-home-icon-security-fg: #059669;
 }

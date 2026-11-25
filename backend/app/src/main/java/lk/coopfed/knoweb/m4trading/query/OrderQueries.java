@@ -19,6 +19,11 @@ public interface OrderQueries {
      */
     List<OrderView> listOrders(Role role, String status, ScopeContext scope);
 
+    /**
+     * ListAdjustments(orderId): the manual adjustments recorded on an order, oldest first.
+     */
+    List<OrderAdjustmentView> listAdjustments(UUID orderId, ScopeContext scope);
+
     enum Role {
         BUYER,
         SELLER

@@ -55,6 +55,20 @@ class PeripheralsTest {
     }
 
     @Test
+    fun samePhysicalBarcodeReadTwiceDueToScannerBounceDroppedByScanReader() {
+        val reader = ScanReader(dedupeMillis = 700)
+        // Scanner emits first read rapidly (keystrokes < 50ms apart)
+        "4791234567891".forEachIndexed { i, c -> reader.key(c, 1000L + i * 2) }
+        val scan1 = reader.enter(1030)
+        assertEquals(ScanReader.Scan("4791234567891", byScanner = true), scan1)
+
+        // Scanner bounces and emits exact same code 200ms later
+        "4791234567891".forEachIndexed { i, c -> reader.key(c, 1200L + i * 2) }
+        val bounce = reader.enter(1230)
+        assertNull(bounce, "ScanReader must drop scanner bounce of identical barcode within dedupe window")
+    }
+
+    @Test
     fun simulatorPeripheralsWorkWithoutHardware() {
         val drawer = SimulatorCashDrawer()
         drawer.open()

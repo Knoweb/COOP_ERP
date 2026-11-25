@@ -110,9 +110,22 @@ export function ClaimPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/trading">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("trading.back").text}
+      <Link className="back-link back-pill-btn" to="/trading">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back").text}</span>
       </Link>
       <DocumentHeader
         code={c.docNumber ?? ""}
@@ -124,11 +137,19 @@ export function ClaimPage() {
           { label: t("trading.claim.kind").text, value: t(`trading.claim.kind.${c.kind}`).text },
           {
             label: t("trading.grn.title").text,
-            value: <Link to={`/trading/grns/${c.grnId}`}>{c.grnDocNumber ?? t("trading.grn.open").text}</Link>
+            value: (
+              <Link className="trading-doc-link" to={`/trading/grns/${c.grnId}`}>
+                {c.grnDocNumber ?? t("trading.grn.open").text}
+              </Link>
+            )
           },
           {
             label: t("trading.invoice.title").text,
-            value: c.invoiceId && <Link to={`/trading/invoices/${c.invoiceId}`}>{t("trading.invoice.title").text}</Link>
+            value: c.invoiceId && (
+              <Link className="trading-doc-link" to={`/trading/invoices/${c.invoiceId}`}>
+                {t("trading.invoice.title").text}
+              </Link>
+            )
           },
           { label: t("trading.claim.raised_at").text, value: c.raisedAt && formatInstant(c.raisedAt) },
           { label: t("trading.claim.window").text, value: formatInstant(c.windowEndsAt) },
@@ -143,51 +164,70 @@ export function ClaimPage() {
           {
             label: t("trading.discrepancy.credit_note").text,
             value: c.creditNoteId && (
-              <Link to={`/trading/credit-notes/${c.creditNoteId}`}>
+              <Link className="trading-doc-link" to={`/trading/credit-notes/${c.creditNoteId}`}>
                 {c.creditNoteDocNumber ?? t("trading.creditnote.title").text}
               </Link>
             )
           },
           { label: t("trading.claim.returned_at").text, value: c.returnedAt && formatInstant(c.returnedAt) }
         ]}
-      />
+      >
+        <div className="trading-header-actions">
+          <button
+            type="button"
+            className="trading-print-btn"
+            onClick={() => window.print()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>{t("trading.invoice.print").text}</span>
+          </button>
+        </div>
+      </DocumentHeader>
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("trading.column.item").text}</th>
-            <th>{t("trading.column.unit").text}</th>
-            <th>{t("trading.claim.claimed").text}</th>
-            <th>{t("trading.claim.accepted").text}</th>
-            <th>{t("trading.column.tier_price").text}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {c.lines.map((line) => (
-            <tr key={line.claimLineId}>
-              <td>
-                <SkuLabel skuId={line.skuId} />
-              </td>
-              <td>{line.uomCode}</td>
-              <td>{line.claimedQty}</td>
-              <td>
-                {isSeller && open && canDecide ? (
-                  <input
-                    inputMode="decimal"
-                    aria-label={t("trading.claim.accepted").text}
-                    placeholder={String(line.claimedQty)}
-                    value={accepted[line.claimLineId] ?? ""}
-                    onChange={(event) => setAccepted({ ...accepted, [line.claimLineId]: event.target.value })}
-                  />
-                ) : (
-                  line.approvedQty
-                )}
-              </td>
-              <td>{line.unitPrice !== undefined && <MoneyDisplay amount={line.unitPrice} />}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="modern-table-card trading-table-card">
+        <div className="modern-table-scroll">
+          <table className="modern-table trading-table">
+            <thead>
+              <tr>
+                <th>{t("trading.column.item").text}</th>
+                <th>{t("trading.column.unit").text}</th>
+                <th>{t("trading.claim.claimed").text}</th>
+                <th>{t("trading.claim.accepted").text}</th>
+                <th className="trading-cell-numeric">{t("trading.column.tier_price").text}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.lines.map((line) => (
+                <tr key={line.claimLineId}>
+                  <td>
+                    <SkuLabel skuId={line.skuId} />
+                  </td>
+                  <td>{line.uomCode}</td>
+                  <td>{line.claimedQty}</td>
+                  <td>
+                    {isSeller && open && canDecide ? (
+                      <input
+                        inputMode="decimal"
+                        aria-label={t("trading.claim.accepted").text}
+                        placeholder={String(line.claimedQty)}
+                        value={accepted[line.claimLineId] ?? ""}
+                        onChange={(event) => setAccepted({ ...accepted, [line.claimLineId]: event.target.value })}
+                      />
+                    ) : (
+                      line.approvedQty
+                    )}
+                  </td>
+                  <td className="trading-cell-numeric">{line.unitPrice !== undefined && <MoneyDisplay amount={line.unitPrice} />}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <h2>{t("trading.claim.photos").text}</h2>
       <AttachmentCapture

@@ -8,8 +8,10 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.SyncAnomaly;
 import lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.kernel.sync.web.generated.HeartbeatResponse;
@@ -49,6 +51,10 @@ class AppVersionFloorConformanceIntegrationTest extends SyncIntegrationTest {
     @AfterEach
     void noFloorLeftBehind() {
         superuserJdbc().update("delete from kernel.config_value where key = ?", FLOOR);
+        superuserJdbc()
+                .update(
+                        "delete from kernel.audit_event where event_type_code = 'SYNC_APP_VERSION_BELOW_FLOOR' and device_id = ?",
+                        DEVICE);
         config.invalidate(FLOOR);
     }
 
@@ -84,6 +90,7 @@ class AppVersionFloorConformanceIntegrationTest extends SyncIntegrationTest {
         assertThat(till.heartbeat().getInstructions())
                 .extracting(Instruction::getType)
                 .contains(Instruction.TypeEnum.FLOOR_NOTICE);
+        assertThat(kernel.committedAudit()).noneMatch(a -> "SYNC_APP_VERSION_BELOW_FLOOR".equals(a.eventType()));
     }
 
     /**
@@ -111,6 +118,27 @@ class AppVersionFloorConformanceIntegrationTest extends SyncIntegrationTest {
                 .extracting(Instruction::getType)
                 .contains(Instruction.TypeEnum.FLOOR_NOTICE);
 
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> "SYNC_APP_VERSION_BELOW_FLOOR".equals(a.eventType()))
+                .singleElement()
+                .satisfies(record -> {
+                    assertThat(record.subject().type()).isEqualTo("device");
+                    assertThat(record.subject().id()).isEqualTo(DEVICE);
+                    assertThat(record.scope().deviceId()).isEqualTo(DEVICE);
+                    assertThat(String.valueOf(record.after())).contains("1.2.9").contains("1.3");
+                });
+        Map<String, Object> audit = superuserJdbc()
+                .queryForMap(
+                        """
+                        select a.*, t.severity
+                          from kernel.audit_event a
+                          join kernel.audit_event_type t on t.event_type_code = a.event_type_code
+                         where a.event_type_code = ? and a.device_id = ?
+                        """,
+                        "SYNC_APP_VERSION_BELOW_FLOOR",
+                        DEVICE);
+        assertThat(audit.get("severity")).isEqualTo("ALERT");
+
         assertThatThrownBy(till::refreshSnapshot).isInstanceOfSatisfying(TillSimulator.Refused.class, refused -> {
             assertThat(refused.status).isEqualTo(426);
             assertThat(refused.problem.path("code").asText()).isEqualTo("sync.app_below_floor");
@@ -128,6 +156,121 @@ class AppVersionFloorConformanceIntegrationTest extends SyncIntegrationTest {
                 get("/v1/sync/locations/" + SHOP + "/changes?since=0", TestIdentityProvider.deviceHeaders(DEVICE));
         assertThat(changes.getStatusCode().value()).isEqualTo(426);
         assertThat(changes.getBody().path("code").asText()).isEqualTo("sync.app_below_floor");
+    }
+
+    /**
+     * Doc 31 section 6 (FIX-14): a till uploading below the version floor after the grace period
+     * produces an ALERT audit event.
+     */
+    @Test
+    void aTillPastTheGracePeriodProducesAnAlertAuditEvent() {
+        floorSince("1.4", Duration.ofDays(16));
+        TillSimulator till = till("1.3.1");
+        till.recordSales(1);
+
+        till.uploadOnce(500);
+
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> "SYNC_APP_VERSION_BELOW_FLOOR".equals(a.eventType()))
+                .singleElement()
+                .satisfies(record -> {
+                    assertThat(record.subject().type()).isEqualTo("device");
+                    assertThat(record.subject().id()).isEqualTo(DEVICE);
+                    assertThat(record.scope().deviceId()).isEqualTo(DEVICE);
+                    assertThat(record.scope().entityId()).isEqualTo(ENTITY);
+                });
+
+        Map<String, Object> row = superuserJdbc()
+                .queryForMap(
+                        """
+                        select a.event_type_code, a.device_id, t.severity, a.after_state::text as after_state
+                          from kernel.audit_event a
+                          join kernel.audit_event_type t on t.event_type_code = a.event_type_code
+                         where a.event_type_code = 'SYNC_APP_VERSION_BELOW_FLOOR' and a.device_id = ?
+                        """,
+                        DEVICE);
+        assertThat(row.get("severity")).isEqualTo("ALERT");
+        assertThat(String.valueOf(row.get("after_state")))
+                .contains("1.3.1")
+                .contains("1.4")
+                .contains("graceEndedAt")
+                .as("one key for the end of the grace (K4-02)")
+                .doesNotContain("graceEndsAt");
+    }
+
+    /**
+     * K4-01 (wave 4): one helpdesk entry per device and floor (doc 31 section 6), not one per
+     * batch: two uploads and a heartbeat past the grace give one ALERT and one sync.anomaly.v1.
+     */
+    @Test
+    void twoUploadsAndAHeartbeatPastTheGraceGiveOneAlert() {
+        floorSince("1.4", Duration.ofDays(16));
+        TillSimulator till = till("1.3.1");
+        till.recordSales(1);
+        till.uploadOnce(500);
+        till.recordSales(1);
+        till.uploadOnce(500);
+        till.heartbeat();
+
+        assertThat(cursor()).isEqualTo(2);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> "SYNC_APP_VERSION_BELOW_FLOOR".equals(a.eventType()))
+                .hasSize(1);
+        assertThat(belowFloorAnomalies()).hasSize(1);
+        assertThat(alertsInTheLedger()).isEqualTo(1);
+    }
+
+    /** K4-01: a till past its grace with nothing to upload is alerted by its heartbeat, once. */
+    @Test
+    void aTillThatOnlyHeartbeatsPastTheGraceIsAlertedOnce() {
+        floorSince("1.4", Duration.ofDays(16));
+        TillSimulator till = till("1.3.1");
+
+        till.heartbeat();
+        till.heartbeat();
+
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> "SYNC_APP_VERSION_BELOW_FLOOR".equals(a.eventType()))
+                .singleElement()
+                .satisfies(record -> assertThat(record.subject().id()).isEqualTo(DEVICE));
+        assertThat(belowFloorAnomalies()).singleElement().satisfies(anomaly -> assertThat(anomaly.deviceId())
+                .isEqualTo(DEVICE));
+    }
+
+    /** K4-01: within the grace a heartbeat raises nothing; a later raise of the floor alerts again. */
+    @Test
+    void withinTheGraceNothingAndANewFloorAlertsAgain() {
+        floorSince("1.4", Duration.ofDays(2));
+        TillSimulator till = till("1.3.1");
+        till.heartbeat();
+        assertThat(alertsInTheLedger()).isZero();
+
+        superuserJdbc().update("delete from kernel.config_value where key = ?", FLOOR);
+        floorSince("1.4", Duration.ofDays(20));
+        till.heartbeat();
+        floorSince("1.5", Duration.ofDays(1));
+        till.heartbeat();
+        till.heartbeat();
+
+        assertThat(alertsInTheLedger()).isEqualTo(2);
+        assertThat(belowFloorAnomalies()).hasSize(2);
+    }
+
+    private java.util.List<SyncAnomaly> belowFloorAnomalies() {
+        return kernel.committedEvents().stream()
+                .filter(SyncAnomaly.class::isInstance)
+                .map(SyncAnomaly.class::cast)
+                .filter(a -> "APP_VERSION_BELOW_FLOOR".equals(a.kind()))
+                .toList();
+    }
+
+    private long alertsInTheLedger() {
+        return superuserJdbc()
+                .queryForObject(
+                        "select count(*) from kernel.audit_event where event_type_code = 'SYNC_APP_VERSION_BELOW_FLOOR'"
+                                + " and device_id = ?",
+                        Long.class,
+                        DEVICE);
     }
 
     /** An updated till reports its new version and receives the snapshot again at once. */

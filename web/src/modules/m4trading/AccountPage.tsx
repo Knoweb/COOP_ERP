@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
@@ -40,18 +41,39 @@ export function AccountPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/trading">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("trading.back").text}
+      <Link className="back-link back-pill-btn" to="/trading">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        <span>{t("trading.back").text}</span>
       </Link>
-      <h1>
-        {t("trading.account.title").text}: <EntityName entityId={counterpartyId} />
-      </h1>
+      <PageHeader
+        icon="finance"
+        title={
+          <>
+            {t("trading.account.title").text}: <EntityName entityId={counterpartyId} />
+          </>
+        }
+      />
       {error && <p role="alert">{errorText(error, t("trading.error.generic").text)}</p>}
       {exposures.isLoading ? <p>{t("trading.loading").text}</p> : exposure && <ExposurePanel exposure={exposure} />}
       {role === "SELLER" && canChangeLimit && exposure && (
-        <p>
-          <Link to={`/party/relationships/${exposure.relationshipId}`}>{t("trading.account.credit_limit").text}</Link>
+        <p className="trading-action-row">
+          <Link className="action-link" to={`/party/relationships/${exposure.relationshipId}`}>
+            <span className="action-link__symbol" aria-hidden="true">✎</span>
+            <span>{t("trading.account.credit_limit").text}</span>
+          </Link>
         </p>
       )}
 
@@ -60,39 +82,45 @@ export function AccountPage() {
         {pairInvoices.length === 0 ? (
           <p>{t("trading.invoices.empty").text}</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>{t("trading.column.number").text}</th>
-                <th>{t("trading.invoice.tax_point").text}</th>
-                <th>{t("trading.invoice.gross").text}</th>
-                <th>{t("trading.invoice.amount_due").text}</th>
-                <th>{t("trading.column.payment_state").text}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pairInvoices.map((invoice) => (
-                <tr key={invoice.invoiceId}>
-                  <td>
-                    <Link to={`/trading/invoices/${invoice.invoiceId}`}>{invoice.docNumber}</Link>
-                  </td>
-                  <td>{formatDate(invoice.taxPointDate)}</td>
-                  <td>
-                    <MoneyDisplay amount={invoice.grossAmount} />
-                  </td>
-                  <td>
-                    <MoneyDisplay amount={invoice.amountDue ?? invoice.grossAmount} />
-                  </td>
-                  <td>
-                    <StateChip
-                      state={paymentStateChip(invoice.paymentState)}
-                      label={t(`trading.invoice.payment_state.${invoice.paymentState ?? "OPEN"}`).text}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="modern-table-card trading-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table trading-table">
+                <thead>
+                  <tr>
+                    <th>{t("trading.column.number").text}</th>
+                    <th>{t("trading.invoice.tax_point").text}</th>
+                    <th className="trading-cell-numeric">{t("trading.invoice.gross").text}</th>
+                    <th className="trading-cell-numeric">{t("trading.invoice.amount_due").text}</th>
+                    <th>{t("trading.column.payment_state").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pairInvoices.map((invoice) => (
+                    <tr key={invoice.invoiceId}>
+                      <td>
+                        <Link className="trading-doc-link" to={`/trading/invoices/${invoice.invoiceId}`}>
+                          {invoice.docNumber}
+                        </Link>
+                      </td>
+                      <td className="trading-cell-date">{formatDate(invoice.taxPointDate)}</td>
+                      <td className="trading-cell-numeric">
+                        <MoneyDisplay amount={invoice.grossAmount} />
+                      </td>
+                      <td className="trading-cell-numeric">
+                        <MoneyDisplay amount={invoice.amountDue ?? invoice.grossAmount} />
+                      </td>
+                      <td>
+                        <StateChip
+                          state={paymentStateChip(invoice.paymentState)}
+                          label={t(`trading.invoice.payment_state.${invoice.paymentState ?? "OPEN"}`).text}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </section>
 
@@ -101,34 +129,40 @@ export function AccountPage() {
         {pairPayments.length === 0 ? (
           <p>{t("trading.payments.empty").text}</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>{t("trading.column.number").text}</th>
-                <th>{t("trading.payment.received_on").text}</th>
-                <th>{t("trading.payment.method").text}</th>
-                <th>{t("trading.column.amount").text}</th>
-                <th>{t("trading.column.status").text}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pairPayments.map((payment) => (
-                <tr key={payment.receiptId}>
-                  <td>
-                    <Link to={`/trading/payments/${payment.receiptId}`}>{payment.docNumber}</Link>
-                  </td>
-                  <td>{formatDate(payment.receivedOn)}</td>
-                  <td>{t(`trading.payment.method.${payment.method}`).text}</td>
-                  <td>
-                    <MoneyDisplay amount={payment.status === "REVERSAL" ? -payment.amount : payment.amount} />
-                  </td>
-                  <td>
-                    <StateChip state={receiptChip(payment.status)} label={t(`trading.payment.status.${payment.status}`).text} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="modern-table-card trading-table-card">
+            <div className="modern-table-scroll">
+              <table className="modern-table trading-table">
+                <thead>
+                  <tr>
+                    <th>{t("trading.column.number").text}</th>
+                    <th>{t("trading.payment.received_on").text}</th>
+                    <th>{t("trading.payment.method").text}</th>
+                    <th className="trading-cell-numeric">{t("trading.column.amount").text}</th>
+                    <th>{t("trading.column.status").text}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pairPayments.map((payment) => (
+                    <tr key={payment.receiptId}>
+                      <td>
+                        <Link className="trading-doc-link" to={`/trading/payments/${payment.receiptId}`}>
+                          {payment.docNumber}
+                        </Link>
+                      </td>
+                      <td className="trading-cell-date">{formatDate(payment.receivedOn)}</td>
+                      <td>{t(`trading.payment.method.${payment.method}`).text}</td>
+                      <td className="trading-cell-numeric">
+                        <MoneyDisplay amount={payment.status === "REVERSAL" ? -payment.amount : payment.amount} />
+                      </td>
+                      <td>
+                        <StateChip state={receiptChip(payment.status)} label={t(`trading.payment.status.${payment.status}`).text} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </section>
 

@@ -8,5 +8,5 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M6 Point of Sale",
-        allowedDependencies = {"kernel", "kernel::api"})
+        allowedDependencies = {"kernel", "kernel::api", "m5inventory::query"})
 package lk.coopfed.knoweb.m6pos;

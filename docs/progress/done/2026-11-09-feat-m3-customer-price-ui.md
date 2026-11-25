@@ -1,0 +1,1 @@
+- feat(m3pricing): style customer price lookup filter bar and search results matching Price List visual design, incorporating PageHeader icon, custom animated select dropdowns across pricing filters, unified single clear button, and elegant pill tags with icon indicators for SKU and UOM.

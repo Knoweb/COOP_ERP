@@ -1,15 +1,16 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { usePricingApi } from "./pricingApi";
 import type { MrpPolicy, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
 import { errorText } from "./priceListState";
+import { PricingSelect } from "./PricingSelect";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -31,7 +32,7 @@ export function MrpPolicyPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("pricing.policy.title").text}</h1>
+      <PageHeader icon="mrp-policy" title={t("pricing.policy.title").text} />
       <PricingTabs />
       <p className="modern-intro-text">{t("pricing.policy.intro").text}</p>
 
@@ -56,7 +57,7 @@ export function MrpPolicyPage() {
                 <tbody>
                   {policies.data.map((policy) => (
                     <tr key={`${policy.skuId}/${policy.source}`}>
-                      <td>
+                      <td className="pricing-cell-item">
                         <SkuName skuId={policy.skuId} />
                       </td>
                       <td>{t(`pricing.policy.${policy.policy.toLowerCase()}`).text}</td>
@@ -89,6 +90,38 @@ function SetPolicyForm({ onSet }: { onSet: () => void }) {
   const [gapAmount, setGapAmount] = useState("");
   const [gapPercent, setGapPercent] = useState("");
 
+  const policyOptions: Array<{ value: PolicyKind; label: string; icon: ReactNode }> = [
+    {
+      value: "AUTO_LOWEST",
+      label: t("pricing.policy.auto_lowest").text,
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M19 12l-7 7-7-7" />
+        </svg>
+      )
+    },
+    {
+      value: "BARCODE_RESOLVED",
+      label: t("pricing.policy.barcode_resolved").text,
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14" />
+        </svg>
+      )
+    },
+    {
+      value: "PICKER",
+      label: t("pricing.policy.picker").text,
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M19 8v6M22 11h-6" />
+        </svg>
+      )
+    }
+  ];
+
   const set = useMutation({
     mutationFn: () =>
       api.setMrpPolicy(
@@ -119,44 +152,89 @@ function SetPolicyForm({ onSet }: { onSet: () => void }) {
 
   return (
     <section className="pricing-section" aria-labelledby="pricing-policy-set">
-      <h2 id="pricing-policy-set">{t("pricing.policy.set").text}</h2>
-      {sku ? (
-        <p className="pricing-header-row">
-          <SkuName skuId={sku.skuId} />
-          <button type="button" onClick={() => setSku(null)}>
-            {t("pricing.gazette.change_item").text}
-          </button>
-        </p>
-      ) : (
-        <SkuPicker onPick={setSku} />
-      )}
-      <form onSubmit={submit} className="pricing-form-grid">
-        <label className="pricing-form-field">
-          {t("pricing.column.policy").text}
-          <select value={policy} onChange={(event) => setPolicy(event.target.value as PolicyKind)}>
-            <option value="AUTO_LOWEST">{t("pricing.policy.auto_lowest").text}</option>
-            <option value="BARCODE_RESOLVED">{t("pricing.policy.barcode_resolved").text}</option>
-            <option value="PICKER">{t("pricing.policy.picker").text}</option>
-          </select>
-        </label>
-        {policy === "PICKER" && (
-          <>
-            <label className="pricing-form-field">
-              {t("pricing.policy.field.gap_amount").text}
-              <input type="number" min="0" step="0.01" value={gapAmount} onChange={(e) => setGapAmount(e.target.value)} />
-            </label>
-            <label className="pricing-form-field">
-              {t("pricing.policy.field.gap_percent").text}
-              <input type="number" min="0" max="100" step="0.01" value={gapPercent} onChange={(e) => setGapPercent(e.target.value)} />
-            </label>
-          </>
+      <h2 id="pricing-policy-set" className="pricing-gazette-heading">{t("pricing.policy.set").text}</h2>
+      <div className="pricing-card pricing-mrp-entry-card">
+        {sku ? (
+          <div className="pricing-gazette-selected-sku">
+            <span className="pricing-gazette-selected-sku__name">
+              <SkuName skuId={sku.skuId} />
+            </span>
+            <button type="button" className="pricing-btn-secondary" onClick={() => setSku(null)}>
+              {t("pricing.gazette.change_item").text}
+            </button>
+          </div>
+        ) : (
+          <SkuPicker onPick={setSku} />
         )}
-        <button type="submit" disabled={set.isPending || !sku}>
-          {t("pricing.policy.submit").text}
-        </button>
-      </form>
-      {set.isSuccess && <p role="status">{t("pricing.policy.saved").text}</p>}
-      {set.isError && <p role="alert">{errorText(set.error, t("pricing.error.generic").text)}</p>}
+        <form onSubmit={submit} className="pricing-mrp-form">
+          <div className="pricing-form-field pricing-mrp-policy-group">
+            <label htmlFor="pricing-policy-select" className="pricing-filter-label">
+              {t("pricing.column.policy").text}
+            </label>
+            <div className="pricing-policy-options" role="radiogroup" aria-label={t("pricing.column.policy").text}>
+              {policyOptions.map((opt) => {
+                const isSelected = policy === opt.value;
+                return (
+                  <button
+                    type="button"
+                    key={opt.value}
+                    role="radio"
+                    aria-checked={isSelected}
+                    className={`pricing-policy-option${isSelected ? " pricing-policy-option--selected" : ""}`}
+                    onClick={() => setPolicy(opt.value)}
+                  >
+                    <span className="pricing-policy-option__icon">{opt.icon}</span>
+                    <span className="pricing-policy-option__label">{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {policy === "PICKER" && (
+            <div className="pricing-mrp-gap-grid">
+              <label className="pricing-form-field">
+                <span className="pricing-filter-label">{t("pricing.policy.field.gap_amount").text}</span>
+                <input type="number" min="0" step="0.01" value={gapAmount} onChange={(e) => setGapAmount(e.target.value)} />
+              </label>
+              <label className="pricing-form-field">
+                <span className="pricing-filter-label">{t("pricing.policy.field.gap_percent").text}</span>
+                <input type="number" min="0" max="100" step="0.01" value={gapPercent} onChange={(e) => setGapPercent(e.target.value)} />
+              </label>
+            </div>
+          )}
+
+          <div className="pricing-mrp-submit-row">
+            <div className="pricing-mrp-select-wrap">
+              <PricingSelect
+                id="pricing-policy-select"
+                className="pricing-policy-select"
+                ariaLabel={t("pricing.column.policy").text}
+                value={policy}
+                onChange={(nextValue) => setPolicy(nextValue as PolicyKind)}
+                options={[
+                  { value: "AUTO_LOWEST", label: t("pricing.policy.auto_lowest").text },
+                  { value: "BARCODE_RESOLVED", label: t("pricing.policy.barcode_resolved").text },
+                  { value: "PICKER", label: t("pricing.policy.picker").text }
+                ]}
+              />
+            </div>
+            <button type="submit" className="modern-btn modern-btn--primary" disabled={set.isPending || !sku}>
+              {t("pricing.policy.submit").text}
+            </button>
+            {set.isSuccess && (
+              <span role="status" className="pricing-alert-box pricing-alert-box--success">
+                {t("pricing.policy.saved").text}
+              </span>
+            )}
+            {set.isError && (
+              <span role="alert" className="pricing-alert-box pricing-alert-box--error">
+                {errorText(set.error, t("pricing.error.generic").text)}
+              </span>
+            )}
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

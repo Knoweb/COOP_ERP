@@ -66,7 +66,17 @@
     "pos.session.opened_at": "Open since {time}",
     "pos.session.closed_at": "Closed at {time}",
     "pos.session.status.OPEN": "Open",
-    "pos.session.status.CLOSED": "Closed"
+    "pos.session.status.CLOSED": "Closed",
+    "pos.column.unit_cost": "Unit cost",
+    "pos.column.line_cost": "Cost",
+    "pos.column.line_profit": "Profit",
+    "pos.column.margin": "Margin %",
+    "pos.profit.title": "Profit & Margin (Staff only)",
+    "pos.profit.total_cost": "Cost of Goods Sold",
+    "pos.profit.gross_profit": "Gross Profit",
+    "pos.profit.margin_pct": "Gross Margin %",
+    "pos.profit.cost_pending": "Cost pending",
+    "pos.profit.pending_notice": "Some line items have cost pending central inventory reconciliation."
   },
   "si": {
     "pos.nav": "සාප්පු රිසිට්පත්",
@@ -135,7 +145,17 @@
     "pos.session.opened_at": "{time} සිට විවෘතයි",
     "pos.session.closed_at": "{time} ට වසා දැමිණි",
     "pos.session.status.OPEN": "විවෘතයි",
-    "pos.session.status.CLOSED": "වසා ඇත"
+    "pos.session.status.CLOSED": "වසා ඇත",
+    "pos.column.unit_cost": "ඒකක පිරිවැය",
+    "pos.column.line_cost": "පිරිවැය",
+    "pos.column.line_profit": "ලාභය",
+    "pos.column.margin": "ආන්තිකය %",
+    "pos.profit.title": "ලාභය සහ ආන්තිකය (කාර්ය මණ්ඩලය පමණි)",
+    "pos.profit.total_cost": "විකිණූ භාණ්ඩවල පිරිවැය",
+    "pos.profit.gross_profit": "දළ ලාභය",
+    "pos.profit.margin_pct": "දළ ආන්තිකය %",
+    "pos.profit.cost_pending": "පිරිවැය අපේක්ෂිතයි",
+    "pos.profit.pending_notice": "සමහර අයිතම සඳහා මධ්‍යම තොග සැසඳුමෙන් පිරිවැය තහවුරු විය යුතුය."
   },
   "ta": {
     "pos.nav": "கடை ரசீதுகள்",
@@ -204,6 +224,16 @@
     "pos.session.opened_at": "{time} முதல் திறந்துள்ளது",
     "pos.session.closed_at": "{time} இல் மூடப்பட்டது",
     "pos.session.status.OPEN": "திறந்துள்ளது",
-    "pos.session.status.CLOSED": "மூடப்பட்டது"
+    "pos.session.status.CLOSED": "மூடப்பட்டது",
+    "pos.column.unit_cost": "அலகு அடக்கவிலை",
+    "pos.column.line_cost": "அடக்கவிலை",
+    "pos.column.line_profit": "இலாபம்",
+    "pos.column.margin": "விளிம்பு %",
+    "pos.profit.title": "இலாபம் மற்றும் விளிம்பு (ஊழியர்களுக்கு மட்டும்)",
+    "pos.profit.total_cost": "விற்கப்பட்ட பொருட்களின் அடக்கவிலை",
+    "pos.profit.gross_profit": "மொத்த இலாபம்",
+    "pos.profit.margin_pct": "மொத்த விளிம்பு %",
+    "pos.profit.cost_pending": "அடக்கவிலை நிலுவையில்",
+    "pos.profit.pending_notice": "சில பொருட்களுக்கான அடக்கவிலை இருப்பு சரிபார்ப்புக்குப் பின் நிர்ணயிக்கப்படும்."
   }
 }

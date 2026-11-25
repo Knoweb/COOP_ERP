@@ -17,6 +17,7 @@ import lk.coopfed.knoweb.m1party.query.LocationFilter;
 import lk.coopfed.knoweb.m1party.query.LocationPage;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m1party.query.ShopRef;
 import lk.coopfed.knoweb.m1party.query.TillPositionView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -364,6 +365,20 @@ class PartyQueriesImpl implements PartyQueries {
                         rs.getString("status"),
                         rs.getBoolean("is_primary")),
                 locationId);
+    }
+
+    @Override
+    public List<ShopRef> listChangeLogShops(UUID entityId, ScopeContext scope) {
+        if (scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        // The function decides from the connection's scope who may see which shops (V0017);
+        // a caller's own location scope does not narrow it to one shop.
+        return jdbc.query(
+                "select shop_entity_id, shop_location_id from party.change_log_shops(?)",
+                (rs, row) -> new ShopRef(
+                        rs.getObject("shop_entity_id", UUID.class), rs.getObject("shop_location_id", UUID.class)),
+                entityId);
     }
 
     private static LocationView mapLocation(ResultSet rs, int rowNumber) throws SQLException {

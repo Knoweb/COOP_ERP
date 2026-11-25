@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * M2's snapshot contributor (22A section 7.3) in the scope of a till: the SKUs the shop's entity
  * may sell (its own LOCAL ones and every SHARED one) each with its conversions, ACTIVE barcodes
- * and tags inside the row, and the tax categories with their rates; decimals as text.
+ * and tags inside the row, the tax categories with their rates; decimals as text. No batches (TD-02, TD-04).
  */
 class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTest {
 
@@ -72,6 +72,18 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 "insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id)"
                         + " values (?, (select tag_id from catalogue.tag where tag_code = 'rice' and governed), ?)",
                 LOCAL,
+                ENTITY);
+        db.update(
+                """
+                insert into catalogue.location_assortment (location_id, sku_id, reasons, sell_through, owner_entity_id)
+                values (?, ?, ARRAY['LOCAL'], false, ?),
+                       (?, ?, ARRAY['CORE_RANGE'], false, ?)
+                """,
+                SHOP,
+                LOCAL,
+                ENTITY,
+                SHOP,
+                SHARED,
                 ENTITY);
     }
 
@@ -162,11 +174,20 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
         assertThat(rows.get(TAX).get("rates").toString()).contains("12.50").doesNotContain("10.00");
     }
 
+    /**
+     * Batches are M5's to serve, as the batches with on-hand at the location (doc 32 section 5.1);
+     * M2 serving every batch its scope can read carried the whole federation's (TD-02, TD-04).
+     */
+    @Test
+    void tablesAreSkuAndTaxCategoryWithoutBatches() {
+        assertThat(catalogue.tables()).containsExactlyInAnyOrder("sku", "tax_category");
+    }
+
     private static void sku(JdbcTemplate db, UUID id, String code, UUID owner, String status) {
         db.update(
                 """
                 insert into catalogue.sku (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si, short_name_ta,
-                                           base_uom_code, tax_category_id)
+                                            base_uom_code, tax_category_id)
                 values (?, ?, ?, ?, ?, 'සිංහල', 'தமிழ்', 'EA', ?)
                 """,
                 id,
@@ -191,8 +212,12 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
     }
 
     private static void forget(JdbcTemplate db) {
+        db.update("delete from catalogue.location_assortment where location_id = ?", SHOP);
         List<UUID> skus = List.of(LOCAL, DRAFT, OTHERS, SHARED);
         for (UUID sku : skus) {
+            db.update("delete from catalogue.location_assortment where sku_id = ?", sku);
+            db.update("delete from catalogue.batch_key where sku_id = ?", sku);
+            db.update("delete from catalogue.batch where sku_id = ?", sku);
             db.update("delete from catalogue.sku_image where sku_id = ?", sku);
             db.update("delete from catalogue.sku_tag where sku_id = ?", sku);
             db.update("delete from catalogue.sku_barcode where sku_id = ?", sku);

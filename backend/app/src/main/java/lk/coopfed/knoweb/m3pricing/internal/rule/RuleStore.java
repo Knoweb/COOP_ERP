@@ -14,11 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.api.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Reads of pricing.discount_rule, and the JSON form of a predicate and a benefit. The JSON keys
@@ -29,9 +31,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class RuleStore {
 
-    static final String DRAFT = "DRAFT";
-    static final String ACTIVE = "ACTIVE";
-    static final String WITHDRAWN = "WITHDRAWN";
+    public static final String DRAFT = "DRAFT";
+    public static final String ACTIVE = "ACTIVE";
+    public static final String EXPIRED = "EXPIRED";
+    public static final String WITHDRAWN = "WITHDRAWN";
+
+    public record DueRule(UUID ruleId, UUID ownerEntityId, LocalDate validTo) {}
 
     private static final String COLUMNS = "rule_id, owner_entity_id, name, kind, predicate::text as predicate,"
             + " benefit::text as benefit, priority, valid_from, valid_to, status, created_at";
@@ -76,6 +81,23 @@ public class RuleStore {
                 Date.valueOf(date));
     }
 
+    /**
+     * The ACTIVE rules across all entities whose validity has ended before {@code today},
+     * read in the scope it passes (the Federation-wide view).
+     */
+    @Transactional(readOnly = true)
+    public List<DueRule> dueForExpiry(LocalDate today, ScopeContext scope) {
+        return jdbc.query(
+                "select rule_id, owner_entity_id, valid_to from pricing.discount_rule"
+                        + " where status = 'ACTIVE' and valid_to is not null and valid_to < ?"
+                        + " order by valid_to, rule_id",
+                (rs, row) -> new DueRule(
+                        rs.getObject("rule_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getDate("valid_to").toLocalDate()),
+                Date.valueOf(today));
+    }
+
     String predicateJson(RulePredicate p) {
         Map<String, Object> map = new LinkedHashMap<>();
         putIfPresent(map, "sku_id", p.skuId() == null ? null : p.skuId().toString());
@@ -83,6 +105,11 @@ public class RuleStore {
         putIfPresent(map, "min_qty", plain(p.minQty()));
         putIfPresent(map, "days_to_expiry", p.daysToExpiry());
         putIfPresent(map, "bill_total_from", plain(p.billTotalFrom()));
+        putIfPresent(map, "customer_class", p.customerClass());
+        putIfPresent(
+                map,
+                "location_id",
+                p.locationId() == null ? null : p.locationId().toString());
         return write(map);
     }
 
@@ -97,6 +124,12 @@ public class RuleStore {
         Date validTo = rs.getDate("valid_to");
         JsonNode p = read(rs.getString("predicate"));
         JsonNode b = read(rs.getString("benefit"));
+        UUID locationId = null;
+        if (p.hasNonNull("location_id")) {
+            locationId = UUID.fromString(p.get("location_id").asText());
+        } else if (p.hasNonNull("locationId")) {
+            locationId = UUID.fromString(p.get("locationId").asText());
+        }
         return new RuleView(
                 rs.getObject("rule_id", UUID.class),
                 rs.getObject("owner_entity_id", UUID.class),
@@ -107,7 +140,9 @@ public class RuleStore {
                         p.hasNonNull("uom_code") ? p.get("uom_code").asText() : null,
                         decimal(p, "min_qty"),
                         p.hasNonNull("days_to_expiry") ? p.get("days_to_expiry").asInt() : null,
-                        decimal(p, "bill_total_from")),
+                        decimal(p, "bill_total_from"),
+                        p.hasNonNull("customer_class") ? p.get("customer_class").asText() : null,
+                        locationId),
                 new RuleBenefit(b.path("kind").asText(null), decimal(b, "value")),
                 rs.getInt("priority"),
                 rs.getDate("valid_from").toLocalDate(),

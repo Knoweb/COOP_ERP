@@ -9,7 +9,7 @@
 openapi: 3.1.0
 info:
   title: COOP ERP Pricing API
-  version: 0.4.0
+  version: 0.5.0
 paths:
   /v1/pricing/lists:
     get:
@@ -24,7 +24,7 @@ paths:
         - in: query
           name: kind
           required: false
-          schema: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+          schema: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         - in: query
           name: status
           required: false
@@ -151,6 +151,38 @@ paths:
               schema: { $ref: '#/components/schemas/SetLinesResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/lists/{listId}/import:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: importPriceListLines
+      summary: Bulk import price list lines from a sheet or rows into a draft price list
+      description: >
+        Parses a CSV/TSV sheet or line items, validates each line against catalogue SKUs and authoring rules,
+        and populates an existing draft price list without activating/publishing prices.
+        Guards: price list must exist in DRAFT status in the caller's owner scope.
+        Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+      x-permission: prc.pricelist.author
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportPriceListLinesRequest' }
+      responses:
+        '200':
+          description: Import report with outcome status, row counts, problems, and per-line outcomes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListImportReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/pricing/lists/{listId}/publish:
     parameters:
       - in: path
@@ -178,6 +210,35 @@ paths:
       responses:
         '200':
           description: The published version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/lists/{listId}/withdraw:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: withdrawDraft
+      summary: Withdraw an unpublished price-list draft
+      description: >
+        Only the owning entity may withdraw a DRAFT.
+        A reason is required. Published versions cannot be withdrawn.
+      x-permission: prc.pricelist.author
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithdrawDraftRequest' }
+      responses:
+        '200':
+          description: The withdrawn draft
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PriceListResponse' }
@@ -222,6 +283,28 @@ paths:
         '404':
           description: No visible relationship, no bound list in force, or no line for the SKU and unit
   /v1/pricing/resolve/retail:
+    post:
+      tags: [Pricing]
+      operationId: resolveBasket
+      summary: Resolve a basket at a shop
+      description: Steps 1 to 4 of doc 23 section 3.5 through the shared engine for a whole basket.
+      x-permission: prc.pricelist.view
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveBasketRequest' }
+      responses:
+        '200':
+          description: The resolved basket
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BasketResult' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: The location is not visible to the caller
     get:
       tags: [Pricing]
       operationId: resolveRetailPrice
@@ -262,6 +345,127 @@ paths:
               schema: { $ref: '#/components/schemas/RetailPriceResponse' }
         '404':
           description: The location or the SKU is not visible in the caller's scope
+  /v1/pricing/resolve/commercial:
+    get:
+      tags: [Pricing]
+      operationId: resolveCommercialPrice
+      summary: The commercial selling price of a SKU at a shop on a date (tax-inclusive, per unit), under MRP and control ceilings
+      description: >
+        Prioritizes the society's published COMMERCIAL list in force on the date, falling back to
+        RETAIL list when no commercial line exists, bounded by in-stock MRP and the control price.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uom
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: qty
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The commercial price, or why the item is not sellable there
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetailPriceResponse' }
+        '404':
+          description: The location or the SKU is not visible in the caller's scope
+  /v1/pricing/customer/lookup:
+    get:
+      tags: [Pricing]
+      operationId: lookupCustomerPrice
+      summary: Customer price lookup for an item at a shop location
+      description: >
+        Customer-facing price lookup that resolves the current permitted public retail price
+        for a product at a given shop using the effective retail price resolver. Internal cost,
+        margin, batch references, supplier identity, and restricted owner data are strictly excluded.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: barcode
+          required: false
+          schema: { type: string, maxLength: 64 }
+        - in: query
+          name: skuCode
+          required: false
+          schema: { type: string, maxLength: 60 }
+        - in: query
+          name: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: uom
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: date
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The customer-safe public price
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPriceLookupResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: Location or product not found
+  /v1/pricing/customer/search:
+    get:
+      tags: [Pricing]
+      operationId: searchCustomerPrices
+      summary: Search current permitted product prices at a shop location for customer portal
+      description: >
+        Customer-facing search across catalog items at a given shop location. Returns permitted
+        public retail prices with zero internal cost or margin data.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: date
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Matching product public prices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CustomerPriceLookupResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
   /v1/pricing/advisory-lines:
     get:
       tags: [Pricing]
@@ -483,6 +687,53 @@ paths:
               schema: { $ref: '#/components/schemas/RuleResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/labels:
+    post:
+      tags: [Pricing]
+      operationId: printShelfLabels
+      summary: Queue shelf labels for the published retail list in force today
+      description: >
+        The shop belongs to the caller and every requested SKU has a line on the caller's
+        published RETAIL list in force on the print date. The configured pricing.label_template
+        is recorded with the QUEUED job. Ask for the job until it is RENDERED or FAILED. Codes
+        this operation can answer with 422: m3.label.location_not_owned,
+        m3.label.retail_list_not_found, m3.label.sku_not_on_list,
+        m3.label.template_invalid.
+      x-permission: prc.label.print
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrintShelfLabelsRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelJobResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/labels/{jobId}:
+    get:
+      tags: [Pricing]
+      operationId: getLabelJob
+      summary: A shelf-label print job with a fresh PDF link when rendered
+      x-permission: prc.label.print
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The label job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelJobResponse' }
+        '404':
+          description: No such label job in the caller's scope
   /v1/pricing/rules/{ruleId}:
     parameters:
       - in: path
@@ -555,6 +806,86 @@ paths:
               schema: { $ref: '#/components/schemas/RuleResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/reviews:
+    get:
+      tags: [Pricing]
+      operationId: listReviews
+      summary: The pricing reviews in the caller's scope
+      x-permission: prc.review.view
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          schema: { type: string, enum: [BATCH_MRP_BELOW_LIST, TRADE_ABOVE_MRP, LIST_ABOVE_CEILING_AT_GAZETTE] }
+        - in: query
+          name: status
+          required: false
+          description: OPEN answers every review; SETTLED answers none until a settle command exists
+          schema: { type: string, enum: [OPEN, SETTLED] }
+      responses:
+        '200':
+          description: The reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReviewItem' }
+  /v1/pricing/expiry-slow-moving-discounts:
+    get:
+      tags: [Pricing]
+      operationId: listExpirySlowMovingDiscounts
+      summary: Active expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+      description: >
+        Returns active markdown discounts calculated deterministically from authoritative
+        inventory near-expiry and slow-moving facts. Filterable by reason (NEAR_EXPIRY,
+        SLOW_MOVING) and status (ACTIVE).
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: reason
+          required: false
+          schema: { type: string, enum: [ALL, NEAR_EXPIRY, SLOW_MOVING] }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [ALL, ACTIVE] }
+      responses:
+        '200':
+          description: List of active expiry and slow-moving discount markdowns
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExpirySlowMovingDiscountResponse' }
+  /v1/pricing/expiry-slow-moving-discounts/evaluate:
+    post:
+      tags: [Pricing]
+      operationId: evaluateExpirySlowMovingDiscounts
+      summary: Evaluate near-expiry and slow-moving discount markdowns for a location (PGL-M1-07)
+      description: >
+        Triggers evaluation of inventory near-expiry and slow-moving candidates against
+        configured markdown rules, records audit EXPIRY_SLOW_MOVING_DISCOUNTS_EVALUATED,
+        publishes pricing.expiry_slow_moving_discounts_evaluated.v1, and returns evaluation summary.
+      x-permission: prc.rule.activate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluateExpirySlowMovingDiscountsRequest' }
+      responses:
+        '200':
+          description: Evaluation result summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpirySlowMovingEvaluationResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
     RulePredicate:
@@ -569,6 +900,14 @@ components:
         minQty: { type: [number, 'null'], exclusiveMinimum: 0 }
         daysToExpiry: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
         billTotalFrom: { type: [number, 'null'], exclusiveMinimum: 0 }
+        customerClass:
+          type: [string, 'null']
+          enum: [MEMBER, EMPLOYEE]
+          description: Optional customer-class targeting (PGL-M1-06); null applies to general public.
+        locationId:
+          type: [string, 'null']
+          format: uuid
+          description: Optional shop/branch location scope (PGL-M1-06); null applies society-wide to all branches.
     RuleBenefit:
       type: object
       required: [kind, value]
@@ -610,13 +949,18 @@ components:
       type: object
       required: [kind, name]
       properties:
-        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        kind: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         name: { type: string, minLength: 1, maxLength: 120 }
     PublishPriceListRequest:
       type: object
       required: [applyFrom]
       properties:
         applyFrom: { type: string, format: date, description: The first business date the version applies }
+    WithdrawDraftRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
     SetLinesRequest:
       type: object
       required: [lines]
@@ -662,6 +1006,78 @@ components:
           description: CONTROL_PRICE or MRP, the binding ceiling of a RETAIL or ADVISORY line (refused or not), or the MRP a TRADE line is reviewed against
         ceilingValue: { type: [number, 'null'] }
         ceilingRef: { type: [string, 'null'], description: 'The gazette reference of a control price, the batch number of an MRP' }
+    ImportPriceListLinesRequest:
+      type: object
+      properties:
+        sheet:
+          type: string
+          description: Raw CSV, TSV or delimited spreadsheet text with headers (e.g. sku,uom,tier,price)
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportPriceListLineRow'
+        replace:
+          type: boolean
+          default: true
+          description: When true, replaces existing draft lines; when false, merges lines into the draft list
+    ImportPriceListLineRow:
+      type: object
+      required: [price]
+      properties:
+        sku:
+          type: string
+          description: SKU code, barcode, or SKU UUID
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+          description: Unit of measure; defaults to SKU base UOM if omitted
+        tierFromQty:
+          type: number
+          minimum: 0
+          default: 0
+          description: Quantity threshold from which the price applies
+        price:
+          type: number
+          minimum: 0
+          description: Unit price
+    PriceListImportReportResponse:
+      type: object
+      required: [priceListId, saved, totalRows, importedLines, errorRows, problems, outcomes]
+      properties:
+        priceListId:
+          type: string
+          format: uuid
+        saved:
+          type: boolean
+          description: True if lines were saved into the draft list
+        totalRows:
+          type: integer
+        importedLines:
+          type: integer
+        errorRows:
+          type: integer
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceListImportProblem'
+        outcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineOutcome'
+    PriceListImportProblem:
+      type: object
+      required: [line, message]
+      properties:
+        line:
+          type: integer
+        sku:
+          type: [string, 'null']
+        field:
+          type: [string, 'null']
+        message:
+          type: string
     RetailPriceResponse:
       type: object
       required: [locationId, skuId, uomCode, sellable, capReason, policy, engineVersion]
@@ -680,6 +1096,22 @@ components:
         policy: { type: string, enum: [AUTO_LOWEST, BARCODE_RESOLVED, PICKER] }
         batchId: { type: [string, 'null'], format: uuid }
         engineVersion: { type: string }
+    CustomerPriceLookupResponse:
+      type: object
+      required: [skuId, skuCode, productName, uom, publicPrice, currency, isAvailable, isPriceControlled, locationId]
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        productName: { type: string }
+        uom: { type: string }
+        publicPrice: { type: number, description: 'Current permitted retail price, tax-inclusive' }
+        currency: { type: string, default: 'LKR' }
+        isAvailable: { type: boolean }
+        controlPrice: { type: [number, 'null'], description: 'Gazetted maximum retail price ceiling if applicable' }
+        isPriceControlled: { type: boolean }
+        locationId: { type: string, format: uuid }
+        locationName: { type: [string, 'null'] }
+        effectiveDate: { type: [string, 'null'], format: date }
     EnterControlPriceRequest:
       type: object
       required: [skuId, ceilingPrice, ceilingUomCode, effectiveFrom, gazetteReference]
@@ -730,6 +1162,40 @@ components:
         ownerEntityId: { type: [string, 'null'], format: uuid }
         source: { type: string, enum: [OWN, FEDERATION, DEFAULT], description: 'Whose row applies: the caller''s, the Federation''s, or none (the configured default)' }
         setAt: { type: [string, 'null'], format: date-time }
+    PrintShelfLabelsRequest:
+      type: object
+      required: [locationId, skuIds]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, format: uuid }
+    LabelRefusal:
+      type: object
+      required: [skuId, skuCode, reason, listPrice, ceilingPrice]
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        reason: { type: string, enum: [ABOVE_CONTROL_PRICE] }
+        listPrice: { type: number }
+        ceilingPrice: { type: number }
+        ceilingReference: { type: [string, 'null'] }
+    LabelJobResponse:
+      type: object
+      required: [jobId, locationId, status, requestedCount, renderedCount, refused, createdAt]
+      properties:
+        jobId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        status: { type: string, enum: [QUEUED, RENDERED, FAILED] }
+        requestedCount: { type: integer, minimum: 1 }
+        renderedCount: { type: integer, minimum: 0 }
+        refused:
+          type: array
+          items: { $ref: '#/components/schemas/LabelRefusal' }
+        downloadUrl: { type: string, format: uri, description: A fresh pre-signed PDF link when RENDERED }
+        createdAt: { type: string, format: date-time }
     PriceListResponse:
       type: object
       required: [priceListId, rootPriceListId, kind, name, version, status, createdAt]
@@ -737,7 +1203,7 @@ components:
         priceListId: { type: string, format: uuid }
         rootPriceListId: { type: string, format: uuid, description: The id of version 1 that a relationship binds }
         ownerEntityId: { type: string, format: uuid }
-        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        kind: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         name: { type: string }
         version: { type: integer }
         sourceVersionId: { type: [string, 'null'], format: uuid }
@@ -776,3 +1242,159 @@ components:
         tierFromQty: { type: number }
         unitPrice: { type: number, description: Per unit and tax-exclusive with four decimals }
         engineVersion: { type: string }
+
+    ResolveBasketRequest:
+      type: object
+      required: [locationId, businessDate, tenderKind, lines]
+      properties:
+        locationId: { type: string, format: uuid }
+        businessDate: { type: string, format: date }
+        tenderKind:
+          type: string
+          enum: [CASH, CARD, KHATA, CHEQUE, VOUCHER]
+          description: >
+            Doc 23 section 3.5: CASH rounds the total to the rupee; CARD, KHATA (the member's
+            account) and CHEQUE are exact. VOUCHER is not priced by M3 (vouchers are a later
+            phase) and is refused with 400 m3.basket.tender_not_priced.
+        beneficiaryClass:
+          type: [string, 'null']
+          enum: [MEMBER, EMPLOYEE]
+          description: Optional explicit beneficiary class (PGL-M1-06). Requires beneficiaryIdentifier when supplied.
+        beneficiaryIdentifier:
+          type: [string, 'null']
+          description: Optional explicit beneficiary credential (e.g. memberNo for MEMBER, employeeNo for EMPLOYEE).
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/ResolveBasketLineRequest' }
+    ResolveBasketLineRequest:
+      type: object
+      required: [skuId, uom, qty]
+      properties:
+        skuId: { type: string, format: uuid }
+        uom: { type: string }
+        qty:
+          type: number
+          exclusiveMinimum: 0
+          description: At most three decimals (doc 18); a fourth is refused with 400 m3.basket.qty_precision.
+        batchId: { type: [string, 'null'], format: uuid }
+        pickedBatchId: { type: [string, 'null'], format: uuid }
+    BatchCandidate:
+      type: object
+      required: [batchId, batchNo]
+      properties:
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        printedMrp: { type: [number, 'null'] }
+        expiry: { type: [string, 'null'], format: date }
+        thumbKey:
+          type: [string, 'null']
+          description: The image of the batch for the picker; not filled at central yet (no image per batch)
+    LineResult:
+      type: object
+      required: [skuId, uom, qty, unitPrice, capReason, taxRatePercent, taxAmount, lineTotal, discountAmount]
+      properties:
+        skuId: { type: string, format: uuid }
+        uom: { type: string }
+        qty: { type: number }
+        batchId: { type: [string, 'null'], format: uuid }
+        unitPrice: { type: number }
+        mrpApplied: { type: [number, 'null'] }
+        controlPriceApplied: { type: [number, 'null'] }
+        capReason: { type: string, enum: [NONE, MRP_LOWEST, MRP_BARCODE, MRP_PICKED, CONTROL_PRICE] }
+        ruleId: { type: [string, 'null'], format: uuid }
+        discountAmount: { type: number }
+        taxRatePercent: { type: number }
+        taxAmount: { type: number }
+        lineTotal: { type: number }
+        candidates:
+          type: array
+          description: Filled only when the policy is PICKER and the till must pick a batch (23A section 5)
+          items: { $ref: '#/components/schemas/BatchCandidate' }
+    BasketResult:
+      type: object
+      required: [lines, subtotal, total, rounding, engineVersion]
+      properties:
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/LineResult' }
+        billRuleId: { type: [string, 'null'], format: uuid }
+        billDiscount: { type: number }
+        subtotal: { type: number }
+        total: { type: number }
+        rounding: { type: number }
+        engineVersion: { type: string }
+        snapshotVersion:
+          type: [string, 'null']
+          description: The till's snapshot version; null at central, which reads the tables rather than a snapshot
+    ReviewItem:
+      type: object
+      required: [reviewId, kind, severity, status, occurredAt, ownerEntityId, skuId]
+      description: >
+        Escalation (23A section 8) is not in the contract yet: no review is settled or escalated
+        until the exception-queue flow exists.
+      properties:
+        reviewId: { type: string, format: uuid }
+        kind: { type: string }
+        severity: { type: string }
+        status:
+          type: string
+          enum: [OPEN, SETTLED]
+          description: Every review is OPEN until a settle command exists
+        occurredAt: { type: string, format: date-time }
+        ownerEntityId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuName: { type: [string, 'null'] }
+        skuCode: { type: [string, 'null'] }
+        details: { type: object }
+    ExpirySlowMovingDiscountResponse:
+      type: object
+      required:
+        - skuId
+        - skuCode
+        - locationId
+        - reason
+        - tierOrClassification
+        - basePrice
+        - markdownPercent
+        - discountedPrice
+        - qtyOnHand
+        - status
+      properties:
+        skuId: { type: string, format: uuid }
+        skuCode: { type: string }
+        stockLotId: { type: [string, 'null'], format: uuid }
+        batchId: { type: [string, 'null'], format: uuid }
+        batchNo: { type: [string, 'null'] }
+        locationId: { type: string, format: uuid }
+        reason: { type: string, enum: [NEAR_EXPIRY, SLOW_MOVING] }
+        tierOrClassification: { type: string }
+        basePrice: { type: number }
+        markdownPercent: { type: number }
+        discountedPrice: { type: number }
+        qtyOnHand: { type: number }
+        expiryDate: { type: [string, 'null'], format: date }
+        daysToExpiry: { type: [integer, 'null'] }
+        validFrom: { type: [string, 'null'], format: date }
+        validTo: { type: [string, 'null'], format: date }
+        status: { type: string, enum: [ACTIVE] }
+    EvaluateExpirySlowMovingDiscountsRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { type: string, format: uuid }
+    ExpirySlowMovingEvaluationResponse:
+      type: object
+      required:
+        - locationId
+        - totalEvaluated
+        - markdownsActive
+        - nearExpiryCount
+        - slowMovingCount
+        - evaluatedAt
+      properties:
+        locationId: { type: string, format: uuid }
+        totalEvaluated: { type: integer }
+        markdownsActive: { type: integer }
+        nearExpiryCount: { type: integer }
+        slowMovingCount: { type: integer }
+        evaluatedAt: { type: string, format: date-time }

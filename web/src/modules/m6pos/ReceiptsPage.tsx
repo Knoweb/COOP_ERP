@@ -48,7 +48,7 @@ export function ReceiptsPage() {
   return (
     <main className="shell-page">
       <PageHeader
-        icon="stock"
+        icon="receipts"
         title={t("pos.receipts.title").text}
         actions={
           locationId ? (

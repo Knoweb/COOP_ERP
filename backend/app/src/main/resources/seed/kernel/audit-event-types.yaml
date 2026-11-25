@@ -33,6 +33,10 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A numbering series is not dense
+  - code: DEVICE_SEQUENCE_GAP
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A device source sequence is not dense
   # K-12 and K-13: scheduled jobs and the business day.
   - code: JOB_TIMED_OUT
     severity: ALERT
@@ -128,6 +132,11 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: An administrator moved a device's sync cursor past numbers it lost; the gap is recorded
+  # doc 31 section 6 (FIX-14): a till below the application floor after grace expired raises ALERT.
+  - code: SYNC_APP_VERSION_BELOW_FLOOR
+    severity: ALERT
+    offline_capturable: false
+    description_en: Till application below version floor after grace expired
   # wave 2, PR 16 (till trust and durability, TWK-03): the till records a PIN lock-out offline as
   # an audit.* fact (26A section 8, "5 failures -> 15-min lockout (local + audit)").
   - code: TILL_PIN_LOCKOUT
@@ -146,3 +155,31 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: true
     description_en: A supervisor moved a till's business date back while no session was open
+  # doc 26A section 8 (TILL-PLAT-02): operator switch on the till audited offline as an audit.* fact.
+  - code: TILL_OPERATOR_SWITCH
+    severity: INFO
+    offline_capturable: true
+    description_en: Operators switched on a till
+  # TILL-SELL-05 (doc 26 DR-5): session close or the configured age abandons a local parked basket.
+  - code: TILL_PARKED_SALE_ABANDONED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: An unfinished sale parked on a till was abandoned
+  # doc 31 section 4 (TILL-PLAT-07): release registry and rollout control.
+  - code: RELEASE_PUBLISHED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till application release published
+  - code: RELEASE_PAUSED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Till application release paused from rollout
+  - code: RELEASE_RESUMED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till application release resumed for rollout
+  - code: DEVICE_RING_ASSIGNED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device rollout ring assigned
+

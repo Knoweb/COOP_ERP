@@ -15,7 +15,8 @@
 #                     job till (the till JVM tests, the debug APK and the Linux desktop till)
 #                     job scaffolder (a module copied from hello still builds and passes)
 #   e2e               job stack-smoke (the composed stack with two backend instances: first
-#                     tools/smoke.mjs from outside, then the Playwright run in a browser)
+#                     tools/smoke.mjs from outside, then the desktop till conformance test (QA-01),
+#                     then the Playwright run in a browser)
 #   package           jobs package (pull request) and package-main (main, after the tests) (Jib image, web bundle, shared engine, SBOM; the till APK
 #                     comes from job till)
 #   publish           job package-main, on a push to main only: the backend images, the web image
@@ -197,7 +198,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -224,7 +229,7 @@ jobs:
       # The committed web clients and module diagrams must be what the slices and the code
       # generate today.
       - name: make check-generated
-        run: make check-generated ARCH_TESTS=:app:test
+        run: make check-generated
 
       - name: Web build
         working-directory: web
@@ -289,7 +294,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -359,7 +368,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       # Landed directly under app/build/jacoco/, where jacocoTestReport's own fileTree
       # (build.gradle.kts: `include("jacoco/*.exec")`) already looks for exec data — the same
@@ -391,7 +404,8 @@ jobs:
   # distributable (CR-30-1: one Kotlin Multiplatform codebase). Its own
   # job, because it shares nothing with the backend build and took fifty seconds of the
   # critical path when it ran after it.
-  # On a pull request that touches neither till/ nor the shared engine the steps are skipped
+  # On a pull request that touches neither till/, the shared engine nor the root build entry point
+  # the steps are skipped
   # and the job still reports success, so the check stays green and required. The filter is
   # inside the job, not on the workflow, for that reason. Push to main and the nightly run build
   # it always.
@@ -415,6 +429,7 @@ jobs:
             till:
               - 'till/**'
               - 'backend/shared-engine/**'
+              - 'Makefile'
               - '.github/workflows/ci.yml'
 
       - name: Set up Java 21
@@ -423,7 +438,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
+          build-root-directory: till
 
       - name: Install Android SDK packages
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
@@ -504,7 +525,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -540,7 +565,8 @@ jobs:
 
   # The whole stack as `make up-2` starts it: PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak,
   # Mailpit, two backend instances behind nginx and the web client. Then tools/smoke.mjs from
-  # outside, through the published ports, and then the Playwright run in a real browser, which
+  # outside, through the published ports, the desktop till conformance test (QA-01), and then
+  # the Playwright run in a real browser, which
   # signs in as each development user. Both run against the TWO-instance stack, which is the
   # "two instances: nothing breaks" row of the 17A proof table (section 12).
   # The runner publishes the same ports the developer machine does, so localhost:5173 and
@@ -561,7 +587,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       # make e2e installs the web dependencies with pnpm, so the runner needs it.
       - name: Set up pnpm
@@ -597,6 +627,7 @@ jobs:
         working-directory: web
         run: |
           pnpm install --frozen-lockfile
+          sudo apt-get update
           pnpm exec playwright install --with-deps chromium
 
       - name: make up-2
@@ -610,6 +641,10 @@ jobs:
       - name: make demo-data
         run: make demo-data
 
+      # Conformance suite (Doc 32 section 11, QA-01): the real KMP desktop till against central.
+      - name: make test-till-stack
+        run: make test-till-stack
+
       - name: make e2e
         run: make e2e
 
@@ -622,6 +657,17 @@ jobs:
             web/playwright-report
             web/test-results
           retention-days: 7
+
+      - name: Upload till stack test reports when something failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: till-stack-test-reports
+          path: |
+            till/desktop/build/reports/tests
+            till/desktop/build/test-results
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Container logs when something failed
         if: failure()
@@ -658,7 +704,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -790,6 +840,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: false
 
       # make test also runs the web client's lint and tests, which need pnpm on the host.
       - name: Set up pnpm

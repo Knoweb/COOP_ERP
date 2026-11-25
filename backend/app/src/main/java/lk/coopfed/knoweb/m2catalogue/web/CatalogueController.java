@@ -24,6 +24,8 @@ import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueApi;
 import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueReferenceResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ConversionResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.DefineConversionRequest;
+import lk.coopfed.knoweb.m2catalogue.web.generated.DepartmentCategoryResponse;
+import lk.coopfed.knoweb.m2catalogue.web.generated.PromoteSkuRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuPageResponse;
@@ -119,7 +121,11 @@ class CatalogueController implements CatalogueApi {
                 })
                 .toList();
 
-        return ResponseEntity.ok(new CatalogueReferenceResponse(units, taxCategories));
+        List<DepartmentCategoryResponse> departments = queries.departmentCategories(scope).stream()
+                .map(DepartmentController::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(new CatalogueReferenceResponse(units, taxCategories, departments));
     }
 
     @Override
@@ -172,6 +178,20 @@ class CatalogueController implements CatalogueApi {
     }
 
     @Override
+    public ResponseEntity<Void> promoteSku(UUID skuId, String idempotencyKey, PromoteSkuRequest request) {
+
+        ScopeContext scope = currentScope.get();
+
+        if (request.getMode() == PromoteSkuRequest.ModeEnum.NEW) {
+            commands.promoteToShared(skuId, scope);
+        } else {
+            commands.mergeIntoShared(skuId, request.getTargetSkuId(), scope);
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
     public ResponseEntity<Void> deactivateSku(UUID skuId, String idempotencyKey, ReasonRequest request) {
 
         commands.deactivate(
@@ -208,7 +228,8 @@ class CatalogueController implements CatalogueApi {
                 request.getTaxCategoryId(),
                 request.getMultiMrpPolicy().getValue(),
                 request.getOriginKind().getValue(),
-                request.getAttributes());
+                request.getAttributes(),
+                request.getDepartmentId());
     }
 
     private static SkuResponse toResponse(SkuView view) {
@@ -238,6 +259,7 @@ class CatalogueController implements CatalogueApi {
         }
 
         response.setAttributes(view.attributes());
+        response.setDepartmentId(view.departmentId());
 
         return response;
     }

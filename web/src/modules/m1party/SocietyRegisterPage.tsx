@@ -7,10 +7,40 @@ import { useT } from "../../shell/i18n/useT";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { ApiProblem } from "../../shell/api/client";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
+import { CustomSelect } from "./CustomSelect";
 import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
+
+const DISTRICTS = [
+  "Ampara",
+  "Anuradhapura",
+  "Badulla",
+  "Batticaloa",
+  "Colombo",
+  "Galle",
+  "Gampaha",
+  "Hambantota",
+  "Jaffna",
+  "Kalutara",
+  "Kandy",
+  "Kegalle",
+  "Kilinochchi",
+  "Kurunegala",
+  "Mannar",
+  "Matale",
+  "Matara",
+  "Monaragala",
+  "Mullaitivu",
+  "Nuwara Eliya",
+  "Polonnaruwa",
+  "Puttalam",
+  "Ratnapura",
+  "Trincomalee",
+  "Vavuniya"
+];
 
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
@@ -31,6 +61,7 @@ export function SocietyRegisterPage() {
 
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
+
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
 
@@ -55,45 +86,61 @@ export function SocietyRegisterPage() {
 
   return (
     <main className="shell-page">
-      <div className="page-heading">
-        <div className="page-heading__icon">
-          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        </div>
-        <div className="page-heading__copy">
-          <h1>{t("party.register.title").text}</h1>
-        </div>
-        {canRegister && (
-          <div className="page-heading__actions" aria-label={t("party.register.actions").text}>
-            <Link className="modern-btn" to="/party/societies/new">{t("party.register.new").text}</Link>
-            <Link className="modern-btn" to="/party/societies/bulk">{t("party.register.bulk").text}</Link>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        icon="society"
+        title={t("party.register.title").text}
+        actions={
+          canRegister ? (
+            <div aria-label={t("party.register.actions").text} style={{ display: "contents" }}>
+              <Link className="modern-btn" to="/party/societies/new">{t("party.register.new").text}</Link>
+              <Link className="modern-btn" to="/party/societies/bulk">{t("party.register.bulk").text}</Link>
+            </div>
+          ) : undefined
+        }
+      />
 
-      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel">
-        <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
-        </label>
-        <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
-          <div className="modern-select">
-            <select value={status} onChange={(event) => setStatus(event.target.value as SocietyStatus | "")}>
-              <option value="">{t("party.filter.status.any").text}</option>
-              {STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {t(statusMessageId(value)).text}
-                </option>
-              ))}
-            </select>
-            <svg className="modern-select__arrow" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" /></svg>
+      <div className="society-filters-wrap">
+        <form id="society-filters" role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel society-filter-panel">
+          <label className="modern-field">
+            <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
+          </label>
+          <div className="modern-field">
+            <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
+            <CustomSelect
+              id="society-status-filter"
+              ariaLabel={t("party.filter.status").text}
+              value={status}
+              onChange={(val) => setStatus(val as SocietyStatus | "")}
+              options={[
+                { value: "", label: t("party.filter.status.any").text },
+                ...STATUSES.map((s) => ({
+                  value: s,
+                  label: t(statusMessageId(s)).text
+                }))
+              ]}
+            />
           </div>
-        </label>
-        <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
-          <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
-        </label>
-      </form>
+          <div className="modern-field">
+            <span className="modern-field__label party-filter-label">
+              {t("party.filter.district").text}
+            </span>
+            <CustomSelect
+              id="society-district-filter"
+              ariaLabel={t("party.filter.district").text}
+              value={district}
+              onChange={(val) => setDistrict(val)}
+              options={[
+                { value: "", label: t("party.filter.district.any").text },
+                ...DISTRICTS.map((name) => ({
+                  value: name,
+                  label: name
+                }))
+              ]}
+            />
+          </div>
+        </form>
+      </div>
 
       {societies.isLoading && <p>{t("party.list.loading").text}</p>}
       {societies.isError && <p role="alert">{errorText(societies.error, t("party.error.generic").text)}</p>}
@@ -140,6 +187,7 @@ export function SocietyRegisterPage() {
     </main>
   );
 }
+
 /** The legal name in the user's language, or in English with the EN tag when not translated. */
 export function SocietyName({ society, locale }: { society: Society; locale: string }) {
   const translated = legalNameIn(society, locale);

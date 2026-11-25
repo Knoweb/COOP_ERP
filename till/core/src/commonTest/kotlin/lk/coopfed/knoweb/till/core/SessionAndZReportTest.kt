@@ -52,6 +52,7 @@ class SessionAndZReportTest {
         val closed = Json.parseToJsonElement(till.store.pendingOutbox(10).last().json).jsonObject.getValue("payload").jsonObject
         assertEquals("5271.00", closed.getValue("expected_cash").jsonPrimitive.content)
         assertEquals("-271.00", closed.getValue("variance").jsonPrimitive.content)
+        assertEquals("0", closed.getValue("open_sessions_remaining").jsonPrimitive.content)
     }
 
     @Test

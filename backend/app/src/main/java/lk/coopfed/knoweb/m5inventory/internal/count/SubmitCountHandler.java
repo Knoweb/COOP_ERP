@@ -242,6 +242,17 @@ class SubmitCountHandler implements Handles<SubmitCount, UUID> {
                 review ? reviewValue : null,
                 band,
                 task.taskId());
+
+        // Transition linked open expiry tasks to COUNTED (doc 25 section 4.6)
+        jdbc.update(
+                """
+                update inventory.expiry_task
+                   set status = 'COUNTED'
+                 where count_task_id = ?
+                   and status = 'OPEN'
+                """,
+                task.taskId());
+
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", review ? "VARIANCE_REVIEW" : "CLOSED");
         after.put("lines", lines.size());

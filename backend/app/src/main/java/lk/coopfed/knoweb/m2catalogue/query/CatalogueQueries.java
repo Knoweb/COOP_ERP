@@ -24,6 +24,12 @@ public interface CatalogueQueries {
     /** The units every scope reads (22A section 3.1), for the SKU editor's pickers (M2-10). */
     List<UomView> units(ScopeContext scope);
 
+    /** Lists units of measure, optionally including inactive ones (PGL-M2-04). */
+    List<UomView> listUoms(boolean includeInactive, ScopeContext scope);
+
+    /** Resolves a unit of measure by its code if visible in the scope (PGL-M2-04). */
+    Optional<UomView> getUom(String uomCode, ScopeContext scope);
+
     /** The tax categories every scope reads (22A section 3.1), for the SKU editor's picker (M2-10). */
     List<TaxCategoryView> taxCategories(ScopeContext scope);
 
@@ -35,6 +41,12 @@ public interface CatalogueQueries {
      */
     Optional<TaxRateView> taxRateInForce(UUID skuId, LocalDate onDate, ScopeContext scope);
 
+    /**
+     * Lists tax rates, optionally filtered by tax category and/or effective date.
+     * Accessible by every authenticated scope (catalogue.tax_rate authenticated_read policy).
+     */
+    List<TaxRateHistoryView> taxRates(UUID taxCategoryId, LocalDate onDate, ScopeContext scope);
+
     /** The conversions of a SKU visible in the scope (catalogue RLS); empty otherwise. */
     List<ConversionView> conversions(UUID skuId, ScopeContext scope);
 
@@ -43,4 +55,19 @@ public interface CatalogueQueries {
 
     /** The images of a SKU visible in the scope. */
     List<ImageView> images(UUID skuId, ScopeContext scope);
+
+    /** The duplicate suspects visible in the scope (catalogue RLS) (CAT-01, 22A section 6.1). */
+    List<DuplicateSuspectView> listDuplicateSuspects(String status, int limit, ScopeContext scope);
+
+    /**
+     * Resolves the canonical SKU id of a SKU by following the alias chain in catalogue.sku_alias
+     * (max depth 3, 22A section 7; doc 22 section 6.3). Returns the SKU itself if not aliased.
+     */
+    UUID resolveAlias(UUID skuId, ScopeContext scope);
+
+    /** The merchandise department categories visible in the scope (PGL-M2-08). */
+    List<DepartmentCategoryView> departmentCategories(ScopeContext scope);
+
+    /** Resolves a department category by its identifier if visible in the scope (PGL-M2-08). */
+    Optional<DepartmentCategoryView> getDepartmentCategory(UUID departmentId, ScopeContext scope);
 }

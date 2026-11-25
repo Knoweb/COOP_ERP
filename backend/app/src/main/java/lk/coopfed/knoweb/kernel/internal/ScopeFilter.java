@@ -16,7 +16,7 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.security.LocationOwners;
-import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
+import lk.coopfed.knoweb.kernel.internal.web.ProblemResponses;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.context.annotation.Profile;

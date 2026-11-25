@@ -8,10 +8,12 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.api.ApplyCreditNote;
+import lk.coopfed.knoweb.m4trading.api.BulkImportReceivables;
 import lk.coopfed.knoweb.m4trading.api.DisputeInvoice;
 import lk.coopfed.knoweb.m4trading.api.IssueCreditNote;
 import lk.coopfed.knoweb.m4trading.api.IssueDebitNote;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
+import lk.coopfed.knoweb.m4trading.api.ReceivableOpeningRow;
 import lk.coopfed.knoweb.m4trading.api.ResolveInvoiceDispute;
 import lk.coopfed.knoweb.m4trading.internal.invoice.ApplyCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.DisputeInvoiceHandler;
@@ -19,17 +21,22 @@ import lk.coopfed.knoweb.m4trading.internal.invoice.IssueCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueDebitNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueInvoiceHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.ResolveInvoiceDisputeHandler;
+import lk.coopfed.knoweb.m4trading.internal.opening.BulkReceivableImporter;
 import lk.coopfed.knoweb.m4trading.query.CreditNoteQueries;
 import lk.coopfed.knoweb.m4trading.query.CreditNoteView;
 import lk.coopfed.knoweb.m4trading.query.DebitNoteQueries;
 import lk.coopfed.knoweb.m4trading.query.DebitNoteView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
+import lk.coopfed.knoweb.m4trading.query.OpeningReceivableQueries;
+import lk.coopfed.knoweb.m4trading.query.OpeningReceivableView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
 import lk.coopfed.knoweb.m4trading.web.generated.ApplyCreditNoteRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.BillingApi;
+import lk.coopfed.knoweb.m4trading.web.generated.BulkImportReceivablesRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.BulkReceivableReport;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNotePrintResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteResponse;
@@ -46,6 +53,8 @@ import lk.coopfed.knoweb.m4trading.web.generated.InvoiceResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueCreditNoteRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueDebitNoteRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueInvoiceRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.OpeningReceivableResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.ReceivableProblemResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.ResolveInvoiceDisputeRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,6 +72,8 @@ class BillingController implements BillingApi {
     private final IssueCreditNoteHandler issueCreditNote;
     private final ApplyCreditNoteHandler applyCreditNote;
     private final IssueDebitNoteHandler issueDebitNote;
+    private final BulkReceivableImporter bulkImporter;
+    private final OpeningReceivableQueries openingReceivables;
     private final InvoiceQueries queries;
     private final CreditNoteQueries creditNotes;
     private final DebitNoteQueries debitNotes;
@@ -78,6 +89,8 @@ class BillingController implements BillingApi {
             IssueCreditNoteHandler issueCreditNote,
             ApplyCreditNoteHandler applyCreditNote,
             IssueDebitNoteHandler issueDebitNote,
+            BulkReceivableImporter bulkImporter,
+            OpeningReceivableQueries openingReceivables,
             InvoiceQueries queries,
             CreditNoteQueries creditNotes,
             DebitNoteQueries debitNotes,
@@ -91,6 +104,8 @@ class BillingController implements BillingApi {
         this.issueCreditNote = issueCreditNote;
         this.applyCreditNote = applyCreditNote;
         this.issueDebitNote = issueDebitNote;
+        this.bulkImporter = bulkImporter;
+        this.openingReceivables = openingReceivables;
         this.queries = queries;
         this.creditNotes = creditNotes;
         this.debitNotes = debitNotes;
@@ -411,5 +426,83 @@ class BillingController implements BillingApi {
         response.setInvoiceDocNumber(note.invoiceDocNumberDisplay());
         response.setIssuedAt(note.issuedAt());
         return response;
+    }
+
+    @Override
+    public ResponseEntity<BulkReceivableReport> bulkImportReceivables(
+            String idempotencyKey, BulkImportReceivablesRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<ReceivableOpeningRow> rows = request.getRows() != null
+                ? request.getRows().stream()
+                        .map(r -> new ReceivableOpeningRow(
+                                r.getSellerEntityId(),
+                                r.getSellerCode(),
+                                r.getBuyerEntityId(),
+                                r.getBuyerCode(),
+                                r.getAmount(),
+                                r.getDueDate(),
+                                r.getAsOfDate(),
+                                r.getReferenceNo(),
+                                r.getSellerSignedBy(),
+                                r.getSellerSigner(),
+                                r.getBuyerSignedBy(),
+                                r.getBuyerSigner(),
+                                r.getNotes()))
+                        .toList()
+                : List.of();
+
+        var report = bulkImporter.handle(
+                new BulkImportReceivables(
+                        request.getSellerEntityId(),
+                        request.getSheet(),
+                        rows,
+                        Boolean.TRUE.equals(request.getSimulateSignatures())),
+                scope);
+
+        BulkReceivableReport response = new BulkReceivableReport(
+                report.importId(),
+                BulkReceivableReport.StatusEnum.fromValue(report.status()),
+                report.totalRows(),
+                report.importedCount(),
+                report.documentIds(),
+                report.problems().stream()
+                        .map(p -> {
+                            ReceivableProblemResponse pr = new ReceivableProblemResponse();
+                            pr.setRow(p.line());
+                            pr.setCode(p.reference());
+                            pr.setMessage(p.message());
+                            return pr;
+                        })
+                        .toList());
+
+        return ResponseEntity.created(URI.create("/v1/trading/opening-receivables/bulk"))
+                .body(response);
+    }
+
+    @Override
+    public ResponseEntity<OpeningReceivableResponse> getOpeningReceivable(UUID id) {
+        ScopeContext scope = currentScope.get();
+        return openingReceivables
+                .getOpeningReceivable(id, scope)
+                .map(v -> ResponseEntity.ok(toOpeningReceivableResponse(v)))
+                .orElseThrow(() -> new ProblemException("m4.receivable.not_found"));
+    }
+
+    static OpeningReceivableResponse toOpeningReceivableResponse(OpeningReceivableView v) {
+        OpeningReceivableResponse res = new OpeningReceivableResponse(
+                v.openingReceivableId(),
+                v.documentId(),
+                v.relationshipId(),
+                v.sellerEntityId(),
+                v.buyerEntityId(),
+                v.amount(),
+                v.sellerSignedBy(),
+                v.sellerSignedAt(),
+                v.buyerSignedBy(),
+                v.buyerSignedAt(),
+                v.createdAt());
+        res.setReferenceNo(v.referenceNo());
+        res.setNotes(v.notes());
+        return res;
     }
 }

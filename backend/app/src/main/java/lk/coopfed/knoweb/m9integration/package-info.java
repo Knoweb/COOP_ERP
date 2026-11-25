@@ -7,8 +7,9 @@
  *
  * <p>allowedDependencies: the kernel's api only. M9 reads the other modules' facts from their
  * events, by field name, and decides nothing about money (29A, "Read this first").
+ * Also includes m3pricing::api to answer EmployeeEligibilityForPricing (PGL-M1-06).
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M9 Integration",
-        allowedDependencies = {"kernel::api"})
+        allowedDependencies = {"kernel::api", "m3pricing::api"})
 package lk.coopfed.knoweb.m9integration;

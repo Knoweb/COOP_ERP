@@ -69,6 +69,10 @@ public final class CustomersFixture {
         return ScopeContext.dev(null, SOCIETY, SHOP);
     }
 
+    public static ScopeContext till2() {
+        return ScopeContext.dev(null, SOCIETY, SHOP_2);
+    }
+
     public static void arrange(JdbcTemplate admin) {
         clean(admin);
         entity(admin, SOCIETY, SOCIETY_CODE);
@@ -92,6 +96,11 @@ public final class CustomersFixture {
     /** Everything the M7 tests and the demo leave behind in the customers schema, and the CPRs. */
     public static void cleanAllCustomers(JdbcTemplate admin) {
         for (String table : new String[] {
+            "loyalty_insurance_claim",
+            "loyalty_points_ledger",
+            "loyalty_monthly_reward",
+            "loyalty_spend",
+            "loyalty_reward_policy",
             "allocation_reversal",
             "account_history",
             "account_adjustment",
@@ -102,6 +111,8 @@ public final class CustomersFixture {
             "customer_account",
             "customer_tag",
             "customer_consent",
+            "loyalty_permitted_location",
+            "loyalty_customer",
             "customer_phone",
             "customer"
         }) {

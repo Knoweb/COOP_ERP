@@ -11,7 +11,97 @@ audit_event_types:
     offline_capturable: false
     description_en: A journal export was generated for an entity and a period
 
+  - code: JOURNAL_EXPORT_ACKNOWLEDGED
+    severity: INFO
+    offline_capturable: false
+    description_en: A generated journal export was acknowledged by its recipient
+
+  - code: JOURNAL_EXPORT_UNACKNOWLEDGED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A generated journal export remained unacknowledged past the configured threshold
+
   - code: NOTIFICATION_RULE_STATUS_CHANGED
     severity: INFO
     offline_capturable: false
     description_en: A notification rule was activated or retired
+
+  - code: EMPLOYEE_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: An employee profile was registered or updated for attendance and payroll
+
+  - code: ATTENDANCE_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Biometric attendance punch records were imported and validated
+
+  - code: OVERTIME_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: Overtime calculation was approved for payroll contribution
+
+  - code: NOTIFICATION_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification request was queued through the centralized notification gateway
+
+  - code: NOTIFICATION_SENT
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification was successfully dispatched to the provider through the centralized notification gateway
+
+  - code: VEHICLE_LOCATION_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Real-time GPS location update was captured for a delivery vehicle
+
+  - code: DELIVERY_TRIP_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery trip was planned and created for a vehicle
+
+  - code: DELIVERY_TRIP_COMPLETED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery trip was completed with final odometer and distance
+
+  - code: DELIVERY_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery drop was scheduled on a delivery trip
+
+  - code: DELIVERY_STATUS_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: The status of a delivery drop was updated
+
+  - code: PAYMENT_INITIATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction was initiated via online gateway, LankaQR, or COD
+
+  - code: PAYMENT_SETTLED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction was confirmed and settled
+
+  - code: PAYMENT_FAILED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction failed or was rejected by provider
+
+  - code: COD_PAYMENT_COLLECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Cash on delivery payment was collected and marked settled
+
+  - code: PAYMENT_RETRIED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment transaction was retried with payment provider
+
+  - code: PAYMENT_WEBHOOK_PROCESSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A provider webhook callback was received and processed idempotently

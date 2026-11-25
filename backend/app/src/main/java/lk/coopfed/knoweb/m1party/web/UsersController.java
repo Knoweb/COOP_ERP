@@ -1,11 +1,13 @@
 package lk.coopfed.knoweb.m1party.web;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.api.BulkImportUsers;
 import lk.coopfed.knoweb.m1party.api.CreateUser;
 import lk.coopfed.knoweb.m1party.api.CredentialResetResult;
 import lk.coopfed.knoweb.m1party.api.DeactivateUser;
@@ -14,6 +16,10 @@ import lk.coopfed.knoweb.m1party.api.UpdateUser;
 import lk.coopfed.knoweb.m1party.query.UserFilter;
 import lk.coopfed.knoweb.m1party.query.UserQueries;
 import lk.coopfed.knoweb.m1party.query.UserView;
+import lk.coopfed.knoweb.m1party.web.generated.BulkImportUsersRequest;
+import lk.coopfed.knoweb.m1party.web.generated.BulkUserImportReport;
+import lk.coopfed.knoweb.m1party.web.generated.BulkUserItem;
+import lk.coopfed.knoweb.m1party.web.generated.BulkUserProblem;
 import lk.coopfed.knoweb.m1party.web.generated.CreateUserRequest;
 import lk.coopfed.knoweb.m1party.web.generated.CredentialResetResponse;
 import lk.coopfed.knoweb.m1party.web.generated.ResetCredentialRequest;
@@ -33,6 +39,7 @@ class UsersController implements UsersApi {
     private final Handles<UpdateUser, UUID> updateUser;
     private final Handles<ResetCredential, CredentialResetResult> resetCredential;
     private final Handles<DeactivateUser, UUID> deactivateUser;
+    private final Handles<BulkImportUsers, lk.coopfed.knoweb.m1party.api.BulkUserReport> bulkImportUsers;
     private final UserQueries queries;
     private final CurrentScope currentScope;
 
@@ -41,14 +48,51 @@ class UsersController implements UsersApi {
             Handles<UpdateUser, UUID> updateUser,
             Handles<ResetCredential, CredentialResetResult> resetCredential,
             Handles<DeactivateUser, UUID> deactivateUser,
+            Handles<BulkImportUsers, lk.coopfed.knoweb.m1party.api.BulkUserReport> bulkImportUsers,
             UserQueries queries,
             CurrentScope currentScope) {
         this.createUser = createUser;
         this.updateUser = updateUser;
         this.resetCredential = resetCredential;
         this.deactivateUser = deactivateUser;
+        this.bulkImportUsers = bulkImportUsers;
         this.queries = queries;
         this.currentScope = currentScope;
+    }
+
+    @Override
+    public ResponseEntity<BulkUserImportReport> bulkImportUsers(String idempotencyKey, BulkImportUsersRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<BulkImportUsers.UserRow> rows = new ArrayList<>();
+        if (request.getUsers() != null) {
+            for (BulkUserItem item : request.getUsers()) {
+                rows.add(new BulkImportUsers.UserRow(
+                        item.getUsername(),
+                        item.getDisplayName(),
+                        item.getLanguage() == null ? null : item.getLanguage().getValue(),
+                        item.getUserKind() == null ? null : item.getUserKind().getValue(),
+                        item.getPin(),
+                        item.getPassword(),
+                        item.getLocationCode()));
+            }
+        }
+        BulkImportUsers command = new BulkImportUsers(request.getSheet(), rows);
+        lk.coopfed.knoweb.m1party.api.BulkUserReport report = bulkImportUsers.handle(command, scope);
+
+        BulkUserImportReport response = new BulkUserImportReport();
+        response.setStatus(BulkUserImportReport.StatusEnum.fromValue(report.status()));
+        response.setImported(report.imported());
+        response.setFailed(report.failed());
+        List<BulkUserProblem> problems = new ArrayList<>();
+        for (lk.coopfed.knoweb.m1party.api.BulkUserReport.Problem p : report.problems()) {
+            BulkUserProblem prob = new BulkUserProblem();
+            prob.setUsername(p.username());
+            prob.setField(p.field());
+            prob.setReason(p.reason());
+            problems.add(prob);
+        }
+        response.setProblems(problems);
+        return ResponseEntity.ok(response);
     }
 
     @Override

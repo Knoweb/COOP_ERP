@@ -19,4 +19,43 @@ public record SkuDetails(
         UUID taxCategoryId,
         String multiMrpPolicy,
         String originKind,
-        Map<String, Object> attributes) {}
+        Map<String, Object> attributes,
+        UUID departmentId) {
+
+    public SkuDetails(
+            String shortNameEn,
+            String shortNameSi,
+            String shortNameTa,
+            String descriptionEn,
+            String descriptionSi,
+            String descriptionTa,
+            String baseUomCode,
+            boolean soldByWeight,
+            boolean batchTracked,
+            boolean expiryTracked,
+            boolean hasPrintedMrp,
+            Short expiryWarningDays,
+            UUID taxCategoryId,
+            String multiMrpPolicy,
+            String originKind,
+            Map<String, Object> attributes) {
+        this(
+                shortNameEn,
+                shortNameSi,
+                shortNameTa,
+                descriptionEn,
+                descriptionSi,
+                descriptionTa,
+                baseUomCode,
+                soldByWeight,
+                batchTracked,
+                expiryTracked,
+                hasPrintedMrp,
+                expiryWarningDays,
+                taxCategoryId,
+                multiMrpPolicy,
+                originKind,
+                attributes,
+                null);
+    }
+}

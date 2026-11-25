@@ -123,6 +123,7 @@ public final class TradingFixture {
                 """,
                 UUID.class);
         for (String table : new String[] {
+            "doc_order_adjustment",
             "claim_return",
             "claim_decision_line",
             "claim_decision",
@@ -138,9 +139,11 @@ public final class TradingFixture {
             "doc_payment_receipt",
             "invoice_dispute",
             "discrepancy_settlement",
+            "opening_receivable",
             "doc_debit_note",
             "doc_credit_note",
             "doc_invoice",
+            "discrepancy_photo",
             "doc_discrepancy_line",
             "doc_discrepancy",
             "doc_grn_line",
@@ -173,6 +176,7 @@ public final class TradingFixture {
 
     public static void clean(JdbcTemplate admin) {
         for (String table : new String[] {
+            "doc_order_adjustment",
             "claim_return",
             "claim_decision_line",
             "claim_decision",
@@ -188,9 +192,11 @@ public final class TradingFixture {
             "doc_payment_receipt",
             "invoice_dispute",
             "discrepancy_settlement",
+            "opening_receivable",
             "doc_debit_note",
             "doc_credit_note",
             "doc_invoice",
+            "discrepancy_photo",
             "doc_discrepancy_line",
             "doc_discrepancy",
             "doc_grn_line",
@@ -229,6 +235,7 @@ public final class TradingFixture {
                 "delete from inventory.stock_movement where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from catalogue.batch_key where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.batch where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
+        admin.update("delete from catalogue.location_assortment where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.sku where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.tax_rate where tax_category_id in (?, ?)", TAX_CATEGORY, EXEMPT_CATEGORY);
         admin.update(

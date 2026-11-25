@@ -1,0 +1,143 @@
+-- Migration from v1 to v2: Extend till local schema (TILL-PLAT-04)
+-- Adds document_lines, tenders, state_history, stock_movements, audit,
+-- cash_movements, parked_sales, and lot_cache tables.
+
+CREATE TABLE document_lines (
+    line_id TEXT NOT NULL PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    line_no INTEGER NOT NULL,
+    sku_id TEXT NOT NULL,
+    batch_id TEXT,
+    uom_code TEXT NOT NULL,
+    qty TEXT NOT NULL,
+    unit_price TEXT NOT NULL,
+    mrp_applied TEXT,
+    control_price_applied TEXT,
+    cap_reason TEXT,
+    discount_rule_id TEXT,
+    discount_amount TEXT,
+    tax_rate_percent TEXT,
+    tax_amount TEXT,
+    line_total TEXT NOT NULL,
+    unit_cost_at_issue TEXT,
+    loss_category TEXT,
+    reference_line_id TEXT,
+    negative_ack INTEGER NOT NULL DEFAULT 0,
+    picked INTEGER NOT NULL DEFAULT 0,
+    weight_kg TEXT
+);
+
+CREATE INDEX document_lines_doc ON document_lines(document_id);
+
+CREATE TABLE tenders (
+    tender_id TEXT NOT NULL PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    reference TEXT,
+    customer_account_id TEXT,
+    change_given TEXT,
+    offline INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX tenders_doc ON tenders(document_id);
+
+CREATE TABLE state_history (
+    history_id TEXT NOT NULL PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    occurred_at INTEGER NOT NULL,
+    occurred_local TEXT,
+    actor_user_id TEXT NOT NULL,
+    reason_code TEXT,
+    reason_text TEXT
+);
+
+CREATE INDEX state_history_doc ON state_history(document_id);
+
+CREATE TABLE stock_movements (
+    movement_id TEXT NOT NULL PRIMARY KEY,
+    movement_seq INTEGER,
+    location_id TEXT NOT NULL,
+    sku_id TEXT,
+    batch_id TEXT,
+    lot_id TEXT,
+    condition TEXT NOT NULL DEFAULT 'GOOD',
+    qty_delta TEXT NOT NULL,
+    movement_type TEXT NOT NULL,
+    unit_cost_at_movement TEXT,
+    document_id TEXT,
+    document_line_id TEXT,
+    occurred_at INTEGER NOT NULL,
+    occurred_local TEXT,
+    operator_user_id TEXT NOT NULL,
+    device_id TEXT
+);
+
+CREATE INDEX stock_movements_doc ON stock_movements(document_id);
+CREATE INDEX stock_movements_sku ON stock_movements(sku_id);
+
+CREATE TABLE audit (
+    audit_id TEXT NOT NULL PRIMARY KEY,
+    event_type_code TEXT NOT NULL,
+    occurred_at INTEGER NOT NULL,
+    occurred_local TEXT,
+    owner_entity_id TEXT,
+    location_id TEXT,
+    actor_user_id TEXT NOT NULL,
+    device_id TEXT,
+    till_position_id TEXT,
+    subject_table TEXT,
+    subject_id TEXT,
+    document_id TEXT,
+    before_state TEXT,
+    after_state TEXT,
+    reason_code TEXT,
+    reason_text TEXT,
+    device_seq INTEGER,
+    correlation_id TEXT
+);
+
+CREATE INDEX audit_occurred ON audit(occurred_at);
+
+CREATE TABLE cash_movements (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    operator_user_id TEXT NOT NULL,
+    reason TEXT
+);
+
+CREATE INDEX cash_movements_session ON cash_movements(session_id);
+
+CREATE TABLE parked_sales (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT,
+    lines_json TEXT NOT NULL,
+    parked_at INTEGER NOT NULL,
+    operator_user_id TEXT NOT NULL,
+    customer_id TEXT,
+    notes TEXT
+);
+
+CREATE INDEX parked_sales_session ON parked_sales(session_id);
+
+CREATE TABLE lot_cache (
+    lot_id TEXT NOT NULL PRIMARY KEY,
+    sku_id TEXT NOT NULL,
+    batch_id TEXT,
+    location_id TEXT NOT NULL,
+    cost_price TEXT,
+    selling_price TEXT,
+    mrp TEXT,
+    available_qty TEXT NOT NULL DEFAULT '0',
+    expiry_date TEXT,
+    condition TEXT NOT NULL DEFAULT 'GOOD',
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX lot_cache_sku ON lot_cache(sku_id);
