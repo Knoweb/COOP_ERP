@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { usePermissions } from "../auth/PermissionsContext";
+import { useSession } from "../auth/session";
 import { useScope } from "../scope/useScope";
 import { useT } from "../i18n/useT";
 import { navItemsFor } from "../modules/assemble";
@@ -8,11 +9,17 @@ import { NavIcon } from "../nav/NavIcon";
 
 export function ShellHome({ modules }: { modules: ModuleDefinition[] }) {
   const permissions = usePermissions();
+  const session = useSession();
   const scope = useScope();
   const t = useT();
 
   const items = permissions ? navItemsFor(modules, permissions) : [];
+  const userName = session?.displayName || "";
   const entityName = scope?.entityName || scope?.entityShortId || t("shell.home.default_entity").text;
+
+  const welcomeTitle = userName
+    ? t("shell.home.welcome_user", undefined, { entity: entityName, user: userName }).text
+    : t("shell.home.welcome", undefined, { entity: entityName }).text;
 
   return (
     <main className="shell-home">
@@ -23,7 +30,7 @@ export function ShellHome({ modules }: { modules: ModuleDefinition[] }) {
             <span>{t("shell.home.badge").text}</span>
           </div>
           <h1 className="shell-home-hero__title">
-            {t("shell.home.welcome", undefined, { entity: entityName }).text}
+            {welcomeTitle}
           </h1>
           <p className="shell-home-hero__subtitle">{t("shell.home.welcome_sub").text}</p>
         </div>
