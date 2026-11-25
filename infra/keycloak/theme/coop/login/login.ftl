@@ -17,7 +17,7 @@
     <title>${msg("loginTitle",(realm.displayName!''))}</title>
     <link rel="icon" type="image/png" href="${url.resourcesPath}/img/favicon.png" />
     <link rel="shortcut icon" href="${url.resourcesPath}/img/favicon.ico" />
-    <link href="${url.resourcesPath}/css/styles.css?v=19" rel="stylesheet" />
+    <link href="${url.resourcesPath}/css/styles.css?v=20" rel="stylesheet" />
 </head>
 <body class="auth-page">
 
@@ -29,7 +29,7 @@
             <div class="showcase-hero">
                 <div class="showcase-badge">
                     <span class="badge-dot"></span>
-                    <span>COOPFED SRI LANKA</span>
+                    <span>Co-op Sri Lanka</span>
                 </div>
 
                 <h1 class="showcase-title">${msg("coopHeroHeadline")}</h1>
@@ -69,7 +69,7 @@
         <!-- Top Navigation Bar inside form panel -->
         <div class="portal-topbar">
             <div class="mobile-brand-pill">
-                <span class="coopfed-text">COOPFED</span> <span class="erp-text">ERP</span>
+                <span class="coopfed-text">Co-op</span> <span class="erp-text">ERP</span>
             </div>
             <#if realm.internationalizationEnabled  && locale.supported?size gt 1>
                 <div class="language-position">
@@ -106,7 +106,7 @@
                         <img src="${url.resourcesPath}/img/coop_logo-removebg-preview.png" alt="${msg("coopLogoAlt")}" class="coopfed-logo" />
                     </div>
                     <h1>
-                        <span class="coopfed">COOPFED</span> <span class="erp">ERP</span>
+                        <span class="coopfed">Co-op</span> <span class="erp">ERP</span>
                     </h1>
                     <p class="tagline">${msg("coopTagline")}</p>
                 </div>

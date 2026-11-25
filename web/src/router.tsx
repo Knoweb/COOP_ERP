@@ -107,7 +107,7 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
                 <img src={coopLogo} alt="" aria-hidden="true" />
               </span>
               <span className="brand-text">
-                <span className="brand-name">COOPFED</span>
+                <span className="brand-name">Co-op</span>
                 <span className="brand-badge">ERP</span>
               </span>
             </div>
