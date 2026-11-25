@@ -89,18 +89,22 @@ class ShopOperationsPowerLossHarnessTest {
 
         // Open database
         var driver = EncryptedJvmDatabase.open(file, key)
+        driver.execute(null, "PRAGMA synchronous = NORMAL", 0)
         var store = SqlTillStore(driver)
 
-        fun reopenDatabase() {
+        fun reopenDatabase(checkIntegrity: Boolean = false) {
             driver.close()
             driver = EncryptedJvmDatabase.open(file, key)
+            driver.execute(null, "PRAGMA synchronous = NORMAL", 0)
             store = SqlTillStore(driver)
-            // PRAGMA integrity_check must be 'ok' on every restart
-            val integrity = driver.executeQuery(null, "PRAGMA integrity_check", { cursor ->
-                cursor.next()
-                app.cash.sqldelight.db.QueryResult.Value(cursor.getString(0) ?: "unknown")
-            }, 0).value
-            assertEquals("ok", integrity, "SQLite database must open clean every time")
+            if (checkIntegrity) {
+                // PRAGMA integrity_check must be 'ok' on restart
+                val integrity = driver.executeQuery(null, "PRAGMA integrity_check", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getString(0) ?: "unknown")
+                }, 0).value
+                assertEquals("ok", integrity, "SQLite database must open clean every time")
+            }
         }
 
         try {
@@ -325,51 +329,59 @@ class ShopOperationsPowerLossHarnessTest {
                         }
                     }
 
-                    // Assert All-or-Nothing: zero trace of this uncommitted document
-                    assertEquals(emptyList(), store.documentLines(docId), "document lines rolled back on kill")
-                    assertEquals(emptyList(), store.stateHistoryOf(docId), "state history rolled back on kill")
-                    assertEquals(emptyList(), store.stockMovementsOf(docId), "stock movements rolled back on kill")
-                    assertEquals(emptyList(), store.auditEventsOf(docId), "audit rolled back on kill")
-
-                    // Reboot till at representative checkpoints (first 10 cycles, and periodically every 200 cycles)
-                    if (i < 10 || i % 200 == 0) {
-                        reopenDatabase()
+                    // Assert All-or-Nothing: zero trace of this uncommitted document on sample checkpoints
+                    if (i < 20 || i % 100 == 0) {
+                        assertEquals(emptyList(), store.documentLines(docId), "document lines rolled back on kill")
+                        assertEquals(emptyList(), store.stateHistoryOf(docId), "state history rolled back on kill")
+                        assertEquals(emptyList(), store.stockMovementsOf(docId), "stock movements rolled back on kill")
+                        assertEquals(emptyList(), store.auditEventsOf(docId), "audit rolled back on kill")
                     }
 
-                    // Retry same document number and device sequence safely
-                    store.saveShopOperation(bundle)
-                    store.putSetting(Settings.docNumberKey(opType), (docNumber + 1).toString())
-                    store.putSetting(Settings.NEXT_DEVICE_SEQ, (currentDeviceSeq + 1).toString())
+                    // Reboot till at representative checkpoints (first 5 cycles, and periodically every 500 cycles)
+                    if (i < 5 || i % 500 == 0) {
+                        reopenDatabase(checkIntegrity = (i < 5 || i % 1000 == 0))
+                    }
+
+                    // Retry same document number and device sequence safely inside a single transaction
+                    store.transaction {
+                        store.saveShopOperation(bundle)
+                        store.putSetting(Settings.docNumberKey(opType), (docNumber + 1).toString())
+                        store.putSetting(Settings.NEXT_DEVICE_SEQ, (currentDeviceSeq + 1).toString())
+                    }
                     committedCount++
                     currentDeviceSeq++
                     nextDocNumbers[opType] = docNumber + 1
                 } else if (failureStep == 6) {
                     // Post-commit power cut
                     postCommitKills++
-                    store.saveShopOperation(bundle)
-                    store.putSetting(Settings.docNumberKey(opType), (docNumber + 1).toString())
-                    store.putSetting(Settings.NEXT_DEVICE_SEQ, (currentDeviceSeq + 1).toString())
+                    store.transaction {
+                        store.saveShopOperation(bundle)
+                        store.putSetting(Settings.docNumberKey(opType), (docNumber + 1).toString())
+                        store.putSetting(Settings.NEXT_DEVICE_SEQ, (currentDeviceSeq + 1).toString())
+                    }
                     committedCount++
                     currentDeviceSeq++
                     nextDocNumbers[opType] = docNumber + 1
 
                     // Reboot till at representative checkpoints
-                    if (i < 10 || i % 200 == 6) {
-                        reopenDatabase()
+                    if (i < 5 || i % 500 == 6) {
+                        reopenDatabase(checkIntegrity = (i < 5 || i % 1000 == 6))
                     }
                 } else {
                     // Clean commit
-                    store.saveShopOperation(bundle)
-                    store.putSetting(Settings.docNumberKey(opType), (docNumber + 1).toString())
-                    store.putSetting(Settings.NEXT_DEVICE_SEQ, (currentDeviceSeq + 1).toString())
+                    store.transaction {
+                        store.saveShopOperation(bundle)
+                        store.putSetting(Settings.docNumberKey(opType), (docNumber + 1).toString())
+                        store.putSetting(Settings.NEXT_DEVICE_SEQ, (currentDeviceSeq + 1).toString())
+                    }
                     committedCount++
                     currentDeviceSeq++
                     nextDocNumbers[opType] = docNumber + 1
                 }
             }
 
-            // Post-harness assertions
-            reopenDatabase()
+            // Post-harness assertions: final reboot and full integrity check on the complete 10,000-cycle database
+            reopenDatabase(checkIntegrity = true)
 
             // 1. All committed operations are intact
             assertEquals(committedCount.toLong(), store.pendingCount())

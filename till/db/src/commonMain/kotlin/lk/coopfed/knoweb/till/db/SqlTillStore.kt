@@ -185,8 +185,9 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
         if (deviceSeqs.isEmpty()) 0 else q.countQuarantinedAmong(deviceSeqs).executeAsOne()
 
     override fun saveShopOperation(bundle: ShopOperationBundle) {
-        appendOutbox(bundle.outboxEntry)
-        for (line in bundle.lines) {
+        transaction {
+            appendOutbox(bundle.outboxEntry)
+            for (line in bundle.lines) {
             q.insertDocumentLine(
                 line_id = line.lineId,
                 document_id = bundle.document.documentId,
@@ -267,6 +268,7 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
                 correlation_id = a.correlationId,
             )
         }
+    }
     }
 
     override fun documentLines(documentId: String): List<ShopDocumentLine> =

@@ -755,7 +755,9 @@ class TillService(
     }
 
     /** The business date a session opens on now, for the screen (null before the first session). */
-    suspend fun currentBusinessDate(): LocalDate? = lock.withLock { store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) } }
+    suspend fun currentBusinessDate(): LocalDate? = lock.withLock { storedBusinessDate() }
+
+    private fun storedBusinessDate(): LocalDate? = store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) }
 
     /** Today's date at the shop by the till's corrected clock. */
     suspend fun clockDate(): LocalDate = lock.withLock { Times.date(now(), clock.zone) }
@@ -1089,7 +1091,7 @@ class TillService(
         if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
             throw TillRefusal("Operation $operationId was already recorded")
         }
-        val date = currentBusinessDate() ?: openBusinessDay(clock.now())
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
         val reading = clockReading()
         store.transaction {
             val docNumber = next(Settings.docNumberKey("GRN"))
@@ -1119,7 +1121,7 @@ class TillService(
         if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
             throw TillRefusal("Operation $operationId was already recorded")
         }
-        val date = currentBusinessDate() ?: openBusinessDay(clock.now())
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
         val reading = clockReading()
         store.transaction {
             val docNumber = next(Settings.docNumberKey("CNT"))
@@ -1149,7 +1151,7 @@ class TillService(
         if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
             throw TillRefusal("Operation $operationId was already recorded")
         }
-        val date = currentBusinessDate() ?: openBusinessDay(clock.now())
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
         val reading = clockReading()
         store.transaction {
             val docNumber = next(Settings.docNumberKey("WOF"))
@@ -1179,7 +1181,7 @@ class TillService(
         if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
             throw TillRefusal("Operation $operationId was already recorded")
         }
-        val date = currentBusinessDate() ?: openBusinessDay(clock.now())
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
         val reading = clockReading()
         store.transaction {
             val docNumber = next(Settings.docNumberKey("RPK"))
@@ -1209,7 +1211,7 @@ class TillService(
         if (operationId != null && store.documentLines(operationId).isNotEmpty()) {
             throw TillRefusal("Operation $operationId was already recorded")
         }
-        val date = currentBusinessDate() ?: openBusinessDay(clock.now())
+        val date = storedBusinessDate() ?: openBusinessDay(clock.now())
         val reading = clockReading()
         store.transaction {
             val docNumber = next(Settings.docNumberKey("XFR"))

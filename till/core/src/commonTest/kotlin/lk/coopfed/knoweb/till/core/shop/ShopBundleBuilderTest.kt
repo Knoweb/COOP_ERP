@@ -6,7 +6,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.serialization.json.Json
@@ -392,7 +392,7 @@ class ShopBundleBuilderTest {
     // =========================================================================
 
     @Test
-    fun tillServiceCoordinatesMixedOperationsWithDenseSequenceNumbers() = runBlocking {
+    fun tillServiceCoordinatesMixedOperationsWithDenseSequenceNumbers() = runTest {
         val fixture = TillFixture().signedInWithSession()
         val service = fixture.service
         val store = fixture.store
@@ -478,7 +478,7 @@ class ShopBundleBuilderTest {
     }
 
     @Test
-    fun duplicateOperationIdThrowsRefusalAndDoesNotConsumeSequence() = runBlocking {
+    fun duplicateOperationIdThrowsRefusalAndDoesNotConsumeSequence() = runTest {
         val fixture = TillFixture().signedInWithSession()
         val service = fixture.service
         val store = fixture.store
