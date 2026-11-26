@@ -84,6 +84,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sync/devices/{device_id}/sync-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get synchronization status and heartbeat details for a device
+         * @description Returns the device's server-side sync state (cursor, in-flight batch, sequence gaps) and latest health report (heartbeat, clock offset, battery, storage).
+         */
+        get: operations["getDeviceSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List quarantined sync events in the caller's scope
+         * @description Returns quarantined events filtered by device or resolution status, in reverse chronological order.
+         */
+        get: operations["listQuarantine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/quarantine/{quarantine_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a quarantined sync event by ID
+         * @description Returns the details of a single quarantined sync event including its raw payload and resolution status.
+         */
+        get: operations["getQuarantine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sync/quarantine/{quarantine_id}/resolve": {
         parameters: {
             query?: never;
@@ -234,6 +294,76 @@ export interface components {
             resolution: "REPAIRED" | "DISCARDED";
             /** Format: date-time */
             resolved_at: string;
+        };
+        QuarantinedEvent: {
+            /** Format: uuid */
+            quarantine_id: string;
+            /** Format: uuid */
+            device_id: string;
+            /** Format: int64 */
+            device_seq: number;
+            /** Format: uuid */
+            owner_entity_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            /** Format: uuid */
+            batch_id: string;
+            /** Format: uuid */
+            event_id?: string | null;
+            event_type?: string | null;
+            /** @enum {string} */
+            reason: "SCHEMA" | "DUPLICATE_ID" | "HASH" | "TOO_LARGE" | "FORBIDDEN_FIELD";
+            detail?: string | null;
+            raw_event?: string | null;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: date-time */
+            resolved_at?: string | null;
+            /** Format: uuid */
+            resolved_by_user_id?: string | null;
+            /** @enum {string|null} */
+            resolution?: "REPAIRED" | "DISCARDED" | null;
+            resolution_reason?: string | null;
+            /** Format: uuid */
+            series_id?: string | null;
+            /** Format: int64 */
+            doc_number?: number | null;
+        };
+        DeviceSyncStatus: {
+            /** Format: uuid */
+            device_id: string;
+            /** Format: uuid */
+            owner_entity_id: string;
+            /** Format: int64 */
+            last_applied_seq: number;
+            /** Format: date-time */
+            last_applied_at?: string | null;
+            /** Format: uuid */
+            last_batch_id?: string | null;
+            /** Format: uuid */
+            in_flight_batch_id?: string | null;
+            /** Format: date-time */
+            in_flight_since?: string | null;
+            gap_rejections: number;
+            /** Format: int64 */
+            resend_from_seq?: number | null;
+            /** Format: int64 */
+            snapshot_version_reported?: number | null;
+            app_version?: string | null;
+            /** Format: date-time */
+            last_enrolled_at?: string | null;
+            /** Format: date-time */
+            last_seen_at?: string | null;
+            battery_pct?: number | null;
+            /** Format: int64 */
+            storage_free_mb?: number | null;
+            pending_event_count?: number | null;
+            /** Format: int64 */
+            last_acknowledged_seq?: number | null;
+            /** Format: int64 */
+            clock_offset_ms?: number | null;
+            open_session?: boolean | null;
+            recent_gaps?: components["schemas"]["SequenceGap"][];
         };
         SequenceGap: {
             /** Format: uuid */
@@ -780,6 +910,84 @@ export interface operations {
             403: components["responses"]["Refused"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDeviceSyncStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The device; for a device operation, the dev claim of the token */
+                device_id: components["parameters"]["DeviceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Device sync status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSyncStatus"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["Refused"];
+            404: components["responses"]["Refused"];
+        };
+    };
+    listQuarantine: {
+        parameters: {
+            query?: {
+                device_id?: string;
+                resolved?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quarantined events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuarantinedEvent"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["Refused"];
+        };
+    };
+    getQuarantine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quarantine_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quarantined event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuarantinedEvent"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["Refused"];
+            404: components["responses"]["Refused"];
         };
     };
     resolveQuarantine: {

@@ -61,7 +61,22 @@ class ScopeFilterPrincipalTest {
                         () -> ScopeFilter.validatePrincipal(device, "/v1/sync/devices/" + DEVICE + "/enrolment-codes"))
                 .isInstanceOf(ProblemException.class)
                 .hasMessage("sync.device_token_not_allowed");
+        assertThatThrownBy(() -> ScopeFilter.validatePrincipal(device, "/v1/sync/devices/" + DEVICE + "/sync-status"))
+                .isInstanceOf(ProblemException.class)
+                .hasMessage("sync.device_token_not_allowed");
+        assertThatThrownBy(() -> ScopeFilter.validatePrincipal(device, "/v1/sync/quarantine"))
+                .isInstanceOf(ProblemException.class)
+                .hasMessage("sync.device_token_not_allowed");
+        assertThatThrownBy(() -> ScopeFilter.validatePrincipal(device, "/v1/sync/quarantine/" + UUID.randomUUID()))
+                .isInstanceOf(ProblemException.class)
+                .hasMessage("sync.device_token_not_allowed");
         assertThatCode(() -> ScopeFilter.validatePrincipal(user, "/v1/sync/devices/" + DEVICE + "/enrolment-codes"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> ScopeFilter.validatePrincipal(user, "/v1/sync/devices/" + DEVICE + "/sync-status"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> ScopeFilter.validatePrincipal(user, "/v1/sync/quarantine"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> ScopeFilter.validatePrincipal(user, "/v1/sync/quarantine/" + UUID.randomUUID()))
                 .doesNotThrowAnyException();
         assertThatCode(() -> ScopeFilter.validatePrincipal(nobody, "/v1/sync/devices/" + DEVICE + "/enrol"))
                 .doesNotThrowAnyException();

@@ -1809,3 +1809,133 @@ table.modern-table tbody tr:hover td {
   box-shadow: none !important;
   transform: none !important;
 }
+
+/* ---- Devices & Quarantine Screens (ADM-01) ------------------------------- */
+
+.device-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-half);
+  padding: var(--space-half) var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-strong);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.device-action-btn:hover:not(:disabled) {
+  background: var(--color-surface-subtle);
+  border-color: var(--color-accent);
+}
+
+.device-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.device-action-btn--primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.device-action-btn--primary:hover:not(:disabled) {
+  background: var(--color-accent);
+  filter: brightness(0.9);
+}
+
+.device-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--color-sidebar-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-2);
+}
+
+.device-modal-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  max-width: var(--page-max-width);
+  width: 100%;
+  max-height: calc(var(--space-8) * 10);
+  overflow-y: auto;
+  box-shadow: 0 var(--border-width-strong) var(--space-2) var(--color-sidebar-shadow);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.device-modal-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+}
+
+.device-code-box {
+  padding: var(--space-2);
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-accent);
+}
+
+.device-facts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-8) * 3), 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.device-fact-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.device-fact-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.device-fact-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.quarantine-pre {
+  background: var(--color-surface-subtle);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  overflow-x: auto;
+  max-height: calc(var(--space-8) * 4);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.device-actions-row {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
