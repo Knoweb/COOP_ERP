@@ -11,6 +11,7 @@ import {
   useCatalogueApi,
   type UomDetail
 } from "./catalogueApi";
+import { CatalogueDropdown } from "./CatalogueDropdown";
 import { errorText } from "./skuView";
 
 export function UnitsOfMeasurePage() {
@@ -365,16 +366,16 @@ export function UnitsOfMeasurePage() {
               />
             </label>
 
-            <label className="catalogue-form-field">
-              <span>{t("catalogue.uom.status").text}</span>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value as "ACTIVE" | "INACTIVE")}
-              >
-                <option value="ACTIVE">{t("catalogue.uom.status.ACTIVE").text}</option>
-                <option value="INACTIVE">{t("catalogue.uom.status.INACTIVE").text}</option>
-              </select>
-            </label>
+            <CatalogueDropdown<"ACTIVE" | "INACTIVE">
+              id="edit-uom-status-select"
+              label={t("catalogue.uom.status").text}
+              value={editStatus}
+              onChange={(val) => setEditStatus(val)}
+              options={[
+                { value: "ACTIVE", label: t("catalogue.uom.status.ACTIVE").text },
+                { value: "INACTIVE", label: t("catalogue.uom.status.INACTIVE").text }
+              ]}
+            />
 
             <div className="catalogue-checkbox-row">
               <input
@@ -410,25 +411,7 @@ export function UnitsOfMeasurePage() {
       )}
 
       {/* Filter Toolbar */}
-      <section className="uom-filter-toolbar" aria-label={t("catalogue.filter.toggle").text}>
-        <div className="uom-filter-label-group">
-          <span className="uom-filter-icon" aria-hidden="true">
-            <svg
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-          </span>
-          <span className="uom-filter-title">{t("catalogue.filter.toggle").text}</span>
-        </div>
-
+      <section className="uom-filter-toolbar">
         <label className="uom-filter-toggle">
           <input
             type="checkbox"
