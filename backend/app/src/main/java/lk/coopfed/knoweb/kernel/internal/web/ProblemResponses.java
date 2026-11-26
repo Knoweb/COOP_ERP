@@ -78,6 +78,7 @@ public class ProblemResponses {
             // Wave 2: a quarantine row the caller cannot see (CR-32-1 item 2), and a render that
             // found every browser slot taken (TWK-28), which the caller may try again.
             Map.entry("sync.quarantine.not_found", HttpStatus.NOT_FOUND),
+            Map.entry("sync.device.not_found", HttpStatus.NOT_FOUND),
             Map.entry("render.busy", HttpStatus.SERVICE_UNAVAILABLE));
 
     private final Messages messages;

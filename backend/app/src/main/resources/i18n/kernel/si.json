@@ -82,6 +82,7 @@
   "sync.device_token_not_allowed": "උපාංගයකට ඇමතිය හැක්කේ සමමුහුර්ත සේවාව පමණි",
   "sync.device_token_required": "මෙම සමමුහුර්ත මෙහෙයුම ඇමතිය හැක්කේ ඇතුළත් කළ උපාංගයකට පමණි",
   "sync.device_unknown": "මෙම උපාංගය පද්ධතියේ ලියාපදිංචි වී නැත",
+  "sync.device.not_found": "උපාංගය හමු නොවීය",
   "sync.enrolment.code_invalid": "ඇතුළත් කිරීමේ කේතය මෙම උපාංගය සඳහා වලංගු නැත",
   "sync.enrolment.device_not_assigned": "ඇතුළත් වීමට පෙර උපාංගය මුදල් ලේඛන ස්ථානයකට පැවරිය යුතුය",
   "sync.enrolment.device_not_enrollable": "මෙම උපාංගයේ වත්මන් තත්ත්වයේදී එයට ඇතුළත් කිරීමේ කේතයක් දිය නොහැක",

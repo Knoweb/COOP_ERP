@@ -3,6 +3,11 @@ package lk.coopfed.knoweb.kernel.internal.sync;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +15,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
@@ -17,6 +23,7 @@ import lk.coopfed.knoweb.kernel.internal.sync.DeviceDirectory.DeviceRecord;
 import lk.coopfed.knoweb.kernel.sync.web.generated.ChangeEntry;
 import lk.coopfed.knoweb.kernel.sync.web.generated.ChangePage;
 import lk.coopfed.knoweb.kernel.sync.web.generated.DeviceCredential;
+import lk.coopfed.knoweb.kernel.sync.web.generated.DeviceSyncStatus;
 import lk.coopfed.knoweb.kernel.sync.web.generated.EnrolmentCode;
 import lk.coopfed.knoweb.kernel.sync.web.generated.EnrolmentRequest;
 import lk.coopfed.knoweb.kernel.sync.web.generated.EnrolmentResponse;
@@ -27,6 +34,7 @@ import lk.coopfed.knoweb.kernel.sync.web.generated.Instruction;
 import lk.coopfed.knoweb.kernel.sync.web.generated.PresignRequest;
 import lk.coopfed.knoweb.kernel.sync.web.generated.PresignResponse;
 import lk.coopfed.knoweb.kernel.sync.web.generated.QuarantineResolution;
+import lk.coopfed.knoweb.kernel.sync.web.generated.QuarantinedEvent;
 import lk.coopfed.knoweb.kernel.sync.web.generated.ResolvedQuarantine;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SequenceGap;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SequenceResetRequest;
@@ -42,6 +50,7 @@ import lk.coopfed.knoweb.kernel.sync.web.generated.SyncApi;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SyncBatch;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -69,6 +78,7 @@ class SyncController implements SyncApi {
     private final HttpServletRequest request;
     private final AppVersionFloors floors;
     private final ResolveQuarantineHandler quarantine;
+    private final JdbcTemplate jdbc;
 
     SyncController(
             CurrentScope currentScope,
@@ -87,9 +97,11 @@ class SyncController implements SyncApi {
             ObjectMapper json,
             HttpServletRequest request,
             AppVersionFloors floors,
-            ResolveQuarantineHandler quarantine) {
+            ResolveQuarantineHandler quarantine,
+            JdbcTemplate jdbc) {
         this.floors = floors;
         this.quarantine = quarantine;
+        this.jdbc = jdbc;
         this.currentScope = currentScope;
         this.directory = directory;
         this.enrolment = enrolment;
@@ -186,6 +198,197 @@ class SyncController implements SyncApi {
                 resolved.reason(),
                 ResolvedQuarantine.ResolutionEnum.fromValue(resolved.resolution()),
                 resolved.resolvedAt()));
+    }
+
+    @Override
+    public ResponseEntity<DeviceSyncStatus> getDeviceSyncStatus(UUID deviceId) {
+        ScopeContext scope = currentScope.get();
+        DeviceRecord dev = directory.find(deviceId).orElseThrow(() -> new ProblemException("sync.device.not_found"));
+        if (scope.policyClass() != PolicyClass.FEDERATION_VIEW
+                && (scope.policyClass() != PolicyClass.OWN
+                        || !dev.ownerEntityId().equals(scope.entityId()))) {
+            throw new ProblemException("sync.device.not_found");
+        }
+        return transactions.inScope(scope, () -> {
+            String sql =
+                    """
+                    select c.device_id, c.owner_entity_id, c.last_applied_seq, c.last_applied_at,
+                           c.last_batch_id, c.in_flight_batch_id, c.in_flight_since, c.gap_rejections,
+                           c.resend_from_seq, c.snapshot_version_reported,
+                           coalesce(h.app_version, c.app_version) as app_version, c.last_enrolled_at,
+                           h.last_seen_at, h.battery_pct, h.storage_free_mb, h.pending_event_count,
+                           h.last_acknowledged_seq, h.clock_offset_ms, h.open_session
+                      from kernel.device_sync_cursor c
+                      left join kernel.device_heartbeat h on h.device_id = c.device_id
+                     where c.device_id = ?
+                    """;
+            List<DeviceSyncStatus> statuses = jdbc.query(
+                    sql,
+                    (rs, rowNum) -> {
+                        UUID devId = (UUID) rs.getObject("device_id");
+                        UUID ownerId = (UUID) rs.getObject("owner_entity_id");
+                        long appliedSeq = rs.getLong("last_applied_seq");
+                        int gapRej = rs.getInt("gap_rejections");
+
+                        DeviceSyncStatus status = new DeviceSyncStatus(devId, ownerId, appliedSeq, gapRej);
+                        Timestamp appliedAt = rs.getTimestamp("last_applied_at");
+                        status.setLastAppliedAt(appliedAt != null ? appliedAt.toInstant() : null);
+                        status.setLastBatchId((UUID) rs.getObject("last_batch_id"));
+                        status.setInFlightBatchId((UUID) rs.getObject("in_flight_batch_id"));
+                        Timestamp inFlightSince = rs.getTimestamp("in_flight_since");
+                        status.setInFlightSince(inFlightSince != null ? inFlightSince.toInstant() : null);
+
+                        long resendFrom = rs.getLong("resend_from_seq");
+                        status.setResendFromSeq(rs.wasNull() ? null : resendFrom);
+
+                        long snapRep = rs.getLong("snapshot_version_reported");
+                        status.setSnapshotVersionReported(rs.wasNull() ? null : snapRep);
+
+                        status.setAppVersion(rs.getString("app_version"));
+                        Timestamp enrolledAt = rs.getTimestamp("last_enrolled_at");
+                        status.setLastEnrolledAt(enrolledAt != null ? enrolledAt.toInstant() : null);
+
+                        Timestamp seenAt = rs.getTimestamp("last_seen_at");
+                        status.setLastSeenAt(seenAt != null ? seenAt.toInstant() : null);
+
+                        int battery = rs.getInt("battery_pct");
+                        status.setBatteryPct(rs.wasNull() ? null : battery);
+
+                        long storage = rs.getLong("storage_free_mb");
+                        status.setStorageFreeMb(rs.wasNull() ? null : storage);
+
+                        int pendingEvents = rs.getInt("pending_event_count");
+                        status.setPendingEventCount(rs.wasNull() ? null : pendingEvents);
+
+                        long lastAckSeq = rs.getLong("last_acknowledged_seq");
+                        status.setLastAcknowledgedSeq(rs.wasNull() ? null : lastAckSeq);
+
+                        long clockOffset = rs.getLong("clock_offset_ms");
+                        status.setClockOffsetMs(rs.wasNull() ? null : clockOffset);
+
+                        boolean openSession = rs.getBoolean("open_session");
+                        status.setOpenSession(rs.wasNull() ? null : openSession);
+
+                        return status;
+                    },
+                    deviceId);
+
+            DeviceSyncStatus status;
+            if (statuses.isEmpty()) {
+                status = new DeviceSyncStatus(dev.deviceId(), dev.ownerEntityId(), 0L, 0);
+                status.setRecentGaps(List.of());
+                return ResponseEntity.ok(status);
+            } else {
+                status = statuses.getFirst();
+            }
+
+            List<SequenceGap> gaps = jdbc.query(
+                    """
+                    select gap_id, device_id, from_seq, to_seq, recorded_at
+                      from kernel.sync_sequence_gap
+                     where device_id = ?
+                     order by recorded_at desc
+                     limit 10
+                    """,
+                    (rs, rowNum) -> {
+                        UUID gapId = (UUID) rs.getObject("gap_id");
+                        UUID devId = (UUID) rs.getObject("device_id");
+                        long fromSeq = rs.getLong("from_seq");
+                        long toSeq = rs.getLong("to_seq");
+                        Timestamp recAt = rs.getTimestamp("recorded_at");
+                        return new SequenceGap(gapId, devId, fromSeq, toSeq, recAt != null ? recAt.toInstant() : null);
+                    },
+                    deviceId);
+            status.setRecentGaps(gaps);
+            return ResponseEntity.ok(status);
+        });
+    }
+
+    @Override
+    public ResponseEntity<List<QuarantinedEvent>> listQuarantine(
+            UUID deviceId, Boolean resolved, Integer limit, Integer offset) {
+        ScopeContext scope = currentScope.get();
+        return transactions.inScope(scope, () -> {
+            StringBuilder sql = new StringBuilder(
+                    """
+                    select quarantine_id, device_id, device_seq, owner_entity_id, location_id, batch_id,
+                           event_id, event_type, reason, detail, raw_event, received_at,
+                           resolved_at, resolved_by_user_id, resolution, resolution_reason,
+                           series_id, doc_number
+                      from kernel.sync_quarantine
+                     where 1=1
+                    """);
+            List<Object> params = new ArrayList<>();
+            if (deviceId != null) {
+                sql.append(" and device_id = ?");
+                params.add(deviceId);
+            }
+            if (resolved != null) {
+                if (resolved) {
+                    sql.append(" and resolved_at is not null");
+                } else {
+                    sql.append(" and resolved_at is null");
+                }
+            }
+            sql.append(" order by received_at desc, device_seq desc limit ? offset ?");
+            params.add(limit != null ? limit : 100);
+            params.add(offset != null ? offset : 0);
+
+            List<QuarantinedEvent> events =
+                    jdbc.query(sql.toString(), (rs, rowNum) -> mapQuarantinedEvent(rs), params.toArray());
+            return ResponseEntity.ok(events);
+        });
+    }
+
+    @Override
+    public ResponseEntity<QuarantinedEvent> getQuarantine(UUID quarantineId) {
+        ScopeContext scope = currentScope.get();
+        return transactions.inScope(scope, () -> {
+            String sql =
+                    """
+                    select quarantine_id, device_id, device_seq, owner_entity_id, location_id, batch_id,
+                           event_id, event_type, reason, detail, raw_event, received_at,
+                           resolved_at, resolved_by_user_id, resolution, resolution_reason,
+                           series_id, doc_number
+                      from kernel.sync_quarantine
+                     where quarantine_id = ?
+                    """;
+            List<QuarantinedEvent> rows = jdbc.query(sql, (rs, rowNum) -> mapQuarantinedEvent(rs), quarantineId);
+            if (rows.isEmpty()) {
+                throw new ProblemException("sync.quarantine.not_found");
+            }
+            return ResponseEntity.ok(rows.getFirst());
+        });
+    }
+
+    private QuarantinedEvent mapQuarantinedEvent(ResultSet rs) throws SQLException {
+        UUID qId = (UUID) rs.getObject("quarantine_id");
+        UUID devId = (UUID) rs.getObject("device_id");
+        long devSeq = rs.getLong("device_seq");
+        UUID ownerId = (UUID) rs.getObject("owner_entity_id");
+        UUID batchId = (UUID) rs.getObject("batch_id");
+        String reasonStr = rs.getString("reason");
+        QuarantinedEvent.ReasonEnum reason = QuarantinedEvent.ReasonEnum.fromValue(reasonStr);
+        Timestamp recTs = rs.getTimestamp("received_at");
+        Instant receivedAt = recTs != null ? recTs.toInstant() : null;
+
+        QuarantinedEvent event = new QuarantinedEvent(qId, devId, devSeq, ownerId, batchId, reason, receivedAt);
+        event.setLocationId((UUID) rs.getObject("location_id"));
+        event.setEventId((UUID) rs.getObject("event_id"));
+        event.setEventType(rs.getString("event_type"));
+        event.setDetail(rs.getString("detail"));
+        event.setRawEvent(rs.getString("raw_event"));
+
+        Timestamp resTs = rs.getTimestamp("resolved_at");
+        event.setResolvedAt(resTs != null ? resTs.toInstant() : null);
+        event.setResolvedByUserId((UUID) rs.getObject("resolved_by_user_id"));
+        String resStr = rs.getString("resolution");
+        event.setResolution(resStr != null ? QuarantinedEvent.ResolutionEnum.fromValue(resStr) : null);
+        event.setResolutionReason(rs.getString("resolution_reason"));
+        event.setSeriesId((UUID) rs.getObject("series_id"));
+        long docNum = rs.getLong("doc_number");
+        event.setDocNumber(rs.wasNull() ? null : docNum);
+        return event;
     }
 
     @Override

@@ -174,6 +174,83 @@ paths:
         '403': { $ref: '#/components/responses/Refused' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/sync/devices/{device_id}/sync-status:
+    get:
+      tags: [Sync]
+      operationId: getDeviceSyncStatus
+      summary: Get synchronization status and heartbeat details for a device
+      description: >
+        Returns the device's server-side sync state (cursor, in-flight batch, sequence gaps)
+        and latest health report (heartbeat, clock offset, battery, storage).
+      x-permission: sys.device.view
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Device sync status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceSyncStatus' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '404': { $ref: '#/components/responses/Refused' }
+  /v1/sync/quarantine:
+    get:
+      tags: [Sync]
+      operationId: listQuarantine
+      summary: List quarantined sync events in the caller's scope
+      description: >
+        Returns quarantined events filtered by device or resolution status, in reverse chronological order.
+      x-permission: sync.quarantine.resolve
+      parameters:
+        - in: query
+          name: device_id
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: resolved
+          required: false
+          schema: { type: boolean }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: The quarantined events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/QuarantinedEvent' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+  /v1/sync/quarantine/{quarantine_id}:
+    get:
+      tags: [Sync]
+      operationId: getQuarantine
+      summary: Get a quarantined sync event by ID
+      description: >
+        Returns the details of a single quarantined sync event including its raw payload and resolution status.
+      x-permission: sync.quarantine.resolve
+      parameters:
+        - in: path
+          name: quarantine_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The quarantined event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuarantinedEvent' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '404': { $ref: '#/components/responses/Refused' }
   /v1/sync/quarantine/{quarantine_id}/resolve:
     post:
       tags: [Sync]
@@ -439,6 +516,56 @@ components:
           description: Why it was quarantined, SCHEMA, DUPLICATE_ID, HASH, TOO_LARGE or FORBIDDEN_FIELD
         resolution: { type: string, enum: [REPAIRED, DISCARDED] }
         resolved_at: { type: string, format: date-time }
+    QuarantinedEvent:
+      type: object
+      required: [quarantine_id, device_id, device_seq, owner_entity_id, batch_id, reason, received_at]
+      properties:
+        quarantine_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        device_seq: { type: integer, format: int64 }
+        owner_entity_id: { type: string, format: uuid }
+        location_id: { type: [string, 'null'], format: uuid }
+        batch_id: { type: string, format: uuid }
+        event_id: { type: [string, 'null'], format: uuid }
+        event_type: { type: [string, 'null'] }
+        reason:
+          type: string
+          enum: [SCHEMA, DUPLICATE_ID, HASH, TOO_LARGE, FORBIDDEN_FIELD]
+        detail: { type: [string, 'null'] }
+        raw_event: { type: [string, 'null'] }
+        received_at: { type: string, format: date-time }
+        resolved_at: { type: [string, 'null'], format: date-time }
+        resolved_by_user_id: { type: [string, 'null'], format: uuid }
+        resolution: { type: [string, 'null'], enum: [REPAIRED, DISCARDED] }
+        resolution_reason: { type: [string, 'null'] }
+        series_id: { type: [string, 'null'], format: uuid }
+        doc_number: { type: [integer, 'null'], format: int64 }
+    DeviceSyncStatus:
+      type: object
+      required: [device_id, owner_entity_id, last_applied_seq, gap_rejections]
+      properties:
+        device_id: { type: string, format: uuid }
+        owner_entity_id: { type: string, format: uuid }
+        last_applied_seq: { type: integer, format: int64 }
+        last_applied_at: { type: [string, 'null'], format: date-time }
+        last_batch_id: { type: [string, 'null'], format: uuid }
+        in_flight_batch_id: { type: [string, 'null'], format: uuid }
+        in_flight_since: { type: [string, 'null'], format: date-time }
+        gap_rejections: { type: integer }
+        resend_from_seq: { type: [integer, 'null'], format: int64 }
+        snapshot_version_reported: { type: [integer, 'null'], format: int64 }
+        app_version: { type: [string, 'null'] }
+        last_enrolled_at: { type: [string, 'null'], format: date-time }
+        last_seen_at: { type: [string, 'null'], format: date-time }
+        battery_pct: { type: [integer, 'null'] }
+        storage_free_mb: { type: [integer, 'null'], format: int64 }
+        pending_event_count: { type: [integer, 'null'] }
+        last_acknowledged_seq: { type: [integer, 'null'], format: int64 }
+        clock_offset_ms: { type: [integer, 'null'], format: int64 }
+        open_session: { type: [boolean, 'null'] }
+        recent_gaps:
+          type: array
+          items: { $ref: '#/components/schemas/SequenceGap' }
     SequenceGap:
       type: object
       required: [gap_id, device_id, from_seq, to_seq, recorded_at]
