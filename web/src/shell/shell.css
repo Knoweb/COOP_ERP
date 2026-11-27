@@ -5928,7 +5928,8 @@ button[type="submit"]:not(:disabled):hover,
 
 /* ---- Users List & New User Page Enhancement -------------------------------------------- */
 
-.users-filter-panel {
+.users-filter-panel,
+.devices-filter-panel {
   display: flex;
   width: fit-content;
   max-width: 240px;
@@ -5943,46 +5944,54 @@ button[type="submit"]:not(:disabled):hover,
   border: 1px solid var(--color-polish-14);
 }
 
-.users-filter-panel .modern-field {
+.users-filter-panel .modern-field,
+.devices-filter-panel .modern-field {
   width: 200px;
   max-width: 100%;
   gap: 6px;
 }
 
-.users-filter-panel .modern-field__label {
+.users-filter-panel .modern-field__label,
+.devices-filter-panel .modern-field__label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
   letter-spacing: 0.04em;
   line-height: 1.2;
 }
 
-.users-filter-panel .custom-dropdown {
+.users-filter-panel .custom-dropdown,
+.devices-filter-panel .custom-dropdown {
   max-width: 200px;
 }
 
-.users-filter-panel .custom-dropdown__trigger {
+.users-filter-panel .custom-dropdown__trigger,
+.devices-filter-panel .custom-dropdown__trigger {
   min-height: 40px;
   padding: 8px 12px;
   font-size: 13.5px;
   border-radius: 10px;
 }
 
-.users-filter-panel .custom-dropdown__value {
+.users-filter-panel .custom-dropdown__value,
+.devices-filter-panel .custom-dropdown__value {
   font-size: 13px;
 }
 
-.users-filter-panel .custom-dropdown__arrow {
+.users-filter-panel .custom-dropdown__arrow,
+.devices-filter-panel .custom-dropdown__arrow {
   width: 14px;
   height: 14px;
 }
 
-.users-filter-panel .custom-dropdown__menu {
+.users-filter-panel .custom-dropdown__menu,
+.devices-filter-panel .custom-dropdown__menu {
   min-width: 170px;
   padding: 4px 0;
   border-radius: 8px;
 }
 
-.users-filter-panel .custom-dropdown__item {
+.users-filter-panel .custom-dropdown__item,
+.devices-filter-panel .custom-dropdown__item {
   padding: 6px 10px;
   font-size: 13px;
 }
@@ -6465,7 +6474,8 @@ button[type="submit"]:not(:disabled):hover,
     justify-content: center;
   }
 
-  .users-filter-panel {
+  .users-filter-panel,
+  .devices-filter-panel {
     display: flex;
     width: fit-content;
     max-width: 100%;
@@ -6474,7 +6484,8 @@ button[type="submit"]:not(:disabled):hover,
     margin-top: 0;
   }
 
-  .users-filter-panel .modern-field {
+  .users-filter-panel .modern-field,
+  .devices-filter-panel .modern-field {
     width: 170px;
     max-width: 100%;
   }
@@ -6544,7 +6555,8 @@ button[type="submit"]:not(:disabled):hover,
     padding: 6px 10px;
   }
 
-  .users-filter-panel {
+  .users-filter-panel,
+  .devices-filter-panel {
     padding: 8px 10px;
     border-radius: 10px;
     margin-bottom: var(--space-2);
@@ -14122,4 +14134,22 @@ table tbody tr:not(.stock-nested-row):not(.pnl-total-row):not(.pnl-unallocated-r
   .shell-home-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Global guarantee: Table action buttons and secondary outline buttons preserve legible accent text and never have white hover */
+.modern-table button:not(.btn--primary):not(.button--primary):not([type="submit"]):hover,
+.modern-table .btn:not(.btn--primary):not(.button--primary):hover,
+.catalogue-action-btn--secondary:hover,
+.catalogue-action-btn--secondary:hover span,
+.device-table-btn:hover,
+.device-table-btn:hover span {
+  color: var(--color-accent) !important;
+  background-color: var(--color-surface-subtle) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.catalogue-action-btn--secondary:hover svg,
+.device-table-btn:hover svg {
+  stroke: var(--color-accent) !important;
+  color: var(--color-accent) !important;
 }

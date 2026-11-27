@@ -11,6 +11,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
 import { useTradingApi, type LotBalance } from "./tradingApi";
 import { deliveryRequest, errorText, isSyntheticBatchNo, openQty, type DispatchRow } from "./tradingView";
+import { TradingSelect } from "./TradingSelect";
 
 /** The lot a line is sent from by default: the first GOOD lot of the item in FEFO order (M5). */
 function firstLot(lots: LotBalance[], skuId: string): LotBalance | undefined {
@@ -129,17 +130,21 @@ export function NewDeliveryNotePage() {
       {!o.deliverToLocationId && <p role="alert">{t("trading.note.no_deliver_to").text}</p>}
 
       <form onSubmit={send} className="trading-form-row">
-        <label className="trading-form-field">
-          {t("trading.field.from_location").text}
-          <select value={fromLocationId} onChange={(event) => setFromLocationId(event.target.value)} required>
-            <option value="">{t("trading.field.choose").text}</option>
-            {(warehouses.data ?? []).map((location) => (
-              <option key={location.locationId} value={location.locationId}>
-                {`${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="trading-form-field">
+          <span>{t("trading.field.from_location").text}</span>
+          <TradingSelect
+            id="trading-from-location-select"
+            ariaLabel={t("trading.field.from_location").text}
+            value={fromLocationId}
+            onChange={setFromLocationId}
+            placeholder={t("trading.field.choose").text}
+            options={(warehouses.data ?? []).map((location) => ({
+              value: location.locationId,
+              label: `${location.locationCode} ${inLocale(locale, location.nameEn, location.nameSi, location.nameTa)}`
+            }))}
+            required
+          />
+        </div>
         <label className="trading-form-field">
           {t("trading.field.vehicle").text}
           <input value={vehicleRef} maxLength={40} onChange={(event) => setVehicleRef(event.target.value)} />

@@ -9,6 +9,7 @@ import "./trading.css";
 import { SkuLabel } from "./labels";
 import { useTradingApi, type ClaimKind } from "./tradingApi";
 import { errorText } from "./tradingView";
+import { TradingSelect } from "./TradingSelect";
 
 const KINDS: ClaimKind[] = ["DAMAGED", "EXPIRED_ON_ARRIVAL", "WRONG_GOODS", "QUALITY"];
 
@@ -76,20 +77,19 @@ export function NewClaimPage() {
       {grn.data && (
         <>
           <p>{`${t("trading.grn.title").text} ${grn.data.docNumber ?? ""}`}</p>
-          <label className="trading-form-field">
-            {t("trading.claim.kind").text}
-            <select
-              aria-label={t("trading.claim.kind").text}
+          <div className="trading-form-field">
+            <span>{t("trading.claim.kind").text}</span>
+            <TradingSelect
+              id="trading-claim-kind"
+              ariaLabel={t("trading.claim.kind").text}
               value={kind}
-              onChange={(event) => setKind(event.target.value as ClaimKind)}
-            >
-              {KINDS.map((option) => (
-                <option key={option} value={option}>
-                  {t(`trading.claim.kind.${option}`).text}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(val) => setKind(val as ClaimKind)}
+              options={KINDS.map((option) => ({
+                value: option,
+                label: t(`trading.claim.kind.${option}`).text
+              }))}
+            />
+          </div>
           <div className="modern-table-card trading-table-card">
             <div className="modern-table-scroll">
               <table className="modern-table trading-table">

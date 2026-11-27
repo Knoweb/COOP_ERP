@@ -1002,9 +1002,9 @@ span.pricing-version-text {
   min-width: 0;
 }
 
-/* Action buttons inside tables with rich vibrant theme colors */
-.modern-table button:not(.custom-dropdown__trigger),
-.modern-table .btn {
+/* Action buttons inside tables with clean outline pill theme colors */
+.modern-table button:not(.custom-dropdown__trigger):not(.btn--primary):not(.button--primary):not([type="submit"]),
+.modern-table .btn:not(.btn--primary):not(.button--primary) {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -1012,10 +1012,10 @@ span.pricing-version-text {
   gap: var(--space-half);
   min-height: calc(var(--space-4) + var(--space-half));
   padding: var(--space-half) var(--space-2);
-  border: var(--border-width-strong) solid var(--color-polish-19);
+  border: var(--border-width) solid var(--color-accent);
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--color-polish-29), var(--color-surface));
-  color: var(--color-polish-25);
+  background: var(--color-surface);
+  color: var(--color-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-strong);
   cursor: pointer;
@@ -1024,17 +1024,17 @@ span.pricing-version-text {
   white-space: nowrap;
 }
 
-.modern-table button:not(.custom-dropdown__trigger):hover,
-.modern-table .btn:hover {
-  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20));
-  border-color: var(--color-polish-19);
-  color: var(--color-polish-4) !important;
-  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6);
+.modern-table button:not(.custom-dropdown__trigger):not(.btn--primary):not(.button--primary):not([type="submit"]):hover,
+.modern-table .btn:not(.btn--primary):not(.button--primary):hover {
+  background: var(--color-surface-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13);
   transform: translateY(calc(var(--border-width) * -1));
 }
 
-.modern-table button:not(.custom-dropdown__trigger):active,
-.modern-table .btn:active {
+.modern-table button:not(.custom-dropdown__trigger):not(.btn--primary):not(.button--primary):not([type="submit"]):active,
+.modern-table .btn:not(.btn--primary):not(.button--primary):active {
   transform: translateY(0) scale(0.98);
 }
 
@@ -4897,17 +4897,35 @@ select.pricing-select:not(.visually-hidden) option:focus {
 }
 
 .pricing-modal-close {
-  background: none;
-  border: none;
-  font-size: var(--font-size-2xl);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 0 var(--space-2);
-  line-height: 1;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--space-3) !important;
+  height: var(--space-3) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  border-radius: var(--radius-pill) !important;
+  background: var(--color-surface) !important;
+  border: var(--border-width) solid var(--color-border) !important;
+  color: var(--color-text-muted) !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.pricing-modal-close svg {
+  width: calc(var(--space-1) + var(--space-half)) !important;
+  height: calc(var(--space-1) + var(--space-half)) !important;
+  stroke-width: 2.2 !important;
 }
 
 .pricing-modal-close:hover {
-  color: var(--color-text);
+  background: var(--color-polish-31) !important;
+  border-color: var(--color-polish-21) !important;
+  color: var(--color-polish-25) !important;
+  transform: rotate(90deg) !important;
 }
 
 .pricing-modal-description {

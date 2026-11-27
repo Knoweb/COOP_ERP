@@ -7,6 +7,7 @@ import { businessToday } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { useTradingApi, type PaymentReceipt } from "./tradingApi";
 import { errorText, paymentReady, paymentRequest, type PaymentForm } from "./tradingView";
+import { TradingSelect } from "./TradingSelect";
 
 const METHODS: PaymentForm["method"][] = ["TRANSFER", "CASH", "CHEQUE", "DEPOSIT"];
 
@@ -61,16 +62,19 @@ export function PaymentEntry({
       <h2>{t("trading.payment.new").text}</h2>
       <p>{t(invoiceId ? "trading.payment.against_invoice" : "trading.payment.oldest_first").text}</p>
       <div className="trading-filter-bar">
-        <label className="trading-form-field">
-          {t("trading.payment.method").text}
-          <select value={form.method} onChange={(event) => set({ method: event.target.value as PaymentForm["method"] })}>
-            {METHODS.map((method) => (
-              <option key={method} value={method}>
-                {t(`trading.payment.method.${method}`).text}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="trading-form-field">
+          <span>{t("trading.payment.method").text}</span>
+          <TradingSelect
+            id="trading-payment-method"
+            ariaLabel={t("trading.payment.method").text}
+            value={form.method}
+            onChange={(val) => set({ method: val as PaymentForm["method"] })}
+            options={METHODS.map((method) => ({
+              value: method,
+              label: t(`trading.payment.method.${method}`).text
+            }))}
+          />
+        </div>
         <label className="trading-form-field">
           {t("trading.payment.amount").text}
           <input type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => set({ amount: event.target.value })} />

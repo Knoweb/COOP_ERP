@@ -1232,6 +1232,16 @@
   width: 100% !important;
 }
 
+.trading-form-field .trading-dropdown-select .custom-dropdown__trigger {
+  min-height: var(--target-min) !important;
+  padding: var(--space-1) var(--space-2) !important;
+  border-radius: calc(var(--radius) * 2.5) !important;
+}
+
+.trading-form-field .trading-dropdown-select.custom-dropdown--open {
+  z-index: 50 !important;
+}
+
 .trading-dropdown-select>select.visually-hidden {
   position: absolute !important;
   top: 0 !important;
