@@ -95,7 +95,14 @@ export function CustomSelect<T extends string | number>({
       <button
         type="button"
         className="custom-dropdown__trigger"
-        onClick={toggleOpen}
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleOpen();
+        }}
         aria-haspopup="listbox"
         aria-expanded={open}
       >

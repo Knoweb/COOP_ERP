@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import "./m1party.css";
 import { useT } from "../../shell/i18n/useT";
@@ -41,6 +42,22 @@ export function DevicesPage() {
   const [resetReasonText, setResetReasonText] = useState<string>("");
   const [resetResult, setResetResult] = useState<SequenceGap | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (issuedCode) setIssuedCode(null);
+        else if (syncStatusDevice) setSyncStatusDevice(null);
+        else if (resetDevice) {
+          setResetDevice(null);
+          setResetResult(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [issuedCode, syncStatusDevice, resetDevice]);
 
   const devicesQuery = useQuery({
     queryKey: ["party", "devices", status],
@@ -98,9 +115,9 @@ export function DevicesPage() {
     <main className="shell-page">
       <PageHeader icon="terminal" title={t("party.devices.title").text} />
 
-      <form role="search" onSubmit={(e) => e.preventDefault()} className="modern-filter-panel">
-        <label className="modern-field">
-          <span className="modern-field__label">{t("party.device.status").text}</span>
+      <form role="search" onSubmit={(e) => e.preventDefault()} className="modern-filter-panel devices-filter-panel users-filter-panel">
+        <div className="modern-field">
+          <span className="modern-field__label party-filter-label">{t("party.device.status").text}</span>
           <CustomSelect
             value={status}
             onChange={(val) => setStatus(val)}
@@ -113,7 +130,7 @@ export function DevicesPage() {
               }))
             ]}
           />
-        </label>
+        </div>
       </form>
 
       {devicesQuery.isLoading && <p>{t("party.list.loading").text}</p>}
@@ -162,30 +179,43 @@ export function DevicesPage() {
                           {canEnrol && (
                             <button
                               type="button"
-                              className="device-action-btn device-action-btn--primary"
+                              className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                               disabled={!isEnrollable || issueCodeMutation.isPending}
                               onClick={() => issueCodeMutation.mutate(device.deviceId)}
                             >
-                              {t("party.device.action.enrol_code").text}
+                              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <circle cx="7.5" cy="15.5" r="4.5" />
+                                <path d="M10.5 12.5L20 3m-3 0l3 3m-4.5 1.5l2 2" />
+                              </svg>
+                              <span>{t("party.device.action.enrol_code").text}</span>
                             </button>
                           )}
                           <button
                             type="button"
-                            className="device-action-btn"
+                            className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                             onClick={() => {
                               setActionError(null);
                               setSyncStatusDevice(device);
                             }}
                           >
-                            {t("party.device.action.sync_status").text}
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <polyline points="23 4 23 10 17 10" />
+                              <polyline points="1 20 1 14 7 14" />
+                              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                            </svg>
+                            <span>{t("party.device.action.sync_status").text}</span>
                           </button>
                           {canEnrol && (
                             <button
                               type="button"
-                              className="device-action-btn"
+                              className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                               onClick={() => handleOpenReset(device)}
                             >
-                              {t("party.device.action.reset_seq").text}
+                              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                              </svg>
+                              <span>{t("party.device.action.reset_seq").text}</span>
                             </button>
                           )}
                         </div>
@@ -200,39 +230,147 @@ export function DevicesPage() {
       )}
 
       {/* Enrolment Code Modal */}
-      {issuedCode && (
-        <div className="device-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="enrol-modal-title">
-          <div className="device-modal-card">
-            <h2 id="enrol-modal-title" className="device-modal-title">
-              {t("party.device.enrol.title").text}
-            </h2>
-            <p>{t("party.device.enrol.notice").text}</p>
-            <div className="device-code-box" aria-label={t("party.device.enrol.code").text}>
-              {issuedCode.code}
-            </div>
-            <p>
-              {t("party.device.enrol.expires").text}: {new Date(issuedCode.expires_at).toLocaleString()}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      {issuedCode && typeof document !== "undefined" && createPortal(
+        <div
+          className="device-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="enrol-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIssuedCode(null);
+          }}
+        >
+          <div className="device-modal-card device-modal-card--enrol">
+            <div className="device-modal-header">
+              <div className="device-modal-header-left">
+                <div className="device-modal-icon-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="7.5" cy="15.5" r="4.5" />
+                    <path d="M10.5 12.5L20 3m-3 0l3 3m-4.5 1.5l2 2" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 id="enrol-modal-title" className="device-modal-title">
+                    {t("party.device.enrol.title").text}
+                  </h2>
+                  <p className="device-modal-subtitle">
+                    {t("party.device.enrol.notice").text}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                className="device-action-btn device-action-btn--primary"
+                className="device-modal-close-btn"
+                onClick={() => setIssuedCode(null)}
+                aria-label={t("party.device.close_dialog").text}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="device-enrol-card">
+              <div className="device-code-box" aria-label={t("party.device.enrol.code").text}>
+                <span className="device-code-text">{issuedCode.code}</span>
+                <button
+                  type="button"
+                  className="device-copy-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(issuedCode.code);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  title={copied ? t("party.device.enrol.copied").text : t("party.device.enrol.copy").text}
+                  aria-label={copied ? t("party.device.enrol.copied").text : t("party.device.enrol.copy").text}
+                >
+                  {copied ? (
+                    <>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>{t("party.device.enrol.copied").text}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                      <span>{t("party.device.enrol.copy").text}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="device-enrol-expiry">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>
+                  {t("party.device.enrol.expires").text}: <strong>{new Date(issuedCode.expires_at).toLocaleString()}</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="device-modal-actions">
+              <button
+                type="button"
+                className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                 onClick={() => setIssuedCode(null)}
               >
                 {t("party.device.close").text}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Sync Status Modal */}
-      {syncStatusDevice && (
-        <div className="device-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title">
-          <div className="device-modal-card">
-            <h2 id="sync-modal-title" className="device-modal-title">
-              {t("party.device.sync.title").text}: {syncStatusDevice.hardwareSerial}
-            </h2>
+      {syncStatusDevice && typeof document !== "undefined" && createPortal(
+        <div
+          className="device-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sync-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSyncStatusDevice(null);
+          }}
+        >
+          <div className="device-modal-card device-modal-card--sync">
+            <div className="device-modal-header">
+              <div className="device-modal-header-left">
+                <div className="device-modal-icon-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 id="sync-modal-title" className="device-modal-title">
+                    {t("party.device.sync.title").text}: {syncStatusDevice.hardwareSerial}
+                  </h2>
+                  <p className="device-modal-subtitle">
+                    {syncStatusDevice.deviceKind} · {syncStatusDevice.status}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="device-modal-close-btn"
+                onClick={() => setSyncStatusDevice(null)}
+                aria-label={t("party.device.close_dialog").text}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
 
             {syncStatusQuery.isLoading && <p>{t("party.list.loading").text}</p>}
             {syncStatusQuery.isError && (
@@ -241,110 +379,219 @@ export function DevicesPage() {
 
             {syncStatusQuery.data && (
               <>
-                <div className="device-facts-grid">
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.last_applied_seq").text}</span>
-                    <span className="device-fact-value">{syncStatusQuery.data.last_applied_seq}</span>
+                <div className="device-kpi-grid device-facts-grid">
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.last_applied_seq").text}</span>
+                      <span className="device-kpi-val device-fact-value">{syncStatusQuery.data.last_applied_seq}</span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="4" y1="9" x2="20" y2="9" />
+                        <line x1="4" y1="15" x2="20" y2="15" />
+                        <line x1="10" y1="3" x2="8" y2="21" />
+                        <line x1="16" y1="3" x2="14" y2="21" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.last_applied_at").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.last_applied_at
-                        ? new Date(syncStatusQuery.data.last_applied_at).toLocaleString()
-                        : t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.last_applied_at").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.last_applied_at
+                          ? new Date(syncStatusQuery.data.last_applied_at).toLocaleString()
+                          : t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.gap_rejections").text}</span>
-                    <span className="device-fact-value">{syncStatusQuery.data.gap_rejections}</span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.gap_rejections").text}</span>
+                      <span className="device-kpi-val device-fact-value">{syncStatusQuery.data.gap_rejections}</span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.in_flight").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.in_flight_batch_id ?? t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.in_flight").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.in_flight_batch_id ?? t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13" />
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.app_version").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.app_version ?? t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.app_version").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.app_version ?? t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="4 17 10 11 4 5" />
+                        <line x1="12" y1="19" x2="20" y2="19" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.battery").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.battery_pct !== null && syncStatusQuery.data.battery_pct !== undefined
-                        ? `${syncStatusQuery.data.battery_pct}%`
-                        : t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.battery").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.battery_pct !== null && syncStatusQuery.data.battery_pct !== undefined
+                          ? `${syncStatusQuery.data.battery_pct}%`
+                          : t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+                        <line x1="23" y1="10" x2="23" y2="14" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.storage").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.storage_free_mb !== null && syncStatusQuery.data.storage_free_mb !== undefined
-                        ? `${syncStatusQuery.data.storage_free_mb} MB`
-                        : t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.storage").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.storage_free_mb !== null && syncStatusQuery.data.storage_free_mb !== undefined
+                          ? `${syncStatusQuery.data.storage_free_mb} MB`
+                          : t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3" />
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.pending_events").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.pending_event_count ?? t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.pending_events").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.pending_event_count ?? t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.clock_offset").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.clock_offset_ms !== null && syncStatusQuery.data.clock_offset_ms !== undefined
-                        ? `${syncStatusQuery.data.clock_offset_ms} ms`
-                        : t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.clock_offset").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.clock_offset_ms !== null && syncStatusQuery.data.clock_offset_ms !== undefined
+                          ? `${syncStatusQuery.data.clock_offset_ms} ms`
+                          : t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 14 10" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="device-fact-item">
-                    <span className="device-fact-label">{t("party.device.sync.session").text}</span>
-                    <span className="device-fact-value">
-                      {syncStatusQuery.data.open_session === true
-                        ? t("party.device.sync.yes").text
-                        : syncStatusQuery.data.open_session === false
-                        ? t("party.device.sync.no").text
-                        : t("party.device.sync.none").text}
-                    </span>
+
+                  <div className="device-kpi-card device-fact-item">
+                    <div className="device-kpi-content">
+                      <span className="device-kpi-label device-fact-label">{t("party.device.sync.session").text}</span>
+                      <span className="device-kpi-val device-fact-value">
+                        {syncStatusQuery.data.open_session === true
+                          ? t("party.device.sync.yes").text
+                          : syncStatusQuery.data.open_session === false
+                          ? t("party.device.sync.no").text
+                          : t("party.device.sync.none").text}
+                      </span>
+                    </div>
+                    <div className="device-kpi-icon-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
 
-                <h3 style={{ marginTop: "var(--space-2)", marginBottom: "var(--space-1)", fontSize: "var(--font-size-md)" }}>
-                  {t("party.device.sync.gaps_title").text}
-                </h3>
-                {syncStatusQuery.data.recent_gaps && syncStatusQuery.data.recent_gaps.length > 0 ? (
-                  <table className="modern-table">
-                    <thead>
-                      <tr>
-                        <th>{t("party.device.sync.from_seq").text}</th>
-                        <th>{t("party.device.sync.to_seq").text}</th>
-                        <th>{t("party.device.sync.recorded_at").text}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {syncStatusQuery.data.recent_gaps.map((g) => (
-                        <tr key={g.gap_id}>
-                          <td>{g.from_seq}</td>
-                          <td>{g.to_seq}</td>
-                          <td>{new Date(g.recorded_at).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p>{t("party.device.sync.no_gaps").text}</p>
-                )}
+                <div className="device-gaps-section">
+                  <h3 className="device-modal-section-title">
+                    {t("party.device.sync.gaps_title").text}
+                  </h3>
+                  {syncStatusQuery.data.recent_gaps && syncStatusQuery.data.recent_gaps.length > 0 ? (
+                    <div className="modern-table-card">
+                      <div className="modern-table-scroll">
+                        <table className="modern-table">
+                          <thead>
+                            <tr>
+                              <th>{t("party.device.sync.from_seq").text}</th>
+                              <th>{t("party.device.sync.to_seq").text}</th>
+                              <th>{t("party.device.sync.recorded_at").text}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {syncStatusQuery.data.recent_gaps.map((g) => (
+                              <tr key={g.gap_id}>
+                                <td>{g.from_seq}</td>
+                                <td>{g.to_seq}</td>
+                                <td>{new Date(g.recorded_at).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="device-gaps-empty-wrap">
+                      <div className="device-gaps-empty-badge" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="device-gaps-empty-title">{t("party.device.sync.no_gaps").text}</span>
+                        <p className="device-empty-text">{t("party.device.sync.no_gaps").text}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
 
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-2)" }}>
-              {canEnrol && (
+            <div className="device-modal-actions device-modal-actions--between">
+              {canEnrol ? (
                 <button
                   type="button"
-                  className="device-action-btn"
+                  className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                   onClick={() => {
                     const curSeq = syncStatusQuery.data?.last_applied_seq ?? 0;
                     const dev = syncStatusDevice;
@@ -352,26 +599,42 @@ export function DevicesPage() {
                     handleOpenReset(dev, curSeq);
                   }}
                 >
-                  {t("party.device.action.reset_seq").text}
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  </svg>
+                  <span>{t("party.device.action.reset_seq").text}</span>
                 </button>
-              )}
+              ) : <div />}
               <button
                 type="button"
-                className="device-action-btn device-action-btn--primary"
+                className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                 onClick={() => setSyncStatusDevice(null)}
               >
                 {t("party.device.close").text}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Sequence Reset Modal */}
-      {resetDevice && (
-        <div className="device-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
+      {resetDevice && typeof document !== "undefined" && createPortal(
+        <div
+          className="device-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !resetSeqMutation.isPending) {
+              setResetDevice(null);
+              setResetResult(null);
+            }
+          }}
+        >
           <form
-            className="device-modal-card"
+            className="device-modal-card device-modal-card--reset"
             onSubmit={(e) => {
               e.preventDefault();
               const seq = parseInt(newStartSeq, 10);
@@ -384,20 +647,63 @@ export function DevicesPage() {
               });
             }}
           >
-            <h2 id="reset-modal-title" className="device-modal-title">
-              {t("party.device.reset.title").text}: {resetDevice.hardwareSerial}
-            </h2>
+            <div className="device-modal-header">
+              <div className="device-modal-header-left">
+                <div className="device-modal-icon-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 id="reset-modal-title" className="device-modal-title">
+                    {t("party.device.reset.title").text}: {resetDevice.hardwareSerial}
+                  </h2>
+                  <p className="device-modal-subtitle">
+                    {resetDevice.deviceKind} · {resetDevice.status}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="device-modal-close-btn"
+                onClick={() => {
+                  setResetDevice(null);
+                  setResetResult(null);
+                }}
+                disabled={resetSeqMutation.isPending}
+                aria-label={t("party.device.close_dialog").text}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
 
             {resetResult ? (
-              <div>
-                <p role="status">
-                  {t("party.device.reset.success", undefined, { nextSeq: resetResult.to_seq + 1 }).text}
-                </p>
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
+              <div className="device-enrol-card">
+                <div className="device-gaps-empty-wrap">
+                  <div className="device-gaps-empty-badge" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <strong className="device-gaps-empty-title">
+                      {t("party.device.reset.success", undefined, { nextSeq: resetResult.to_seq + 1 }).text}
+                    </strong>
+                    <p className="device-gaps-empty-desc">{t("party.device.reset.updated").text}</p>
+                  </div>
+                </div>
+                <div className="device-modal-actions">
                   <button
                     type="button"
-                    className="device-action-btn device-action-btn--primary"
-                    onClick={() => setResetDevice(null)}
+                    className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
+                    onClick={() => {
+                      setResetDevice(null);
+                      setResetResult(null);
+                    }}
                   >
                     {t("party.device.close").text}
                   </button>
@@ -405,54 +711,71 @@ export function DevicesPage() {
               </div>
             ) : (
               <>
-                <p>
-                  {t("party.device.reset.cursor_info", undefined, { currentSeq: parseInt(newStartSeq, 10) - 1 || 0 }).text}
-                </p>
+                <div className="device-info-banner">
+                  <div className="device-info-banner-badge" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                  </div>
+                  <div className="device-info-banner-text">
+                    <span className="device-reset-cursor-info">
+                      {t("party.device.reset.cursor_info", undefined, { currentSeq: parseInt(newStartSeq, 10) - 1 || 0 }).text}
+                    </span>
+                  </div>
+                </div>
 
-                {actionError ? <p role="alert">{refusalOf(actionError, t("party.error.generic").text).text}</p> : null}
+                {actionError ? <p role="alert" className="device-modal-alert">{refusalOf(actionError, t("party.error.generic").text).text}</p> : null}
 
-                <label className="modern-field">
-                  <span className="modern-field__label">{t("party.device.reset.new_seq").text}</span>
-                  <input
-                    type="number"
-                    min={2}
-                    value={newStartSeq}
-                    onChange={(e) => setNewStartSeq(e.target.value)}
-                    required
-                    className="modern-input"
-                  />
-                </label>
+                <div className="device-reset-fields">
+                  <label className="modern-field device-reset-field">
+                    <span className="modern-field__label">
+                      {t("party.device.reset.new_seq").text}
+                    </span>
+                    <input
+                      type="number"
+                      min={2}
+                      value={newStartSeq}
+                      onChange={(e) => setNewStartSeq(e.target.value)}
+                      required
+                      className="modern-input device-reset-input"
+                    />
+                  </label>
 
-                <label className="modern-field">
-                  <span className="modern-field__label">{t("party.device.reset.reason_code").text}</span>
-                  <select
-                    value={resetReasonCode}
-                    onChange={(e) => setResetReasonCode(e.target.value)}
-                    required
-                    className="modern-input"
-                  >
-                    {RESET_REASON_CODES.map((code) => (
-                      <option key={code} value={code}>
-                        {code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="modern-field device-reset-field">
+                    <span className="modern-field__label">
+                      {t("party.device.reset.reason_code").text}
+                    </span>
+                    <CustomSelect
+                      id="reset-reason-code"
+                      value={resetReasonCode}
+                      onChange={(val) => setResetReasonCode(val)}
+                      ariaLabel={t("party.device.reset.reason_code").text}
+                      options={RESET_REASON_CODES.map((code) => ({
+                        value: code,
+                        label: code
+                      }))}
+                    />
+                  </div>
 
-                <label className="modern-field">
-                  <span className="modern-field__label">{t("party.device.reset.reason_text").text}</span>
-                  <textarea
-                    value={resetReasonText}
-                    onChange={(e) => setResetReasonText(e.target.value)}
-                    maxLength={500}
-                    className="modern-textarea"
-                  />
-                </label>
+                  <label className="modern-field device-reset-field">
+                    <span className="modern-field__label">{t("party.device.reset.reason_text").text}</span>
+                    <textarea
+                      value={resetReasonText}
+                      onChange={(e) => setResetReasonText(e.target.value)}
+                      maxLength={500}
+                      rows={3}
+                      placeholder={t("party.device.reset.reason_text").text}
+                      className="modern-textarea device-reset-textarea"
+                    />
+                  </label>
+                </div>
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-1)" }}>
+                <div className="device-modal-actions">
                   <button
                     type="button"
-                    className="device-action-btn"
+                    className="device-action-btn catalogue-action-btn catalogue-action-btn--secondary device-table-btn"
                     disabled={resetSeqMutation.isPending}
                     onClick={() => setResetDevice(null)}
                   >
@@ -460,7 +783,7 @@ export function DevicesPage() {
                   </button>
                   <button
                     type="submit"
-                    className="device-action-btn device-action-btn--primary"
+                    className="device-action-btn catalogue-action-btn catalogue-action-btn--primary device-submit-btn"
                     disabled={resetSeqMutation.isPending}
                   >
                     {resetSeqMutation.isPending
@@ -471,7 +794,8 @@ export function DevicesPage() {
               </>
             )}
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </main>
   );

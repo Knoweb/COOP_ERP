@@ -1265,11 +1265,11 @@
 .shell-page .stock-positions-table .stock-expand-btn:hover,
 .stock-positions-table .stock-expand-btn:hover,
 .stock-expand-btn:hover {
-  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
-  border-color: var(--color-polish-19) !important;
-  color: var(--color-polish-4) !important;
-  transform: scale(1.1) !important;
-  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6) !important;
+  background: var(--color-surface-subtle) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 var(--space-half) var(--space-1) var(--color-polish-13) !important;
 }
 
 .stock-expand-chevron {
@@ -1293,10 +1293,10 @@
   justify-content: center !important;
   min-height: calc(var(--space-3) + var(--space-1)) !important;
   padding: calc(var(--space-half) / 1.5) var(--space-2) !important;
-  border: var(--border-width-strong) solid var(--color-polish-19) !important;
+  border: var(--border-width) solid var(--color-accent) !important;
   border-radius: var(--radius-pill) !important;
-  background: linear-gradient(135deg, var(--color-polish-29), var(--color-surface)) !important;
-  color: var(--color-polish-25) !important;
+  background: var(--color-surface) !important;
+  color: var(--color-accent) !important;
   font-size: var(--font-size-xs) !important;
   font-weight: var(--font-weight-strong) !important;
   cursor: pointer !important;
@@ -1307,11 +1307,11 @@
 
 .shell-page .stock-positions-table .button.button--small:hover,
 .stock-positions-table .button.button--small:hover {
-  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
-  color: var(--color-polish-4) !important;
-  border-color: var(--color-polish-19) !important;
+  background: var(--color-surface-subtle) !important;
+  color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
   transform: translateY(calc(var(--border-width) * -1)) !important;
-  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-6) !important;
+  box-shadow: 0 var(--space-half) var(--space-2) var(--color-polish-13) !important;
 }
 
 .shell-page .stock-positions-table td.col-item .entity-link,
@@ -3509,13 +3509,14 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: calc(var(--space-4) + var(--space-half)) !important;
-  height: calc(var(--space-4) + var(--space-half)) !important;
+  width: var(--space-3) !important;
+  height: var(--space-3) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   border-radius: var(--radius-pill) !important;
   border: var(--border-width) solid var(--color-polish-18) !important;
   background: var(--color-surface) !important;
   color: var(--color-polish-25) !important;
-  font-size: var(--font-size-md) !important;
   cursor: pointer !important;
   outline: none !important;
   -webkit-tap-highlight-color: transparent !important;
@@ -3523,6 +3524,13 @@
   flex-shrink: 0 !important;
   box-shadow: 0 var(--border-width) var(--space-half) var(--color-polish-14) !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.shell-page .stock-modal-close-btn svg,
+.stock-modal-close-btn svg {
+  width: calc(var(--space-1) + var(--space-half)) !important;
+  height: calc(var(--space-1) + var(--space-half)) !important;
+  stroke-width: 2.2 !important;
 }
 
 .shell-page .stock-modal-close-btn:hover,

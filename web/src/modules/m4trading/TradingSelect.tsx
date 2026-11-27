@@ -328,7 +328,14 @@ export function TradingSelect<T extends string = string>({
         ref={triggerRef}
         type="button"
         className="custom-dropdown__trigger"
-        onClick={toggleOpen}
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleOpen();
+        }}
         onKeyDown={handleKeyDown}
         disabled={disabled}
         aria-haspopup="listbox"
